@@ -61,6 +61,43 @@ XSSentinel 的目标是**在开源/自研工具中做到检测维度最全、架
 
 ---
 
+## 外部参照：PortSwigger（Burp 官方）语料覆盖对照
+
+自有基准再满分也只能证明"内部一致"。要回答"检测面够不够广"，需要一个**第三方撰写的权威向量集**——
+[PortSwigger XSS cheat sheet](https://portswigger.net/web-security/cross-site-scripting/cheat-sheet)
+（Burp Suite 厂商维护，业界公认最全）就是这个参照，且自带两项第三方标注：是否需要用户交互、适用上下文。
+
+复现（cheat sheet 需自行抓取，本仓库不内联第三方内容）：
+
+```bash
+curl -o pw.html https://portswigger.net/web-security/cross-site-scripting/cheat-sheet
+python benchmark/portswigger_corpus_coverage.py --html pw.html \
+    --json benchmark/results/portswigger_corpus_coverage.json
+```
+
+当前结果（822 条向量，对照 `payloads.json` / `svg_xss.json` / `framework_xss.json`）：
+
+| 分组 | 向量数 | 事件处理器覆盖 | 标签覆盖 | 协议覆盖 |
+|---|---|---|---|---|
+| **无需用户交互**（主指标） | 57 | **23.1%**（12/52） | 71.4%（15/21） | 100%（1/1） |
+| 需用户交互（仅参考） | 520 | 15.4%（16/104） | 74.4%（29/39） | 100%（2/2） |
+| 其他（标签 / 框架 / 协议类） | 245 | 57.1%（8/14） | 69.2%（36/52） | 100%（3/3） |
+
+**为什么只把"无需用户交互"当主指标**：cheat sheet 穷举了浏览器整个事件面，其中一大半
+（pointerdown / mousemove / mouseenter …）必须用户交互才触发，把它们算进分母会得出一个
+误导性的低数字（三组混算只有 15.4%）。公平口径是看注入即执行的那一组——**23.1%**。
+
+**这个数字不能说明什么**（别拿它自欺）：
+
+- 字符串出现 ≠ 语义等价：语料里出现 `onanimationend` 不代表有一条能真正触发它的完整载荷；
+- 覆盖 ≠ 能检出：这只测"检测面有没有提到这项技术"，不测端到端检出率；
+- 忽略 PortSwigger 标注的浏览器支持差异。
+
+缺口 top（`no_interaction` 组，按 PortSwigger 使用频次）：`beforematch`、`durationchange`、
+`scrollend`、`beforeprint`、`webkitanimationiteration`、`scrollsnapchange`、`popstate`、
+`transitionrun` 等 40 个事件处理器；标签侧缺 `slot`、`address`、`camera`、`span`、`br`、`b`。
+
+
 ## Range #3 —— 第三方意见应用靶场
 
 `range3/` 是一个刻意与 benchmark 异形的**应用**靶场:SQLite 持久化、登录会话与
@@ -357,12 +394,14 @@ python tests/passive_demo.py         # 产出 tests/passive_demo_report.html
 
 测试策略（Phase 37）：`tests/test_pipeline.py` 把靶场 2 的精简切片纳入 pytest —— **主流程回归在每次 pytest 就会暴露**，不再依赖手动靶场演练；`tests/test_async_pipeline.py` 补上 async 扫描器首批测试（曾靠 0% 覆盖掩盖了 `for_context` 缺失导致 async L1 静默失效的 bug）；core 的 verbose 诊断已统一路由到 `logger.debug`（`--verbose` 即 DEBUG 级）。Phase 43 补齐 `tests/test_fuzzer.py`（`--fuzz` 七个评分维度全断言，覆盖率 0%→全路径）与 `tests/test_form_miner.py`（表单抽取/填充/端点转换），并拆分 `__main__.py`（1145→497 行 + cli_runner/cli_commands）。Phase 44 新增三个测试文件共 42 例：`tests/test_passive_proxy.py`（签名去重/scope 匹配/body 解析/裸 socket 真代理端到端捕获 + 真实 Scanner 反射命中回归）、`tests/test_sqli.py`（五家族指纹全路径 + 真回显服务命中）、`tests/test_retire_js.py`（库名锚定版本提取防路径数字泄漏/版本区间边界/去重）。
 
-**当前基线（2026-09-25 实测，192 用例矩阵，两引擎同一口径）**：`benchmark/run_benchmark.py`，默认预算 10/6/90；结果 `benchmark/results/benchmark_20260924_022744.json`（sync）与 `benchmark_20260925_140833.json`（async，已含 `ctx.classify` 修复 + Phase 176s 补层）。**两引擎仍不对齐**，但差距已从 9 条缩到"1 条真漏 + 2 条待整轮复测"：
+**当前基线（192 用例矩阵，两引擎同一口径）**：`benchmark/run_benchmark_batched.py`，默认预算 10/6/90；结果 `benchmark/results/benchmark_20260924_022744.json`（sync）与 `benchmark/results/benchmark_20260925_asyncfix.json`（async，含 Phase 177 主循环 concat 重试补齐）。**双引擎在各自计分口径内均为 recall 1.000 / precision 1.000 / FPR 0**——此前 async 的 6 条 FN 已归零。async 的 10 例 SKIP 是 manifest 声明 `engines:["sync"]` 的存储型 / 二阶链路，异步不实现，**记 SKIP 而不是记通过或记漏报**，故分母是 182 而非 192：
 
-| 引擎 | 用例 | TP | FP | TN | FN | ERROR | recall | precision | FPR | 墙钟 |
-|------|------|----|----|----|----|-------|--------|-----------|-----|------|
-| sync | 192 | 113 | 0 | 79 | 0 | **0** | 1.000 | 1.000 | 0.000 | 1214s |
-| async | 192 | 104 | 0 | 76 | **6** | **0** | **0.9455** | 1.000 | 0.000 | 1255s |
+| 引擎 | 用例 | 计分 | TP | FP | TN | FN | ERROR | recall | precision | FPR | 墙钟 |
+|------|------|------|----|----|----|----|-------|--------|-----------|-----|------|
+| sync | 192 | 192 | 113 | 0 | 79 | 0 | **0** | 1.000 | 1.000 | 0.000 | 1214s |
+| async | 192 | 182 | 108 | 0 | 74 | **0** | **0** | 1.000 | 1.000 | 0.000 | 未记录 |
+
+（async 那格留空的原因：`benchmark_20260925_asyncfix.json` 只记录逐例 `scan_time_s`（累计 1719s，含 FN 重试），与 sync 的墙钟口径不可直接比较。**宁可空着，也不填一个看着能比的数字**。）
 
 - **sync 192/192 全部计分**（`scored=192`、`errors=0`、产物里新增 `engine` /
   `retried_cases` 字段）；async 是 `scored=186 / skipped=6`——那 6 例
