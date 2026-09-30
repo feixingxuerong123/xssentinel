@@ -141,6 +141,130 @@ def _init_script(marker: str) -> str:
     }
   } catch(e) { /* leave the native method alone rather than break the page */ }
 
+  // ------------------------------------------------------------------
+  // Phase 185: DOMParser 重建链。
+  //
+  // 这是真实世界里绕过 DOMPurify 类净化的主流写法：先把 HTML 交给
+  // DOMParser.parseFromString 解析，再用 importNode / adoptNode 把节点转移
+  // 进主文档并插入。此前整条链在引擎里 **零覆盖** —— 既没钩子，也没矩阵形状。
+  //
+  // 它不能按"参数字符串含标记"来判，理由是被测出来的：
+  // benchmark/sink_execution.py 实测 `appendChild(createTextNode(<img
+  // onerror=...>))` **不执行**，而 DOMParser 链的 9 个形状全部执行。
+  // 只看字符串会把前者也报成 "marker executed"，那是实打实的误报。
+  //
+  // 所以这里做的是**污点传播 + 插入时复查**：
+  //   1. parseFromString 的输入含标记 -> 产出的 document 记为污点源；
+  //   2. importNode / adoptNode / cloneNode 把污点传给结果节点；
+  //   3. 插入点只在"污点节点"上判定，且要求它**当下**仍含标记——
+  //      净化器若已把 onerror 摘掉，outerHTML 里就没有标记，不会命中。
+  //
+  // 性能：只有污点节点才会走到 outerHTML 序列化（O(1) 的 WeakSet 命中之后），
+  // 普通 appendChild 调用几乎零开销。
+  // ------------------------------------------------------------------
+  var __taintedDocs = new WeakSet();
+  var __taintedNodes = new WeakSet();
+  function markNode(n){ try { if (n) __taintedNodes.add(n); } catch(e){} }
+  function isTainted(n){
+    try {
+      if (!n) return false;
+      if (__taintedNodes.has(n)) return true;
+      var doc = (n.nodeType === 9) ? n : n.ownerDocument;
+      return doc ? __taintedDocs.has(doc) : false;
+    } catch(e) { return false; }
+  }
+  function serialize(n){
+    var t = n.nodeType;
+    if (t === 1) return n.outerHTML;
+    if (t === 9) return n.documentElement ? n.documentElement.outerHTML : '';
+    if (t === 11){
+      var tmp = document.createElement('div');
+      tmp.appendChild(n.cloneNode(true));
+      return tmp.innerHTML;
+    }
+    return '';
+  }
+  // 只有能承载可执行结构的节点类型才算命中：Element(1) / Document(9) /
+  // DocumentFragment(11)。Text(3) 一律排除 —— 它是那个实测不执行的对照形状。
+  function taintedHit(label, n){
+    try {
+      if (!n || typeof n !== 'object') return;
+      if (!isTainted(n)) return;
+      var s = serialize(n);
+      if (s && s.indexOf(MARKER) !== -1) hit(label, s);
+    } catch(e){ /* a node we cannot read is not evidence of anything */ }
+  }
+
+  try {
+    if (window.DOMParser && DOMParser.prototype.parseFromString){
+      var oPFS = DOMParser.prototype.parseFromString;
+      DOMParser.prototype.parseFromString = function(str){
+        var res = oPFS.apply(this, arguments);
+        try { if (has(str)) __taintedDocs.add(res); } catch(e){}
+        return res;
+      };
+    }
+  } catch(e) { /* leave the native method alone rather than break the page */ }
+
+  [['importNode','Document.importNode'],
+   ['adoptNode','Document.adoptNode']].forEach(function(pair){
+    var meth = pair[0];
+    try {
+      if (!Document.prototype[meth]) return;
+      var oT = Document.prototype[meth];
+      Document.prototype[meth] = function(node){
+        // 污点必须在调用原生方法 **之前** 判定。adoptNode 会把节点迁出原
+        // 文档：调用一返回，node.ownerDocument 就已经是主文档了，那时再查
+        // 永远是 false —— 整条 adoptNode 链因此静默漏报。importNode 不移动
+        // 源节点，所以踩不到这个坑，两种写法在这里统一成"先判后调"。
+        // （由 dev/_p185_repro.py 抓到：importNode 命中、adoptNode 静默。）
+        var wasTainted = false;
+        try { wasTainted = isTainted(node); } catch(e){}
+        var res = oT.apply(this, arguments);
+        try { if (wasTainted) markNode(res); } catch(e){}
+        return res;
+      };
+    } catch(e){}
+  });
+
+  try {
+    var oClone = Node.prototype.cloneNode;
+    Node.prototype.cloneNode = function(){
+      var res = oClone.apply(this, arguments);
+      try { if (isTainted(this)) markNode(res); } catch(e){}
+      return res;
+    };
+  } catch(e){}
+
+  ['appendChild','insertBefore','replaceChild'].forEach(function(meth){
+    try {
+      var oIns = Node.prototype[meth];
+      if (!oIns) return;
+      Node.prototype[meth] = function(){
+        for (var i=0;i<arguments.length;i++) taintedHit('Node.'+meth, arguments[i]);
+        return oIns.apply(this, arguments);
+      };
+    } catch(e){}
+  });
+
+  // append / prepend / after / before / replaceWith：字符串参数会被转成
+  // **文本节点**（不执行），所以只检查节点参数——又一处"只看字符串就误报"。
+  ['append','prepend','after','before','replaceWith'].forEach(function(meth){
+    [window.Element, window.CharacterData].forEach(function(Ctor){
+      try {
+        if (!Ctor || !Ctor.prototype || !Ctor.prototype[meth]) return;
+        var oM = Ctor.prototype[meth];
+        Ctor.prototype[meth] = function(){
+          for (var i=0;i<arguments.length;i++){
+            var a = arguments[i];
+            if (a && typeof a === 'object') taintedHit(Ctor.name+'.'+meth, a);
+          }
+          return oM.apply(this, arguments);
+        };
+      } catch(e){}
+    });
+  });
+
   // iframe.srcdoc (property assignment parses the value as a document)
   try {
     var dSD = Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype, 'srcdoc');

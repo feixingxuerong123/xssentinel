@@ -52,7 +52,19 @@ REQUIRED = [
     # benchmark/sink_execution.py found iframe.src=javascript: executing while
     # embed.src / object.data (and a.href, in every activation mode) do not.
     "iframe.src = 'javascript:' + x",
+    # Phase 185: DOMParser 重建链。完整 9 个形状留在 benchmark/sink_matrix.py
+    # 当探针用（那里一次跑完整个矩阵），这里只钉结构上最脆的四条：
+    "DOMParser + importNode + appendChild",      # 主链
+    "DOMParser + adoptNode + appendChild",       # 见下：真实踩过的 bug
+    "DOMParser + importNode + ParentNode.append",   # 原生 append（非 jQuery）
+    "document.writeln",                         # hook 一直在，从未被矩阵测过
 ]
+
+# 为什么单独钉住 adoptNode 那条：它踩过一个真 bug。adoptNode 把节点**迁出**原
+# 文档，调用一返回 node.ownerDocument 就已经是主文档了，所以污点若在调用 *之后*
+# 判定就恒为 False —— 整条 adoptNode 链静默漏报。importNode 不移动源节点，踩不
+# 到这个坑，正是它掩盖了 adoptNode 的问题（最小复现 dev/_p185_repro.py 里
+# importNode 命中、adoptNode 静默）。修法是"先判污点、再调原生"。
 
 # Measured in Chromium (Playwright, headless, 2026-09-18) NOT to execute:
 #   * a.href = 'javascript:...'  -- not on load, not even on a trusted click
@@ -69,6 +81,10 @@ MEASURED_NOT_A_SINK = [
     # an artefact.  Phase 163 claimed "executes with no activation" for them.
     "embed.src = 'javascript:' + x",
     "object.data = 'data:text/html,...'",
+    # Phase 185: 插入纯文本节点不执行（benchmark/sink_execution.py 实测）。
+    # 这条钉的是**实现方式**：若 appendChild 只检查"参数字符串含标记"就会误报，
+    # 正确做法是污点传播 + 插入时复查节点当下是否仍含标记。
+    "appendChild(createTextNode(x))",
 ]
 
 

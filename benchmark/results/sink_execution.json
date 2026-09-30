@@ -103,5 +103,60 @@
   "shape": "div.innerHTML = <script>CODE (control)",
   "executes": false,
   "note": ""
+ },
+ {
+  "shape": "DOMParser + importNode + appendChild",
+  "executes": true,
+  "note": ""
+ },
+ {
+  "shape": "DOMParser + adoptNode + appendChild",
+  "executes": true,
+  "note": ""
+ },
+ {
+  "shape": "DOMParser + importNode + insertBefore",
+  "executes": true,
+  "note": ""
+ },
+ {
+  "shape": "DOMParser + cloneNode + adoptNode + appendChild",
+  "executes": true,
+  "note": ""
+ },
+ {
+  "shape": "DOMParser + importNode + replaceChild",
+  "executes": true,
+  "note": ""
+ },
+ {
+  "shape": "DOMParser + importNode + ParentNode.append",
+  "executes": true,
+  "note": ""
+ },
+ {
+  "shape": "DOMParser + importNode + ParentNode.prepend",
+  "executes": true,
+  "note": ""
+ },
+ {
+  "shape": "DOMParser + importNode + ChildNode.after",
+  "executes": true,
+  "note": ""
+ },
+ {
+  "shape": "DOMParser + importNode + ChildNode.replaceWith",
+  "executes": true,
+  "note": ""
+ },
+ {
+  "shape": "document.writeln(<img onerror>)",
+  "executes": true,
+  "note": ""
+ },
+ {
+  "shape": "appendChild(createTextNode(<img onerror>)) [control: must NOT execute]",
+  "executes": false,
+  "note": ""
  }
 ]

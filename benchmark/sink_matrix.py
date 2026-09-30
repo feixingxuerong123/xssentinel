@@ -93,6 +93,51 @@ SINKS = {
         "var i = document.createElement('img');"
         " i.onerror = location.hash.slice(1) || null;"
         " i.src = 'x-bad://nope'; document.body.appendChild(i);", "no-exec"),
+    # --- Phase 185: DOMParser 重建链 -------------------------------------
+    # 真实世界绕过 DOMPurify 类净化的主流写法，此前整条链零覆盖。
+    # 执行性由 benchmark/sink_execution.py 实测（Chromium，sentinel 是
+    # document.title）：下面每个 confirm 形状都实测 EXECUTES。
+    "DOMParser + importNode + appendChild": (
+        "var d = new DOMParser().parseFromString(location.hash.slice(1),"
+        " 'text/html');"
+        " document.body.appendChild(document.importNode(d.body, true));",
+        "confirm"),
+    "DOMParser + adoptNode + appendChild": (
+        "var d = new DOMParser().parseFromString(location.hash.slice(1),"
+        " 'text/html');"
+        " document.body.appendChild(document.adoptNode(d.body));", "confirm"),
+    "DOMParser + importNode + insertBefore": (
+        "var d = new DOMParser().parseFromString(location.hash.slice(1),"
+        " 'text/html');"
+        " document.body.insertBefore(document.importNode(d.body, true),"
+        " document.body.firstChild);", "confirm"),
+    "DOMParser + cloneNode + adoptNode + appendChild": (
+        "var d = new DOMParser().parseFromString(location.hash.slice(1),"
+        " 'text/html');"
+        " document.body.appendChild(document.adoptNode("
+        "d.body.cloneNode(true)));", "confirm"),
+    "DOMParser + importNode + ParentNode.append": (
+        "var d = new DOMParser().parseFromString(location.hash.slice(1),"
+        " 'text/html');"
+        " document.body.append(document.importNode(d.body, true));",
+        "confirm"),
+    "DOMParser + importNode + ChildNode.after": (
+        "var d = new DOMParser().parseFromString(location.hash.slice(1),"
+        " 'text/html');"
+        " document.body.firstChild.after(document.importNode(d.body, true));",
+        "confirm"),
+    "DOMParser + importNode + ChildNode.replaceWith": (
+        "var d = new DOMParser().parseFromString(location.hash.slice(1),"
+        " 'text/html');"
+        " document.body.firstChild.replaceWith("
+        "document.importNode(d.body, true));", "confirm"),
+    "document.writeln": (
+        "document.writeln(location.hash.slice(1));", "confirm"),
+    # 对照：同一串字符走 text node —— 实测不执行，引擎必须保持沉默。
+    # 这条钉住的是"只看参数字符串就命中"的实现方式：那样做它会误报。
+    "appendChild(createTextNode(x))": (
+        "document.body.appendChild("
+        "document.createTextNode(location.hash.slice(1)));", "no-exec"),
 }
 # Why the two no-exec shapes are recorded rather than hooked (measured in
 # Chromium via Playwright, headless, 2026-09-18):

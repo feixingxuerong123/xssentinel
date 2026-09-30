@@ -32,6 +32,7 @@ XSSentinel 的目标是**在开源/自研工具中做到检测维度最全、架
 - **DOM XSS 静态污点分析**：不依赖服务器响应，直接分析前端 JS 的 source→sink 流（如 `location.hash` → `innerHTML`、jQuery `.html()`、`postMessage` 事件、`dangerouslySetInnerHTML`、`v-html`、`{{ }}` 等）。
 - **JS AST 数据流分析（Phase 43）**：esprima ESTree 解析每个 `<script>` 块，跟踪污点变量跨声明/赋值/拼接的多跳传播（含压缩混淆代码与 postMessage 回调函数体），产出带 `[AST]` 标记的高置信 source→sink 链（DalFox v3 式）；解析失败透明回退正则通道（`pip install xssentinel[ast]` 启用，缺失时自动降级）。
 - **DOM XSS 真·浏览器执行确认（L6 强化）**：在真实无头浏览器（Playwright）里给危险 sink 插桩——`innerHTML`/`outerHTML`/`document.write`/`Function`/`setTimeout`/`location.*`/`window.open`/`setAttribute(on*)`/jQuery `.html()` 等，并把唯一标记注入 `location.hash`/`location.search`/`document.cookie`/`postMessage` 等可控源。**标记一旦真正流入 sink，即判定为已确认（high）DOM XSS**——这是猜测式静态分析无法给出的硬证据（静态命中仅作为 medium/low 提示）。Playwright 不可用时优雅降级为静态启发式，不影响其他层。
+- **DOM 重建链（Phase 185）**：覆盖 `DOMParser.parseFromString` → `importNode` / `adoptNode` / `cloneNode` → `appendChild` / `insertBefore` / `replaceChild` / `append` / `prepend` / `after` / `before` / `replaceWith` 这条「解析后重建 DOM 再插入」的链路——真实世界绕过 DOMPurify 类净化的主流写法。判定走**污点传播 + 插入时复查节点当下是否仍含标记**：净化器若已把 onerror 摘掉，插入时就不会命中；插入纯文本节点也**不算**命中（`benchmark/sink_execution.py` 实测它根本不执行）。
 - **存储型 XSS**：注入后重新拉取"展示页"确认持久化执行（多数开源工具不做）。
 - **盲打 XSS（OOB）自动确认**：注入带唯一 token 的带外回调 payload，再轮询回调监听服务——**收到 beacon 即判定为已确认（high）盲打**，而非只"撒网不收网"。支持自托管监听器（`--oob self`，离线可测）与公共 interactsh（`--oob interactsh`，真实场景）。
 - **双重确认**：语义确认（token 是否落在真实可执行汇聚点，且用 BeautifulSoup 结构化判定，可识别 `html.escape` 伪漏洞）+ 可选无头浏览器真实弹窗确认，显著降低误报。
@@ -759,6 +760,32 @@ API 攻击面加固：--serve 状态变更路由同源防御（Phase 70）+ Host
 **基准工具链**：`benchmark/run_benchmark_batched.py [out.json] [batch] [port] [sync|async] [max_payloads] [max_transforms] [timeout]` —— 位置参数 4-7 可选，默认 sync/10/6/45；传 `sync 14 12 90` 才能复现 `python -m benchmark.runner` 的标定口径（旧基线就是 14/12/90，用默认 10/6 跑出来的数不能直接跟它比）。续跑时若检测到预算变了会丢弃旧结果而非静默合并。`benchmark/compare_runs.py A.json B.json` 做逐用例 diff（聚合分会掩盖"哪些用例移动了"，ERROR→FP 单独分桶，不会被当成改进）；`benchmark/repro_case.py CASE_ID [port] [sync|async]` 单跑一个用例并打印服务端原始回显 + 判定 + finding 详情——**排误报和验证 FN 是否是环境问题都用它**。
 
 **Phase 176：LLM 多供应商故障转移池 + AI 报告章节（`--ai-report`）**。报告此前只有确定性模板与语料修复建议；现在可选配一段由大模型撰写的叙事章节（执行摘要 / 风险评级 / 逐条成因与修复 / 修复优先级）。**判定权不下放**：类型、严重度、URL、参数、载荷全部来自确定性引擎，模型只写散文——prompt 明令禁止编造，`report_ai._verify_facts` 事后核对模型引用的 URL 与载荷是否真在输入里，对不上的进报告页脚告警而非当作事实。**默认关闭**：开启后目标 URL/参数/载荷会发给第三方供应商，帮助文本里已写明。**必须降级**：池全挂时回落 `data/fix_advice.json` 语料模板并在文首标注原因，报告永远有产出。
+
+**Phase 185：DOMParser 重建链（真实世界绕过净化器的主流写法，此前零覆盖）**。
+`DOMParser.parseFromString` → `importNode` / `adoptNode` → 插入主文档这条链，在
+`dom_engine.py` 与 `benchmark/sink_matrix.py` 里**一处都没有**——「DOMPurify 之类净化后
+重建 DOM 再插入」是真实世界高频写法，引擎完全看不见它。
+
+动手前先**测量而不是假设**（`benchmark/sink_execution.py` 新增 11 个形状，sentinel 是
+`document.title`）：DOMParser 链 9 个形状**全部真执行**（parseFromString 产出的文档是
+inert 的，执行发生在节点被转移进主文档并插入之后），`document.writeln` 执行，
+而对照 `appendChild(createTextNode(<img onerror>))` **不执行**。
+
+那条对照决定了实现方式：**不能只看「参数字符串含标记」**——那样会把插入纯文本节点也报成
+「marker executed」。现在做的是**污点传播 + 插入时复查**：parseFromString 的输入含标记
+就把产出的 document 记为污点源，importNode / adoptNode / cloneNode 把污点传给结果节点，
+插入点只在污点节点上判定、且要求它**当下**仍含标记，Text 节点一律排除。普通 appendChild
+只多一次 O(1) 的 WeakSet 命中，不会拖慢页面。
+
+过程中踩到一个真 bug：`adoptNode` 会把节点**迁出**原文档，调用一返回 `node.ownerDocument`
+就已经是主文档了，所以污点若在调用*之后*判定就恒为 False——整条 adoptNode 链静默漏报；
+`importNode` 不移动源节点，踩不到这个坑，**正是它掩盖了 adoptNode 的问题**（最小复现
+`dev/dom_parser_hook_repro.py`：importNode 命中、adoptNode 静默）。修法是先判污点、再调原生。
+
+结果：`benchmark/sink_matrix.py` 新增 9 个契约形状——**must-confirm 21/21 全部命中，
+5 个 measured-not-a-sink 全部保持沉默，零契约冲突**；`tests/test_dom_sink_matrix.py`
+钉住最脆的 4 个 confirm + 1 个 no-exec 对照（完整矩阵留给 probe 工具，不把测试拖慢）。
+
 
 池本体 `core/llm_pool.py`（零新依赖，仅 `requests`）：候选按「provider × key × model」展开（**model-outer / key-inner**，多 key 视为同一模型列表的配额冗余，先把首选模型在所有 key 上试一遍）；失败分类读 **body** 而不只看状态码——实测供应商会返回两种含义相反的 403（账户被封 vs 某个模型不在 token plan），只看码会把一个健康 key 整个停掉。冷却分作用域：`rate_limit` / `model_error` / `empty_response` / `truncated_response` 记在**候选级**（AMD 的并发上限是 **per-model**：「Model 'GLM-5.3-Flash' is at its concurrency limit (8)」，同 key 其他模型完全可用），`auth_error` / `server_error` / `timeout` 记在 **key 级**；同一轮内 key 级失败后同 key 的兄弟候选直接跳过（实测这处浪费让一次报告从 45s 涨到 95s+）。冷却带指数退避并持久化到 `data/llm_state.json`（跨进程保留限流窗口），全池冷却时取最快恢复者强行试一次，退化而非死掉。
 

@@ -7,7 +7,7 @@
   "hit_sinks": [
    "Element.innerHTML"
   ],
-  "elapsed": 6.1
+  "elapsed": 6.2
  },
  {
   "sink": "outerHTML",
@@ -17,7 +17,7 @@
   "hit_sinks": [
    "Element.outerHTML"
   ],
-  "elapsed": 5.6
+  "elapsed": 5.7
  },
  {
   "sink": "insertAdjacentHTML",
@@ -27,7 +27,7 @@
   "hit_sinks": [
    "insertAdjacentHTML"
   ],
-  "elapsed": 5.6
+  "elapsed": 5.7
  },
  {
   "sink": "iframe.srcdoc",
@@ -37,7 +37,7 @@
   "hit_sinks": [
    "iframe.srcdoc"
   ],
-  "elapsed": 5.5
+  "elapsed": 5.6
  },
  {
   "sink": "document.write",
@@ -67,7 +67,7 @@
   "hit_sinks": [
    "Function"
   ],
-  "elapsed": 5.5
+  "elapsed": 5.6
  },
  {
   "sink": "setTimeout(string)",
@@ -97,7 +97,7 @@
   "hit_sinks": [
    "iframe.src(javascript)"
   ],
-  "elapsed": 5.5
+  "elapsed": 5.7
  },
  {
   "sink": "embed.src = 'javascript:' + x",
@@ -105,7 +105,7 @@
   "confirmed": false,
   "verdict": "ok",
   "hit_sinks": [],
-  "elapsed": 5.5
+  "elapsed": 5.6
  },
  {
   "sink": "object.data = 'data:text/html,...'",
@@ -123,7 +123,7 @@
   "hit_sinks": [
    "setAttribute(onclick)"
   ],
-  "elapsed": 5.5
+  "elapsed": 5.6
  },
  {
   "sink": "window.name -> innerHTML",
@@ -133,7 +133,7 @@
   "hit_sinks": [
    "Element.innerHTML"
   ],
-  "elapsed": 5.5
+  "elapsed": 6.3
  },
  {
   "sink": "document.cookie -> innerHTML",
@@ -143,7 +143,7 @@
   "hit_sinks": [
    "Element.innerHTML"
   ],
-  "elapsed": 5.6
+  "elapsed": 5.9
  },
  {
   "sink": "a.href = 'javascript:' + x",
@@ -151,10 +151,98 @@
   "confirmed": false,
   "verdict": "ok",
   "hit_sinks": [],
-  "elapsed": 5.5
+  "elapsed": 6.5
  },
  {
   "sink": "el.onerror = x (string)",
+  "expect": "no-exec",
+  "confirmed": false,
+  "verdict": "ok",
+  "hit_sinks": [],
+  "elapsed": 15.5
+ },
+ {
+  "sink": "DOMParser + importNode + appendChild",
+  "expect": "confirm",
+  "confirmed": true,
+  "verdict": "ok",
+  "hit_sinks": [
+   "Node.appendChild"
+  ],
+  "elapsed": 6.2
+ },
+ {
+  "sink": "DOMParser + adoptNode + appendChild",
+  "expect": "confirm",
+  "confirmed": true,
+  "verdict": "ok",
+  "hit_sinks": [
+   "Node.appendChild"
+  ],
+  "elapsed": 6.2
+ },
+ {
+  "sink": "DOMParser + importNode + insertBefore",
+  "expect": "confirm",
+  "confirmed": true,
+  "verdict": "ok",
+  "hit_sinks": [
+   "Node.insertBefore"
+  ],
+  "elapsed": 8.0
+ },
+ {
+  "sink": "DOMParser + cloneNode + adoptNode + appendChild",
+  "expect": "confirm",
+  "confirmed": true,
+  "verdict": "ok",
+  "hit_sinks": [
+   "Node.appendChild"
+  ],
+  "elapsed": 5.9
+ },
+ {
+  "sink": "DOMParser + importNode + ParentNode.append",
+  "expect": "confirm",
+  "confirmed": true,
+  "verdict": "ok",
+  "hit_sinks": [
+   "Element.append"
+  ],
+  "elapsed": 5.9
+ },
+ {
+  "sink": "DOMParser + importNode + ChildNode.after",
+  "expect": "confirm",
+  "confirmed": true,
+  "verdict": "ok",
+  "hit_sinks": [
+   "CharacterData.after"
+  ],
+  "elapsed": 5.9
+ },
+ {
+  "sink": "DOMParser + importNode + ChildNode.replaceWith",
+  "expect": "confirm",
+  "confirmed": true,
+  "verdict": "ok",
+  "hit_sinks": [
+   "CharacterData.replaceWith"
+  ],
+  "elapsed": 5.9
+ },
+ {
+  "sink": "document.writeln",
+  "expect": "confirm",
+  "confirmed": true,
+  "verdict": "ok",
+  "hit_sinks": [
+   "document.writeln"
+  ],
+  "elapsed": 6.3
+ },
+ {
+  "sink": "appendChild(createTextNode(x))",
   "expect": "no-exec",
   "confirmed": false,
   "verdict": "ok",
