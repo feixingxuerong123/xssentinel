@@ -786,6 +786,29 @@ inert 的，执行发生在节点被转移进主文档并插入之后），`docu
 5 个 measured-not-a-sink 全部保持沉默，零契约冲突**；`tests/test_dom_sink_matrix.py`
 钉住最脆的 4 个 confirm + 1 个 no-exec 对照（完整矩阵留给 probe 工具，不把测试拖慢）。
 
+**Phase 186：jQuery 那一批——11 个方法，此前一个都没测过**。
+`dom_engine.py` 的 `wrapJQ()` 包装了 jQuery 的 11 个方法，但 `benchmark/sink_matrix.py`
+里**没有对应形状**：写了，却从未验证过。补测之后一次抓出两个方向相反的问题。
+
+**先测量**（`benchmark/sink_execution.py` 新增 jQuery 组，页面注入仓库内 vendored 的
+`benchmark/vendor/jquery.min.js`，离线可跑，不依赖 CDN）：`.html` / `.append` /
+`.prepend` / `.after` / `.before` / `.replaceWith` **全部真执行**；`.text()`、`.val()`、
+`.attr('onclick', …)` **都不执行**。
+
+**修掉两条误报**：`.text()` 只写文本、`.val()` 只写表单值，HTML 根本不解析，而 `wrapJQ`
+判的是「参数字符串含标记」——它们一直会命中。两个方法已从包装列表摘掉。`.attr()` 保留：
+属性值可以是可执行载体（srcdoc、带 `javascript:` 的 src/href），与 `setAttribute(on*)`
+的既有口径一致，跟着收紧会引入漏报。
+
+**修掉一整批漏报（更严重）**：`wrapJQ()` 只在 init 时和 `DOMContentLoaded` 时各调一次，
+而页面里同步执行的脚本会在那之前就用到 `$.append()`——那时 `fn` 还没被包装。矩阵的 6 个
+jQuery 形状里 **5 个因此整批 MISS**（`jQuery.html` 之所以命中，只是因为它内部走
+`innerHTML` setter，跟 `wrapJQ` 无关，正好掩盖了问题）。现在改成拦截 `window.jQuery`
+的赋值：jQuery 一挂上来就立刻包装，原来那两次调用留作兜底。
+
+结果：矩阵 **must-confirm 27/27 全部命中**，6 个 measured-not-a-sink 全部静默，零契约冲突。
+契约测试钉住 `jQuery.append`（时序问题的代表）与 `jQuery.text`（防误报回归）。
+
 
 池本体 `core/llm_pool.py`（零新依赖，仅 `requests`）：候选按「provider × key × model」展开（**model-outer / key-inner**，多 key 视为同一模型列表的配额冗余，先把首选模型在所有 key 上试一遍）；失败分类读 **body** 而不只看状态码——实测供应商会返回两种含义相反的 403（账户被封 vs 某个模型不在 token plan），只看码会把一个健康 key 整个停掉。冷却分作用域：`rate_limit` / `model_error` / `empty_response` / `truncated_response` 记在**候选级**（AMD 的并发上限是 **per-model**：「Model 'GLM-5.3-Flash' is at its concurrency limit (8)」，同 key 其他模型完全可用），`auth_error` / `server_error` / `timeout` 记在 **key 级**；同一轮内 key 级失败后同 key 的兄弟候选直接跳过（实测这处浪费让一次报告从 45s 涨到 95s+）。冷却带指数退避并持久化到 `data/llm_state.json`（跨进程保留限流窗口），全池冷却时取最快恢复者强行试一次，退化而非死掉。
 

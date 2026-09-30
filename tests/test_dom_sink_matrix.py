@@ -58,6 +58,9 @@ REQUIRED = [
     "DOMParser + adoptNode + appendChild",       # 见下：真实踩过的 bug
     "DOMParser + importNode + ParentNode.append",   # 原生 append（非 jQuery）
     "document.writeln",                         # hook 一直在，从未被矩阵测过
+    # Phase 186: wrapJQ 的**时序**。6 个 jQuery 方法里只钉 append 一个代表：
+    # 它命中不了就说明 jQuery 是被"延迟包装"的，而页面同步脚本根本等不到。
+    "jQuery.append",
 ]
 
 # 为什么单独钉住 adoptNode 那条：它踩过一个真 bug。adoptNode 把节点**迁出**原
@@ -85,6 +88,10 @@ MEASURED_NOT_A_SINK = [
     # 这条钉的是**实现方式**：若 appendChild 只检查"参数字符串含标记"就会误报，
     # 正确做法是污点传播 + 插入时复查节点当下是否仍含标记。
     "appendChild(createTextNode(x))",
+    # Phase 186: jQuery.text() 只写文本，HTML 不解析（实测不执行），但 wrapJQ
+    # 判的是"参数字符串含标记"，所以它会命中——Phase 186 已把 text/val 摘掉。
+    # 钉在这里防止有人把它们加回去。
+    "jQuery.text",
 ]
 
 

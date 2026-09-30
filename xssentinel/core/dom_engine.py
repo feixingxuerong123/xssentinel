@@ -410,7 +410,18 @@ def _init_script(marker: str) -> str:
   // jQuery sinks (may load after this script)
   function wrapJQ(){
     if (window.jQuery && window.jQuery.fn){
-      ['html','append','prepend','after','before','replaceWith','text','attr','prop','val','load']
+      // Phase 186: 移除了 'text' 与 'val'。benchmark/sink_execution.py 实测
+      // （Chromium，sentinel 是 document.title）：
+      //   jQuery.text('<img onerror=...>')  -> 不执行（只写文本，HTML 被转义）
+      //   jQuery.val('<img onerror=...>')   -> 不执行（只写表单值，不解析）
+      // 而这里判的是"参数字符串含标记"，两条都会命中 —— 纯粹的误报，
+      // 而且这是本批形状第一次被真正量过：此前这 11 个方法一个都没测过。
+      //
+      // attr / prop / load 保留：属性值可以是可执行载体（srcdoc、带 javascript:
+      // 的 src/href 等），与 setAttribute(on*) 的既有口径一致——on* 需要点击才
+      // 触发，但"标记流入事件处理器属性"本身就是漏洞形态，sink_matrix 里
+      // setAttribute('onclick') 是 confirm 契约，所以这里不跟着收紧。
+      ['html','append','prepend','after','before','replaceWith','attr','prop','load']
         .forEach(function(m){
           if (window.jQuery.fn[m]){
             var o = window.jQuery.fn[m];
@@ -422,6 +433,21 @@ def _init_script(marker: str) -> str:
         });
     }
   }
+  // 何时包装 jQuery：只在 init 时包一次、再等 DOMContentLoaded 补一次是**不够的**。
+  // 页面里同步执行的脚本（内联 script、或直接调用）会在 DOMContentLoaded 之前
+  // 就用到 $.append()，那时 fn 还没被包装 —— benchmark/sink_matrix.py 的 jQuery
+  // 形状正是这样整批漏掉的（jQuery.html 之所以命中，只是因为它内部走 innerHTML
+  // setter，那条路早就 hook 了，跟 wrapJQ 无关）。
+  // 所以改成拦截 window.jQuery 的赋值：jQuery 一被挂上来就立刻包装。
+  // 下面两行调用保留作兜底（拦截不了的环境、或 jQuery 在 init 前就已存在）。
+  var _jqVal = window.jQuery;
+  try {
+    Object.defineProperty(window, 'jQuery', {
+      configurable: true,
+      get: function(){ return _jqVal; },
+      set: function(v){ _jqVal = v; try { wrapJQ(); } catch(e){} }
+    });
+  } catch(e) { /* 拦不住就只剩 DOMContentLoaded 那条兜底 */ }
   wrapJQ();
   document.addEventListener('DOMContentLoaded', wrapJQ);
 

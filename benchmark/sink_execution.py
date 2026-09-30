@@ -175,6 +175,44 @@ SHAPES: list[tuple[str, str, bool, bool]] = [
      + _SENT_NQ + "'>\"));", False, True),
 ]
 
+# ---------------------------------------------------------------------------
+# jQuery 形状单独一组：它们要页面里真有 jQuery 才能跑。
+#
+# dom_engine 的 wrapJQ() 包装了 fn.html / append / prepend / after / before /
+# replaceWith / text / attr / prop / val / load，但这一整批此前**一个都没被测过**
+# ——既没量过执行性，也没进 sink_matrix 契约。
+#
+# 最可疑的是 .text()：它只写文本内容，HTML 不解析、不执行，而钩子判的是
+# "参数字符串含标记"，所以按现状它会命中——一条待验证的误报路径。同理 .val()
+# 对非表单元素也是写值不解析。
+# ---------------------------------------------------------------------------
+_JQ_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                        "vendor", "jquery.min.js")
+
+_JQ_SHAPES: list[tuple[str, str, bool]] = [
+    ("jQuery.html(<img onerror>)",
+     "jQuery('#o').html(\"<img src=x onerror='" + _SENT_NQ + "'>\");", False),
+    ("jQuery.append(<img onerror>)",
+     "jQuery('#o').append(\"<img src=x onerror='" + _SENT_NQ + "'>\");", False),
+    ("jQuery.prepend(<img onerror>)",
+     "jQuery('#o').prepend(\"<img src=x onerror='" + _SENT_NQ + "'>\");", False),
+    ("jQuery.after(<img onerror>)",
+     "jQuery('#o').after(\"<img src=x onerror='" + _SENT_NQ + "'>\");", False),
+    ("jQuery.before(<img onerror>)",
+     "jQuery('#o').before(\"<img src=x onerror='" + _SENT_NQ + "'>\");", False),
+    ("jQuery.replaceWith(<img onerror>)",
+     "jQuery('#o').replaceWith(\"<img src=x onerror='" + _SENT_NQ + "'>\");",
+     False),
+    # 对照：.text() 只写文本，HTML 不解析 —— 必须不执行
+    ("jQuery.text(<img onerror>) [control: must NOT execute]",
+     "jQuery('#o').text(\"<img src=x onerror='" + _SENT_NQ + "'>\");", False),
+    # 同样可疑的两条：wrapJQ 也包装了它们，但按现状从未量过
+    ("jQuery.val(<img onerror>) [control: must NOT execute]",
+     "jQuery('#o').val(\"<img src=x onerror='" + _SENT_NQ + "'>\");", False),
+    ("jQuery.attr('onclick', CODE) [control: must NOT execute]",
+     "jQuery('#o').attr('onclick', '" + _SENT_NQ + "');", False),
+]
+
 
 def main() -> int:
     from playwright.sync_api import sync_playwright
@@ -207,6 +245,34 @@ def main() -> int:
                 continue
             rows.append({"shape": name, "executes": ran, "note": ""})
             print(f"  {'EXECUTES' if ran else 'no-exec '} {name}", flush=True)
+        # jQuery 形状要页面里真有 jQuery，所以单独开一个 page 注入 vendored 的
+        # jquery.min.js（仓库内自带，离线可跑，不依赖 CDN）。
+        if os.path.exists(_JQ_PATH):
+            jq = browser.new_page()
+            jq.goto("about:blank")
+            jq.add_script_tag(path=_JQ_PATH)
+            for name, js, _needs_click in _JQ_SHAPES:
+                jq.evaluate("document.title=''")
+                jq.evaluate(
+                    "document.body.innerHTML = '<div id=\"o\">safe</div>'")
+                try:
+                    jq.evaluate(f"() => {{ {js} }}")
+                except Exception as e:
+                    rows.append({"shape": name, "executes": None,
+                                 "group": "jquery",
+                                 "note": f"injection error: {str(e)[:60]}"})
+                    print(f"  ERR  {name}  ({str(e)[:44]})", flush=True)
+                    continue
+                jq.wait_for_timeout(450)
+                ran = jq.title() == "EXEC"
+                rows.append({"shape": name, "executes": ran,
+                             "group": "jquery", "note": ""})
+                print(f"  {'EXECUTES' if ran else 'no-exec '} {name}",
+                      flush=True)
+            jq.close()
+        else:
+            print(f"  [skip] jQuery 形状：缺 {_JQ_PATH}", flush=True)
+
         browser.close()
 
     ok = [r for r in rows if r["executes"] is True]

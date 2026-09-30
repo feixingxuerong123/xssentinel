@@ -17,7 +17,7 @@
   "hit_sinks": [
    "Element.outerHTML"
   ],
-  "elapsed": 5.7
+  "elapsed": 5.6
  },
  {
   "sink": "insertAdjacentHTML",
@@ -27,7 +27,7 @@
   "hit_sinks": [
    "insertAdjacentHTML"
   ],
-  "elapsed": 5.7
+  "elapsed": 5.6
  },
  {
   "sink": "iframe.srcdoc",
@@ -47,7 +47,7 @@
   "hit_sinks": [
    "document.write"
   ],
-  "elapsed": 5.6
+  "elapsed": 5.7
  },
  {
   "sink": "eval",
@@ -97,7 +97,7 @@
   "hit_sinks": [
    "iframe.src(javascript)"
   ],
-  "elapsed": 5.7
+  "elapsed": 5.6
  },
  {
   "sink": "embed.src = 'javascript:' + x",
@@ -133,7 +133,7 @@
   "hit_sinks": [
    "Element.innerHTML"
   ],
-  "elapsed": 6.3
+  "elapsed": 5.6
  },
  {
   "sink": "document.cookie -> innerHTML",
@@ -143,7 +143,7 @@
   "hit_sinks": [
    "Element.innerHTML"
   ],
-  "elapsed": 5.9
+  "elapsed": 5.6
  },
  {
   "sink": "a.href = 'javascript:' + x",
@@ -151,7 +151,7 @@
   "confirmed": false,
   "verdict": "ok",
   "hit_sinks": [],
-  "elapsed": 6.5
+  "elapsed": 5.6
  },
  {
   "sink": "el.onerror = x (string)",
@@ -159,7 +159,7 @@
   "confirmed": false,
   "verdict": "ok",
   "hit_sinks": [],
-  "elapsed": 15.5
+  "elapsed": 5.6
  },
  {
   "sink": "DOMParser + importNode + appendChild",
@@ -169,7 +169,7 @@
   "hit_sinks": [
    "Node.appendChild"
   ],
-  "elapsed": 6.2
+  "elapsed": 5.6
  },
  {
   "sink": "DOMParser + adoptNode + appendChild",
@@ -179,7 +179,7 @@
   "hit_sinks": [
    "Node.appendChild"
   ],
-  "elapsed": 6.2
+  "elapsed": 5.6
  },
  {
   "sink": "DOMParser + importNode + insertBefore",
@@ -189,7 +189,7 @@
   "hit_sinks": [
    "Node.insertBefore"
   ],
-  "elapsed": 8.0
+  "elapsed": 5.6
  },
  {
   "sink": "DOMParser + cloneNode + adoptNode + appendChild",
@@ -199,7 +199,7 @@
   "hit_sinks": [
    "Node.appendChild"
   ],
-  "elapsed": 5.9
+  "elapsed": 5.6
  },
  {
   "sink": "DOMParser + importNode + ParentNode.append",
@@ -209,7 +209,7 @@
   "hit_sinks": [
    "Element.append"
   ],
-  "elapsed": 5.9
+  "elapsed": 5.6
  },
  {
   "sink": "DOMParser + importNode + ChildNode.after",
@@ -219,7 +219,7 @@
   "hit_sinks": [
    "CharacterData.after"
   ],
-  "elapsed": 5.9
+  "elapsed": 5.6
  },
  {
   "sink": "DOMParser + importNode + ChildNode.replaceWith",
@@ -229,7 +229,7 @@
   "hit_sinks": [
    "CharacterData.replaceWith"
   ],
-  "elapsed": 5.9
+  "elapsed": 5.6
  },
  {
   "sink": "document.writeln",
@@ -239,10 +239,87 @@
   "hit_sinks": [
    "document.writeln"
   ],
-  "elapsed": 6.3
+  "elapsed": 5.6
  },
  {
   "sink": "appendChild(createTextNode(x))",
+  "expect": "no-exec",
+  "confirmed": false,
+  "verdict": "ok",
+  "hit_sinks": [],
+  "elapsed": 5.6
+ },
+ {
+  "sink": "jQuery.html",
+  "expect": "confirm",
+  "confirmed": true,
+  "verdict": "ok",
+  "hit_sinks": [
+   "Element.innerHTML",
+   "jQuery.html"
+  ],
+  "elapsed": 5.6
+ },
+ {
+  "sink": "jQuery.append",
+  "expect": "confirm",
+  "confirmed": true,
+  "verdict": "ok",
+  "hit_sinks": [
+   "jQuery.append"
+  ],
+  "elapsed": 5.6
+ },
+ {
+  "sink": "jQuery.prepend",
+  "expect": "confirm",
+  "confirmed": true,
+  "verdict": "ok",
+  "hit_sinks": [
+   "jQuery.prepend"
+  ],
+  "elapsed": 5.6
+ },
+ {
+  "sink": "jQuery.after",
+  "expect": "confirm",
+  "confirmed": true,
+  "verdict": "ok",
+  "hit_sinks": [
+   "jQuery.after"
+  ],
+  "elapsed": 5.6
+ },
+ {
+  "sink": "jQuery.before",
+  "expect": "confirm",
+  "confirmed": true,
+  "verdict": "ok",
+  "hit_sinks": [
+   "jQuery.before"
+  ],
+  "elapsed": 5.6
+ },
+ {
+  "sink": "jQuery.replaceWith",
+  "expect": "confirm",
+  "confirmed": true,
+  "verdict": "ok",
+  "hit_sinks": [
+   "jQuery.replaceWith"
+  ],
+  "elapsed": 5.6
+ },
+ {
+  "sink": "jQuery.text",
+  "expect": "no-exec",
+  "confirmed": false,
+  "verdict": "ok",
+  "hit_sinks": [],
+  "elapsed": 5.6
+ },
+ {
+  "sink": "jQuery.val",
   "expect": "no-exec",
   "confirmed": false,
   "verdict": "ok",

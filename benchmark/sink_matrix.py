@@ -21,8 +21,15 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 sys.path.insert(0, ".")
 
+# jQuery 是仓库内 vendored 的（benchmark/vendor/jquery.min.js，3.7.1），
+# 这样矩阵与测试离线可跑，不依赖 CDN。所有形状页面都加载它，jQuery 自身的
+# 启动不会触发任何 hook（没有污点、没有标记）。
+_VENDOR_JQ = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                          "vendor", "jquery.min.js")
+
 _PAGE = """<!DOCTYPE html><html><body>
 <div id="o">safe</div><iframe id="f"></iframe>
+<script src="/vendor/jquery.min.js"></script>
 <script>
 try { %s } catch (e) { document.title = 'ERR ' + e; }
 </script>
@@ -135,9 +142,32 @@ SINKS = {
         "document.writeln(location.hash.slice(1));", "confirm"),
     # 对照：同一串字符走 text node —— 实测不执行，引擎必须保持沉默。
     # 这条钉住的是"只看参数字符串就命中"的实现方式：那样做它会误报。
+    # 对照：同一串字符走 text node —— 实测不执行，引擎必须保持沉默。
+    # 这条钉住的是"只看参数字符串就命中"的实现方式：那样做它会误报。
     "appendChild(createTextNode(x))": (
         "document.body.appendChild("
         "document.createTextNode(location.hash.slice(1)));", "no-exec"),
+    # --- Phase 186: jQuery 形状 ------------------------------------------
+    # wrapJQ 包装了 11 个 jQuery 方法，但这一整批此前一个都没被测过。
+    # 执行性由 benchmark/sink_execution.py 实测：下面 6 个 EXECUTES，
+    # 后 2 个（text / val）实测不执行 —— 并且它们原本会命中（钩子判的是
+    # "参数字符串含标记"），是两条真误报，Phase 186 已把这两个方法摘掉。
+    "jQuery.html": (
+        "jQuery('#o').html(location.hash.slice(1));", "confirm"),
+    "jQuery.append": (
+        "jQuery('#o').append(location.hash.slice(1));", "confirm"),
+    "jQuery.prepend": (
+        "jQuery('#o').prepend(location.hash.slice(1));", "confirm"),
+    "jQuery.after": (
+        "jQuery('#o').after(location.hash.slice(1));", "confirm"),
+    "jQuery.before": (
+        "jQuery('#o').before(location.hash.slice(1));", "confirm"),
+    "jQuery.replaceWith": (
+        "jQuery('#o').replaceWith(location.hash.slice(1));", "confirm"),
+    "jQuery.text": (
+        "jQuery('#o').text(location.hash.slice(1));", "no-exec"),
+    "jQuery.val": (
+        "jQuery('#o').val(location.hash.slice(1));", "no-exec"),
 }
 # Why the two no-exec shapes are recorded rather than hooked (measured in
 # Chromium via Playwright, headless, 2026-09-18):
@@ -156,7 +186,22 @@ _NAMES = {f"/s/{i}": name for i, name in enumerate(SINKS.keys())}
 
 class _H(BaseHTTPRequestHandler):
     def do_GET(self):  # noqa: N802
-        body = _ROUTES.get(self.path.split("?")[0].split("#")[0])
+        path = self.path.split("?")[0].split("#")[0]
+        if path == "/vendor/jquery.min.js":
+            try:
+                with open(_VENDOR_JQ, "rb") as fh:
+                    data = fh.read()
+            except OSError:
+                self.send_response(404)
+                self.end_headers()
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", "application/javascript")
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+            return
+        body = _ROUTES.get(path)
         if body is None:
             self.send_response(404)
             self.end_headers()

@@ -158,5 +158,59 @@
   "shape": "appendChild(createTextNode(<img onerror>)) [control: must NOT execute]",
   "executes": false,
   "note": ""
+ },
+ {
+  "shape": "jQuery.html(<img onerror>)",
+  "executes": true,
+  "group": "jquery",
+  "note": ""
+ },
+ {
+  "shape": "jQuery.append(<img onerror>)",
+  "executes": true,
+  "group": "jquery",
+  "note": ""
+ },
+ {
+  "shape": "jQuery.prepend(<img onerror>)",
+  "executes": true,
+  "group": "jquery",
+  "note": ""
+ },
+ {
+  "shape": "jQuery.after(<img onerror>)",
+  "executes": true,
+  "group": "jquery",
+  "note": ""
+ },
+ {
+  "shape": "jQuery.before(<img onerror>)",
+  "executes": true,
+  "group": "jquery",
+  "note": ""
+ },
+ {
+  "shape": "jQuery.replaceWith(<img onerror>)",
+  "executes": true,
+  "group": "jquery",
+  "note": ""
+ },
+ {
+  "shape": "jQuery.text(<img onerror>) [control: must NOT execute]",
+  "executes": false,
+  "group": "jquery",
+  "note": ""
+ },
+ {
+  "shape": "jQuery.val(<img onerror>) [control: must NOT execute]",
+  "executes": false,
+  "group": "jquery",
+  "note": ""
+ },
+ {
+  "shape": "jQuery.attr('onclick', CODE) [control: must NOT execute]",
+  "executes": false,
+  "group": "jquery",
+  "note": ""
  }
 ]
