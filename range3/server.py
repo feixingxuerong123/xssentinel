@@ -124,6 +124,16 @@ class Handler(BaseHTTPRequestHandler):
         self._send(*handler(qs, form))
 
     def _send(self, status: int, headers: dict, body):
+        # Content-Length is REQUIRED under HTTP/1.1 keep-alive (see the
+        # protocol_version note above): without it the body has no delimiter
+        # -- the connection stays open and every read-to-EOF client
+        # (requests always reads the body) blocks until its timeout.  This
+        # was the range3 "startup wedge" and, same root cause, very likely
+        # the test_benchmark one (dev/WEDGE_test_benchmark_20260927.md):
+        # both appeared when keep-alive was enabled (Phase 179) and the
+        # other fixture servers got the header while this _send did not.
+        headers = dict(headers or {})
+        headers.setdefault("Content-Length", str(len(body)))
         self.send_response(status)
         for k, v in headers.items():
             self.send_header(k, v)
