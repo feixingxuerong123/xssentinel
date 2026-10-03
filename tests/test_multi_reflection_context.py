@@ -32,7 +32,7 @@ import pytest
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
-from xssentinel.core import context as ctx
+from xssentinel.core import context as ctx  # noqa: E402
 
 MARK = "XSSMULTICTX"
 HIGH_MED = ("high", "medium", "critical")

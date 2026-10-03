@@ -4,7 +4,7 @@
 Usage:
   python benchmark/run_benchmark.py              # Run XSSentinel-only evaluation
   python benchmark/run_benchmark.py --compare    # Also run dalfox/XSStrike comparison
-  python benchmark/run_benchmark.py --quick      # Quick mode (10 cases)
+  python benchmark/run_benchmark.py --quick      # Quick mode (64 cases: one per ground_truth x context)
   python benchmark/run_benchmark.py --report     # Generate HTML report after run
 
 Outputs:

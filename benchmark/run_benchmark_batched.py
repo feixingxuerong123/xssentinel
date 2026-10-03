@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Batched evaluator for the full 98-case benchmark (loopback-degradation safe).
+"""Batched evaluator for the full benchmark matrix (loopback-degradation safe).
 
 ``run_benchmark.py`` runs every case inside ONE long-lived process; on
 machines where a security agent intermittently kills loopback connections
@@ -19,8 +19,8 @@ Windows:
     request count) is never retried.  Cross-run comparisons must check
     ``meta.fn_retry_on`` -- the FN semantics differ when it flips.
 
-Verified: full 98 cases in ~7 min on a machine where run_benchmark.py could
-not finish once in 7 attempts.
+Verified on the then-98-case matrix (the manifest is 192 cases now) in ~7 min
+on a machine where run_benchmark.py could not finish once in 7 attempts.
 
 Usage::
 
@@ -167,7 +167,6 @@ def _is_degraded_fn(rec: dict) -> bool:
 def _atomic_flush(out_path, rows, tp, fp, tn, fn, err, mid):
     """Write results via tmp + os.replace so a mid-write kill can never
     truncate the output file and lose all resumed progress."""
-    import tempfile
     # fn_retry_* are read at WRITE time (not at import): the retry policy
     # may be tuned after import (env vars, tests), and the meta block must
     # describe the policy that actually produced these records.

@@ -145,7 +145,6 @@ class _EchoReq:
     the mirror-page shape that used to flood the triage."""
 
     def __init__(self):
-        import re as _re
         self.calls = 0
 
     def request(self, method, url, params=None, data=None, headers=None):
@@ -238,7 +237,6 @@ class TestBavProbes:
         """Dispatches on the injected value's BAV signature."""
 
         def __init__(self):
-            import re as _re
             self.calls = []
 
         def request(self, method, url, params=None, data=None, headers=None):
@@ -299,29 +297,8 @@ class TestCrawlerBavWiring:
     """Phase 82: CrawlMixin._mine_hidden_params turns BAV confirmations
     into real findings when the scanner runs with bav=True."""
 
-    def _crawl_self(self, bav):
-        from types import SimpleNamespace
-
-        class _NullCov:
-            def touch_layer(self, *a, **kw):
-                pass
-
-            def record_request(self, *a, **kw):
-                pass
-
-        outer = TestBavProbes()
-        req = outer._BavReq()
-        return SimpleNamespace(
-            req=req, max_payloads=10, param_wordlist=None,
-            verbose=False, coverage=_NullCov(),
-            bav=bav, added=[],
-            _add=lambda f: outer_sc.added.append(f),
-        ), req
-
     def test_bav_confirmation_becomes_finding(self):
         from xssentinel.core.scanner_crawl import CrawlMixin
-        outer_sc = None
-        outer_sc_holder = self
         # Build the fake self with a shared findings collector.
         added = []
         outer = TestBavProbes()

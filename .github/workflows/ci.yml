@@ -3,13 +3,21 @@ name: CI
 # XSSentinel quality gate (Phase 42 / P2-10):
 #   1. unit + integration pytest (includes the pipeline slice over
 #      Attack Range #2 -- main-flow regressions fail here)
-#   2. accuracy benchmark (192 cases) -- gate: FPR<=20% and recall>=50%
-#      (hard thresholds; project runs at 100%/100%)
+#   2. accuracy benchmark -- the push job runs the stratified quick slice
+#      (benchmark.runner --quick = 64 of 192 cases, one per
+#      (ground_truth, context) pair, so EVERY context family is measured on
+#      every push) on BOTH engines, under --strict-gate (FP0/FN0/ERROR0);
+#      the full 192-case matrix lives in the
+#      separate benchmark-full job (nightly + workflow_dispatch only, ~15 min
+#      of pure scanning).  The legacy FPR<=20%/recall>=50% thresholds stay as
+#      the default outside --strict-gate, but on a slice this size they
+#      tolerated a false positive and two misses per push without turning red.
 #   3. accuracy drill on Range #2 (15 vuln + 5 safe, 100%/100% required)
-# 4. nightly: the FULL file-by-file gate (tests/run_all_batched.py, 129+
-#    files with per-file timeout and retry) + the full 192-case matrix --
-#    the same entry point the author's machine gates on, so a wedge or a
-#    per-file regression cannot hide behind the 10-case quick slice.
+# 4. nightly: the FULL file-by-file gate (tests/run_all_batched.py, 141
+#    test files with per-file timeout and retry) + the full 192-case matrix on
+#    both engines -- installed from the same extra set as requirements.txt, so
+#    a wedge or a per-file regression cannot hide behind the 64-case quick
+#    slice, and an esprima/flask-gated test cannot silently self-skip.
 # Async/asyncio.run tests self-skip via tests/conftest.py when the runner's
 # loopback socketpair is throttled.
 
@@ -25,7 +33,10 @@ on:
 jobs:
   tests:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    # 40 -> 60: the push accuracy step now scores both engines over the 64-case
+    # slice (~2 x 6 min on the slowest host we gate on, a degraded-loopback
+    # Windows box), which pushed the job past its old ceiling.
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 
@@ -43,11 +54,24 @@ jobs:
           pip install cryptography playwright
           python -m playwright install chromium --with-deps
 
+      # Lint gate: E/F/W baseline is ZERO.  Fail fast before any test runs
+      # so regressions (new unused imports, undefined names, dead code)
+      # are caught before they eat CI minutes.
+      - name: Lint (ruff E/F/W -- zero baseline)
+        run: python -m ruff check
+
       - name: Unit + integration tests (pipeline slice included)
         run: pytest tests/ -q --ignore=tests/test_benchmark.py --timeout=120
 
-      - name: Accuracy benchmark (98 cases, report saved)
-        run: python -m benchmark.runner --quick
+      - name: Accuracy benchmark (64-case stratified slice, both engines, zero-error gate)
+        # --strict-gate: FP0/FN0/ERROR0, because a gate that tolerates an FP or
+        # an FN cannot see a broken layer.  The async arm runs here for the same
+        # reason: every "async forgot a sync fix" regression on record (concat
+        # retry, content-type downgrade, JSONP gadget) was invisible to a
+        # push job that only ever scored sync.
+        run: |
+          python -m benchmark.runner --quick --engine sync --strict-gate
+          python -m benchmark.runner --quick --engine async --strict-gate
 
       - name: Range #2 accuracy drill (must be 100% / 100%)
         run: python tests/run_range2.py
@@ -71,7 +95,7 @@ jobs:
     # Full 192-case drill on demand (slower, ~15 min of pure scanning).
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -79,9 +103,19 @@ jobs:
           python-version: "3.11"
       - run: |
           python -m pip install --upgrade pip
-          pip install -e ".[dev,async]"
-      - name: Full benchmark
+          # Same extra set as requirements.txt (-e .[dev,async,ast,api]): the
+          # AST channel (esprima) is part of the judgment layer, so a matrix
+          # calibrated without it is not the same measurement the local gate
+          # reports.
+          pip install -e ".[dev,async,ast]"
+      - name: Full benchmark (sync)
+        # No --strict-gate here yet: the zero-error claim is measured for the
+        # 64-case push slice, not for this 192-case run (the last full matrices
+        # on this project's own box logged environment FNs).  Tighten once a
+        # full both-engines run has actually passed clean.
         run: python -m benchmark.runner
+      - name: Full benchmark (async)
+        run: python -m benchmark.runner --engine async
       - uses: actions/upload-artifact@v4
         with:
           name: benchmark-results
@@ -102,7 +136,11 @@ jobs:
           python-version: "3.11"
       - run: |
           python -m pip install --upgrade pip
-          pip install -e ".[dev,async]"
+          # requirements.txt is the declared environment (`-e .[dev,async,ast,api]`);
+          # installing less here meant the AST-channel and flask-path tests
+          # self-skipped in the very job that claims to run "the same entry
+          # point the author's machine gates on".
+          pip install -e ".[dev,async,ast,api]"
       - name: Full file-by-file test gate
         run: python tests/run_all_batched.py --quiet
       - name: Upload failure evidence

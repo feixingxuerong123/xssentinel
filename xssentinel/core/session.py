@@ -18,7 +18,7 @@ from __future__ import annotations
 import time
 
 try:
-    import requests
+    import requests  # noqa: F401  (可选依赖可用性探测:导入即使用)
     _HAS_REQUESTS = True
 except ImportError:
     _HAS_REQUESTS = False

@@ -27,7 +27,8 @@ Idempotent: skips payloads whose `payload` text already exists.
 Also normalizes `confidence` to string ("high"/"medium"/"low") to fix
 the schema inconsistency from extend_payloads.py.
 """
-import json, os, sys
+import json
+import os
 
 PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                     "xssentinel", "data", "payloads.json")
@@ -1323,7 +1324,7 @@ print(f"[+] Added {added} payloads (total: {len(data['payloads'])}, "
 contexts = sorted(set(p["context"] for p in data["payloads"]))
 print(f"[+] Contexts: {len(contexts)} -> {contexts}")
 # Per-context count
-from collections import Counter
+from collections import Counter  # noqa: E402
 counts = Counter(p["context"] for p in data["payloads"])
 for ctx, n in sorted(counts.items(), key=lambda x: -x[1]):
     print(f"    {ctx:30s} {n}")

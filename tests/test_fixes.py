@@ -14,15 +14,16 @@ Tests each fix in isolation so regressions are caught immediately:
 Run:  python tests/test_fixes.py
 """
 from __future__ import annotations
-import os, sys, threading, time, json
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import os
+import sys
+import threading
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from xssentinel.core import payloads as payloads_mod
 from xssentinel.core import verifier
 from xssentinel.core.oob import SelfHostedListener, InteractshListener
-from xssentinel.core.scanner import Scanner, Finding
+from xssentinel.core.scanner import Scanner
 from xssentinel.core.requester import Requester
 
 PASS = 0

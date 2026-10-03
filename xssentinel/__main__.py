@@ -17,7 +17,6 @@ Use only on systems you are authorized to test.
 from __future__ import annotations
 
 import argparse
-import json
 import os
 import sys
 from urllib.parse import urlparse
@@ -53,10 +52,10 @@ def _poc_dir_for(base: str, url: str) -> str:
 # Phase 43: sub-command + runner implementations live in cli_runner /
 # cli_commands; re-exported here so `cli._run_async_batch`-style access
 # in tests and downstream scripts keeps working unchanged.
-from .cli_runner import (  # noqa: F401
+from .cli_runner import (  # noqa: E402, F401  (re-export:tests 与下游脚本按 cli._run_* 访问)
     _build_progress, _do_login, _run_scan, _run_async_scan,
     _run_async_batch, _write_report)
-from .cli_commands import (  # noqa: F401
+from .cli_commands import (  # noqa: E402, F401  (re-export:同上)
     _run_self_test, _run_serve, _run_verify_fix, _run_diff,
     _run_passive_proxy, _run_marker_fuzz, _run_sandbox)
 
@@ -142,6 +141,15 @@ def build_parser():
                             " the sitemap's own host follow the HAR scope"
                             " rules (dropped unless --allow-host /"
                             " --allow-any-host); pairs with -o DIR.")
+    g_tgt.add_argument("--wayback", default=None, metavar="DOMAIN_OR_URL",
+                       help="Import scan targets from the Internet Archive"
+                            " CDX API (Phase 188, gau/waymore parity): every"
+                            " historically-crawled URL of DOMAIN_OR_URL"
+                            " becomes a target; a path prefix narrows the"
+                            " match (example.com/app).  URLs outside the"
+                            " named host follow the HAR scope rules (dropped"
+                            " unless --allow-host / --allow-any-host);"
+                            " pairs with -o DIR.")
     # Phase 176l: authorization scope for IMPORTED targets.  A browser HAR
     # carries the site's CDN / analytics / SSO / ad domains next to the app, and
     # those are other people's systems.  Payloads must never reach them just
@@ -249,6 +257,14 @@ def build_parser():
                             "any job that was RUNNING when the previous "
                             "process died is marked FAILED.  Example: "
                             "--db xssentinel.db")
+    g_tgt.add_argument("--mcp", action="store_true",
+                       help="Run as an MCP (Model Context Protocol) stdio "
+                            "server (Phase 189, dalfox v3 parity): expose "
+                            "xssentinel_scan as a tool for LLM agents. "
+                            "JSON-RPC over stdin/stdout, one message per "
+                            "line; ignores -u/--batch and other target "
+                            "flags. Add to an MCP client with: "
+                            "xssentinel --mcp")
     g_tgt.add_argument("--webhook", dest="webhook_urls", action="append",
                        default=[],
                        help="Webhook URL to notify on scan completion "
@@ -346,6 +362,18 @@ def build_parser():
                               "BeautifulSoup crawler (default: auto)")
     g_crawl.add_argument("--scope", default=None,
                          help="Crawl scope prefix (default: same-origin only)")
+    g_crawl.add_argument("--stop-at-cross-origin", dest="stop_at_cross_origin",
+                         action="store_true",
+                         help="Authorization boundary: refuse to FOLLOW a "
+                              "redirect that leaves the origins you named "
+                              "(the scanned page's Location: header then cannot "
+                              "drag payloads onto somebody else's host). "
+                              "Default off -- redirects keep being followed, as "
+                              "before; operator credentials are withheld from "
+                              "off-origin hops either way (Phase 189). Sync "
+                              "engine only: aiohttp gives no way to abort a "
+                              "chain mid-loop, so --async keeps scrubbing "
+                              "secrets but still follows.")
     # Detection
     g_det = ap.add_argument_group("Detection")
     g_det.add_argument("--headless", action="store_true",
@@ -779,6 +807,13 @@ def main(argv=None):
     if args.serve:
         return _run_serve(args)
 
+    # Phase 189: MCP stdio server (dalfox v3 parity) -- agents drive the
+    # scanner as a tool over JSON-RPC/stdio.  Must sit before target
+    # handling: MCP mode carries its targets in tool calls, not argv.
+    if getattr(args, "mcp", False):
+        from .api.mcp_server import serve as _mcp_serve
+        return _mcp_serve()
+
     # Phase 80: --fuzz-body marker injection mode.
     if getattr(args, "fuzz_body", None):
         return _run_marker_fuzz(args)
@@ -942,6 +977,36 @@ def main(argv=None):
                            " scan. Re-run with --allow-host.")
                 return 2
         print(f"[*] Sitemap {args.sitemap}: {len(urls)} URL(s) imported")
+    elif getattr(args, "wayback", None):
+        from .core.wayback_import import wayback_to_urls, normalize_target
+        try:
+            urls = wayback_to_urls(args.wayback, timeout=max(args.timeout, 30))
+        except Exception as e:
+            _log.error("Wayback import failed: %s", e)
+            return 2
+        if not urls:
+            _log.error("Wayback %s expanded to zero URLs.", args.wayback)
+            return 2
+        # The archive covers the whole web; the operator named ONE host.
+        # Same partition as the sitemap import -- --allow-host /
+        # --allow-any-host behave identically across all imports.
+        from .core import scoping as _scoping
+        patterns = _scoping.baseline_hosts([normalize_target(args.wayback)],
+                                           getattr(args, "allow_host", []))
+        if not getattr(args, "allow_any_host", False):
+            wrapped, dropped = _scoping.partition_by_scope(
+                [{"url": u} for u in urls], patterns)
+            if dropped:
+                hosts = sorted({d.get("host") or "?" for d in dropped})
+                print("\n[!] %d wayback URL(s) are OUTSIDE the named host"
+                      " and were not imported. Hosts: " % len(dropped)
+                      + ", ".join(hosts[:12]), file=sys.stderr)
+            urls = [t["url"] for t in wrapped]
+            if not urls:
+                _log.error("Every wayback URL was out of scope; nothing to"
+                           " scan. Re-run with --allow-host.")
+                return 2
+        print(f"[*] Wayback {args.wayback}: {len(urls)} URL(s) imported")
     if spec_targets:
         urls = [t["url"] for t in spec_targets]
         print(f"[*] {src_label}: {len(spec_targets)} endpoint(s) imported")
@@ -949,7 +1014,8 @@ def main(argv=None):
     if not urls:
         ap.print_help()
         print("\n[!] No target specified. Use -u URL, --batch FILE, "
-              "--batch-stdin, --har FILE, --openapi FILE or --sitemap.",
+              "--batch-stdin, --har FILE, --openapi FILE, --sitemap or "
+              "--wayback.",
               file=sys.stderr)
         return 2
 
@@ -1057,6 +1123,8 @@ def main(argv=None):
                               args, "max_response_bytes", 0),
                           rotate_headers=getattr(args, "rotate_headers",
                                                  False),
+                          stop_at_cross_origin=getattr(
+                              args, "stop_at_cross_origin", False),
                           jitter=getattr(args, "jitter_ratio", 0.0) or 0.0)
 
     # Phase 46: one shared request budget for the whole run (batch mode
@@ -1329,6 +1397,15 @@ def main(argv=None):
             if scanner.waf_name:
                 print(f"[*] WAF detected: {scanner.waf_name}")
 
+    if getattr(args, "stop_at_cross_origin", False) and requester.egress.boundary_stops:
+        # The boundary is a scope decision the operator made, so the refusals
+        # are reported -- "0 findings" must never silently mean "we stopped at
+        # someone else's host and never looked".
+        print(f"\n[!] Authorization boundary: {len(requester.egress.boundary_stops)} "
+              "cross-origin redirect(s) NOT followed:")
+        for _stopped in requester.egress.boundary_stops:
+            print(f"    - {_stopped}")
+
     if len(urls) > 1:
         # Phase 25-2: include the failure count in the batch summary so the
         # operator knows some targets were skipped due to errors.
@@ -1337,7 +1414,7 @@ def main(argv=None):
               f"({ok} ok, {len(failed_targets)} failed), "
               f"{total_findings} total finding(s).")
         if failed_targets:
-            print(f"[!] Failed targets:")
+            print("[!] Failed targets:")
             for u in failed_targets:
                 print(f"    - {u}")
 

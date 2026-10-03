@@ -87,7 +87,7 @@ class TestBuildJson:
 class TestBuildCsv:
     def test_header_and_row(self):
         csv_text = report.build_csv([_f()], "http://t/s", META)
-        lines = [l for l in csv_text.splitlines() if l.strip()]
+        lines = [line for line in csv_text.splitlines() if line.strip()]
         assert lines[0].startswith("type,url,method,param")
         assert len(lines) == 2  # header + 1 finding
         assert "reflected" in lines[1] and "http://t/s?q=x" in lines[1]
@@ -339,7 +339,6 @@ class TestNucleiHelpers:
         # by the CLI but the writer only unpacked plain dicts, so every
         # real run silently produced an INDEX.md with zero artifacts.
         # Both shapes must land the .html/.sh artifacts + the index row.
-        import tempfile
 
         from xssentinel.core.findings import Finding
 

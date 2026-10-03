@@ -54,7 +54,6 @@ def test_detected_vulnerable_case_is_tp(monkeypatch):
     import subprocess as sp
 
     def ok(*a, **kw):
-        out = kw["capture_output"]
         path = None
         for i, arg in enumerate(a[0]):
             if arg == "-o":

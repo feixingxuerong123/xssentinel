@@ -11,12 +11,10 @@ here touches a real provider.
 """
 from __future__ import annotations
 
-import html
 import json
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-import pytest
 
 from xssentinel.core import report as reportmod
 from xssentinel.core import report_ai as ra

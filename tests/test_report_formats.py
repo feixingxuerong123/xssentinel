@@ -52,7 +52,7 @@ def _unescaped_pipes(cell_line: str) -> int:
 class TestMarkdownSurvivesHostilePayloads:
     def test_summary_table_cells_survive_pipes_and_urls(self):
         out = report.build_markdown([_f()], "http://t", META)
-        rows = [l for l in out.splitlines() if l.startswith("| 1 ")]
+        rows = [line for line in out.splitlines() if line.startswith("| 1 ")]
         assert rows, "the finding's summary row went missing entirely"
         # 6 columns -> 7 delimiters, payload/URL pipes must not add any.
         assert _unescaped_pipes(rows[0]) == 7, rows[0]
@@ -63,7 +63,7 @@ class TestMarkdownSurvivesHostilePayloads:
             [_f(url="http://t/s?q=a\nb")], "http://t", META)
         # header + 1 finding row; the rule row is "|---|..." (no space)
         # and the URL's newline must not have spawned anything extra.
-        rows = [l for l in out.splitlines() if l.startswith("| ")]
+        rows = [line for line in out.splitlines() if line.startswith("| ")]
         assert len(rows) == 2, rows
         assert "a b" in rows[-1], "newline should collapse to a space"
 

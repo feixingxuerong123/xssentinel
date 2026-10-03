@@ -15,8 +15,8 @@ _ROOT = os.path.dirname(_HERE)
 sys.path.insert(0, _HERE)
 sys.path.insert(0, _ROOT)
 
-from benchmark.server import load_routes, BenchmarkHandler
-from benchmark.runner import evaluate_case
+from benchmark.server import load_routes, BenchmarkHandler  # noqa: E402
+from benchmark.runner import evaluate_case  # noqa: E402
 
 PORT = int(sys.argv[2]) if len(sys.argv) > 2 else 8930
 CASE_ID = sys.argv[1] if len(sys.argv) > 1 else "neg-escape-01"

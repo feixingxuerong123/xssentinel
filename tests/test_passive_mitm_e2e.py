@@ -75,7 +75,6 @@ def test_mitm_to_finding_to_poc(tmp_path):
         assert f.data.get("url", "").startswith("https://"), f.data
         assert f.data.get("param") == "q"
 
-        shim_finding = scanner
         scanner.attach_pocs()
         poc = f.data.get("poc") or {}
         assert poc.get("curl"), f"no curl PoC for MITM finding: {poc}"

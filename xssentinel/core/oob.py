@@ -100,6 +100,12 @@ class SelfHostedListener(OOBListener):
         self._server = None
         self._thread = None
         self._received: set[str] = set()
+        # Phase 188: the query string each beacon carried.  The blind
+        # collector payload (ezXSS/XSSHunter style) exfiltrates cookies,
+        # localStorage/sessionStorage, referrer, URL, UA and a DOM snippet
+        # as query params; without this the strongest evidence channel
+        # threw everything but the token away.
+        self._queries: dict[str, str] = {}
         self._lock = threading.Lock()
         self._started = False
 
@@ -110,10 +116,13 @@ class SelfHostedListener(OOBListener):
 
         class _Handler(BaseHTTPRequestHandler):
             def do_GET(self):
-                tok = self.path.strip("/").split("?")[0].split("/")[0]
+                path, _, query = self.path.partition("?")
+                tok = path.strip("/").split("?")[0].split("/")[0]
                 if tok:
                     with listener._lock:
                         listener._received.add(tok)
+                        if query:
+                            listener._queries[tok] = query[:2000]
                 self.send_response(200)
                 self.send_header("Content-Type", "text/plain")
                 self.end_headers()
@@ -161,6 +170,16 @@ class SelfHostedListener(OOBListener):
             time.sleep(0.2)
         with self._lock:
             return self._received & expected
+
+    def hit_query(self, token: str) -> str:
+        """Raw query string the victim's browser appended to its beacon.
+
+        Only the SelfHostedListener sees the actual request; interactsh
+        confirms through the poll API and has no query to expose (callers
+        guard with ``hasattr``).
+        """
+        with self._lock:
+            return self._queries.get(token, "")
 
 
 class InteractshListener(OOBListener):

@@ -28,19 +28,15 @@ import asyncio
 import copy
 import time
 import secrets
-from typing import Any, AsyncIterator
-from urllib.parse import urlparse, urljoin, urlencode
+from typing import AsyncIterator
+from urllib.parse import urljoin
 
 from .scanner import Finding, json_leaf_paths, _set_json_leaf
-from .findings import (EVIDENCE_BROWSER_EXECUTED, EVIDENCE_MODEL,
-                       EVIDENCE_NO_BROWSER, EVIDENCE_OOB,
-                       _grade_evidence)
-from .scanner_layers import AdvancedLayerMixin
-from .scanner_crawl import CrawlMixin
-from .requester import JsonBody, CountingRequester
+from .findings import (EVIDENCE_MODEL,
+                       EVIDENCE_NO_BROWSER)
+from .requester import JsonBody
 from . import payloads as payloads_mod
 from . import context as ctx
-from . import layer_guard
 from . import verifier
 from . import waf as wafmod
 from . import polyglot as poly_mod
@@ -50,49 +46,51 @@ from . import pre_encode as pre_mod
 # Phase 37: reflection-profile + generator parity (sync Phases 31/32).
 from . import reflection_profile as rp_mod
 from . import generator as gen_mod
-from . import cors_check as cors_mod   # Phase 54: sync CORS audit parity
 from . import csp as csp_mod           # Phase 100: CSP nonce-leak parity
 from . import dom_engine as dom_engine_mod  # Phase 65: DOM-dynamic parity
-from . import xs_leaks as xsleak_mod   # Phase 54: sync XS-Leaks audit parity
 # Phase 86: budget/circuit stops must be catchable by name at every layer --
 # _throttle() raises them, and the generic ``except Exception`` handlers that
 # surround every probe used to swallow them (see _probe_param).
 from .budget import BudgetExhausted, CircuitOpen
+from .egress import EgressPolicy
+
+# Phase 191 split of this file (pure movement; see async_scanner_common.py and
+# the three mixins below).  The helper names are re-imported here because
+# callers and tests import them from the engine module.  `_EGRESS_JAR` is
+# deliberately NOT re-exported: `from x import name` copies the value, so a
+# test that resets the cache would then be writing an alias while
+# `_egress_cookie_jar_cls` keeps reading the real binding in
+# async_scanner_common -- a guard that silently stops guarding anything.
+from .async_scanner_common import (  # noqa: E402  (must follow the block above)
+    _AsyncScannerShim,  # noqa: F401  (engine import surface; used by layers/crawl)
+    _body_kwargs,
+    _drain_agen,
+    _egress_cookie_jar_cls,
+    _extract_links,  # noqa: F401  (engine import surface; used by crawl)
+    _FakeResp,
+    _JSONP_CALLBACK_NAMES,  # noqa: F401  (engine import surface; used by layers)
+    _log,
+    _non_html_grade,
+)
+from .async_scanner_verify import AsyncHeadlessVerifyMixin
+from .async_scanner_layers import AsyncDetectionLayersMixin
+from .async_scanner_crawl import AsyncCrawlMixin
 
 
-def _non_html_grade(resp_headers) -> tuple[str, str]:
-    """Phase 32 parity (scanner._record), Phase 179: markup reflected into a
-    non-HTML response cannot execute in a browser tab -- keep the finding,
-    downgrade severity AND confidence.  Severity-only consumers (benchmark
-    FP gate, SARIF level, report highlighting) must not triage it like a
-    live sink.
-    """
-    try:
-        hdrs = resp_headers or {}
-        ctype = (hdrs.get("Content-Type")
-                 or hdrs.get("content-type") or "").lower()
-    except Exception:
-        ctype = ""
-    if ctype and not any(t in ctype for t in (
-            "text/html", "application/xhtml", "image/svg")):
-        return "low", "low"
-    return "high", "high"
-from .findings import _DEFAULT_TRANSFORMS
-from . import transform as transform_mod
-from .logger import get_logger
-from .parser_utils import bs_parser as _bs_parser
-from .stealth import (marker as _stem_marker, HeaderRotator as _HeaderRotator, ProxyPool as _ProxyPool,
+
+
+
+
+from .findings import _DEFAULT_TRANSFORMS  # noqa: E402
+from . import transform as transform_mod  # noqa: E402
+from .stealth import (marker as _stem_marker, HeaderRotator as _HeaderRotator, ProxyPool as _ProxyPool,  # noqa: E402
                       jitter_interval, load_proxies as _load_proxies)
 
-_log = get_logger("async_scanner")
-
-# JSONP callback parameter names probed by the async JSONP layer.  Kept
-# at module level so it is created once instead of per-scan.
-_JSONP_CALLBACK_NAMES = ("callback", "cb", "jsonp", "jsonpCallback",
-                         "fn", "function", "handler")
 
 
-class AsyncScanner:
+
+class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
+                   AsyncCrawlMixin):
     """Async XSS scanner with full detection pipeline.
 
     Construct with the same options as Scanner; call ``await scan(url, ...)``
@@ -264,10 +262,65 @@ class AsyncScanner:
             return merged
         return base
 
+    def _egress(self) -> "EgressPolicy":
+        """Credential-egress policy shared by every session this scanner opens.
+
+        ``getattr`` guards mirror ``_verify_pool``: tests build this scanner
+        with ``__new__`` to skip ``__init__``, and a missing header bundle
+        simply means "scrub the built-in credential names".
+        """
+        policy = getattr(self, "_egress_policy", None)
+        if policy is None:
+            names = dict(getattr(self, "headers", None) or {})
+            names.update(dict(getattr(self, "auth_headers", None) or {}))
+            policy = EgressPolicy(operator_headers=names)
+            self._egress_policy = policy
+        return policy
+
+    def _session_kwargs(self, url: str) -> dict:
+        """``ClientSession`` kwargs that keep operator credentials on their origin.
+
+        aiohttp 3.13.3 measured here: it forwards the request header dict to
+        every redirect hop, and it applies the cookie jar when it *builds*
+        each hop -- after ``on_request_redirect`` has run -- so a header
+        scrub alone cannot reach jar cookies.  Hence two mechanisms: the
+        redirect listener strips header secrets, the jar subclass stays shut
+        for an origin the operator never named.  ``cookies=`` cannot be passed
+        alongside ``cookie_jar=``, so the operator cookies are seeded here.
+        """
+        import aiohttp
+        policy = self._egress()
+        policy.note(url)
+        jar_cls = _egress_cookie_jar_cls()
+        jar = jar_cls(policy)
+        cookies = getattr(self, "cookies", None)
+        if cookies:
+            jar.update_cookies(dict(cookies))
+        tc = aiohttp.TraceConfig()
+
+        async def _named(session, ctx, params):
+            # Fires once per top-level request, never for a redirect hop --
+            # which is exactly the distinction this policy turns on.
+            policy.note(params.url)
+
+        async def _scrub_hop(session, ctx, params):
+            location = params.response.headers.get("Location")
+            if not location:
+                return
+            target = urljoin(str(params.response.url), str(location))
+            removed = policy.scrub(params.headers, target)
+            if removed:
+                _log.warning("withheld %s from cross-origin redirect to %s",
+                             "+".join(sorted(removed)), target)
+
+        tc.on_request_start.append(_named)
+        tc.on_request_redirect.append(_scrub_hop)
+        return {"trace_configs": [tc], "cookie_jar": jar}
+
     @staticmethod
     def _check_aiohttp() -> bool:
         try:
-            import aiohttp  # noqa: F401
+            import aiohttp  # noqa: F401  (可选依赖可用性探测:导入即使用)
             return True
         except ImportError:
             return False
@@ -309,119 +362,6 @@ class AsyncScanner:
             # through here the same way).
             self.shutdown_headless()
 
-    def _verify_headers(self) -> dict:
-        """Identity the headless replay should carry: the same base +
-        auth headers the probes rode, so an authed reflection is confirmed
-        against the authed page, not bounced by a login wall."""
-        h = dict(getattr(self, "headers", None) or {})
-        h.update(dict(getattr(self, "auth_headers", None) or {}))
-        return h
-
-    def _verify_pool(self):
-        """Lazily create the dedicated verification executor.  getattr
-        guards throughout: tests build this scanner with ``__new__`` to
-        skip ``__init__``, so every knob must survive that shape."""
-        pool = getattr(self, "_headless_pool", None)
-        if pool is None:
-            import concurrent.futures
-            cap = max(1, int(getattr(self, "headless_concurrency", 1) or 1))
-            pool = concurrent.futures.ThreadPoolExecutor(
-                max_workers=cap, thread_name_prefix="xss-headless")
-            self._headless_pool = pool
-        return pool
-
-    def shutdown_headless(self) -> None:
-        """Release the verification executor (idempotent).  With the worker
-        threads gone, their thread-bound Chromiums become collectable; the
-        process-wide registry in dom_engine still closes stragglers atexit."""
-        pool = getattr(self, "_headless_pool", None)
-        if pool is not None:
-            pool.shutdown(wait=False)
-            self._headless_pool = None
-
-    @staticmethod
-    def _probe_token(payload: str) -> str | None:
-        """The unique marker a fired dialog must carry for confirmation.
-
-        ``verifier.mark`` rewrites the payload's alert() argument to the
-        marker, so when the payload executes, the dialog message IS that
-        argument -- extract it from the (possibly transformed) payload
-        instead of threading a token through every yield site.  Order
-        mirrors mark()'s stamp shapes: plain alert('..'), the paren-free
-        alert`..`, and the concat stamp window['ale'+'rt']('..').  No match
-        means the replay cannot be ATTRIBUTED to this probe -- return None
-        so the caller skips verification rather than risk a false
-        browser-refuted grade on an unattributable dialog.
-        """
-        import re as _re
-        m = (_re.search(r"alert\(\s*['\"]([^'\"]{2,})['\"]\s*\)", payload)
-             or _re.search(r"alert`\s*([^`]{2,})\s*`", payload)
-             or _re.search(r"rt\]\(\s*['\"]([^'\"]{2,})['\"]\s*\)", payload))
-        if m:
-            return m.group(1)
-        # Fallback: a marker-token run anywhere in the payload (hex-suffixed
-        # stems like xssp_q_2813 / xssentinel_async_q_2813 / xssup_field_...).
-        m = _re.search(r"[A-Za-z_]*xss[A-Za-z0-9_]*?[0-9a-f]{4,}", payload)
-        return m.group(0) if m else None
-
-    async def _headless_verify_finding(self, f: Finding, seen: set):
-        """Browser-confirm one finding, or return it untouched when a dialog
-        replay cannot prove anything new.  Re-grades confidence/evidence
-        through the SAME ``_grade_evidence`` the sync engine uses, so the
-        two engines state identical evidence vocabulary."""
-        d = f.data
-        if d.get("headless") is not None:
-            return f            # already carries browser evidence (e.g. the
-                                # DOM-dynamic layer's real-browser verdict)
-        if d.get("evidence_class") == EVIDENCE_OOB:
-            return f            # OOB callback hit: no dialog to check, and
-                                # the report already renders the stronger line
-        url = d.get("url")
-        if not url:
-            return f
-        payload = d.get("payload") or ""
-        if payload.startswith("(") and payload.endswith(")"):
-            return f            # placeholder audit observation, not a
-                                # runnable replay (same guard as the
-                                # nuclei exporter's Phase 85 rule)
-        token = self._probe_token(payload)
-        if not token:
-            return f            # unattributable replay: verifying could
-                                # only produce an unproven "not-fired"
-        is_body = d.get("param_in") == "body"
-        if is_body and getattr(self, "json_body", None) is not None:
-            return f            # JSON carrier: the form-body replay would
-                                # confirm the wrong content type (sync's
-                                # Phase 46 skip rule, mirrored)
-        key = (url, d.get("param"), payload)
-        if key in seen:
-            return f            # dedup: identical replay, identical evidence
-        seen.add(key)
-        param = d.get("param") or ""
-        loop = asyncio.get_running_loop()
-        try:
-            result = await loop.run_in_executor(
-                self._verify_pool(),
-                lambda: verifier.verify_headless(
-                    url, d.get("method") or "GET",
-                    params=None if is_body else {param: payload},
-                    data={param: payload} if is_body else None,
-                    headers=self._verify_headers(),
-                    token=token))
-        except Exception as e:
-            _log.warning("headless verification failed for %s: %s",
-                         url, e, exc_info=getattr(self, "verbose", False))
-            result = {"available": False, "confirmed": False,
-                      "outcome": "errored",
-                      "detail": f"async headless verify error: {e}"}
-        _cls, _conf, _det = _grade_evidence(
-            result, d.get("confidence"), d.get("detail") or "")
-        d["headless"] = result
-        d["evidence_class"] = _cls
-        d["confidence"] = _conf
-        d["detail"] = _det
-        return f
-
     async def _scan_raw(self, url: str, method: str = "GET",
                         params: dict | None = None,
                         data: dict | None = None) -> AsyncIterator[Finding]:
@@ -459,7 +399,8 @@ class AsyncScanner:
         try:
             async with aiohttp.ClientSession(timeout=timeout,
                                              connector=connector,
-                                             cookies=self.cookies) as session:
+                                             **self._session_kwargs(url)
+                                             ) as session:
                 # 1) Baseline: get the page for reflection + DOM + advanced.
                 try:
                     async with self._semaphore:
@@ -1244,12 +1185,113 @@ class AsyncScanner:
                                 severity=_non_html_grade(resp_headers)[0],
                                 evidence=_ntext[max(0, _idx - 30):
                                                 _idx + len(_ntok) + 30],
-                                type="reflected",
-                                confidence=_non_html_grade(resp_headers)[1],
-                                transform=["csp_nonce"],
-                                param_in="body" if is_body else "query",
-                                evidence_class=EVIDENCE_MODEL,
-                            )
+                        type="reflected",
+                        confidence=_non_html_grade(resp_headers)[1],
+                        transform=["csp_nonce"],
+                        param_in="body" if is_body else "query",
+                        evidence_class=EVIDENCE_MODEL,
+                    )
+
+        # Phase 187: CSP gadget chain (sync _try_csp_gadget parity).  A strict
+        # script-src that still allowlists a known gadget host (JSONP endpoint,
+        # Angular CDN, ...) re-opens script execution; inline payloads cannot
+        # confirm it.  Framework-gadget payloads (Angular template expression)
+        # confirm through the SAME static template_angular machinery the
+        # corpus uses; JSONP-shaped ones have no honest static verdict (the
+        # token rides a src attribute) -- sync measures those under headless,
+        # the async emission stays on the static machinery like every other
+        # finding here.  Capped at two gadget payloads per (url, param).
+        if not param_confirmed and csp_hdr:
+            try:
+                _gadgets = csp_mod.gadget_bypass_payloads(csp_hdr)
+            except Exception:
+                _gadgets = []
+            _gtried = getattr(self, "_csp_gadget_tried", None)
+            if _gtried is None:
+                _gtried = set()
+                self._csp_gadget_tried = _gtried
+            if ((url, param) not in _gtried
+                    and csp_mod.gadget_chain_relevant(csp_hdr)):
+                _gtried.add((url, param))
+                for _g in _gadgets[:2]:
+                    _gtok = "xssv_" + secrets.token_hex(4)
+                    _gpay = verifier.mark(_g["payload"], _gtok)
+                    if _gpay == _g["payload"]:
+                        continue  # nothing stampable -> no attributable proof
+                    _gparams, _gdata = self._probe_kv(
+                        params, data, param, _gpay, is_body)
+                    try:
+                        async with self._semaphore:
+                            await self._throttle(url)
+                            async with session.request(
+                                method, url, params=_gparams or None,
+                                headers=self._req_headers(self.headers),
+                                proxy=self._next_proxy(),
+                                **_body_kwargs(_gdata),
+                            ) as gresp:
+                                _gtext = await gresp.text()
+                                _ghdrs = dict(
+                                    getattr(gresp, "headers", None) or {})
+                                self.requests_made += 1
+                                self._record_status(
+                                    getattr(gresp, "status", 200))
+                    except (BudgetExhausted, CircuitOpen):
+                        raise
+                    except Exception:
+                        continue
+                    if not _gtext or _gtok not in _gtext:
+                        continue
+                    _gv = await asyncio.to_thread(
+                        verifier.verify_semantic, _gtext, _gtok,
+                        response_headers=_ghdrs)
+                    if not _gv.get("confirmed"):
+                        # JSONP-shaped gadgets have no honest static verdict
+                        # (the token rides a src attribute).  Sync measures
+                        # those under headless; here the Phase-183 wrapper is
+                        # the browser -- but only when one EXISTS.  Without
+                        # Playwright the emission would be a browserless
+                        # claim sync never makes, so stay silent instead.
+                        if not dom_engine_mod.DynamicDomAnalyzer.available():
+                            continue
+                        _gidx = _gtext.find(_gtok)
+                        yield Finding(
+                            url=url, method=method, param=param,
+                            context=context,
+                            payload=_gpay,
+                            severity="high",
+                            evidence=_gtext[max(0, _gidx - 30):
+                                            _gidx + len(_gtok) + 30],
+                            type="reflected",
+                            confidence="low",
+                            transform=["csp_gadget"],
+                            param_in="body" if is_body else "query",
+                            evidence_class=EVIDENCE_NO_BROWSER,
+                            detail=(
+                                "CSP allowlists "
+                                f"'{_g['host']}' which hosts "
+                                f"{_g['gadget']}; the JSONP gadget payload "
+                                "reflected.  Static verdict is honestly "
+                                "silent (the token rides a src attribute) "
+                                "-- browser confirmation pending."),
+                        )
+                        break
+                    if not verifier.payload_survived(_gtext, _gpay):
+                        continue
+                    _gidx = _gtext.find(_gtok)
+                    yield Finding(
+                        url=url, method=method, param=param,
+                        context=_gv.get("context") or context,
+                        payload=_gpay,
+                        severity=_non_html_grade(_ghdrs)[0],
+                        evidence=_gtext[max(0, _gidx - 30):
+                                        _gidx + len(_gtok) + 30],
+                        type="reflected",
+                        confidence=_non_html_grade(_ghdrs)[1],
+                        transform=["csp_gadget"],
+                        param_in="body" if is_body else "query",
+                        evidence_class=EVIDENCE_MODEL,
+                    )
+                    break
 
         # Phase 132: L7 parameter layers (mutation / DOM clobber / template
         # / polyglot / markdown).  Sync reaches these at the end of
@@ -1354,1203 +1396,6 @@ class AsyncScanner:
                     _log.debug("    [!] async bypass_chain error: %s", e)
 
         return variants
-
-    async def _try_pre_encoded_async(self, session, url, method, param,
-                                     params, data, is_body, orig_value,
-                                     struct, context, marker
-                                     ) -> AsyncIterator[Finding]:
-        """Phase 35: container-encoded probes (base64/JWT/JSON), parity
-        with the sync scanner's _try_pre_encoded (Phase 34).  The base
-        payload is token-marked first, then re-wrapped into the container
-        the original value used; no transform chains -- the container
-        encoding IS the transformation."""
-        for base in pre_mod.PRE_ENCODE_BASES:
-            marked = verifier.mark(base, marker)
-            enc = await asyncio.to_thread(
-                pre_mod.encode_payload, orig_value, struct, marked)
-            if not enc:
-                continue
-            send_params, send_data = self._probe_kv(
-                params, data, param, enc, is_body)
-            try:
-                async with self._semaphore:
-                    await self._throttle(url)
-                    async with session.request(
-                        method, url, params=send_params or None,
-                        headers=self._req_headers(self.headers), proxy=self._next_proxy(),
-                        **_body_kwargs(send_data),
-                    ) as resp:
-                        text = await resp.text()
-                        resp_headers = dict(getattr(resp, "headers", None) or {})  # CSP gate parity
-                        self.requests_made += 1
-                        self._record_status(getattr(resp, "status", 200))
-            except (BudgetExhausted, CircuitOpen):
-                raise            # Phase 86: stop instead of "next base"
-            except Exception:
-                continue
-            v = await asyncio.to_thread(verifier.verify_semantic,
-                                        text, marker,
-                                        response_headers=resp_headers)
-            # Phase 178c: NO payload_survived here (sync parity -- sync's
-            # _try_pre_encoded never had one).  The container-wrapped form
-            # can never appear verbatim in a decode-echo response, and
-            # _survival_candidates cannot see inside a JWT's middle
-            # segment, so this check silently killed EVERY jwt container
-            # confirmation (Range3 measured: encode fires, verify
-            # confirms, gate rejects, 0 findings).  Filter rewrites are
-            # still caught: the sandbox inside verify_semantic calls a
-            # mangled script inert.
-            if v["confirmed"]:
-                idx = text.find(marker)
-                yield Finding(
-                    url=url, method=method, param=param,
-                    context=v.get("context") or context,
-                    payload=enc,
-                    severity=_non_html_grade(resp_headers)[0],
-                    evidence=text[max(0, idx - 30):idx + len(marker) + 30],
-                    type="reflected",
-                    confidence=_non_html_grade(resp_headers)[1],
-                    transform=[f"pre_encode:{struct}"],
-                    param_in="body" if is_body else "query",
-                    evidence_class=EVIDENCE_MODEL,
-                )
-                return
-
-    def _resolve_dom_engine(self):
-        """Phase 65: mirror the sync _resolve_dom_engine for L6 parity."""
-        de = self.dom_engine
-        if de == "static":
-            return None
-        if de == "auto" and not dom_engine_mod.DynamicDomAnalyzer.available():
-            return None
-        try:
-            return dom_engine_mod.DynamicDomAnalyzer(
-                auth_headers=self.auth_headers,
-                auth_cookies=self.auth_cookies,
-                auth_local_storage=self.auth_local_storage)
-        except Exception:
-            return None
-
-    async def _scan_dom_async(self, url: str, page_text: str,
-                              method: str = "GET",
-                              params: dict | None = None
-                              ) -> AsyncIterator[Finding]:
-        """L3 static + L6 real-browser DOM layer -- sync _scan_dom parity.
-
-        Phase 65 fixes two divergences from the sync layer: the static
-        analysis was invoked with the URL as the ``is_html`` flag (an
-        accidental truthy pass-through that broke for empty URLs), and the
-        real-browser dynamic confirmation (dom_dynamic) never ran in async
-        mode at all.
-
-        Phase 176t adds the third one, and it is the kind that cannot be
-        spotted from a finding count: the browser was navigated to ``url``,
-        which in async does NOT contain the endpoint's query string (the
-        engine keeps ``url`` and ``params`` apart -- see _scan_reflected).
-        So ``location.search`` was empty at read time, and every DOM vector
-        whose source is the query string was structurally unconfirmable --
-        reported as a clean page, not as a degraded scan.  Sync already
-        re-attaches params before this call (scanner.py:479-486); the guard
-        below is copied from there, including the GET-only condition.
-        """
-        try:
-            from . import dom as dom_mod
-            static_results = await asyncio.to_thread(
-                dom_mod.analyze, page_text, is_html=True)
-            engine = await asyncio.to_thread(self._resolve_dom_engine)
-            dyn_findings: list = []
-            # Phase 154 (sync parity, scanner_layers.py): page_has_client_js
-            # alone lets pages with JS but no possible sink pay for a whole
-            # browser session; page_can_run_sink keeps every external-script
-            # page (SPA bundles) so this only skips provably dead passes.
-            # Phase 159: that function is "is the page provably inert?", not
-            # "did we recognise a sink" -- the whitelist version silently
-            # disabled browser verification for unlisted sinks (srcdoc).
-            # Keep both call sites identical: this is a sync/async parity pair.
-            if engine is not None and await asyncio.to_thread(
-                    lambda t: (dom_engine_mod.page_has_client_js(t)
-                               and dom_engine_mod.page_can_run_sink(t)),
-                    page_text):
-                page_url = url
-                if method == "GET" and params:
-                    try:
-                        qs = urlencode(params)
-                        if qs:
-                            page_url = url + ("&" if "?" in url
-                                              else "?") + qs
-                    except Exception:
-                        pass
-                dyn_findings = await asyncio.to_thread(engine.analyze,
-                                                       page_url)
-
-            dyn_sinks: set = set()
-            for d in dyn_findings:
-                s = (d.get("sink") or "").lower()
-                dyn_sinks.add(s)
-                dyn_sinks.add(s.split(".")[-1])
-
-            def _suppressed(r) -> bool:
-                hay = ((r.get("type") or "") + " " + (r.get("context") or "")
-                       + " " + (r.get("detail") or "")).lower()
-                if not hay:
-                    return False
-                return any(s and s in hay for s in dyn_sinks)
-
-            for r in static_results:
-                if _suppressed(r):
-                    continue  # confirmed dynamically; dynamic finding covers it
-                yield Finding(
-                    url=url, method="GET", param=None,
-                    context=r.get("type"),
-                    payload=r.get("snippet", ""),
-                    severity="medium" if r.get("confidence") == "medium"
-                    else "low",
-                    confidence=r.get("confidence", "low"),
-                    detail=r.get("detail", ""),
-                    type="dom",
-                    evidence_class=EVIDENCE_NO_BROWSER,
-                )
-            for d in dyn_findings:
-                yield Finding(
-                    url=url, method="GET", param=None,
-                    context=d.get("sink"),
-                    payload=d.get("snippet", ""),
-                    severity="high",
-                    confidence=d.get("confidence", "high"),
-                    detail=d.get("detail", ""),
-                    type="dom_dynamic",
-                    headless={"available": True, "confirmed": True,
-                              "outcome": "fired",
-                              "detail": "marker executed in real browser sink"},
-                    proof=d.get("snippet", ""),
-                    evidence_class=EVIDENCE_BROWSER_EXECUTED,
-                )
-        except Exception as e:
-            _log.warning("async DOM layer error: %s", e, exc_info=self.verbose)
-
-    async def _scan_advanced_page(self, url: str, page_text: str,
-                                  params: dict | None = None
-                                  ) -> AsyncIterator[Finding]:
-        """L5 advanced page-level layers (postMessage / prototype / SW / etc).
-
-        Delegates to the sync ``advanced_layers.run_page_layers`` in a
-        thread, then streams any findings produced.
-
-        Phase 87: forward the endpoint params -- import map / CSSI /
-        dangling markup sub-layers use them to detect user-controlled
-        reflection; the old call left them at None (sync parity:
-        scanner.py passes ``params=params``).
-
-        Phase 176s: pass a REAL requester instead of ``None``.  Several page
-        layers need a follow-up GET -- most visibly cookie tossing, which
-        reads the ``Set-Cookie`` response headers (``layers/content_layers.py``
-        does ``req.get(url)`` then ``resp.raw.headers.getlist``).  With
-        ``req=None`` that call raised AttributeError, the layer's own
-        ``except Exception: pass`` swallowed it, and the layer went on with
-        an empty header list -- so it could never report the one thing it
-        exists to report.  The shim's old comment called this "degrades
-        gracefully"; it degrades *silently*, which is how the gap survived
-        until a benchmark case (pos-ctoss-01) measured it.
-        """
-        try:
-            from . import advanced_layers
-            # Create a lightweight sync scanner shim to collect findings.
-            shim = _AsyncScannerShim(self)
-            # CountingRequester, not the bare requester: some sub-layers bump
-            # the scanner themselves and some do not, and either way the
-            # traffic has to land in the scan's request accounting instead of
-            # sailing past it (Phase 142).
-            shim.req = CountingRequester(self._get_sync_requester(),
-                                         shim._bump)
-            await asyncio.to_thread(
-                advanced_layers.run_page_layers, shim, shim.req, url,
-                page_text, params=params)
-            self.requests_made += shim.requests_made
-            for f in shim._findings:
-                yield f
-        except Exception as e:
-            _log.warning("async advanced page layers error: %s", e, exc_info=self.verbose)
-
-    async def _scan_time_based(self, url: str, method: str, params: dict,
-                               data: dict, param: str, is_body: bool
-                               ) -> AsyncIterator[Finding]:
-        """Phase 176s: time-based (OOB resource-fetch) fallback.
-
-        Sync reaches this at the end of ``_scan_param`` (scanner.py:1122):
-        the marker reflected, every standard payload failed to confirm, so a
-        strict CSP is the prime suspect.  ``<style>@import</style>`` /
-        ``<img src>`` / onerror-fetch payloads make the browser fetch a
-        resource whether or not inline script is allowed, and the OOB
-        listener turns that fetch into proof of execution.
-
-        Async never had this step at all.  It matters precisely because it
-        is the ONLY thing that fires on a CSP-locked endpoint -- without it
-        those are silent false negatives, not degraded detections.
-        """
-        shim = None
-        try:
-            from . import time_xss as tx_mod
-            shim = _AsyncScannerShim(self)
-            # Same requester wiring as the other thread-offloaded sync
-            # layers: a real one, wrapped so its traffic is counted.
-            shim.req = CountingRequester(self._get_sync_requester(),
-                                         shim._bump)
-            await asyncio.to_thread(
-                tx_mod.scan_time_based, shim, shim.req, url, method,
-                params, data, param, is_body)
-            self.requests_made += shim.requests_made
-            for f in shim._findings:
-                yield f
-        except (BudgetExhausted, CircuitOpen):
-            raise        # a budget stop is not a layer bug
-        except Exception as e:
-            # Same failed-row rule as _scan_request_layers above: silence
-            # here reads as "this param had no CSP fallback", not "it died".
-            if shim is not None:
-                shim.coverage.record_layer(
-                    url, "L7_time_based", status="failed",
-                    detail=f"{type(e).__name__}: {str(e)[:140]}")
-            _log.warning("async time-based fallback error: %s", e,
-                         exc_info=self.verbose)
-
-    async def _scan_request_layers(self, url: str, method: str,
-                                   params: dict, data: dict
-                                   ) -> AsyncIterator[Finding]:
-        """L8 request-injection layers (header / path / cookie / error XSS).
-
-        Phase 87: async mode never called
-        ``advanced_layers.run_request_layers``, so four whole XSS carrier
-        classes (User-Agent/Referer/XFF header injection, URL path segment
-        XSS, cookie value XSS, error page XSS) were never tested in
-        --async scans -- an entire layer of missed findings.  Mirror the
-        sync scan_endpoint wiring: run the sync layer in a thread against
-        a real sync Requester (the transport layers issue blocking
-        ``requests`` calls), then stream the shim's findings.
-
-        Budget/circuit semantics (Phase 86): a BudgetExhausted /
-        CircuitOpen raised inside the thread is a deliberate scan stop,
-        not a layer bug -- it propagates (through _drain_agen) like every
-        other layer instead of being swallowed.
-        """
-        shim = None
-        try:
-            from . import advanced_layers
-            shim = _AsyncScannerShim(self)
-            req = self._get_sync_requester()
-            await asyncio.to_thread(
-                advanced_layers.run_request_layers,
-                shim, req, url, method, params, data)
-            # Coverage visibility: the shim's NullCoverage only records in
-            # memory, but tests/debugging inspect shim.coverage.touched to
-            # prove the L8 request layers ran -- which is exactly why the
-            # touch happens AFTER the call now.  Recorded before it, an
-            # entry-time failure still left "L8_request: touched" behind, so
-            # the introspection that exists to catch a silently dead layer was
-            # itself fooled by one.  (sync: scanner.py L7_time_based, same
-            # fix, same reason.)
-            shim.coverage.touch_layer(url, "L8_request", method,
-                                      "async request-injection layers")
-            for f in shim._findings:
-                yield f
-        except (BudgetExhausted, CircuitOpen):
-            raise        # Phase 86: a budget/circuit stop is NOT a layer bug
-        except Exception as e:
-            # Phase 176u: a swallowed failure must leave a failed row, not
-            # silence -- "no row" reads as "this endpoint had no such layer",
-            # which is exactly how a dead layer stayed invisible.  shim is
-            # None precisely when the failure was on entry (bad import /
-            # constructor), which is the case this row exists to reveal.
-            if shim is not None:
-                shim.coverage.record_layer(
-                    url, "L8_request", status="failed",
-                    detail=f"{type(e).__name__}: {str(e)[:140]}")
-            _log.warning("async request layers error: %s", e,
-                         exc_info=self.verbose)
-
-    async def _scan_advanced_param_layers(self, url: str, method: str,
-                                          params: dict, data: dict,
-                                          param: str, is_body: bool,
-                                          marker: str,
-                                          resp_text: str
-                                          ) -> AsyncIterator[Finding]:
-        """L7 parameter layers (mutation / DOM clobber / template /
-        polyglot / markdown).
-
-        Phase 132: ``--async`` never ran these.  ``_probe_param`` did the
-        payload loop, the position shift and the CSP-nonce exploit, then
-        stopped -- so five whole detection families (mutation XSS, DOM
-        clobbering, client-side template injection, polyglot, and the
-        markdown/BBCode markup layers) were reported by sync and silently
-        missed by async.
-
-        These sub-layers issue blocking ``requests`` calls, so this mirrors
-        ``_scan_request_layers``: a real sync Requester plus the
-        ``AdvancedLayerMixin``-backed shim, run in a worker thread, with
-        the shim's findings streamed back.
-
-        Unlike the payload loop this is a *step* the sync engine always
-        takes once the marker reflected -- even when the reflection is
-        HTML-escaped.  It is deliberately NOT gated on ``marker_escaped``
-        so the two engines stay in step (see scanner.py ``_scan_param``,
-        which reaches ``_run_advanced_layers`` unconditionally).
-        """
-        shim = _AsyncScannerShim(self)
-        try:
-            req = self._get_sync_requester()
-            shim.req = req
-            await asyncio.to_thread(
-                shim._run_advanced_layers,
-                req, url, method, params, data, param, is_body, marker,
-                resp_text)
-            # The sub-layers bump the shim's own counter; fold it in so the
-            # scan's request accounting stays honest.
-            self.requests_made += shim.requests_made
-            for f in shim._findings:
-                yield f
-        except (BudgetExhausted, CircuitOpen):
-            raise        # a budget/circuit stop is NOT a layer bug
-        except Exception as e:
-            _log.warning("async advanced param layers error: %s", e,
-                         exc_info=self.verbose)
-
-    async def _mine_hidden_params_async(self, url: str, method: str,
-                                        params: dict, data: dict) -> dict:
-        """Phase 133: hidden-parameter mining (sync parity).
-
-        Sync merges ``param_miner``'s discoveries into the endpoint's
-        params *before* probing it (scanner.py:302-324).  Async never had
-        an equivalent, so an endpoint whose interesting parameter has no
-        UI hint was only ever probed with the parameters already in the
-        URL -- benchmark case pos-pmmine-01 was a clean sync TP / async FN
-        (sync 46 requests, async 10).
-
-        ``param_miner`` issues blocking requests, so this runs the sync
-        miner in a worker thread against the shared sync Requester.
-
-        BAV is deliberately NOT enabled here: the CLI documents ``--bav`` as
-        sync-only, and half-implementing it would be worse than not
-        claiming it.
-        """
-        shim = _AsyncScannerShim(self)
-        try:
-            # Counting proxy: the miner never bumps a counter itself, so
-            # without this its ~N probe requests would not show up at all.
-            shim.req = CountingRequester(self._get_sync_requester(),
-                                     shim._bump)
-            found = await asyncio.to_thread(
-                shim._mine_hidden_params, url, method, params, data, False)
-            self.requests_made += shim.requests_made
-            return dict(found or {})
-        except (BudgetExhausted, CircuitOpen) as e:
-            # Phase 142: a budget stop while mining must NOT abort the scan.
-            # The page tasks created afterwards include layers that cost no
-            # requests at all (L6 CSP header analysis, L3 DOM static), and
-            # re-raising here meant they never ran -- a bypassable CSP went
-            # unreported purely because the miner had spent the cap first.
-            # Record the reason and fall through; the request-driven layers
-            # still raise on their own through _throttle, which propagates
-            # out of _drain_agen exactly as before.
-            _log.debug("async hidden-param mining stopped early: %s", e)
-            return {}
-        except Exception as e:
-            _log.warning("async hidden-param mining error: %s", e,
-                         exc_info=self.verbose)
-            return {}
-
-    def _get_sync_requester(self):
-        """Lazily-built sync Requester for thread-offloaded sync layers.
-
-        The transport layers (header/path/cookie/error XSS) need a
-        blocking ``requests`` client.  The async scanner has none -- the
-        shim's ``req`` is None and those layers' own try/except used to
-        degrade to no-ops.  Build one sharing the scan's timeout / headers
-        / cookies / proxy / TLS / rate-limit settings, once per scan.
-        """
-        req = getattr(self, "_sync_requester", None)
-        if req is None:
-            from .requester import Requester
-            req = Requester(
-                timeout=self.timeout,
-                proxy=self._next_proxy(),
-                headers=dict(self.headers),
-                cookies=dict(self.cookies),
-                verify_ssl=self.verify_ssl,
-                rate_limit=self.rate_limit,
-                jitter=self.jitter_ratio,
-            )
-            self._sync_requester = req
-        return req
-
-    async def _scan_csp_async(self, url: str, resp_headers: dict
-                              ) -> AsyncIterator[Finding]:
-        """L6 CSP analysis (runs in thread) -- sync _scan_csp parity.
-
-        Phase 62: the previous version treated the CSPReport OBJECT returned
-        by csp_mod.analyze as a dict (results.get('bypassable')), so every
-        async scan logged a TypeError and async mode NEVER reported a
-        bypassable CSP.  Mirror the sync layer: read report.bypassable /
-        report.weak and emit the same medium csp_bypass finding.
-        """
-        try:
-            from . import csp as csp_mod
-            # Run CSP analysis in a thread.
-            report = await asyncio.to_thread(
-                csp_mod.analyze,
-                resp_headers.get("Content-Security-Policy", ""))
-            if not report.bypassable:
-                return
-            best = await asyncio.to_thread(
-                csp_mod.best_bypass,
-                resp_headers.get("Content-Security-Policy", "")) or {}
-            yield Finding(
-                url=url, method="GET", param="(header)",
-                context="csp_header",
-                payload=best.get("payload", ""),
-                severity="medium",
-                evidence="; ".join(report.weak),
-                type="csp_bypass",
-                confidence="medium",
-                csp_header=resp_headers.get("Content-Security-Policy", ""),
-                bypass_type=best.get("type", ""),
-                bypass_reason=best.get("reason", ""),
-                evidence_class=EVIDENCE_NO_BROWSER,
-            )
-        except Exception as e:
-            _log.warning("async CSP layer error: %s", e, exc_info=self.verbose)
-
-    async def _scan_cors_async(self, session, url: str, method: str
-                               ) -> AsyncIterator[Finding]:
-        """Phase 54: CORS origin-reflection audit -- sync _scan_cors parity.
-
-        One finding per origin (dedup set on the scanner), two cheap probes
-        (GET with the attacker Origin, then an OPTIONS preflight when the
-        GET did not reflect).  Runs whenever advanced_layers is on, exactly
-        like the sync L7 CORS layer.
-        """
-        checked = getattr(self, "_cors_checked", None)
-        if checked is None:
-            checked = set()
-            self._cors_checked = checked
-        try:
-            from urllib.parse import urlparse
-            p = urlparse(url)
-            origin = f"{p.scheme}://{p.netloc}"
-        except Exception:
-            return
-        if not origin or origin in checked:
-            return
-        checked.add(origin)
-        evil = cors_mod.EVIL_ORIGIN
-        for probe_method, extra in cors_mod.PROBES:
-            resp_headers = {}
-            try:
-                async with self._semaphore:
-                    await self._throttle(url)
-                    headers = self._req_headers(self.headers)
-                    headers.update(extra)
-                    async with session.request(
-                        probe_method, url, params=None, headers=headers,
-                        proxy=self._next_proxy(),
-                    ) as resp:
-                        await resp.read()          # drain (headers enough)
-                        resp_headers = dict(resp.headers)
-                        self.requests_made += 1
-                        self._record_status(getattr(resp, "status", 200))
-            except (BudgetExhausted, CircuitOpen):
-                raise        # Phase 86: stop instead of "next probe"
-            except Exception:
-                continue
-            acao = resp_headers.get("Access-Control-Allow-Origin") or ""
-            acac = resp_headers.get("Access-Control-Allow-Credentials") or ""
-            verdict = cors_mod.classify(acao, acac, evil)
-            if verdict is None:
-                continue
-            sev, reason = verdict
-            evidence = (f"probe: {probe_method} {url}\n"
-                        f"Origin: {evil}\n"
-                        f"-> Access-Control-Allow-Origin: {acao or '(absent)'}\n"
-                        f"-> Access-Control-Allow-Credentials: "
-                        f"{acac or '(absent)'}")
-            yield Finding(
-                url=url, method=probe_method, param="", payload=evil,
-                context="cors_header", severity=sev,
-                type="cors_misconfig", confidence="firm",
-                evidence=evidence, detail=reason,
-                evidence_class=EVIDENCE_NO_BROWSER,
-            )
-            return  # one finding per origin is enough
-
-    async def _scan_xsleak_audit_async(self, url: str, resp_headers: dict
-                                       ) -> AsyncIterator[Finding]:
-        """Phase 54: XS-Leaks surface audit -- sync _scan_xsleak_audit parity.
-
-        Opt-in (self.xsleak_audit); reuses the baseline response headers
-        already fetched by scan() (zero extra requests); one low
-        xs_leak_surface finding per origin.
-        """
-        if not self.xsleak_audit:
-            return
-        checked = getattr(self, "_xsleak_audited", None)
-        if checked is None:
-            checked = set()
-            self._xsleak_audited = checked
-        try:
-            from urllib.parse import urlparse
-            p = urlparse(url)
-            origin = f"{p.scheme}://{p.netloc}"
-        except Exception:
-            return
-        if not origin or origin in checked:
-            return
-        checked.add(origin)
-        try:
-            verdict = xsleak_mod.audit_mitigations(resp_headers or {})
-        except Exception:
-            return
-        if verdict is None:
-            return
-        yield Finding(
-            url=url, method="GET", param="", payload="",
-            context=verdict.get("context", "response_headers"),
-            severity=verdict.get("severity", "low"),
-            type=verdict.get("type", "xs_leak_surface"),
-            confidence=verdict.get("confidence", "firm"),
-            evidence=verdict.get("evidence", ""),
-            detail=verdict.get("detail", ""),
-            evidence_class=EVIDENCE_NO_BROWSER,
-        )
-
-    async def _probe_upload_async(self, session, url: str, params: dict,
-                                  data: dict) -> AsyncIterator[Finding]:
-        """Phase 58: multipart upload-filename XSS probing -- sync
-        upload_probe.probe_upload parity over aiohttp.
-
-        Fires on POST scans when the operator named upload fields
-        (upload_fields).  Weaponised filenames are uploaded for each field;
-        an immediate filename echo in an executable context confirms
-        upload_xss, otherwise a marker-bearing stored URL from the response
-        is fetched once to confirm stored_upload.  Mirrors the sync logic
-        candidate-for-candidate so the dual engines report the same.
-        """
-        from .upload_probe import _first_url_with, _name_candidates
-        from urllib.parse import urljoin
-        if not self.upload_fields:
-            return
-        for field in self.upload_fields:
-            marker = f"{_stem_marker('xssup_')}{field}_{secrets.token_hex(2)}"
-            for filename in _name_candidates(marker):
-                text = ""
-                resp_headers = {}
-                try:
-                    # Raw multipart body, NOT aiohttp.FormData: FormData
-                    # percent-encodes the filename (%3Cimg...) and a server
-                    # echoing the raw name then shows encoded markup that
-                    # verify_semantic cannot confirm.  Mirror the sync
-                    # requests wire instead: boundary is a bare token, the
-                    # filename is verbatim except double quotes -> %22
-                    # (urllib3 does the same), which is what the Phase-48
-                    # sync probe sends.
-                    boundary = secrets.token_hex(8)
-                    safe_name = filename.replace('"', "%22")
-                    body = (f"--{boundary}\r\n"
-                            f'Content-Disposition: form-data; name="{field}"; '
-                            f'filename="{safe_name}"\r\n'
-                            "Content-Type: text/plain\r\n\r\n"
-                            "xssentinel upload probe\r\n"
-                            f"--{boundary}--\r\n").encode("utf-8")
-                    hdrs = self._req_headers(self.headers)
-                    hdrs["Content-Type"] = \
-                        f"multipart/form-data; boundary={boundary}"
-                    async with self._semaphore:
-                        await self._throttle(url)
-                        async with session.request(
-                            getattr(self, "_upload_method", "POST"), url,
-                            params=params or None, data=body,
-                            headers=hdrs, proxy=self._next_proxy(),
-                        ) as resp:
-                            text = await resp.text()
-                            resp_headers = dict(resp.headers)
-                            self.requests_made += 1
-                            self._record_status(getattr(resp, "status", 200))
-                except (BudgetExhausted, CircuitOpen):
-                    raise        # Phase 86: stop instead of "next filename"
-                except Exception:
-                    continue
-                if not text or marker not in text:
-                    continue
-                try:
-                    v = await asyncio.to_thread(
-                        verifier.verify_semantic, text, marker,
-                        response_headers=resp_headers)
-                except Exception:
-                    v = {"confirmed": False}
-                idx = text.find(marker)
-                evidence = text[max(0, idx - 60):idx + len(marker) + 120] \
-                    if idx >= 0 else ""
-                if v.get("confirmed"):
-                    yield Finding(
-                        url=url, method="POST",
-                        param=f"{field}[filename]",
-                        type="upload_xss", context="multipart_filename",
-                        payload=filename, severity="high", confidence="high",
-                        detail=(v.get("detail") or "") +
-                               " (filename echoed in upload response)",
-                        evidence=evidence,
-                        transform=["multipart_filename"],
-                        evidence_class=EVIDENCE_MODEL,
-                    )
-                    return  # one confirmed filename echo is enough
-                stored_url = _first_url_with(text, marker)
-                if not stored_url:
-                    continue
-                target = urljoin(url, stored_url)
-                try:
-                    async with self._semaphore:
-                        await self._throttle(target)
-                        async with session.get(
-                            target, headers=self._req_headers(self.headers),
-                            proxy=self._next_proxy(),
-                        ) as sresp:
-                            stext = await sresp.text()
-                            s_headers = dict(sresp.headers)
-                            self.requests_made += 1
-                            self._record_status(getattr(sresp, "status", 200))
-                except (BudgetExhausted, CircuitOpen):
-                    raise        # Phase 86: stop instead of "next filename"
-                except Exception:
-                    continue
-                if marker in stext:
-                    try:
-                        sv = await asyncio.to_thread(
-                            verifier.verify_semantic, stext, marker,
-                            response_headers=s_headers)
-                    except Exception:
-                        sv = {"confirmed": False}
-                    if sv.get("confirmed"):
-                        yield Finding(
-                            url=target, method="GET",
-                            param=f"{field}[filename]",
-                            type="stored_upload", context="uploaded_file",
-                            payload=filename, severity="high",
-                            confidence="high",
-                            detail=(sv.get("detail") or "") +
-                                   f" (stored file {stored_url} served "
-                                   "attacker markup)",
-                            evidence=stext[max(0, stext.find(marker) - 60):
-                                           stext.find(marker)
-                                           + len(marker) + 120],
-                            transform=["multipart_filename", "stored"],
-                            evidence_class=EVIDENCE_MODEL,
-                        )
-                        return
-
-            # Phase 90 (P2): filename vectors exhausted on this field --
-            # probe weaponised file CONTENT (HTML/SVG whose handler fires
-            # alert(marker)) served back at a stored URL.  Mirrors the
-            # sync probe_upload_content one candidate at a time.
-            from .upload_probe import _content_candidates as _cc
-            cmarker = f"{_stem_marker('xssupc_')}{secrets.token_hex(2)}"
-            for filename, content, mime in _cc(cmarker):
-                text = ""
-                resp_headers = {}
-                try:
-                    boundary = secrets.token_hex(8)
-                    body = (f"--{boundary}\r\n"
-                            f'Content-Disposition: form-data; name="{field}"; '
-                            f'filename="{filename}"\r\n'
-                            f"Content-Type: {mime}\r\n\r\n"
-                            .encode("utf-8") + content +
-                            f"\r\n--{boundary}--\r\n".encode("utf-8"))
-                    hdrs = self._req_headers(self.headers)
-                    hdrs["Content-Type"] = \
-                        f"multipart/form-data; boundary={boundary}"
-                    async with self._semaphore:
-                        await self._throttle(url)
-                        async with session.request(
-                            getattr(self, "_upload_method", "POST"), url,
-                            params=params or None, data=body,
-                            headers=hdrs, proxy=self._next_proxy(),
-                        ) as resp:
-                            text = await resp.text()
-                            resp_headers = dict(resp.headers)
-                            self.requests_made += 1
-                            self._record_status(
-                                getattr(resp, "status", 200))
-                except (BudgetExhausted, CircuitOpen):
-                    raise        # Phase 86: stop instead of "next file"
-                except Exception:
-                    continue
-                if not text or cmarker not in text:
-                    continue
-                stored_url = _first_url_with(text, cmarker)
-                if not stored_url:
-                    continue
-                target = urljoin(url, stored_url)
-                try:
-                    async with self._semaphore:
-                        await self._throttle(target)
-                        async with session.get(
-                            target, headers=self._req_headers(self.headers),
-                            proxy=self._next_proxy(),
-                        ) as sresp:
-                            stext = await sresp.text()
-                            s_headers = dict(sresp.headers)
-                            self.requests_made += 1
-                            self._record_status(getattr(sresp, "status", 200))
-                except (BudgetExhausted, CircuitOpen):
-                    raise        # Phase 86: stop instead of "next file"
-                except Exception:
-                    continue
-                if cmarker not in stext:
-                    continue
-                try:
-                    sv = await asyncio.to_thread(
-                        verifier.verify_semantic, stext, cmarker,
-                        response_headers=s_headers)
-                except Exception:
-                    sv = {"confirmed": False}
-                if sv.get("confirmed"):
-                    yield Finding(
-                        url=target, method="GET",
-                        param=f"{field}[content]",
-                        type="stored_upload",
-                        context="uploaded_file_content",
-                        payload=filename, severity="high",
-                        confidence="high",
-                        detail=(sv.get("detail") or "") +
-                               f" (stored file {stored_url} serves weaponised "
-                               "HTML/SVG content)",
-                        evidence=stext[max(0, stext.find(cmarker) - 60):
-                                       stext.find(cmarker)
-                                       + len(cmarker) + 120],
-                        transform=["uploaded_file_content", "stored"],
-                        evidence_class=EVIDENCE_MODEL,
-                    )
-                    return
-
-    async def _scan_jsonp_async(self, url: str, method: str,
-                                params: dict, data: dict
-                                ) -> AsyncIterator[Finding]:
-        """L6 JSONP callback XSS detection (fully async, no sync fallback).
-
-        Phase 24-1: rewritten to use the aiohttp ClientSession directly
-        instead of spinning up a synchronous Requester in a thread.
-        The old implementation negated the async throughput advantage
-        because each of the 7 callback-name probes blocked a thread on
-        ``requests.request()``.
-        """
-        try:
-            import aiohttp  # type: ignore
-        except ImportError:
-            return
-        # Build a query string carrying the existing params so the JSONP
-        # endpoint sees the same context the reflection layer saw.
-        for cb_name in _JSONP_CALLBACK_NAMES:
-            if cb_name in params or cb_name in data:
-                continue  # already being tested by the reflection layer
-            marker = f"xsjsonp_{secrets.token_hex(3)}"
-            probe_params = dict(params)
-            probe_params[cb_name] = marker
-            try:
-                async with self._semaphore:
-                    await self._throttle(url)
-                    async with aiohttp.ClientSession(
-                        cookies=self.cookies, headers=self._req_headers(self.headers),
-                        timeout=aiohttp.ClientTimeout(total=self.timeout),
-                    ) as sess:
-                        async with sess.get(
-                            url, params=probe_params, proxy=self._next_proxy(),
-                        ) as resp:
-                            text = await resp.text()
-                            self.requests_made += 1
-                            self._record_status(getattr(resp, "status", 200))
-                if marker not in text:
-                    continue
-                # Reflection found -- check if it lands in a JS-executable
-                # context (callback function position).  verify_semantic
-                # is CPU-bound but fast; run inline.
-                v = verifier.verify_semantic(text, marker,
-                                             response_headers=dict(resp.headers))
-                if v["confirmed"]:
-                    yield Finding(
-                        url=url, method="GET", param=cb_name,
-                        context="jsonp_callback",
-                        payload=marker,
-                        severity="high",
-                        evidence=f"JSONP callback reflection: {v['detail']}",
-                        type="jsonp_xss",
-                        confidence="high",
-                        evidence_class=EVIDENCE_MODEL,
-                    )
-                    return  # one confirmed JSONP finding is enough
-            except (BudgetExhausted, CircuitOpen):
-                raise    # Phase 86: stop instead of "next callback name"
-            except Exception as e:
-                _log.debug("JSONP probe failed for %s: %s", cb_name, e)
-                continue
-
-    async def _inject_blind_async(self, session, url: str, method: str,
-                                  params: dict, data: dict
-                                  ) -> AsyncIterator[Finding]:
-        """L4 blind XSS injection -- sync _inject_blind parity (Phase 64).
-
-        The old async version fired a hardcoded payload at EVERY parameter
-        unconditionally (no reflection gate -> wasted probes on escaped
-        endpoints), used ONE token for the whole endpoint (callbacks could
-        not be attributed to a parameter) and a stray "');fetch" fragment.
-        It now mirrors the sync layer exactly:
-
-        * one reflection probe per param -- the real OOB payload is only
-          fired where an UNESCAPED executable tag came back;
-        * payloads come from the blind_oob corpus with __OOB__ replaced by
-          a per-param token callback;
-        * injections are recorded in _oob_pending and attributed by
-          collect_oob_async() at the end of the scan (batch poll, same
-          Finding shape as the sync collect_oob).
-        """
-        try:
-            if not self.oob:
-                return
-            if self._semaphore is None:
-                self._semaphore = asyncio.Semaphore(self.max_concurrent)
-            blind_bases = payloads_mod.by_context("blind_oob")
-            if not blind_bases:
-                return
-            raw_tags = ("<script", "<svg", "<img", "<iframe", "<body ")
-            # JSON mode: blind payloads ride the document leaves (Phase 47).
-            if self.json_body is not None:
-                blind_items = [(p, False) for p in params] + \
-                              [(path, True)
-                               for path in json_leaf_paths(self.json_body)]
-            else:
-                blind_items = [(p, False) for p in params] + \
-                              [(p, True) for p in data]
-            probe_variant = (blind_bases[0]["payload"]
-                             .replace("https://__OOB__",
-                                      self.oob.callback_url("__T__"))
-                             .replace("http://__OOB__",
-                                      self.oob.callback_url("__T__")))
-            for param, is_body in blind_items:
-                send_params, send_data = self._probe_kv(
-                    params, data, param, probe_variant, is_body)
-                try:
-                    async with self._semaphore:
-                        await self._throttle(url)
-                        async with session.request(
-                            method, url, params=send_params or None,
-                            headers=self._req_headers(self.headers),
-                            proxy=self._next_proxy(),
-                            **_body_kwargs(send_data),
-                        ) as resp:
-                            text = await resp.text()
-                            self.requests_made += 1
-                            self._record_status(getattr(resp, "status", 200))
-                except (BudgetExhausted, CircuitOpen):
-                    raise        # Phase 86: stop instead of "next param"
-                except Exception:
-                    continue
-                if not any(t in text for t in raw_tags):
-                    continue  # escaped echo can never execute -- skip
-                if not self._oob_started:
-                    try:
-                        self.oob.start()
-                        self._oob_started = True
-                    except Exception as e:
-                        _log.warning("OOB listener failed to start: %s", e,
-                                     exc_info=self.verbose)
-                        return
-                # One blind payload per (url, param): N payloads on the same
-                # parameter all beacon to the same sink -- duplicates only.
-                token = self.oob.token()
-                cb = self.oob.callback_url(token)
-                variant = (blind_bases[0]["payload"]
-                           .replace("https://__OOB__", cb)
-                           .replace("http://__OOB__", cb))
-                send_params, send_data = self._probe_kv(
-                    params, data, param, variant, is_body)
-                try:
-                    async with self._semaphore:
-                        await self._throttle(url)
-                        async with session.request(
-                            method, url, params=send_params or None,
-                            headers=self._req_headers(self.headers),
-                            proxy=self._next_proxy(),
-                            **_body_kwargs(send_data),
-                        ) as resp:
-                            await resp.text()
-                            self.requests_made += 1
-                            self._record_status(getattr(resp, "status", 200))
-                except (BudgetExhausted, CircuitOpen):
-                    raise        # Phase 86: stop instead of "next param"
-                except Exception:
-                    continue
-                async with self._get_lock():
-                    self._oob_pending.append({
-                        "token": token, "url": url, "method": method,
-                        "param": param, "payload": variant,
-                        "context": "blind_oob",
-                    })
-        except (BudgetExhausted, CircuitOpen):
-            raise        # Phase 86: do not swallow the inner stop
-        except Exception as e:
-            _log.warning("async blind layer error: %s", e, exc_info=self.verbose)
-        # Injection-only: this stays an async GENERATOR (page tasks drain
-        # generators via _drain_agen); findings come from collect_oob_async.
-        return
-        yield  # pragma: no cover -- generator marker
-
-    async def collect_oob_async(self, timeout: float | None = None
-                                ) -> AsyncIterator[Finding]:
-        """Batch-poll the OOB listener and emit confirmed blind findings.
-
-        Mirrors the sync collect_oob: only callbacks count (a real browser
-        executed the payload), injections are attributed to their param via
-        the per-param token, oob_keep_listening re-arms late candidates, and
-        the poll runs in a thread so the event loop never blocks.
-        """
-        if not self.oob:
-            return
-        timeout = float(timeout if timeout is not None
-                        else getattr(self, "oob_timeout", 12))
-        async with self._get_lock():
-            expected = {p["token"] for p in self._oob_pending}
-        if not expected:
-            return
-        try:
-            received = await asyncio.to_thread(
-                self.oob.poll, expected, timeout=timeout) or set()
-        except Exception as e:
-            _log.warning("OOB poll failed: %s", e, exc_info=self.verbose)
-            received = set()
-        async with self._get_lock():
-            pending = list(self._oob_pending)
-            self._oob_pending = []
-        confirmed = {t for t in received if t in expected}
-        by_token = {p["token"]: p for p in pending}
-        for tok in sorted(confirmed):
-            p = by_token.get(tok)
-            if not p:
-                continue
-            yield Finding(
-                url=p["url"], method=p["method"], param=p["param"],
-                type="blind", context="blind_oob",
-                payload=p["payload"], transform=[],
-                severity="high", confidence="high",
-                detail=(f"Blind XSS CONFIRMED via out-of-band callback. The "
-                        f"injected payload beaconed to the callback host "
-                        f"('{self.oob.name}'); a victim's browser executed it, "
-                        f"proving the input renders in an executable context "
-                        f"(classic blind/stored flow)."),
-                headless=None,
-                proof={"callback": self.oob.callback_url(tok)},
-                evidence_class=EVIDENCE_OOB,
-            )
-        unconfirmed = [p for p in pending if p["token"] not in confirmed]
-        if getattr(self, "oob_keep_listening", False):
-            async with self._get_lock():
-                self._oob_pending.extend(unconfirmed)
-            if unconfirmed:
-                _log.info("[*] blind: %d payload(s) still armed -- the "
-                          "listener stays up", len(unconfirmed))
-        elif unconfirmed and self.verbose:
-            _log.debug(f"[*] blind: {len(unconfirmed)} OOB payload(s) never "
-                       f"beaconed within {timeout}s")
-
-    async def _poll_oob(self, token: str) -> bool:
-        """Poll the OOB listener for a callback with the given token.
-
-        Phase 24-1: replaced the fixed 1s sleep with exponential backoff
-        (0.5, 1.0, 2.0, 4.0, 8.0 = 15.5s total) and removed the
-        unnecessary ``asyncio.to_thread(getattr, ...)`` for a plain
-        attribute read.
-        """
-        if not self.oob:
-            return False
-        delay = 0.5
-        for _ in range(5):
-            try:
-                callbacks = getattr(self.oob, "callbacks", []) or []
-                if any(token in str(c) for c in callbacks):
-                    return True
-            except Exception as e:
-                _log.debug("OOB poll error: %s", e)
-            await asyncio.sleep(delay)
-            delay = min(delay * 2, 8.0)  # exponential backoff, cap 8s
-        return False
-
-    async def _crawl_mine_endpoints(self, text: str, url: str, depth: int
-                                    ) -> list[tuple[str, str, dict, dict]]:
-        """Phase 176s: form + JS endpoint mining (sync parity).
-
-        ``_extract_links`` collects ``<a href>`` and bare form *actions* --
-        with no fields attached.  Two whole discovery classes were therefore
-        missing from ``--async`` crawls:
-
-          * forms: ``form_miner`` also recovers textarea / select /
-            checkbox / radio / hidden inputs, so the endpoint gets probed
-            with the fields the server actually reads
-            (scanner_crawl.py:250).
-          * JS routes: endpoints referenced in inline or external script but
-            never linked via ``<a href>`` -- the common SPA case
-            (scanner_crawl.py:300).
-
-        Either way an endpoint discovered without its parameters cannot
-        reflect anything, so these were silent false negatives rather than
-        merely thinner coverage (pos-formmine-01 / pos-jsmine-01).
-
-        External scripts are fetched at depth 0 only, mirroring sync's
-        request-volume guard.
-        """
-        found: list[tuple[str, str, dict, dict]] = []
-        origin = urlparse(url).netloc
-        # 1) forms -> endpoint with the fields the markup declares.
-        try:
-            from . import form_miner
-            for f_url, f_method, f_params, f_data in (
-                    form_miner.forms_to_endpoints(text, url) or []):
-                if urlparse(f_url).netloc != origin:
-                    continue
-                found.append((f_url, f_method or "GET", dict(f_params or {}),
-                              dict(f_data or {})))
-        except Exception as e:
-            # Wiring defects escalate before the swallow.  Sync does the
-            # same at scanner_crawl.py:349-352 ("silent layer loss is worse
-            # than a noisy crawl") -- a debug-level catch here would hide a
-            # renamed layer function as "this page had no forms", which is
-            # the exact shape that cost the async engine its ctx.classify
-            # outage (see tests/test_async_wiring.py).
-            if layer_guard.is_wiring_error(e):
-                _log.warning("[layer:async_form_miner] %s: %s",
-                             type(e).__name__, e)
-            _log.debug("async form mining failed on %s: %s", url, e)
-        # 2) routes defined in JS rather than in markup.
-        try:
-            from . import js_miner
-            res = js_miner.mine_html(text, url) or {}
-            eps = list(res.get("inline_endpoints") or [])
-            if depth == 0:
-                for s_url in (res.get("external_scripts") or [])[:8]:
-                    try:
-                        # _throttle FIRST, then send, then count -- the
-                        # ordering every other async send uses.  Without it
-                        # this mining traffic sailed past --max-requests and
-                        # inflated the total, which is Phase 142's bug in a
-                        # new place.
-                        await self._throttle(s_url)
-                        req = self._get_sync_requester()
-                        sj = await asyncio.to_thread(req.get, s_url)
-                        self.requests_made += 1
-                        eps.extend(
-                            (js_miner.mine_js_file(sj.text or "") or {})
-                            .get("endpoints", []))
-                    except (BudgetExhausted, CircuitOpen):
-                        raise    # a budget stop is not a mining bug
-                    except Exception:
-                        continue
-            for ep_url, _kind in eps:
-                resolved = urljoin(url, ep_url)
-                if urlparse(resolved).netloc != origin:
-                    continue
-                params: dict = {}
-                if "?" in resolved:
-                    q = resolved.split("?", 1)[1]
-                    params = {k.split("=")[0]: "xss"
-                              for k in q.split("&") if k}
-                    resolved = urljoin(
-                        resolved, urlparse(resolved).path or "/")
-                found.append((resolved, "GET", params, {}))
-        except Exception as e:
-            if layer_guard.is_wiring_error(e):
-                _log.warning("[layer:async_js_miner] %s: %s",
-                             type(e).__name__, e)
-            _log.debug("async JS mining failed on %s: %s", url, e)
-        return found
-
-    async def _crawl_and_scan(self, session, start_url: str,
-                              start_text: str) -> AsyncIterator[Finding]:
-        """L7 crawl: discover linked endpoints and scan them.
-
-        Uses BFS with the configured ``crawl_depth``.  Link extraction
-        runs in a thread (BeautifulSoup parse).
-
-        Phase 24-1: switched from ``list.pop(0)`` (O(n) per pop) to
-        ``collections.deque.popleft()`` (O(1)) so large crawl frontiers
-        don't suffer quadratic slowdown.
-        """
-        try:
-            from bs4 import BeautifulSoup
-        except ImportError:
-            return
-        from collections import deque
-
-        visited: set[str] = {start_url}
-        # Phase 176s: mined endpoints are keyed by (method, url, fields)
-        # because the same URL reached with different fields is a different
-        # target -- and the bare form action is already in `visited`.
-        mined_seen: set[tuple] = set()
-        queue: deque[tuple[str, int]] = deque([(start_url, 0)])
-        while queue:
-            current_url, depth = queue.popleft()
-            if depth >= self.crawl_depth:
-                continue
-            # Fetch the page (or reuse start_text for the seed).
-            if current_url == start_url:
-                text = start_text
-            else:
-                try:
-                    async with self._semaphore:
-                        await self._throttle(current_url)
-                        async with session.get(
-                            current_url, headers=self._req_headers(self.headers),
-                            proxy=self._next_proxy(),
-                        ) as resp:
-                            text = await resp.text()
-                            self.requests_made += 1
-                            self._record_status(getattr(resp, "status", 200))
-                except (BudgetExhausted, CircuitOpen):
-                    raise        # Phase 86: stop crawling instead of skipping
-                except Exception as e:
-                    _log.debug("crawl fetch failed for %s: %s", current_url, e)
-                    continue
-            # Extract links (CPU-bound) -- run in thread.
-            links = await asyncio.to_thread(_extract_links, text, current_url)
-            for link in links:
-                if link in visited:
-                    continue
-                visited.add(link)
-                queue.append((link, depth + 1))
-                # Scan the discovered endpoint for reflected XSS.  Phase 46:
-                # a link carrying query params (?q=hi&debug=1) is scanned as
-                # a GET endpoint with those params in the params dict and the
-                # URL de-parameterised -- the old call passed ({}, {}) so the
-                # query never reached the reflection probe and every crawled
-                # query-param endpoint was silently skipped (sync crawler
-                # parity: scanner_crawl.py).
-                cparams: dict = {}
-                if "?" in link:
-                    fu = urlparse(link)
-                    q = link.split("?", 1)[1]
-                    cparams = {k.split("=")[0]: "xss"
-                               for k in q.split("&") if k}
-                    link = urljoin(link, fu.path or "/")
-                async for finding in self._scan_reflected(
-                        session, link, "GET", cparams, {}, text):
-                    yield finding
-
-            # Phase 176s: form + JS mining, in addition to <a href> links.
-            # These arrive WITH their parameters, so unlike the link loop
-            # above they can actually carry a payload.
-            for m_url, m_method, m_params, m_data in await (
-                    self._crawl_mine_endpoints(text, current_url, depth)):
-                m_base = m_url.split("?", 1)[0]
-                key = (m_method, m_base,
-                       tuple(sorted(set(m_params) | set(m_data))))
-                if key in mined_seen:
-                    continue
-                mined_seen.add(key)
-                async for finding in self._scan_reflected(
-                        session, m_base, m_method, m_params, m_data, text):
-                    yield finding
 
     async def _add_finding(self, finding: Finding) -> None:
         """Thread-safe append to the findings list."""
@@ -2670,212 +1515,20 @@ class AsyncScanner:
         self._last_request_time[host] = time.monotonic()
 
 
-# =============================================================================
-# Helper shims for delegating async -> sync detection modules
-# =============================================================================
-
-def _body_kwargs(data):
-    """Translate a body value into aiohttp request kwargs.
-
-    A JsonBody wrapper (the sync Requester convention) must leave as
-    ``application/json`` -- aiohttp needs ``json=`` for that and would
-    otherwise form-encode the dict subclass.  A plain dict keeps the
-    default form encoding.  Returns a dict to splat with ``**`` so request
-    call sites stay one line.
-    """
-    if isinstance(data, JsonBody):
-        return {"data": None, "json": dict(data)}
-    return {"data": data or None}
 
 
-async def _drain_agen(agen, sink: list, name: str = "layer") -> None:
-    """Consume an async generator into ``sink``, isolating its exceptions.
-
-    asyncio.as_completed() requires awaitables -- async generators are NOT
-    awaitables, so the old ``as_completed([agen, ...])`` pattern raised
-    TypeError on every scan() call (silently swallowed upstream, leaving
-    async mode with zero findings).  Draining via tasks keeps the layers
-    concurrent while making results collectable; per-layer exceptions stay
-    isolated so one broken layer cannot kill the batch.
-
-    Phase 94: failures are attributed to ``name``, and wiring-class
-    exceptions (ImportError / NameError / ...) escalate to a WARNING that
-    names the layer -- those can never be the target's fault.
-    """
-    try:
-        async for f in agen:
-            sink.append(f)
-    except (BudgetExhausted, CircuitOpen):
-        raise        # Phase 86: a budget/circuit stop is NOT a layer bug
-    except Exception as e:
-        if layer_guard.is_wiring_error(e):
-            _log.warning("[layer:%s] %s: %s -- this layer is OFF until the "
-                         "defect is fixed; the remaining layers still run",
-                         name, type(e).__name__, e)
-            return
-        _log.warning("async layer %s error: %s", name, e)
 
 
-class _FakeResp:
-    """Lightweight response object for sync WAF detection module."""
-
-    def __init__(self, text: str, status: int, headers: dict):
-        self.text = text
-        self.status_code = status
-        self.headers = headers
 
 
-class _AsyncScannerShim(AdvancedLayerMixin, CrawlMixin):
-    """Minimal scanner-like object for sync detection modules.
-
-    The sync ``advanced_layers`` / ``jsonp`` / ``csp`` modules expect a
-    scanner with ``_add()``, ``_bump()``, ``verbose``, ``findings``,
-    ``_lock``, and ``waf_name`` attributes.  This shim provides them so
-    we can reuse the sync detection code without rewriting it.
-
-    Phase 63: every page-level sub-layer in ``layers/*.py`` starts with
-    ``scanner.coverage.touch_layer(...)`` (58 call sites).  The shim had no
-    ``coverage`` attribute at all, so the very first sub-layer
-    (postMessage) raised AttributeError, the whole ``run_page_layers``
-    aborted, and async mode silently reported NONE of the page-level
-    layers -- postMessage, prototype pollution, service worker, web
-    worker, open redirect, framework, GraphQL, WebSocket, Trusted Types,
-    CSP nonce, cookie tossing, SRI, import map, sanitizer bypass, CSSI,
-    dangling markup, SVG.  A no-op coverage facade keeps the sync code
-    path intact while still recording layer touches for debugging.
-    """
-
-    class _NullCoverage:
-        """Stand-in for scanner.coverage (the async scanner has none)."""
-
-        def __init__(self):
-            self.touched: list[tuple] = []
-
-        def touch_layer(self, url, layer_id, method="GET", detail=""):
-            self.touched.append((url, layer_id, method, detail))
-
-        def record_layer(self, url, layer_id, status="ran", detail=""):
-            self.touched.append((url, layer_id, status, detail))
-
-        def record_request(self, url, method="GET"):
-            pass
-
-        def record_param(self, url, param, in_body=False):
-            pass
-
-        def record_finding(self, url, method="GET"):
-            pass
-
-        def start_endpoint(self, url, method="GET", crawled=False):
-            pass
-
-        def end_endpoint(self, url, method="GET"):
-            pass
-
-    def __init__(self, async_scanner: AsyncScanner):
-        self._async = async_scanner
-        self._findings: list[Finding] = []
-        self.verbose = async_scanner.verbose
-        self.findings = self._findings  # alias for advanced_layers
-        self.waf_name = async_scanner.waf_name
-        self.requests_made = 0
-        self.coverage = _AsyncScannerShim._NullCoverage()
-        # Page layers also reach for the requester (GraphQL / cookie
-        # tossing follow-up probes).  Default None; callers that run
-        # request-driven page layers must set a real one.
-        #
-        # Phase 176s: this used to be justified as "the layers' own
-        # try/except degrades gracefully".  It does not -- it degrades
-        # SILENTLY.  Cookie tossing needs a follow-up GET to read
-        # Set-Cookie; with req=None it raised, swallowed the exception,
-        # and proceeded with no headers, so it could never fire.  Async
-        # has had a sync requester since Phase 87 (_get_sync_requester);
-        # the note simply predated it and nobody re-read it.  Do not
-        # reintroduce "it degrades gracefully" reasoning here.
-        #
-        # Annotated `Any` because the layers assign a real Requester over it;
-        # left bare, mypy infers `req: None` from this line and every
-        # `shim.req = CountingRequester(...)` becomes an assignment error.
-        self.req: Any = None
-        # Phase 132: the L7 parameter layers (mutation / DOM clobber /
-        # template / polyglot / markup) read these two off the scanner.
-        # Without them ``_run_advanced_layers`` would raise on the JSON
-        # carrier path and skip the markup sub-layer entirely.
-        # getattr: tests build the scanner with __new__ to skip __init__.
-        self.json_body = getattr(async_scanner, "json_body", None)
-        self._advanced_layers = True
-        # Phase 176s: the OOB-aware layers (time-based) read ``scanner.oob``
-        # and ``scanner._oob_started`` directly.  Async owns both -- it runs
-        # its own listener -- so proxy them instead of letting the layer see
-        # nothing and bail out.  Without this the time-based fallback raised
-        # AttributeError on entry and every CSP-locked endpoint stayed a
-        # silent false negative (pos-tb-01).
-        self.oob = getattr(async_scanner, "oob", None)
-        self._oob_started = bool(getattr(async_scanner, "_oob_started", False))
-        # Phase 133: CrawlMixin._mine_hidden_params reads these.
-        self.max_payloads = getattr(async_scanner, "max_payloads", 14)
-        self.param_wordlist = None      # --param-wordlist stays sync-only
-        self.bav = False                # --bav is documented sync-only
-        import threading
-        self._lock = threading.Lock()
-
-    def _add(self, finding: Finding) -> None:
-        with self._lock:
-            self._findings.append(finding)
-
-    def _bump(self) -> None:
-        """Count one request the shim's sync layers are about to send.
-
-        Phase 142.  This traffic used to be *counted but not constrained*:
-        it sailed straight past ``--max-requests`` while inflating the scan
-        total, which then made ``_throttle`` refuse the very next async
-        request.  At a small budget the effect was that the baseline got
-        rejected, ``page_tasks`` was never built, and every zero-cost layer
-        (L6 CSP analysis, L3 DOM static) silently never ran -- so a
-        bypassable CSP went unreported.  Found via
-        tests/test_async_budget.py::test_scan_keeps_findings_collected_before_the_stop,
-        failing since Phase 133 added the miner.
-
-        The cap lives on the *scanner*, and its counter is only reconciled
-        with this shim's afterwards, so the decision uses the sum of both.
-        Check-then-count, mirroring ``_throttle``: ``requests_made`` never
-        exceeds the cap and a rejected request is never sent.
-        """
-        scanner = self._async
-        cap = getattr(scanner, "max_requests", None)
-        if cap is not None:
-            spent = getattr(scanner, "requests_made", 0) + self.requests_made
-            if spent >= cap:
-                scanner.budget_exhausted_reason = (
-                    f"total request budget exhausted (>={cap} requests)")
-                raise BudgetExhausted(scanner.budget_exhausted_reason)
-        self.requests_made += 1
 
 
-def _extract_links(html: str, base_url: str) -> list[str]:
-    """Extract all links from an HTML page (runs in thread)."""
-    try:
-        from bs4 import BeautifulSoup
-        soup = BeautifulSoup(html, _bs_parser())
-        links = set()
-        for a in soup.find_all("a", href=True):
-            href = a["href"].strip()
-            if href and not href.startswith(("#", "javascript:", "mailto:")):
-                links.add(urljoin(base_url, href))
-        # Also extract form actions.
-        for form in soup.find_all("form", action=True):
-            action = form["action"].strip()
-            if action and not action.startswith(("javascript:", "mailto:")):
-                links.add(urljoin(base_url, action))
-        return list(links)
-    except Exception:
-        return []
 
 
 def is_available() -> bool:
     """Whether async scanning is available (aiohttp installed)."""
     try:
-        import aiohttp  # noqa: F401
+        import aiohttp  # noqa: F401  (可选依赖可用性探测:导入即使用)
         return True
     except ImportError:
         return False

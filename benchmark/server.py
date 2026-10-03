@@ -726,7 +726,6 @@ def m_markdown_filtered(v: str, ctx: dict) -> tuple:
 #                different URL (scanner_stored)
 # ---------------------------------------------------------------------------
 
-import cgi  # noqa: E402  (stdlib; only used for multipart parsing)
 import email as _email  # noqa: E402
 
 # inject-path -> [stored values]  (process-lifetime, like a real toy app)
@@ -1288,9 +1287,20 @@ def m_sanitizer_safe(v: str, ctx: dict) -> tuple:
     ``_js_string_literal``).  It used to sit raw between double quotes, so a
     `"` -- or, more decisively, a `</script>` -- broke out and ran: the
     engine's `script_string_dq` confirmation was CORRECT.
+
+    Phase 189: the pinned version moved 3.0.6 -> 3.4.16.  This is the fixture
+    being stale, not the scanner: since CVE-2024-47875 (nesting mXSS) and
+    CVE-2024-45801 were published, 3.0.6 IS a vulnerable DOMPurify, so the
+    layer's high finding on it is true and "current version" had to catch up
+    with the vendor's actual current release.  The ``integrity`` value is the
+    hash jsdelivr published for 3.0.6 and is therefore decorative here -- the
+    benchmark never fetches the file, and dropping the attribute entirely
+    would trip sri_bypass's "cross-origin script without SRI" (high), which
+    would make this safe page a false positive for a different reason.  Do not
+    copy this tag into a real page.
     """
     return _page(
-        '<script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6'
+        '<script src="https://cdn.jsdelivr.net/npm/dompurify@3.4.16'
         '/dist/purify.min.js" integrity="sha384-aLMwkQFyLD6+QVnoIOJGuXs+fPHjPoUIQb8fAOr1UQgiuhDRImXlHZJEUS8ki3WD"'
         ' crossorigin="anonymous"></script>'
         '<div id="o"></div><script>'

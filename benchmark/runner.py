@@ -6,7 +6,7 @@ parses JSON reports, and computes TP/FP/TN/FN metrics.
 
 Usage:
     python benchmark/runner.py [--port 18777] [--concurrency 1] [--timeout 60]
-    python benchmark/runner.py --quick   # subset for fast iteration
+    python benchmark/runner.py --quick   # stratified push slice (64 of 192 cases)
 """
 from __future__ import annotations
 
@@ -21,7 +21,6 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
-from urllib.parse import quote
 
 _HERE = Path(__file__).resolve().parent
 _PROJECT_ROOT = _HERE.parent
@@ -29,7 +28,7 @@ _MANIFEST_PATH = _HERE / "manifest.json"
 _RESULTS_DIR = _HERE / "results"
 
 sys.path.insert(0, str(_HERE))
-from server import run_server, load_routes, DEFAULT_PORT
+from server import run_server, DEFAULT_PORT  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -496,7 +495,7 @@ def _evaluate_with_retries(base_url: str, case: dict, timeout: int,
     return r
 
 
-def _quick_subset(cases: list, per_class: int = 5) -> list:
+def _quick_subset(cases: list, per_class: int = 0) -> list:
     """Pick a quick-run subset that spans the manifest, not its first page.
 
     The previous pick was literally `[...][:5]` per class, i.e. whichever contexts
@@ -507,6 +506,12 @@ def _quick_subset(cases: list, per_class: int = 5) -> list:
     Round-robin over `context` keeps it deterministic -- the same manifest always
     yields the same N cases, so two builds are comparable -- while making the N
     cases cover N different contexts.
+
+    `per_class=0` (the default) means "one representative per (ground_truth,
+    context) pair", i.e. full context coverage.  The old cap of 5 stopped the
+    round-robin *mid-cycle* in alphabetical order, so the biggest families never
+    entered the push gate at all: `html_element` alone carries 48 vulnerable +
+    34 safe cases -- 43% of the matrix -- and was measured zero times per push.
     """
     out: list = []
     for gt in ("vulnerable", "safe"):
@@ -514,12 +519,13 @@ def _quick_subset(cases: list, per_class: int = 5) -> list:
         for c in cases:
             if c.get("ground_truth") == gt:
                 by_ctx.setdefault(c.get("context") or "unknown", []).append(c)
+        cap = per_class if per_class > 0 else len(by_ctx)
         picked, rank = 0, 0
-        while picked < per_class:
+        while picked < cap:
             took = False
             for ctx in sorted(by_ctx):
                 bucket = by_ctx[ctx]
-                if rank < len(bucket) and picked < per_class:
+                if rank < len(bucket) and picked < cap:
                     out.append(bucket[rank])
                     picked += 1
                     took = True
@@ -541,8 +547,10 @@ def run_benchmark(port: int = DEFAULT_PORT, concurrency: int = 1,
         timeout: Per-case scanner timeout in seconds.
         max_payloads: Scanner payload budget.
         max_transforms: Scanner transform budget.
-        quick: If True, run a stratified subset (5 pos + 5 neg, one per
-            distinct context where possible) for fast iteration.
+        quick: If True, run the stratified push slice: one representative per
+            (ground_truth, context) pair -- currently 64 cases covering every
+            context family in the manifest, instead of the 5+5 alphabetical
+            prefix that used to re-measure the same few families every build.
         verbose: Print per-case progress.
 
     Returns:
@@ -800,10 +808,18 @@ def main():
     ap.add_argument("--max-transforms", type=int, default=12,
                     help="Scanner transform budget")
     ap.add_argument("--quick", action="store_true",
-                    help="Quick mode: small subset for fast iteration")
+                    help="Quick mode: stratified push slice (one case per "
+                         "ground_truth x context, currently 64 of 192)")
+    ap.add_argument("--strict-gate", action="store_true",
+                    help="Exit 1 on ANY false positive, false negative or "
+                         "incomplete case, instead of the legacy FPR>20%% / "
+                         "recall<50%% thresholds.  Those thresholds were set "
+                         "when the tool was imperfect: on the old 10-case "
+                         "slice they tolerated 1 FP and 2 FN per push and "
+                         "still printed green.")
     ap.add_argument("--engine", choices=["sync", "async"], default="sync",
                     help="Which scanner pipeline to benchmark (Phase 43: "
-                         "async is calibrated with the same 98-case matrix)")
+                         "async is calibrated with the same full matrix)")
     ap.add_argument("--verbose", "-v", action="store_true",
                     help="Print every case result")
     ap.add_argument("-o", "--output", default=None,
@@ -825,7 +841,38 @@ def main():
     out_path = save_result(result, Path(args.output) if args.output else None)
     print(f"\n[+] Results saved to: {out_path}")
 
-    # Exit code: non-zero if FPR > 20% or Recall < 50% (sanity gate)
+    # Exit code.  The legacy thresholds are a *sanity* gate from when the tool
+    # still missed things: on the old 10-case quick slice "FPR > 20%" needed 2
+    # false positives and "recall < 50%" needed 3 misses to turn red, so a
+    # broken layer could ship green.  --strict-gate asks for what the project
+    # actually runs at (both engines score FP0/FN0/ERROR0 on the 64-case
+    # slice), which is the only version of this gate that can fail.
+    if args.strict_gate:
+        errored = [c["case_id"] for c in result.cases if c["verdict"] == "ERROR"]
+        skipped = sum(1 for c in result.cases if c["verdict"] == "SKIP")
+        problems = []
+        if result.fp:
+            problems.append(f"FP={result.fp}: "
+                            + ", ".join(c["id"] for c in result.false_positives))
+        if result.fn:
+            problems.append(f"FN={result.fn}: "
+                            + ", ".join(c["id"] for c in result.false_negatives))
+        if errored:
+            problems.append(f"ERROR={len(errored)} (not measured): "
+                            + ", ".join(errored))
+        if result.tp + result.tn == 0:
+            problems.append(f"nothing was scored ({skipped} SKIP of "
+                            f"{result.total_cases} cases)")
+        if problems:
+            print("[!] Strict quality gate FAILED (engine="
+                  f"{result.engine}, {result.total_cases} cases)")
+            for p in problems:
+                print(f"      {p}")
+            return 1
+        print(f"[+] Strict quality gate PASSED: FP0 FN0 ERROR0 over "
+              f"{result.tp + result.tn} scored cases ({skipped} SKIP)")
+        return 0
+
     if result.fpr > 0.20 or result.recall < 0.50:
         print("[!] Quality gate FAILED (FPR>20% or Recall<50%)")
         return 1

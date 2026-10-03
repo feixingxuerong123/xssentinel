@@ -156,6 +156,28 @@ def profile_reflection(response_text: str, token: str) -> dict | None:
     }
 
 
+def triage_line(profile: dict | None) -> str | None:
+    """Phase 188: kxss-style one-liner -- which probed meta chars came back RAW.
+
+    The sandwich profile has always driven queue ordering internally; the
+    competitors (kxss) exist purely to PRINT this.  ``raw="'><>()=/;``` is
+    the triage payoff: a raw ``<`` plus a raw quote means a plain breakout
+    works; ``stripped=``/``encoded=`` say why nothing will.  Metadata only
+    -- it never changes a verdict.  None when there is no profile or the
+    probe never reflected.
+    """
+    if not profile or not profile.get("reflected"):
+        return None
+    parts = []
+    if profile.get("chars_kept"):
+        parts.append('raw="' + "".join(profile["chars_kept"]) + '"')
+    if profile.get("chars_stripped"):
+        parts.append("stripped=" + "".join(profile["chars_stripped"]))
+    if profile.get("chars_encoded"):
+        parts.append("encoded=" + "".join(profile["chars_encoded"]))
+    return " | ".join(parts) if parts else None
+
+
 def prioritize_payloads(profile: dict, candidates: list) -> list:
     """Stable reorder: payloads using missing characters go to the back.
 

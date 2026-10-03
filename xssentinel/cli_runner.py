@@ -7,7 +7,6 @@ pre-scan login helper, the progress factory, and the report writer.  The
 """
 from __future__ import annotations
 
-import asyncio
 import os
 import sys
 import time
@@ -536,6 +535,16 @@ _ASYNC_SYNC_ONLY_FLAGS = ("fuzz", "bav", "scenarios", "stored_inject",
                           "stored_dom", "second_order_inject")
 
 
+def _warn_async_partial_flags(args) -> None:
+    """Flags --async honours only halfway: say so instead of pretending."""
+    if getattr(args, "stop_at_cross_origin", None):
+        print("[!] --stop-at-cross-origin stops the SYNC engine.  In --async "
+              "mode operator credentials are still withheld from off-origin "
+              "hops, but aiohttp runs its redirect loop inside the request "
+              "call (measured: on_request_redirect cannot abort it), so the "
+              "payload itself will still reach that host.", file=sys.stderr)
+
+
 def _operator_skip_params(args) -> set:
     """Phase 184: parse --skip-param ("a,b,c") into a lowercase set.
     Returns an empty set when the flag is absent -- both engines treat
@@ -554,6 +563,7 @@ def _run_async_scan(args, url: str, oob, progress, checkpoint,
         if getattr(args, _flag, None):
             print(f"[!] --{_flag.replace('_', '-')} is sync-only and is "
                   "ignored in --async mode", file=sys.stderr)
+    _warn_async_partial_flags(args)
 
     """Phase 22-1: run a scan via AsyncScanner when ``--async`` is enabled.
 
@@ -871,6 +881,8 @@ def _run_async_batch(args, urls: list[str], requester, oob, progress,
         if getattr(args, _flag, None):
             print(f"[!] --{_flag.replace('_', '-')} is sync-only and is "
                   "ignored in --async mode", file=sys.stderr)
+    _warn_async_partial_flags(args)
+
     async def _do_all():
         # Blind/OOB knobs must be set before the first scan (Phase 64).
         asc.oob_timeout = getattr(args, "oob_timeout", 12)
@@ -1111,7 +1123,7 @@ def _write_report(scanner, target_url, output_path, fmt, meta=None):
             if base.lower().endswith(ext):
                 base = base[: -len(ext)]
                 break
-        paths = reportmod.write_nuclei_dir(
+        reportmod.write_nuclei_dir(
             scanner.findings, target_url, meta, base)
         return base  # directory, not a single file
     elif fmt == "markdown":

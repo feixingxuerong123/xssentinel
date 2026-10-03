@@ -337,7 +337,7 @@ def _run_verify_fix(args):
         pass
 
     print(f"[*] Loaded {len(findings)} finding(s) from {src}")
-    print(f"[*] Re-verifying each finding (replays original payload) ...")
+    print("[*] Re-verifying each finding (replays original payload) ...")
 
     # Build a requester with the user's HTTP options.
     headers = {}
@@ -355,7 +355,9 @@ def _run_verify_fix(args):
     requester = Requester(timeout=args.timeout, proxy=args.proxy,
                           headers=headers or None, cookies=cookies or None,
                           verify_ssl=not args.no_verify_ssl,
-                          rate_limit=args.rate_limit)
+                          rate_limit=args.rate_limit,
+                          stop_at_cross_origin=getattr(
+                              args, "stop_at_cross_origin", False))
 
     # Pre-scan login (the target may require auth to reach the endpoint).
     from .cli_runner import _do_login
@@ -365,7 +367,7 @@ def _run_verify_fix(args):
     s = vf.summarize(results)
     c = s["counts"]
 
-    print(f"\n[+] Verification complete:")
+    print("\n[+] Verification complete:")
     print(f"    Fixed:            {c['fixed']}")
     print(f"    Still vulnerable: {c['still_vuln']}")
     print(f"    Error:            {c['error']}")
@@ -435,7 +437,7 @@ def _run_diff(args):
     diff = dr.diff_findings(baseline, current)
     s = diff["summary"]
 
-    print(f"\n[+] Diff summary:")
+    print("\n[+] Diff summary:")
     print(f"    New:        {s['new']}")
     print(f"    Fixed:      {s['fixed']}")
     print(f"    Regressed:  {s['regressed']}")
@@ -476,7 +478,7 @@ def _run_diff(args):
         print(f"\n[!] CI verdict: FAIL -- {s['new']} new, "
               f"{s['regressed']} regressed finding(s).")
         return 1
-    print(f"\n[+] CI verdict: PASS -- no new or regressed findings.")
+    print("\n[+] CI verdict: PASS -- no new or regressed findings.")
     return 0
 
 
@@ -518,7 +520,8 @@ def _run_passive_proxy(args):
     requester = Requester(
         timeout=args.timeout, proxy=args.proxy,
         headers={}, cookies={},
-        verify_ssl=args.verify_ssl, rate_limit=args.rate_limit)
+        verify_ssl=args.verify_ssl, rate_limit=args.rate_limit,
+        stop_at_cross_origin=getattr(args, "stop_at_cross_origin", False))
 
     proxy = PassiveProxy(
         port=args.proxy_port, host=args.proxy_host,
@@ -570,15 +573,15 @@ def _run_passive_proxy(args):
     if proxy.mitm is not None:
         # Phase 50: interception is on -- tell the operator how to trust it.
         cert_only = proxy.mitm.cert_only_path
-        print(f"[+] HTTPS interception ENABLED: install the CA certificate "
-              f"into the browser/OS trust store")
+        print("[+] HTTPS interception ENABLED: install the CA certificate "
+              "into the browser/OS trust store")
         print(f"    {cert_only}")
-        print(f"[+] (Out-of-scope hosts stay blind tunneled.)")
+        print("[+] (Out-of-scope hosts stay blind tunneled.)")
     else:
-        print(f"[+] HTTPS: blind CONNECT tunnel (no interception). Add "
-              f"--mitm-ca <ca>.pem to capture HTTPS traffic.")
-    print(f"[+] Point your browser/system proxy here, then browse. "
-          f"Ctrl+C to stop and write the report.\n")
+        print("[+] HTTPS: blind CONNECT tunnel (no interception). Add "
+              "--mitm-ca <ca>.pem to capture HTTPS traffic.")
+    print("[+] Point your browser/system proxy here, then browse. "
+          "Ctrl+C to stop and write the report.\n")
     try:
         while True:
             time.sleep(1)

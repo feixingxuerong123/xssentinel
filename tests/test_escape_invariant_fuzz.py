@@ -32,9 +32,9 @@ import pytest
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
-from benchmark.server import BenchmarkHandler, load_routes
-from xssentinel.core.requester import Requester
-from xssentinel.core.scanner import Scanner
+from benchmark.server import BenchmarkHandler, load_routes  # noqa: E402
+from xssentinel.core.requester import Requester  # noqa: E402
+from xssentinel.core.scanner import Scanner  # noqa: E402
 
 PORT = 18878
 HIGH_MED = ("high", "medium", "critical")

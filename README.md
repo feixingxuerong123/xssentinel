@@ -53,8 +53,13 @@ XSSentinel 的目标是**在开源/自研工具中做到检测维度最全、架
 - **批量输入管道（Phase 87 P0）**：`--batch urls.txt` 与 `--batch-stdin`（管道流式喂入，一行一个 URL，# 注释）——侦察链（httpx/gau/wayback）输出可直接接进扫描器，URL 去重、失败目标不中断整批、按目标分报告。对齐 DalFox pipe 模式。
 - **HAR 导入（Phase 88 P1）**：`--har capture.har` —— 浏览器 DevTools/Burp/ZAP 导出的 HTTP Archive 直接作为扫描入口：每个捕获请求展开为一个真实端点，method/form·JSON body/cookie/自定义头全部回填后走完整扫描管线（对齐 Burp/XSpear 的 HAR 入口）。
 - **OpenAPI/Swagger 导入（Phase 89 P1）**：`--openapi spec.json` —— 文档化的 API 契约（OpenAPI 3.x / Swagger 2.0）直接作为扫描入口：每个 path+operation 展开为端点（含浏览器从未访问过的路由），路径模板 `{id}` 按 example/schema 链解析为样本 URL，form/JSON body 由 schema 构建，apiKey/bearer 安全声明转为请求头。与 HAR 互补：HAR 覆盖"实际流量"，OpenAPI 覆盖"声明面"。
-- **抗劣化分批基准跑（Phase 44，Phase 91 扩参）**：`benchmark/run_benchmark_batched.py [out.json] [batch] [port] [sync|async] [max_payloads] [max_transforms] [timeout]` —— `run_benchmark.py` 在单进程内跑完 98 用例，遇到会间歇掐 loopback 的安全软件（WinError 10053/10054）时必然卡在中途（实测 7 次 0 完成）；分批版按小批（默认 6）评估、**每批落盘**、支持中断续跑与失败重试。位置参数 4-7 可选（默认 sync/10/6/45），传 `sync 14 12 90` 即复现标定口径；续跑时预算变了会丢弃旧结果。**Windows 本机跑完整矩阵请用这个入口**（默认预算 6–7 分钟全矩阵，14/12/90 口径 sync 约 12 分钟、async 约 25 分钟）。
+- **抗劣化分批基准跑（Phase 44，Phase 91 扩参）**：`benchmark/run_benchmark_batched.py [out.json] [batch] [port] [sync|async] [max_payloads] [max_transforms] [timeout]` —— `run_benchmark.py` 在单进程内跑完 192 用例，遇到会间歇掐 loopback 的安全软件（WinError 10053/10054）时必然卡在中途（实测 7 次 0 完成）；分批版按小批（默认 6）评估、**每批落盘**、支持中断续跑与失败重试。位置参数 4-7 可选（默认 sync/10/6/45），传 `sync 14 12 90` 即复现标定口径；续跑时预算变了会丢弃旧结果。**Windows 本机跑完整矩阵请用这个入口**（默认预算 6–7 分钟全矩阵，14/12/90 口径 sync 约 12 分钟、async 约 25 分钟）。
+- **凭据不外泄给被扫页面选定的源（Phase 189，对标 Dalfox GHSA-mph2-gf5w-6f9f 的修复）**：实测确认（requests 2.32.5 / urllib3 2.6.3 / aiohttp 3.13.3）跨源 302 时 urllib3 只按 **host 字符串**剥 `Authorization`/`Cookie`（`localhost→127.0.0.1` 算跨、`h:8080→h:9090` 不算），自定义头 `X-Api-Key` 与无 domain 的 `--cookie` 照发；aiohttp 头与 jar cookie 全发。也就是**被扫页面通过 `Location:` 决定操作者凭据送到哪些源**。现规则一条：凭据只跟着"操作者点名的源"走——顶层请求恒带，仅因响应 `Location:` 才到达的源收不到（同族 `--headers`/`--cookies`/`Authorization`/`Cookie` 全剥，`User-Agent` 等浏览器形状头保留，跨源链不再像扫描器）。LLM 池的 `Bearer` API key 改为不跟随重定向。重定向仍被跟随、响应体仍被解析，**判定语义零变化**。可选 `--stop-at-cross-origin` 把同一规则升级为**授权边界**：页面 `Location:` 指向未点名源时连载荷都不发过去（返回 3xx 本身并在运行末尾列出被拒绝的跳转）。实测对照：默认关时一次扫描把 40 余个探针带到第三方 loopback 源，开启后为 0 个；同域重定向照常跟随、照常带凭据。async 侧凭据剥离同样生效，但 aiohttp 的跳转循环无法中途终止，故"停止跟随"目前仅 sync 引擎——CLI 显式警告而不是假装支持。
+- **CSP 交付家族粒度（Phase 189）**：`script-src-elem` / `script-src-attr` 不是"追加"到 `script-src`，而是对各自投递形态**替换**。原实现（`csp.analyze` / `is_strict_inline` / `gadget_chain_relevant` / `verifier._csp_blocks_inline`）一律只读 `script-src`，于是两个方向都错：`script-src 'self'; script-src-attr 'unsafe-inline'` 被判"内联全禁"（反射型 `onerror` 被否证 = FN，预算还被切到早停档），`script-src https://cdn.example.com`（没有 `'unsafe-inline'`）里的反射 `<script>` 被判可执行 = FP。nonce 的"使 `unsafe-inline` 失效"规则改为**按家族**判定：`script-src` 上的 nonce 不再吃掉 `script-src-attr` 里的 `unsafe-inline`。同时 `'unsafe-hashes'` 与 gadget 主机识别覆盖 `-elem`/`-attr` 列表。
+- **净化器语料现代化（Phase 189）**：DOMPurify 版本线从"停在 2020（<2.0.8）"改为三段**修复线**（<2.0.8 mXSS／<3.1.3 原型污染+嵌套 mXSS／≤3.4.15 2026 集群），编号取自厂商 advisory 列表（GitHub API 实测 25 条，最新发布 3.4.16），并按"一个版本一条发现"去重（横幅注释与 npm 路径两种形态不再各报一次）。2026 年全部 advisory 的利用面都是**配置项**而非标签白名单，故新增 `IN_PLACE` / `CUSTOM_ELEMENT_HANDLING` / `SAFE_FOR_TEMPLATES` / `setConfig()` 持久化 / `USE_PROFILES` / `ADD_ATTR` 里的 `on*`（high）/ `ADD_URI_SAFE_ATTR` / `ALLOWED_URI_REGEXP` / `RETURN_TRUSTED_TYPE` 检测，且带"加固过的页面必须沉默"反向对照。
+- **Source map 摄取（Phase 189，对标 nexa / ASTra 类 JS 源码挖掘）**：`//# sourceMappingURL=`（含 legacy `//@`、块注释形、`data:` 内联形）→ 取回 `.map` → `sourcesContent` 里的**未压缩原始源码**进既有 JS 端点/汇聚点挖矿通道（压缩改名的路由、被 tree-shake 掉的 API 路径只有在这里看得见）；能读回 `sourcesContent` 时另记一条 `source_map_exposed`（low）发现。两道硬限制：每个脚本最多取一个 map、引用指向别的源就不取（页面点名的 URL 不构成抓取授权）；非 JSON/超限 body 静默不炸挖矿。
 - **多格式报告 + 并发**：HTML / JSON / CSV / **SARIF(2.1.0) / JUnit / Markdown** 六格式，SARIF 可直接接入 CI / 缺陷平台（如 GitHub code scanning、Defender、Jira）；多线程端点/参数并发扫描。
+
 
 </details>
 
@@ -80,13 +85,14 @@ python benchmark/portswigger_corpus_coverage.py --html pw.html \
 
 | 分组 | 向量数 | 事件处理器覆盖 | 标签覆盖 | 协议覆盖 |
 |---|---|---|---|---|
-| **无需用户交互**（主指标） | 57 | **23.1%**（12/52） | 71.4%（15/21） | 100%（1/1） |
+| **无需用户交互**（主指标） | 57 | **100%**（52/52，Phase 192 补齐 40 个缺失事件） | 100%（21/21，Phase 192 补齐 6 个缺失标签） | 100%（1/1） |
 | 需用户交互（仅参考） | 520 | 15.4%（16/104） | 74.4%（29/39） | 100%（2/2） |
-| 其他（标签 / 框架 / 协议类） | 245 | 57.1%（8/14） | 69.2%（36/52） | 100%（3/3） |
+| 其他（标签 / 框架 / 协议类） | 245 | **100%**（14/14，Phase 192） | 71.2%（37/52） | 100%（3/3） |
 
 **为什么只把"无需用户交互"当主指标**：cheat sheet 穷举了浏览器整个事件面，其中一大半
 （pointerdown / mousemove / mouseenter …）必须用户交互才触发，把它们算进分母会得出一个
-误导性的低数字（三组混算只有 15.4%）。公平口径是看注入即执行的那一组——**23.1%**。
+误导性的低数字（三组混算只有 15.4%）。公平口径是看注入即执行的那一组——Phase 192 起该组
+**三维全部 100%**。
 
 **这个数字不能说明什么**（别拿它自欺）：
 
@@ -281,6 +287,25 @@ sitemap.txt 都吃，`<loc>` 越域 URL 按 HAR 同款 scope 规则丢弃：
 python -m xssentinel --sitemap https://target.com/sitemap.xml -o reports/ -f json
 ```
 
+**Wayback 历史URL导入（Phase 192，gau/waymore 管道一键化）**——域名（可带路径
+前缀收窄）查 Internet Archive CDX API，历史捕获过的 URL 全部成为扫描目标；
+`fl=original` + `collapse=urlkey` + `statuscode:200` 过滤，越域 URL 同样按
+scope 规则丢弃：
+
+```bash
+python -m xssentinel --wayback target.com -o reports/ -f json
+# 路径前缀收窄：--wayback target.com/app
+```
+
+**MCP stdio server（Phase 192，dalfox v3 同款）**——把扫描器作为工具暴露给
+LLM Agent（JSON-RPC over stdin/stdout）：
+
+```bash
+python -m xssentinel --mcp
+# MCP 客户端配置里注册该命令即可;工具 xssentinel_scan 返回压缩后的
+# finding 判定(type/severity/confidence/evidence_class),无发现=成功。
+```
+
 **跳过指定参数（`--skip-param`）**——命中的参数 L1/L2 不再探测、隐藏参数
 挖矿也不再为其花费预算（挖矿默认额外跳过 utm_* / gclid / fbclid 等追踪
 噪声；页面**已声明**的参数不受默认噪声表影响，仍会被主探针覆盖）：
@@ -334,6 +359,14 @@ xssentinel/
     ├── scanner_layers.py  # AdvancedLayerMixin：L3 DOM + L7 jsonp/csp/cors/mXSS/
     │   │                  #  clobber/template/polyglot
     ├── scanner_crawl.py   # CrawlMixin：SPA 无头爬取 + 隐藏参数挖掘 + BFS
+    ├── async_scanner.py   # AsyncScanner 核心（Phase 191 起 = 编排 + _probe_param
+    │   │                  #  + 传输/会话/预算三块，与下面三个 Mixin 组合）
+    ├── async_scanner_verify.py  # AsyncHeadlessVerifyMixin：--headless 逐 finding 确认
+    ├── async_scanner_layers.py  # AsyncDetectionLayersMixin：预编码/DOM/高级层/请求层/
+    │   │                  #  CSP/CORS/XS-Leaks/上传/JSONP/盲打收网
+    ├── async_scanner_crawl.py   # AsyncCrawlMixin：隐藏参数挖掘 + 端点/source map 挖掘 + BFS
+    ├── async_scanner_common.py  # 共享 helper：egress cookie jar、非 HTML 降级、
+    │   │                  #  JSONP 回调名、_AsyncScannerShim…
     ├── cors_check.py      # 目标级 CORS 审计（Phase 51：Origin 反射 + 凭据判定）
     ├── xs_leaks.py        # XS-Leaks（Phase 53：隔离头审计 + 通道载荷库/演示 PoC）
     ├── findings.py        # Finding 数据类 + 默认变形阶梯（mixins 共享）
@@ -394,6 +427,15 @@ python tests/passive_demo.py         # 产出 tests/passive_demo_report.html
 靶场 2（`tests/range2_server.py` + `tests/run_range2.py`）覆盖 benchmark 矩阵之外的真实世界缺陷：递归剥 script、单引号属性、onload 黑名单、空格过滤、mXSS 变异、未闭合引号属性、`--!>` 注释断点、正则字面量上下文、二级存储、**CSP nonce 泄露自动利用**（读取页内泄露的 nonce 构造同 nonce script，验证器对「nonce 与响应 CSP 头一致」的 script 放行——nonce 轮换的服务器不会被误确认）、iframe.srcdoc / cookie / window.name / 多跳 innerHTML 等 DOM 变体。当前成绩 **20 漏洞全报 / 6 安全零误报**（含 second_order 注入/查看双端点路径）——Phase 63 扩容后新增四类真实世界场景：JSON API（application/json 载体按文档 leaf 探测）、RESTful PUT multipart 上传 filename、CORS Origin 反射 + Allow-Credentials（high cors_misconfig）、XS-Leaks 无隔离面（--audit-xs-leaks 记 low），以及一个带 COOP/CORP/COEP 隔离头的安全负样本。
 
 测试策略（Phase 37）：`tests/test_pipeline.py` 把靶场 2 的精简切片纳入 pytest —— **主流程回归在每次 pytest 就会暴露**，不再依赖手动靶场演练；`tests/test_async_pipeline.py` 补上 async 扫描器首批测试（曾靠 0% 覆盖掩盖了 `for_context` 缺失导致 async L1 静默失效的 bug）；core 的 verbose 诊断已统一路由到 `logger.debug`（`--verbose` 即 DEBUG 级）。Phase 43 补齐 `tests/test_fuzzer.py`（`--fuzz` 七个评分维度全断言，覆盖率 0%→全路径）与 `tests/test_form_miner.py`（表单抽取/填充/端点转换），并拆分 `__main__.py`（1145→497 行 + cli_runner/cli_commands）。Phase 44 新增三个测试文件共 42 例：`tests/test_passive_proxy.py`（签名去重/scope 匹配/body 解析/裸 socket 真代理端到端捕获 + 真实 Scanner 反射命中回归）、`tests/test_sqli.py`（五家族指纹全路径 + 真回显服务命中）、`tests/test_retire_js.py`（库名锚定版本提取防路径数字泄漏/版本区间边界/去重）。
+
+**push 精度门禁（64 例分层切片，双引擎零容错）**：`python -m benchmark.runner --quick` 现在取"每个 `(ground_truth, context)` 一条" = **64 例**（36 正 / 28 负），覆盖 manifest 里全部 36 个正例上下文与 28 个负例上下文。旧的 `per_class=5` 在字母序中途就停止取样，于是最大家族 `html_element`（48 正 + 34 负 = 矩阵的 43%）在每次 push 里被测量 **0 次**；而 CI 沿用的 `FPR>20% / recall<50%` 阈值在 10 例切片上**容忍 1 个误报 + 2 个漏报仍然绿灯**。`--strict-gate` 改为要求 `FP0 / FN0 / ERROR0`（ERROR 也算失败：没测到的用例不能让门禁"绿"得像是测过了）。2026-10-03 在本机（劣化 loopback、安全软件间歇掐连接，即最坏口径）实测：
+
+| 引擎 | 用例 | TP | FP | TN | FN | ERROR | SKIP | 墙钟 | 产物 |
+|------|------|----|----|----|----|-------|------|------|------|
+| sync | 64 | 36 | 0 | 28 | 0 | 0 | 0 | 370.3s | `benchmark/results/phase190_quick_sync.json` |
+| async | 64 | 36 | 0 | 27 | 0 | 0 | 1 | 267.3s | `benchmark/results/phase190_quick_async.json` |
+
+（那 1 例 SKIP 是 `engines:["sync"]` 声明的存储型负样本，异步不实现，记 SKIP 不记通过。切片大小与文档口径的一致性由 `tests/test_quick_gate_slice.py` 6 例锁定，其中一条断言"CI / CONTRIBUTING / OPTIMIZATION 里写的切片数字 == 代码实际产生的数字"——本次修的就是这类数字烂掉后没人发现。）
 
 **当前基线（192 用例矩阵，两引擎同一口径）**：`benchmark/run_benchmark_batched.py`，默认预算 10/6/90；结果 `benchmark/results/benchmark_20260924_022744.json`（sync）与 `benchmark/results/benchmark_20260925_asyncfix.json`（async，含 Phase 177 主循环 concat 重试补齐）。**双引擎在各自计分口径内均为 recall 1.000 / precision 1.000 / FPR 0**——此前 async 的 6 条 FN 已归零。async 的 10 例 SKIP 是 manifest 声明 `engines:["sync"]` 的存储型 / 二阶链路，异步不实现，**记 SKIP 而不是记通过或记漏报**，故分母是 182 而非 192：
 

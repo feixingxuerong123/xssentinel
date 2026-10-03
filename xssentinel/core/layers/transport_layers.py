@@ -85,7 +85,7 @@ def _scan_path_xss(scanner, req, url: str) -> None:
     scanner.coverage.touch_layer(url, "L8_path", "GET",
                                  detail="probe URL path segment")
     try:
-        from urllib.parse import urlparse, urlunparse
+        from urllib.parse import urlparse
         parsed = urlparse(url)
         if not parsed.path or parsed.path == "/":
             return  # nothing to inject into
@@ -152,7 +152,7 @@ def _scan_path_xss(scanner, req, url: str) -> None:
         ))
         scanner.coverage.record_finding(url, "GET")
         if scanner.verbose:
-            print(f"    [+] Path XSS via URL segment")
+            print("    [+] Path XSS via URL segment")
     except Exception as e:
         if scanner.verbose:
             print(f"    [!] path layer error: {e}")

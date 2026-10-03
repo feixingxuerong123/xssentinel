@@ -18,7 +18,6 @@ import shutil
 import subprocess
 import sys
 import time
-from urllib.parse import urlencode
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _ROOT = os.path.dirname(_HERE)

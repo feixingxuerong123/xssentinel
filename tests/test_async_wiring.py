@@ -26,11 +26,22 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
 from xssentinel.core import async_scanner as ASYNC  # noqa: E402
+# Phase 191: the async engine is no longer one file.  A guard that kept reading
+# only async_scanner.py would silently lose every layer call site that moved --
+# the very failure mode this file exists to close -- so the engine's files are
+# enumerated BY NAME.  A glob would let the next split hide behind it the same
+# way the last one nearly did.
+from xssentinel.core import (async_scanner_common, async_scanner_crawl,  # noqa: E402
+                             async_scanner_layers, async_scanner_verify)
+
+ENGINE_MODULES = (ASYNC, async_scanner_verify, async_scanner_layers,
+                  async_scanner_crawl, async_scanner_common)
 
 
-def _source():
-    path = str(ASYNC.__file__)
-    return open(path, encoding="utf-8").read()
+def _sources():
+    """(module, source text) for every file the async engine is made of."""
+    return [(m, open(str(m.__file__), encoding="utf-8").read())
+            for m in ENGINE_MODULES]
 
 
 # The pre-fix shape, written out rather than pulled from history.  `ctx` resolves
@@ -62,7 +73,7 @@ _BROKEN_LAZY_SNIPPET = (
 )
 
 
-def _imported_names(tree):
+def _imported_names(tree, mod=None):
     """Resolve imports that are NOT in the module namespace.
 
     Every async layer is imported lazily *inside* its method (``from . import
@@ -72,7 +83,7 @@ def _imported_names(tree):
     Phase 176s additions (form_miner / js_miner / time_xss) went unchecked.
     Same blind spot, different layer.
     """
-    pkg = ASYNC.__name__.rpartition(".")[0]
+    pkg = (mod or ASYNC).__name__.rpartition(".")[0]
     out = {}
     for n in ast.walk(tree):
         if isinstance(n, ast.ImportFrom) and n.level:
@@ -113,7 +124,7 @@ def _imported_names(tree):
     return out
 
 
-def _missing_calls(src):
+def _missing_calls(src, mod=None):
     """Every `name.attr` where `name` is an imported module and `attr` does
     not exist on it.
 
@@ -125,8 +136,9 @@ def _missing_calls(src):
     "passed" against a file that still called the nonexistent symbol.
     """
     tree = ast.parse(src)
-    ns = dict(vars(ASYNC))
-    ns.update(_imported_names(tree))
+    mod = mod or ASYNC
+    ns = dict(vars(mod))
+    ns.update(_imported_names(tree, mod))
     missing = []
     # Every ATTRIBUTE REFERENCE, not just call targets: the original bug is
     # `asyncio.to_thread(ctx.classify, ...)`, where the nonexistent name is an
@@ -150,11 +162,17 @@ def test_every_module_symbol_async_calls_actually_exists():
     Same class as the Phase 63 async-L1 outage and the Phase 37 missing
     `for_context`, both hidden by swallowed exceptions instead of being
     reported.  This is the mechanical version of checking the wiring.
+
+    Phase 191: every file the engine is made of, not just async_scanner.py --
+    each with its OWN namespace, because that is what a name resolves against.
     """
-    bad = _missing_calls(_source())
-    assert not bad, ("async_scanner calls symbols that do not exist; a bare "
+    bad = []
+    for mod, src in _sources():
+        stem = mod.__name__.rpartition(".")[2]
+        bad += ["%s: %s" % (stem, m) for m in _missing_calls(src, mod)]
+    assert not bad, ("the async engine calls symbols that do not exist; a bare "
                      "except would hide them as a degraded scan: "
-                     + ", ".join(bad))
+                     + ", ".join(sorted(bad)))
 
 
 def test_the_guard_actually_catches_the_original_bug():
@@ -199,10 +217,10 @@ def test_the_guard_sees_lazily_imported_layers():
         "real check unrunnable")
 
 
-def _lazy_refs(tree, lazy):
+def _lazy_refs(tree, lazy, mod=ASYNC):
     """`(holder, attr, line)` for every reference through a lazily imported
     module -- i.e. exactly the class of call site the old resolver skipped."""
-    ns = dict(vars(ASYNC))
+    ns = dict(vars(mod))
     return sorted({(n.value.id, n.attr, n.lineno) for n in ast.walk(tree)
                    if isinstance(n, ast.Attribute)
                    and isinstance(n.value, ast.Name)
@@ -220,37 +238,57 @@ def test_the_guard_sees_the_real_lazy_call_sites_not_just_the_synthetic():
     mutation harness that edits the wrong line is worse than none: it makes a
     sound detector look broken.
     """
-    src = _source()
-    tree = ast.parse(src)
-    refs = _lazy_refs(tree, _imported_names(tree))
+    refs = []
+    for mod, src in _sources():
+        tree = ast.parse(src)
+        refs += [(mod, src, h, a, ln) for h, a, ln
+                 in _lazy_refs(tree, _imported_names(tree, mod), mod)]
     assert refs, ("no lazily imported layer call sites found -- the premise of "
                   "this check changed; it would now pass vacuously")
     # The Phase 176s layers are the reason this exists; if one disappears from
     # the engine this test must say so rather than quietly shrink.
     for want in ("form_miner", "js_miner", "tx_mod", "advanced_layers"):
-        assert any(h == want for h, _a, _l in refs), (
+        assert any(h == want for _m, _s, h, _a, _l in refs), (
             "expected %s to be called through a lazy import; found only %s"
-            % (want, sorted({h for h, _a, _l in refs})))
-    lines = src.split("\n")
-    for holder, attr, lineno in refs:
+            % (want, sorted({h for _m, _s, h, _a, _l in refs})))
+    for mod, src, holder, attr, lineno in refs:
+        lines = src.split("\n")
         row = lines[lineno - 1]
         assert "%s.%s" % (holder, attr) in row, (
-            "line %d no longer holds %s.%s -- this check is mutating the wrong "
-            "text and cannot be trusted" % (lineno, holder, attr))
+            "line %d of %s no longer holds %s.%s -- this check is mutating the "
+            "wrong text and cannot be trusted"
+            % (lineno, mod.__name__.rpartition(".")[2], holder, attr))
         broken = "%s.%sZZ" % (holder, attr)
         mutated = "\n".join(
             lines[:lineno - 1] + [row.replace("%s.%s" % (holder, attr), broken)]
             + lines[lineno:])
-        hit = [m for m in _missing_calls(mutated) if broken in m]
+        hit = [m for m in _missing_calls(mutated, mod) if broken in m]
         assert hit, ("guard is blind to a broken call through a lazy import at "
                      "line %d (%s): %s" % (lineno, broken, hit or "silent"))
+
+
+def test_the_split_guard_is_actually_looking_at_every_engine_file():
+    """Premise check for the Phase 191 multi-file scan.
+
+    A guard that iterates a module list reports "clean" just as happily when the
+    list shrinks to one entry or a file reads back empty -- so the count and the
+    size are pinned here, not inferred from the results.
+    """
+    mods = [mod.__name__ for mod, _src in _sources()]
+    assert len(set(mods)) == len(ENGINE_MODULES) == 5, mods
+    for mod, src in _sources():
+        assert len(src.splitlines()) > 50, (
+            "%s reads back as %d lines -- the guard would pass against that "
+            "vacuously" % (mod.__name__, len(src.splitlines())))
 
 
 def test_async_does_not_call_the_nonexistent_classifier():
     """Checked as an attribute REFERENCE, not a substring and not only a call
     target: the name appears legitimately in this module's comments, and the
     actual call site passes it as an argument to `asyncio.to_thread`."""
-    hits = [n.lineno for n in ast.walk(ast.parse(_source()))
+    hits = [(mod.__name__.rpartition(".")[2], n.lineno)
+            for mod, src in _sources()
+            for n in ast.walk(ast.parse(src))
             if isinstance(n, ast.Attribute) and isinstance(n.value, ast.Name)
             and n.value.id == "ctx" and n.attr == "classify"]
     assert not hits, ("context.classify does not exist -- referencing it raises "
@@ -415,8 +453,8 @@ def test_the_dom_layer_is_actually_CALLED_with_the_params():
     bug actually was.  This checks the call itself: four positional arguments,
     method and params included.
     """
-    tree = ast.parse(_source())
-    sites = [n for n in ast.walk(tree)
+    sites = [(mod.__name__.rpartition(".")[2], n)
+             for mod, src in _sources() for n in ast.walk(ast.parse(src))
              if isinstance(n, ast.Call)
              and isinstance(n.func, ast.Attribute)
              and n.func.attr == "_scan_dom_async"
@@ -425,8 +463,8 @@ def test_the_dom_layer_is_actually_CALLED_with_the_params():
     assert sites, ("no `self._scan_dom_async(...)` call site found -- either "
                    "the page phase stopped calling it or this check's premise "
                    "moved, and in both cases it guards nothing")
-    for n in sites:
+    for stem, n in sites:
         assert len(n.args) >= 4, (
-            "line %d: called with %d positional args; the browser needs "
+            "line %d of %s: called with %d positional args; the browser needs "
             "method+params or location.search vectors are unconfirmable again"
-            % (n.lineno, len(n.args)))
+            % (n.lineno, stem, len(n.args)))

@@ -104,10 +104,17 @@ def _failed_rows(tree, layer_id):
 
 
 # (file, layer id, the symbol that IS the layer)
+#
+# Phase 191 note: async_scanner.py was split, and `_scan_request_layers` now
+# lives in async_scanner_layers.py.  These paths are load-bearing -- pointed at
+# the old file this guard would have asserted "the layer stopped reporting
+# itself" (correctly red rather than quietly vacuous), which is exactly why the
+# paths are pinned here instead of globbed.
 SITES = [
     ("xssentinel/core/scanner_layers.py", "L6_dom_dynamic", "analyze"),
     ("xssentinel/core/scanner.py", "L7_time_based", "scan_time_based"),
-    ("xssentinel/core/async_scanner.py", "L8_request", "run_request_layers"),
+    ("xssentinel/core/async_scanner_layers.py", "L8_request",
+     "run_request_layers"),
 ]
 
 # The pre-fix shape, written out rather than pulled from history: recording on

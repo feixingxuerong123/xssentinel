@@ -11,7 +11,6 @@ import json
 import os
 import sys
 import threading
-from io import StringIO
 from unittest.mock import MagicMock, patch
 
 # Make xssentinel importable when run from the project root.
@@ -918,7 +917,7 @@ class TestCliBatchFailureAggregation:
         with pytest.raises(SystemExit) as e:
             cli.main(["--nonsense-flag"])
         assert e.value.code == 2, (
-            f"argparse owns exit 2; if that changed, `Scan incomplete`'s 3 is "
+            "argparse owns exit 2; if that changed, `Scan incomplete`'s 3 is "
             "no longer distinguishable from a bad command line")
 
     def test_missing_egress_counters_do_not_become_an_alarm(self, tmp_path,

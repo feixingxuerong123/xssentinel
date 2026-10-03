@@ -451,16 +451,43 @@ def _init_script(marker: str) -> str:
   wrapJQ();
   document.addEventListener('DOMContentLoaded', wrapJQ);
 
-  // postMessage handlers: fire a synthetic message carrying the marker
+  // postMessage handlers: deliver the marker the way a real attacker can.
+  // A cross-origin attacker's postMessage ALWAYS carries the SENDER's origin
+  // (or "null" out of a sandboxed iframe) -- the browser forbids forging it
+  // to the victim's own origin.  The old harness dispatched the marker with
+  // origin = location.origin, so a handler that VALIDATES origin still fired
+  // the sink and the engine confirmed a cross-origin XSS no attacker could
+  // reach.  Both dispatches below use attacker-reachable origins only; a
+  // handler with effective origin validation stays silent, and that silence
+  // is the measured verdict (DOM Invader's origin-spoof mode, in-harness).
+  var PM_ORIGINS = ["https://attacker.example", "null"];
+  function pmFire(handler){
+    setTimeout(function(){
+      for (var i = 0; i < PM_ORIGINS.length; i++){
+        try { handler({ data: MARKER, origin: PM_ORIGINS[i],
+                        source: null, isTrusted: true }); } catch(e){}
+      }
+    }, 50);
+  }
   var oAE = window.addEventListener;
   window.addEventListener = function(type, handler, opts){
     if (type === 'message' && typeof handler === 'function'){
-      setTimeout(function(){
-        try { handler({ data: MARKER, origin: location.origin, source: window }); } catch(e){}
-      }, 50);
+      pmFire(handler);
     }
     return oAE.call(window, type, handler, opts);
   };
+  // Handlers registered by property instead of addEventListener reach the
+  // same dispatch: wrap the onmessage setter (init script runs before any
+  // page script, so the property is still a plain slot when we get here).
+  try {
+    var _omVal;
+    Object.defineProperty(window, 'onmessage', {
+      configurable: true,
+      set: function(fn){ _omVal = fn;
+                         if (typeof fn === 'function') pmFire(fn); },
+      get: function(){ return _omVal; }
+    });
+  } catch(e){}
 })();
 """.replace("__MARKER__", marker)
 
@@ -956,7 +983,7 @@ class DynamicDomAnalyzer:
         if not self.available():
             return []
         try:
-            from playwright.sync_api import sync_playwright
+            pass
         except Exception:
             return []
         marker = marker or (_stem_marker("xssentinel_dom_") + secrets.token_hex(4))
@@ -1128,6 +1155,12 @@ class DynamicDomAnalyzer:
                                        f"'{probe['source']}' reached executable "
                                        f"sink '{sink}' (marker executed)."),
                         })
+                        if probe["source"] == "postMessage":
+                            findings[-1]["detail"] += (
+                                " Message delivered with an ATTACKER origin "
+                                "(https://attacker.example / sandboxed null) "
+                                "and still reached the sink, so origin "
+                                "validation is absent or ineffective.")
             finally:
                 # Pages are disposable; the shared browser is NOT closed.
                 try:

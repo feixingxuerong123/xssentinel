@@ -25,7 +25,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pytest
 
-from tests.conftest import SOCKETPAIR_OK, loopback_healthy
+from tests.conftest import SOCKETPAIR_OK
 from xssentinel.core import context as ctx
 from xssentinel.core.async_scanner import AsyncScanner
 from xssentinel.core.scanner import Scanner

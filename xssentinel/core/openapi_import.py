@@ -28,7 +28,7 @@ The module is pure (returns plain dicts, no Scanner imports) and mirrors
 from __future__ import annotations
 
 import json
-from urllib.parse import urlencode, urlparse, urlunparse
+from urllib.parse import urlencode, urlparse
 
 
 class OpenApiImportError(ValueError):

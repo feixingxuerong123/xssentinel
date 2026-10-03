@@ -591,7 +591,6 @@ def build_poc_html(
 
     endpoint = endpoint or "/graphql"
     # JS-string-safe versions.
-    js_url = target_url.replace("\\", "\\\\").replace("'", "\\'").replace("</", "<\\/")
     js_endpoint = endpoint.replace("\\", "\\\\").replace("'", "\\'").replace("</", "<\\/")
     js_payload = (
         payload.replace("\\", "\\\\")

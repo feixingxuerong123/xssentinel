@@ -176,6 +176,37 @@ class _FakeAiohttp(types.ModuleType):
         self.ClientTimeout = lambda **kw: kw
         self.TCPConnector = lambda **kw: kw
 
+        class _FakeCookieJar:
+            """Enough of ``aiohttp.CookieJar`` for the egress subclass.
+
+            ``async_scanner._egress_cookie_jar_cls`` inherits from this name
+            (Phase 189), and its ``filter_cookies`` calls ``super()`` and then
+            ``type(jar)()`` to return an empty jar -- so the stand-in has to be
+            a real dict-returning method, not a stub that raises.  The egress
+            SEMANTICS are measured against the genuine aiohttp in
+            ``tests/test_egress_guard.py``; this file only needs the async
+            scan pipeline to reach the parameter miner at all.
+            """
+
+            def __init__(self, **kwargs):
+                self._cookies = {}
+
+            def update_cookies(self, cookies, request_url=None):
+                self._cookies.update(dict(cookies))
+
+            def filter_cookies(self, request_url=None):
+                return dict(self._cookies)
+
+        class _FakeTraceConfig:
+            """Phase 189 hook points: ``_session_kwargs`` appends to both."""
+
+            def __init__(self, **kwargs):
+                self.on_request_start = []
+                self.on_request_redirect = []
+
+        self.CookieJar = _FakeCookieJar
+        self.TraceConfig = _FakeTraceConfig
+
     def ClientSession(self, **kw):
         session = _FakeSession()
 
@@ -223,6 +254,15 @@ def _drive_scan(monkeypatch, advanced_layers):
 
     real = sys.modules.get("aiohttp")
     sys.modules["aiohttp"] = _FakeAiohttp()
+    # `_EGRESS_JAR` caches the jar subclass built from whichever `aiohttp` was
+    # importable at first use.  Without this swap-out/isolate the fake's
+    # CookieJar would leak into later tests that need the genuine one -- and in
+    # the other direction this file only ever reached `TraceConfig` (instead of
+    # `CookieJar`) because some earlier file had already cached the real class,
+    # which is a result that depends on test order.
+    from xssentinel.core import async_scanner_common as _asc_mod
+    _saved_jar = _asc_mod._EGRESS_JAR
+    _asc_mod._EGRESS_JAR = None
     try:
         async def run():
             asc = AsyncScanner(max_concurrent=2, per_host_delay=0, jitter=0,
@@ -235,6 +275,7 @@ def _drive_scan(monkeypatch, advanced_layers):
 
         return asyncio.run(run()), seen
     finally:
+        _asc_mod._EGRESS_JAR = _saved_jar
         if real is None:
             sys.modules.pop("aiohttp", None)
         else:
@@ -258,3 +299,26 @@ def test_scan_skips_mining_when_advanced_layers_are_off(monkeypatch):
     assert seen["mine"] == [], "mining ran despite advanced_layers=False"
     assert seen["reflected"] is not None
     assert "hidden" not in seen["reflected"]
+
+
+def test_fake_aiohttp_leaves_the_cached_egress_jar_alone(monkeypatch):
+    """`_EGRESS_JAR` is a module-level cache of a class built from whatever
+    `aiohttp` was importable at first use.
+
+    If a test installs a fake `aiohttp` and lets that cache fill, the fake jar
+    class stays behind for every later test -- including
+    ``tests/test_egress_guard.py``, whose whole point is that the REAL
+    ``aiohttp.CookieJar.filter_cookies`` gate fires.  A contaminated cache
+    would make that suite pass without exercising anything.
+
+    Non-vacuous both ways: without the fixture's isolate/restore the cache is
+    left holding a fake-derived class here, and `before` differs from it under
+    any test order (fresh process -> None, batched run -> the real class).
+    """
+    from xssentinel.core import async_scanner_common as asc_mod
+
+    before = asc_mod._EGRESS_JAR
+    _drive_scan(monkeypatch, advanced_layers=False)
+    assert asc_mod._EGRESS_JAR is before, (
+        "the fake aiohttp leaked its CookieJar subclass into the module-level "
+        "_EGRESS_JAR cache")

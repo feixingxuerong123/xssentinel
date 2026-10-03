@@ -1,9 +1,10 @@
 {
   "meta": {
     "range": "range4",
-    "generated": "2026-09-29 22:03:22",
+    "generated": "2026-10-03 22:20:02",
     "engines": [
-      "sync"
+      "sync",
+      "async"
     ],
     "max_payloads": 8,
     "max_transforms": 4,
@@ -12,6 +13,13 @@
   },
   "counts": {
     "sync": {
+      "TP": 2,
+      "FP": 0,
+      "TN": 2,
+      "FN": 0,
+      "ERROR": 0
+    },
+    "async": {
       "TP": 2,
       "FP": 0,
       "TN": 2,
@@ -119,7 +127,7 @@
       "verdict": "TP",
       "findings": 12,
       "confirmed": 12,
-      "elapsed_s": 12.1,
+      "elapsed_s": 12.4,
       "findings_detail": [
         {
           "type": "reflected",
@@ -202,9 +210,327 @@
       "verdict": "TN",
       "findings": 0,
       "confirmed": 0,
-      "elapsed_s": 312.7,
+      "elapsed_s": 8.3,
       "findings_detail": [],
-      "error": "timeout after 180s"
+      "error": ""
+    },
+    {
+      "engine": "async",
+      "case_id": "r4-pos-react-dsi",
+      "verdict": "TP",
+      "findings": 23,
+      "confirmed": 23,
+      "elapsed_s": 14.9,
+      "findings_detail": [
+        {
+          "type": "reflected",
+          "severity": "high",
+          "context": "script_block",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "reflected",
+          "severity": "high",
+          "context": "script_block",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "reflected",
+          "severity": "high",
+          "context": "script_block",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "reflected",
+          "severity": "high",
+          "context": "script_block",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "reflected",
+          "severity": "high",
+          "context": "script_block",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "reflected",
+          "severity": "high",
+          "context": "script_block",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "reflected",
+          "severity": "high",
+          "context": "script_block",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "reflected",
+          "severity": "high",
+          "context": "script_block",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "reflected",
+          "severity": "high",
+          "context": "script_block",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "reflected",
+          "severity": "high",
+          "context": "script_block",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "reflected",
+          "severity": "high",
+          "context": "script_block",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "polyglot_reflection",
+          "severity": "medium",
+          "context": "event_handler",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "polyglot_reflection",
+          "severity": "medium",
+          "context": "event_handler",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "polyglot_reflection",
+          "severity": "medium",
+          "context": "event_handler",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "polyglot_reflection",
+          "severity": "medium",
+          "context": "event_handler",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "polyglot_reflection",
+          "severity": "medium",
+          "context": "event_handler",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "polyglot_reflection",
+          "severity": "medium",
+          "context": "event_handler",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "polyglot_reflection",
+          "severity": "medium",
+          "context": "event_handler",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "polyglot_reflection",
+          "severity": "medium",
+          "context": "event_handler",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "polyglot_reflection",
+          "severity": "medium",
+          "context": "event_handler",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "polyglot_reflection",
+          "severity": "medium",
+          "context": "event_handler",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "polyglot_reflection",
+          "severity": "medium",
+          "context": "event_handler",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "dom_dynamic",
+          "severity": "high",
+          "context": "Element.innerHTML",
+          "headless_outcome": "fired"
+        }
+      ],
+      "error": ""
+    },
+    {
+      "engine": "async",
+      "case_id": "r4-neg-react-text",
+      "verdict": "TN",
+      "findings": 0,
+      "confirmed": 0,
+      "elapsed_s": 8.4,
+      "findings_detail": [],
+      "error": ""
+    },
+    {
+      "engine": "async",
+      "case_id": "r4-pos-vue-vhtml",
+      "verdict": "TP",
+      "findings": 23,
+      "confirmed": 23,
+      "elapsed_s": 14.9,
+      "findings_detail": [
+        {
+          "type": "reflected",
+          "severity": "high",
+          "context": "script_block",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "reflected",
+          "severity": "high",
+          "context": "script_block",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "reflected",
+          "severity": "high",
+          "context": "script_block",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "reflected",
+          "severity": "high",
+          "context": "script_block",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "reflected",
+          "severity": "high",
+          "context": "script_block",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "reflected",
+          "severity": "high",
+          "context": "script_block",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "reflected",
+          "severity": "high",
+          "context": "script_block",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "reflected",
+          "severity": "high",
+          "context": "script_block",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "reflected",
+          "severity": "high",
+          "context": "script_block",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "reflected",
+          "severity": "high",
+          "context": "script_block",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "reflected",
+          "severity": "high",
+          "context": "script_block",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "polyglot_reflection",
+          "severity": "medium",
+          "context": "event_handler",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "polyglot_reflection",
+          "severity": "medium",
+          "context": "event_handler",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "polyglot_reflection",
+          "severity": "medium",
+          "context": "event_handler",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "polyglot_reflection",
+          "severity": "medium",
+          "context": "event_handler",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "polyglot_reflection",
+          "severity": "medium",
+          "context": "event_handler",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "polyglot_reflection",
+          "severity": "medium",
+          "context": "event_handler",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "polyglot_reflection",
+          "severity": "medium",
+          "context": "event_handler",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "polyglot_reflection",
+          "severity": "medium",
+          "context": "event_handler",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "polyglot_reflection",
+          "severity": "medium",
+          "context": "event_handler",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "polyglot_reflection",
+          "severity": "medium",
+          "context": "event_handler",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "polyglot_reflection",
+          "severity": "medium",
+          "context": "event_handler",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "dom_dynamic",
+          "severity": "high",
+          "context": "Element.innerHTML",
+          "headless_outcome": "fired"
+        }
+      ],
+      "error": ""
+    },
+    {
+      "engine": "async",
+      "case_id": "r4-neg-vue-vtext",
+      "verdict": "TN",
+      "findings": 0,
+      "confirmed": 0,
+      "elapsed_s": 8.4,
+      "findings_detail": [],
+      "error": ""
     }
   ]
 }

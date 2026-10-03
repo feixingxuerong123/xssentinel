@@ -157,16 +157,20 @@ def main() -> int:
     # --- self-check ---------------------------------------------------------
     ok = True
     if proxy.stats["captures"] < 2:      # /echo captured, /safe captured
-        print("!! expected >=2 unique endpoints captured"); ok = False
+        print("!! expected >=2 unique endpoints captured")
+        ok = False
     if proxy.stats["skipped_dup"] < 1:   # /echo?q=world de-duped
-        print("!! expected dup-skip for /echo?q=world"); ok = False
+        print("!! expected dup-skip for /echo?q=world")
+        ok = False
     xss = [f for f in scanner.findings if f.data.get("type") == "reflected"
            and "echo" in f.data.get("url", "")]
     safe = [f for f in scanner.findings if "safe" in f.data.get("url", "")]
     if not xss:
-        print("!! expected reflected XSS finding on /echo"); ok = False
+        print("!! expected reflected XSS finding on /echo")
+        ok = False
     if safe:
-        print(f"!! zero-误报 FAIL: {len(safe)} finding(s) on /safe"); ok = False
+        print(f"!! zero-误报 FAIL: {len(safe)} finding(s) on /safe")
+        ok = False
     print(f"\n[{'PASS' if ok else 'FAIL'}] passive demo self-check")
     return 0 if ok else 1
 

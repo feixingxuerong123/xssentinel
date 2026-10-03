@@ -37,7 +37,7 @@ python -m pytest tests/test_report.py -q  # 单文件快速迭代
 ## 回归靶场(改判定层必跑)
 
 ```bash
-python -m benchmark.runner --quick   # 98 例快速精度矩阵(双引擎口径见 --engine)
+python -m benchmark.runner --quick   # 64 例分层切片(每个 ground_truth×context 一条,覆盖全检测面;双引擎口径见 --engine)
 python range3/runner.py --engine both    # 异形应用靶场,ground truth 独立撰写
 python range4/runner.py --engine both    # React/Vue 真实框架 SPA 靶场(FN/FP/ERROR ⇒ exit 1)
 ```

@@ -65,7 +65,11 @@ _CROSS_CONTEXT: dict[str, list[tuple[str, int]]] = {
     "html_element": [("dom_clobber", 2), ("html5_new", 2),
                      ("dangling_markup", 1), ("script_gadget", 2),
                      ("markdown", 2), ("framework_react", 1),
-                     ("framework_svelte", 1), ("url_javascript", 2)],
+                     ("framework_svelte", 1), ("url_javascript", 2),
+                     # Phase 189: PortSwigger no-interaction event handlers
+                     # (hashchange/pageshow/animation family/CSP-violation
+                     # self-trigger).  Small slice, rides leftover budget.
+                     ("portswigger_events", 2)],
     "script_block": [("service_worker", 2), ("postmessage_source", 2),
                      ("prototype_gadget", 2)],
 }

@@ -3,25 +3,23 @@ as a Scanner mixin.  Phase 40 split: moved verbatim from scanner.py.
 """
 from __future__ import annotations
 
-import secrets
-
-from . import payloads
+from . import payloads  # noqa: F401  (Mixin 运行时引用:scanner 由 Mixin 组合,静态分析看不见)
 from . import layer_guard
 from . import param_miner
 from . import form_miner
 from . import js_miner
-from . import verifier
-from . import transform
-from . import csp as csp_mod
-from . import jsonp as jsonp_mod
-from . import mutation as mxss_mod
-from . import dom_clobber as clobber_mod
-from . import template as tpl_mod
-from . import polyglot as poly_mod
-from . import dom as dommod
-from . import dom_engine
+from . import verifier  # noqa: F401  (Mixin 运行时引用:scanner 由 Mixin 组合,静态分析看不见)
+from . import transform  # noqa: F401  (Mixin 运行时引用:scanner 由 Mixin 组合,静态分析看不见)
+from . import csp as csp_mod  # noqa: F401  (Mixin 运行时引用:scanner 由 Mixin 组合,静态分析看不见)
+from . import jsonp as jsonp_mod  # noqa: F401  (Mixin 运行时引用:scanner 由 Mixin 组合,静态分析看不见)
+from . import mutation as mxss_mod  # noqa: F401  (Mixin 运行时引用:scanner 由 Mixin 组合,静态分析看不见)
+from . import dom_clobber as clobber_mod  # noqa: F401  (Mixin 运行时引用:scanner 由 Mixin 组合,静态分析看不见)
+from . import template as tpl_mod  # noqa: F401  (Mixin 运行时引用:scanner 由 Mixin 组合,静态分析看不见)
+from . import polyglot as poly_mod  # noqa: F401  (Mixin 运行时引用:scanner 由 Mixin 组合,静态分析看不见)
+from . import dom as dommod  # noqa: F401  (Mixin 运行时引用:scanner 由 Mixin 组合,静态分析看不见)
+from . import dom_engine  # noqa: F401  (Mixin 运行时引用:scanner 由 Mixin 组合,静态分析看不见)
 from . import spa_crawler as spa_mod
-from .findings import (Finding, _DEFAULT_TRANSFORMS, _grade_evidence,
+from .findings import (Finding, _DEFAULT_TRANSFORMS, _grade_evidence,  # noqa: F401  (Mixin 运行时引用:scanner 由 Mixin 组合,静态分析看不见)
                        _norm, _proof, _safe_snippet)
 from .logger import get_logger
 
@@ -29,11 +27,50 @@ _log = get_logger("scanner.mixins")
 
 
 
-from .parser_utils import bs_parser as _bs_parser  # noqa: F401  (Phase 40 split omission fix)
+from .parser_utils import bs_parser as _bs_parser  # noqa: E402,F401  (Phase 40 split omission fix)
 
 
 class CrawlMixin:
     """Crawler / attack-surface discovery methods."""
+
+    def _mine_source_maps(self, script_url: str, js_text: str) -> list:
+        """Mine the original sources behind a bundle's source map.
+
+        Returns extra endpoints and records the disclosure finding itself.
+        Two limits on purpose: one map fetched per script, and never a map
+        reference that points off-origin -- a page naming somebody else's URL
+        is not an invitation to fetch it.
+        """
+        from urllib.parse import urlparse
+
+        from . import sourcemap
+        from .budget import BudgetExhausted, CircuitOpen
+
+        origin = urlparse(script_url).netloc
+        extra: list = []
+        for map_url in sourcemap.map_urls(script_url, js_text)[:1]:
+            if urlparse(map_url).netloc != origin:
+                continue
+            try:
+                body = self.req.get(map_url).text or ""
+                self._bump()
+            except (BudgetExhausted, CircuitOpen):
+                raise       # a deliberate stop is not a per-map failure
+            except Exception as e:
+                if layer_guard.is_wiring_error(e):
+                    _log.warning("[layer:js_miner] %s: %s -- source-map "
+                                 "ingestion OFF until the defect is fixed",
+                                 type(e).__name__, e)
+                continue
+            result = sourcemap.analyze_map(body)
+            if not result["ok"] or not result["js"]:
+                continue
+            extra.extend(js_miner.mine_js_file(result["js"]).get("endpoints", []))
+            fields = sourcemap.disclosure(map_url, result, script_url)
+            if fields:
+                self._add(Finding(**fields))
+                self.coverage.record_finding(script_url, "GET")
+        return extra
 
     def _crawl_spa(self, start_url):
         """Phase 18: SPA headless crawler entry point.
@@ -316,6 +353,11 @@ class CrawlMixin:
                             self._bump()
                             ext = js_miner.mine_js_file(sj.text or "")
                             js_endpoints.extend(ext.get("endpoints", []))
+                            # Phase 189: the bundle's source map, when the
+                            # target ships one, is the un-minified source --
+                            # mine THAT too, and say so as a disclosure.
+                            js_endpoints.extend(
+                                self._mine_source_maps(script_url, sj.text or ""))
                         except Exception as e:
                             if layer_guard.is_wiring_error(e):
                                 _log.warning(

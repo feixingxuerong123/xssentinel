@@ -18,7 +18,6 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import pytest
 
 from xssentinel.core.llm_pool import (
-    Candidate,
     LLMConfigError,
     LLMPool,
     LLMPoolExhausted,

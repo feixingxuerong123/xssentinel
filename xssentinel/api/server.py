@@ -17,8 +17,8 @@ from __future__ import annotations
 import hmac
 import json
 import re
+import sys
 import threading
-import time
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Callable
@@ -302,7 +302,7 @@ def _scan_worker(job: Job) -> None:
                 waf_name=getattr(scanner, "waf_name", None),
                 coverage_summary=cov_summary,
             )
-    except BudgetExhausted as e:
+    except BudgetExhausted:
         if job._cancel_requested.is_set():
             # Phase 180: cooperative cancellation -- publish the findings
             # gathered so far.  mark_completed checks the set flag itself
@@ -1024,8 +1024,16 @@ class StdlibServer:
             host_name = host_hdr.rsplit(":", 1)[0]
         else:
             host_name = host_hdr
+        # The Host allowlist is the whole defence when no secret is
+        # configured, so it must hold.  Once the operator sets --api-key the
+        # secret is the gate, and a remote client must be allowed to name the
+        # host it actually reached -- otherwise the advertised external mode
+        # (`--host 0.0.0.0 --api-key ...`) answered 403 to every legitimate
+        # caller (measured: Host: 192.168.1.5:8000 -> cross_origin_blocked).
+        # The Origin check below stays unconditional; that is the CSRF half.
         if host_name and host_name not in self._local_hosts():
-            return False, f"host header {host_hdr!r} is not a local host"
+            if not self.api_key:
+                return False, f"host header {host_hdr!r} is not a local host"
         if method in ("POST", "PUT", "PATCH", "DELETE"):
             origin = lower.get("origin")
             if origin:
@@ -1136,7 +1144,7 @@ class FlaskServer:
                  max_body_bytes: int = DEFAULT_MAX_BODY_BYTES,
                  ai_config: str | None = None) -> None:
         try:
-            from flask import Flask, request, jsonify, Response as FResp
+            from flask import Flask
         except ImportError as e:
             raise RuntimeError(
                 "FlaskServer requires Flask; install with: pip install flask"
@@ -1252,6 +1260,39 @@ class FlaskServer:
 # ---------------------------------------------------------------------------
 # CLI entry point
 # ---------------------------------------------------------------------------
+
+# Hosts that only ever accept connections from this machine.  Anything else
+# (0.0.0.0, a LAN address, a public interface) means the API is reachable by
+# other hosts.
+_LOOPBACK_BINDS = {"127.0.0.1", "localhost", "::1", "[::1]"}
+
+
+def _warn_unauthenticated_external_bind(host: str,
+                                        api_key: str | None) -> None:
+    """``--host 0.0.0.0`` is an advertised option; ``--api-key`` is optional.
+
+    Together they make an unauthenticated, network-reachable service that will
+    fetch any URL you give it (from the machine it runs on, with the operator's
+    ``-b``/``-H`` credentials attached) and hand the results back to whoever can
+    reach the port -- an SSRF oracle plus a finding disclosure endpoint.
+
+    The Phase 70 same-origin defence is NOT the access-control layer here.  It
+    is browser-shaped by design: a web page cannot forge ``Host`` or ``Origin``,
+    so the allowlist stops a drive-by page from reaching a local API.  A
+    scripted client on the network picks its own ``Host`` header (``curl -H
+    'Host: localhost'`` passes) -- measured, not assumed.
+
+    We warn rather than refuse: binding externally behind a reverse proxy that
+    terminates auth is a legitimate deployment.
+    """
+    if api_key or (host or "").strip().lower() in _LOOPBACK_BINDS:
+        return
+    print(f"[!] Bound to {host!r} with NO --api-key: anyone who can reach this "
+          "port can start scans, read results, and make the scanner fetch "
+          "arbitrary URLs (with your -b/-H credentials).  Set --api-key, or "
+          "bind 127.0.0.1 and put a proxy in front.", file=sys.stderr)
+
+
 def run_stdio(host: str = "127.0.0.1", port: int = 8000,
               api_key: str | None = None, verbose: bool = False,
               max_jobs: int = 200, use_flask: bool = False,
@@ -1262,6 +1303,7 @@ def run_stdio(host: str = "127.0.0.1", port: int = 8000,
               max_body_bytes: int = DEFAULT_MAX_BODY_BYTES,
               ai_config: str | None = None) -> int:
     """Start the API server.  Used by the CLI ``--serve`` flag."""
+    _warn_unauthenticated_external_bind(host, api_key)
     if use_flask:
         try:
             server = FlaskServer(api_key=api_key, max_jobs=max_jobs,

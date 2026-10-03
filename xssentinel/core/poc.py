@@ -250,14 +250,14 @@ def _html_poc(d, url, method, param, payload, ftype,
         # Browsers cannot preset a file input's filename, so the only
         # faithful reproduction of a filename-based upload XSS is the curl
         # multipart command (see build_poc).  The HTML page documents it.
-        return (f'<html><body>\n'
-                f'<!-- Upload-filename XSS cannot be reproduced by an HTML '
-                f'page: a browser always sends the local file name.\n'
-                f'     Use the curl PoC: multipart -F with the hostile '
-                f'filename. -->\n'
-                f'<p>Upload-filename XSS -- reproduce with the curl command '
-                f'(a browser cannot preset a filename).</p>\n'
-                f'</body></html>')
+        return ('<html><body>\n'
+                '<!-- Upload-filename XSS cannot be reproduced by an HTML '
+                'page: a browser always sends the local file name.\n'
+                '     Use the curl PoC: multipart -F with the hostile '
+                'filename. -->\n'
+                '<p>Upload-filename XSS -- reproduce with the curl command '
+                '(a browser cannot preset a filename).</p>\n'
+                '</body></html>')
     if method == "POST" or ftype == "stored":
         # Auto-submit form reproduces a POST / stored injection.  Phase 48:
         # CSRF/hidden fields from the original request ride along as hidden
@@ -281,8 +281,8 @@ def _html_poc(d, url, method, param, payload, ftype,
                 f'onload="window.location.href=\'{esc(target)}\'"></iframe>\n'
                 f'<script>window.location.href="{esc(target)}";</script>\n'
                 f'</body></html>')
-    return (f'<html><body>\n<!-- no parameter; see curl above -->\n'
-            f'</body></html>')
+    return ('<html><body>\n<!-- no parameter; see curl above -->\n'
+            '</body></html>')
 
 
 # ---------------------------------------------------------------------------
@@ -358,7 +358,6 @@ def build_interactive_poc(finding) -> str:
 
     # Launch target: prefer the URL PoC (GET), otherwise the HTML PoC
     # (POST auto-submit / DOM redirect).
-    launch_href = poc_url or "#"
     launch_onclick = ""
     if poc_url:
         launch_onclick = f' onclick="window.open(\'{esc(poc_url)}\', \'_blank\')"'

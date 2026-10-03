@@ -199,7 +199,10 @@ def test_unsafe_inline_overridden_matrix() -> None:
 
 def test_csp_blocks_inline_when_nonce_overrides_unsafe_inline() -> None:
     from xssentinel.core.verifier import _csp_blocks_inline as _blocks
-    h = lambda c: {"Content-Security-Policy": c}
+
+    def h(c):
+        return {"Content-Security-Policy": c}
+
     assert _blocks(h(_CSP_NONCE_UI)) is True        # nonce wins over ui
     assert _blocks(h(_CSP_UI_ONLY)) is False        # ui really works
     assert _blocks(h(_CSP_NONCE_ONLY)) is True      # inline needs the nonce

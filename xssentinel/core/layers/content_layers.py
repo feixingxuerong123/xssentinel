@@ -222,8 +222,8 @@ def _scan_csp_nonce(scanner, url: str, html: str, csp_header: str = "") -> None:
             scanner.coverage.record_finding(url, "GET")
             reported = True
             if scanner.verbose:
-                print(f"    [+] CSP nonce misconfigured: declared but "
-                      f"absent from HTML")
+                print("    [+] CSP nonce misconfigured: declared but "
+                      "absent from HTML")
 
         # Multiple different nonces in one CSP (config bug).
         if len(set(result["csp_nonces"])) > 1:

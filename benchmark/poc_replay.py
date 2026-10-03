@@ -64,7 +64,10 @@ _DOM_TYPES = ("dom_dynamic", "dom", "dom_prototype", "stored_dom")
 _DESCRIPTOR_TYPES = ("trusted_types_policy_bypass", "trusted_types_no_policy",
                      "trusted_types_policy_unused", "prototype_pollution",
                      "xs_leak_surface", "service_worker_xss",
-                     "web_worker_xss", "websocket_xss", "graphql_xss")
+                     "web_worker_xss", "websocket_xss", "graphql_xss",
+                     # Phase 189: the "payload" is a fetched .map URL, not a
+                     # value injected into a request.
+                     "source_map_exposed")
 
 try:
     from xssentinel.core.poc import DOM_POC_PAYLOAD, _MARKER_TYPES

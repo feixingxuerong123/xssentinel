@@ -36,7 +36,6 @@ import sys
 # Make xssentinel importable when run from the project root.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import pytest
 
 from xssentinel.core import graphql_xss as gql
 from xssentinel.core import websocket_xss as ws
@@ -275,7 +274,8 @@ class TestProbeGraphqlEndpoint:
             # Inspect the body to return the right response.
             if "__typename" in body and ":" in body:
                 # Alias probe -- reflect the alias.
-                import json, re
+                import json
+                import re
                 m = re.search(r'query\{([^:}]+):__typename\}', body)
                 if m:
                     alias = m.group(1)
@@ -678,7 +678,6 @@ class TestAdvancedLayersWiring:
         in addition to the existing layers."""
         from xssentinel.core import advanced_layers
         # The function source should reference both new functions.
-        src = advanced_layers.run_page_layers.__code__.co_names
         # co_names doesn't include local function names, so check the
         # function's source code instead.
         import inspect

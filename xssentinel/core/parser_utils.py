@@ -16,7 +16,7 @@ def bs_parser() -> str:
     if cached is not None:
         return cached
     try:
-        import lxml  # noqa: F401
+        import lxml  # noqa: F401  (可选依赖可用性探测:导入即使用)
         bs_parser._cached = "lxml"
     except ImportError:
         bs_parser._cached = "html.parser"

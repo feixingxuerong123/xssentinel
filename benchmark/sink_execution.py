@@ -107,15 +107,15 @@ SHAPES: list[tuple[str, str, bool, bool]] = [
      False, True),
     ("img.src = data:text/html,<script>CODE",
      "var e=document.createElement('img');"
-     f" e.src='data:text/html,<script>{_SELF}<\/script>';"
+     rf" e.src='data:text/html,<script>{_SELF}<\/script>';"
      " document.body.appendChild(e);", False, True),
     ("script.src = data:text/html,<script>CODE",
      "var e=document.createElement('script');"
-     f" e.src='data:text/html,<script>{_SELF}<\/script>';"
+     rf" e.src='data:text/html,<script>{_SELF}<\/script>';"
      " document.body.appendChild(e);", False, True),
     ("div.innerHTML = <script>CODE (control)",
      "var e=document.createElement('div');"
-     f" e.innerHTML='<script>{_SELF}<\/script>';"
+     rf" e.innerHTML='<script>{_SELF}<\/script>';"
      " document.body.appendChild(e);", False, True),
     # --- DOMParser 重建链：真实世界绕过 DOMPurify 类净化的常见写法 --------
     # parseFromString 产出的文档是 inert 的（script 不跑、资源不加载），

@@ -3,7 +3,8 @@ Self-test only — target is the bundled vulnerable server.
 Shows the discovery layer (crawler -> dedup -> reproducible PoC) end-to-end.
 """
 from __future__ import annotations
-import os, sys
+import os
+import sys
 from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -42,4 +43,4 @@ for f in sc.findings:
     print(f"    - [{d.get('severity')}] {d.get('type'):10} {d.get('url')} "
           f"param={d.get('param')} ctx={d.get('context')} | "
           f"poc_url={'yes' if poc.get('url') else 'no'}")
-print(f"[+] reports: tests/crawl_demo_report.{{html,json,csv,sarif}}")
+print("[+] reports: tests/crawl_demo_report.{html,json,csv,sarif}")

@@ -24,11 +24,10 @@ text nodes/v-text DO).
 """
 from __future__ import annotations
 
-import json
 import os
 import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import urlparse
 
 _PORT = 19702
 _VENDOR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "vendor")
@@ -107,8 +106,6 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         u = urlparse(self.path)
         path = u.path
-        qs = {k: v[0] for k, v in
-              parse_qs(u.query, keep_blank_values=True).items()}
 
         if path.startswith("/vendor/"):
             name = os.path.basename(path)   # no traversal

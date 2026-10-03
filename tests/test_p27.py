@@ -1012,7 +1012,7 @@ class TestSriExtractLinkTags:
         # We don't assert len==0 here because _extract_link_tags returns all
         # links; the filtering happens in analyze_page.
         # But verify the link is extracted.
-        assert any(l["href"] == "/favicon.ico" for l in links)
+        assert any(item["href"] == "/favicon.ico" for item in links)
 
 
 class TestSriCrossOrigin:

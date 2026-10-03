@@ -55,11 +55,6 @@ _ALERT_CALL_RE = re.compile(r"alert\s*\(([^()]*)\)|alert\s*`([^`]*)`")
 _RCDATA_TAGS = frozenset(["textarea", "title", "xmp", "iframe", "noembed",
                           "noframes", "noscript"])
 
-# CSP patterns that block inline script execution.
-_CSP_BLOCK_RE = re.compile(
-    r"script-src\s+[^;]*(?:'none'|'self'|'nonce-[A-Za-z0-9+/=]+')",
-    re.I)
-
 
 # Phase 166: the concatenated callable.  A keyword filter typically rewrites a
 # LITERAL callable -- benchmark filter_keywords rewrites
@@ -175,37 +170,44 @@ def _in_rcdata_raw(html_text: str, token_idx: int) -> bool:
     return False
 
 
-def _csp_blocks_inline(headers: dict | None) -> bool:
-    """Return True if the CSP header blocks inline script execution."""
+def _csp_of(headers: dict | None) -> str:
     if not headers:
+        return ""
+    return (headers.get("Content-Security-Policy")
+            or headers.get("content-security-policy") or "")
+
+
+def _csp_blocks_family(headers: dict | None, family: str) -> bool:
+    """Whether CSP stops inline script of ONE delivery family.
+
+    Delegated to :mod:`csp` because the answer depends on which directive
+    governs the family: ``script-src-elem`` / ``script-src-attr`` REPLACE
+    ``script-src`` for their own delivery type, and a nonce inert-izes
+    ``'unsafe-inline'`` only in the list that carries it.  Reading
+    ``script-src`` alone got both directions wrong -- it refuted a reflected
+    ``on*`` handler under ``script-src 'nonce-x' 'unsafe-inline';
+    script-src-attr 'unsafe-inline'`` (false negative), and it confirmed a
+    reflected ``<script>`` under a host-allowlist policy that never mentions
+    'unsafe-inline' at all (false positive).
+
+    The nonce-leak path stays alive regardless: ``_script_nonce_allowed()``
+    re-allows a script carrying a nonce the policy itself declares.
+    """
+    csp_header = _csp_of(headers)
+    if not csp_header:
         return False
-    csp = headers.get("Content-Security-Policy", "") or \
-          headers.get("content-security-policy", "")
-    if not csp:
-        return False
-    # script-src 'none', 'self' (without 'unsafe-inline'), or nonce-only
-    if _CSP_BLOCK_RE.search(csp):
-        # Ensure 'unsafe-inline' is NOT present (which would re-allow
-        # inline) -- with one Phase 98 exception: when the policy ALSO
-        # carries a nonce/hash source the browser IGNORES 'unsafe-inline'
-        # (CSP Level 2+), so inline execution still requires the nonce and
-        # bare inline reflection is blocked.  The nonce-leak path stays
-        # alive: a script carrying a nonce the policy declares is
-        # re-allowed by _script_nonce_allowed() further down, so this
-        # cannot turn into a false negative on the nonce-reuse layer.
-        if "'unsafe-inline'" not in csp.lower():
-            return True
-        try:
-            from .csp import unsafe_inline_overridden
-            if unsafe_inline_overridden(csp):
-                return True
-        except Exception:
-            pass
-    # default-src 'none' without explicit script-src also blocks
-    if re.search(r"default-src\s+[^;]*'none'", csp, re.I) and \
-            "script-src" not in csp.lower():
-        return True
-    return False
+    from .csp import inline_blocked
+    return inline_blocked(csp_header, family)
+
+
+def _csp_blocks_inline(headers: dict | None) -> bool:
+    """Return True if the CSP header blocks inline <script> execution."""
+    return _csp_blocks_family(headers, "elem")
+
+
+def _csp_blocks_attr(headers: dict | None) -> bool:
+    """Return True if the CSP header blocks ``on*`` event-handler attributes."""
+    return _csp_blocks_family(headers, "attr")
 
 
 def _csp_blocks_js_uri(headers: dict | None) -> bool:
@@ -215,9 +217,7 @@ def _csp_blocks_js_uri(headers: dict | None) -> bool:
     script-src.  If script-src lacks 'unsafe-inline', javascript: URIs
     are blocked — same policy that blocks inline <script> and on* handlers.
     """
-    # javascript: URIs are treated as inline scripts by CSP.
-    # If inline scripts are blocked, javascript: URIs are also blocked.
-    return _csp_blocks_inline(headers)
+    return _csp_blocks_family(headers, "uri")
 
 
 def _token_in_js_string(script_text: str, token: str) -> bool:
@@ -338,7 +338,6 @@ def _extract_script_block(html_text: str, token_idx: int) -> str | None:
     lower = html_text.lower()
     # Find all <script> opening tags before the token
     search_start = 0
-    best_start = -1
     best_tag_end = -1
     while True:
         pos = lower.find("<script", search_start)
@@ -352,12 +351,10 @@ def _extract_script_block(html_text: str, token_idx: int) -> str | None:
         close_pos = lower.find("</script>", tag_end)
         if close_pos == -1:
             # No closing tag; this script extends to end of document
-            best_start = pos
             best_tag_end = tag_end
             break
         if close_pos >= token_idx:
             # Token is between this script's open and close → this is our block
-            best_start = pos
             best_tag_end = tag_end
             break
         # Token is after this script's close → try next script tag
@@ -545,7 +542,7 @@ def verify_semantic(response_text: str, token: str,
     try:
         from .sandbox import judge
         sv = judge(response_text, token, sink="parser")
-    except Exception as exc:                # noqa: BLE001
+    except Exception as exc:
         # Keep the pre-sandbox verdict -- a scan must not die on one response.
         # But say so, loudly and once: a gate that silently throws is a gate
         # that has stopped working while every number still looks green.
@@ -650,8 +647,11 @@ def _verify_semantic_impl(response_text: str, token: str,
                 "detail": "token reflected inside {{ }} template expression"}
 
     # -- Conservative fallback: is an executable sink genuinely adjacent? ---
-    # CSP gate applies to the fallback too.
-    if csp_blocks:
+    # CSP gate applies to the fallback too -- and it has to be the AND of both
+    # families, because this path cannot say which delivery form the adjacency
+    # implies.  Refuting on the <script> answer alone would drop a reflected
+    # handler that the policy still lets run.
+    if csp_blocks and _csp_blocks_attr(response_headers):
         return {"confirmed": False, "context": "script_block",
                 "detail": "token reflected but CSP blocks inline execution"}
 
@@ -751,9 +751,10 @@ def _structural_confirm(soup, token: str, csp_blocks: bool,
             if not isinstance(val, str):
                 continue
             if attr.lower().startswith("on") and token in val:
-                if csp_blocks:
+                if _csp_blocks_attr(response_headers):
                     return {"confirmed": False, "context": "event_handler",
-                            "detail": f"token in {attr} but CSP blocks inline execution"}
+                            "detail": f"token in {attr} but CSP blocks inline "
+                                      "handler execution"}
                 return {"confirmed": True, "context": "event_handler",
                         "detail": f"token reflected in {attr} handler"}
             # Phase 168: element-aware URL sinks.  Phase 167 measured, per
@@ -805,9 +806,10 @@ def _structural_confirm(soup, token: str, csp_blocks: bool,
             if not isinstance(val, str):
                 continue
             if attr.lower().lstrip("/").startswith("on") and token in val and attr.lower() != "on":
-                if csp_blocks:
+                if _csp_blocks_attr(response_headers):
                     return {"confirmed": False, "context": "event_handler",
-                            "detail": f"token in {attr} but CSP blocks inline execution"}
+                            "detail": f"token in {attr} but CSP blocks inline "
+                                      "handler execution"}
                 return {"confirmed": True, "context": "event_handler",
                         "detail": f"token reflected in {attr} handler (svg/math)"}
 

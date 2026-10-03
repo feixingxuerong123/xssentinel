@@ -37,7 +37,6 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     def do_POST(self):
         body = self._read_body()
-        ct = self.headers.get("Content-Type", "")
         m = re.search(r'name="[^"]*"\s*;\s*filename="([^"]*)"', body.decode("latin1"))
         name = m.group(1) if m else ""
         # urlparse: tolerate absolute-form request-targets (proxy egress).

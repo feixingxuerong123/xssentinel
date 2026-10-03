@@ -13,7 +13,6 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import pytest
 
 from xssentinel.core.requester import RateLimiter, Requester
 from xssentinel.core.stealth import (

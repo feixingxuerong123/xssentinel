@@ -24,7 +24,6 @@ import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from xssentinel.core import oob  # noqa: E402
 from xssentinel.core.oob import (  # noqa: E402
     SelfHostedListener,
     callback_host_is_unreachable,

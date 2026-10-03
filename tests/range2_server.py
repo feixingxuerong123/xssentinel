@@ -94,7 +94,7 @@ def v_comment_dashbang(v: str) -> tuple:
 def v_regex_context(v: str) -> tuple:
     """Reflection inside a JS regex literal: /../ must be closed first."""
     body = (
-        f"<div>query echoed</div>"
+        "<div>query echoed</div>"
         "<script>var re = /" + v + "/; if(re.test('x'))console.log(1);</script>"
     )
     return _PAGE.format(body), "text/html"

@@ -1,7 +1,8 @@
 """Extend payloads.json with new categories (mXSS, DOM clobber, template,
 JSONP, polyglot, modern bypasses).  Idempotent: skips payloads whose
 `payload` text already exists."""
-import json, os, sys
+import json
+import os
 
 PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                     "xssentinel", "data", "payloads.json")

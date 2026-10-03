@@ -108,7 +108,7 @@ def _payloads() -> list[str]:
 # Serialisation / mutation / escape checks (pure helpers, unit-testable).
 # ---------------------------------------------------------------------------
 
-_SERIALIZED_READBACK_JS = """
+_SERIALIZED_READBACK_JS = r"""
 (arg) => {
   const payload = arg.payload;
   const bodyMark = arg.mark;

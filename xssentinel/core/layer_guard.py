@@ -65,7 +65,7 @@ def run_layer(scanner: Any, name: str, fn: Callable, *args,
         # A budget/circuit stop is a deliberate scan end, not a layer bug
         # -- it must reach the scan loop (Phase 86 semantics).
         raise
-    except Exception as e:                                  # noqa: BLE001
+    except Exception as e:
         if is_wiring_error(e):
             _log.warning(
                 "[layer:%s] %s: %s -- this layer is OFF until the defect "

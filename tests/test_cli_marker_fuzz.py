@@ -19,7 +19,6 @@ import pytest
 
 from tests.conftest import SOCKETPAIR_OK, loopback_healthy
 from xssentinel.cli_commands import _run_marker_fuzz
-from xssentinel.core.requester import Requester
 
 pytestmark = pytest.mark.skipif(
     not SOCKETPAIR_OK, reason="loopback socketpair degraded")

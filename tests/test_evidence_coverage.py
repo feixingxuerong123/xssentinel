@@ -49,6 +49,12 @@ _PASSTHROUGH_SITES = {
     "xssentinel/cli_runner.py": 2,         # same, batch path
     "xssentinel/api/server.py": 1,         # rehydrating findings from the store
     "xssentinel/core/layers/common.py": 1,  # the layer choke point, graded here
+    # source-map disclosure: sourcemap.disclosure() returns the COMPLETE keyword
+    # set (tier included, stated once), so the emit sites forward rather than
+    # author.  They used to be `Finding(url=..., method=..., **fields)`, which
+    # is authoring that hides the tier from this audit.
+    "xssentinel/core/scanner_crawl.py": 1,
+    "xssentinel/core/async_scanner_crawl.py": 1,
 }
 
 # Anything that lowers the total to here is not "fixed", it is a deleted probe.
@@ -142,7 +148,12 @@ def test_graded_modules_stay_fully_graded():
                  "core/scanner_crawl.py", "core/passive_proxy.py",
                  "core/time_xss.py", "core/scanner_layers.py",
                  "core/upload_probe.py", "core/scenarios.py",
-                 "core/async_scanner.py")
+                 "core/async_scanner.py",
+                 # Phase 191: the async engine's own modules inherit the
+                 # commitment of the file they were split out of -- a moved
+                 # emit site must not become an uncommitted one.
+                 "core/async_scanner_layers.py", "core/async_scanner_crawl.py",
+                 "core/async_scanner_verify.py", "core/async_scanner_common.py")
     bad = []
     for path, lineno, graded, _pt in _sites():
         norm = path.replace(os.sep, "/").split("xssentinel/")[-1]

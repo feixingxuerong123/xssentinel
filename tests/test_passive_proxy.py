@@ -528,7 +528,6 @@ class TestRelayEncoding:
 
     def _gzip_origin_and_proxy(self):
         import gzip
-        import socket
 
         class _GzH(BaseHTTPRequestHandler):
             def do_GET(self):
@@ -818,7 +817,6 @@ class TestRequestBodyHandling:
         import socket
         srv, proxy = self._origin()
         try:
-            chunks = b"a=1&b=2"
             chunked_body = (f"{len(b'a=1'):x}\r\na=1\r\n"
                             f"{len(b'&b=2'):x}\r\n&b=2\r\n0\r\n\r\n").encode()
             s = socket.create_connection(("127.0.0.1", proxy.port), timeout=15)

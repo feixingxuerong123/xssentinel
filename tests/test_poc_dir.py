@@ -15,13 +15,12 @@ from __future__ import annotations
 import os
 import sys
 
-import pytest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
-from xssentinel.core import poc as pocmod
-from xssentinel.core import report as reportmod
+from xssentinel.core import poc as pocmod  # noqa: E402
+from xssentinel.core import report as reportmod  # noqa: E402
 
 # A payload that has broken plenty of generated shell commands: it closes a
 # single-quoted argument AND appends another command.
@@ -56,8 +55,8 @@ def test_curl_poc_survives_a_payload_that_closes_the_quote(tmp_path):
     sh = [p for p in os.listdir(out) if p.endswith(".sh")]
     assert sh, os.listdir(out)
     body = open(os.path.join(out, sh[0]), encoding="utf-8").read()
-    line = [l for l in body.splitlines()
-            if l.startswith("curl")][0]
+    line = [line for line in body.splitlines()
+            if line.startswith("curl")][0]
     # The payload must not terminate the quoted argument.  It is
     # URL-encoded here (`%27` for the quote), so the check is: the line
     # contains exactly the two wrapping quotes and nothing raw inside.

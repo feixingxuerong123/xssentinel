@@ -36,7 +36,6 @@ but provides a fallback when the standard sinks are blocked by CSP.
 from __future__ import annotations
 import logging
 import time
-import secrets
 
 from .findings import EVIDENCE_OOB
 
@@ -290,8 +289,8 @@ def scan_time_based(scanner, req, url: str, method: str,
         else:
             send_params[param] = payload
         try:
-            resp = req.request(method, url, params=send_params,
-                               data=send_data)
+            req.request(method, url, params=send_params,
+                        data=send_data)
             scanner._bump()
         except Exception:
             continue

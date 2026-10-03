@@ -18,7 +18,7 @@ import pytest
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
-from benchmark.server import run_server, load_routes, BenchmarkHandler, DEFAULT_PORT
+from benchmark.server import load_routes, BenchmarkHandler  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Fixtures

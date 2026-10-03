@@ -18,7 +18,11 @@ from collections import OrderedDict
 import requests
 
 from .budget import Budget, BudgetExhausted, CircuitOpen, CircuitBreaker  # noqa: F401 (re-exported)
+from .egress import EgressPolicy
+from .logger import get_logger
 from .stealth import HeaderRotator, ProxyPool, jitter_interval, load_proxies  # noqa: F401 (re-exported)
+
+_log = get_logger("requester")
 
 # Phase 46: the previous default UA contained an "XSSentinel/1.0" token,
 # fingerprinting every scan in SIEM/WAF logs (pentest audit P0).  The
@@ -100,6 +104,51 @@ class _Tally:
         self.truncated = 0
 
 
+class GuardedSession(requests.Session):
+    """``requests.Session`` that takes operator credentials off cross-origin hops.
+
+    requests re-enters ``Session.send`` for every redirect hop (the redirect
+    loop lives inside ``send``), so ``send`` is the one place that sees each
+    hop's finished prepared request -- operator headers *and* the ``Cookie``
+    header the jar has just materialized.  That is where scrubbing has to
+    happen; deleting a header before ``session.request()`` would be undone by
+    ``resolve_redirects``.
+    """
+
+    def __init__(self, egress: EgressPolicy | None = None, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.egress = egress or EgressPolicy()
+
+    def request(self, method, url, *args, **kwargs):
+        self.egress.note(url)
+        return super().request(method, url, *args, **kwargs)
+
+    def resolve_redirects(self, resp, req, *args, **kwargs):
+        """Refuse to follow a hop that leaves every origin the operator named.
+
+        requests consumes this generator inside ``send`` and keeps the LAST
+        yielded response, so yielding nothing here hands the caller the 3xx
+        itself -- the redirect is visibly not followed, no synthetic response
+        and no private-API patching.  Off by default: with the boundary off,
+        behaviour is byte-identical to before this method existed.
+        """
+        if self.egress.stop_at_boundary:
+            target = self.get_redirect_target(resp)
+            if target and not self.egress.is_named(target):
+                _log.warning("boundary: not following cross-origin redirect %s",
+                             target)
+                self.egress.note_stop(target)
+                return
+        yield from super().resolve_redirects(resp, req, *args, **kwargs)
+
+    def send(self, request, **kwargs):
+        removed = self.egress.scrub(request.headers, request.url)
+        if removed:
+            _log.warning("withheld %s from cross-origin redirect to %s",
+                         "+".join(sorted(removed)), request.url)
+        return super().send(request, **kwargs)
+
+
 class Requester:
     def __init__(self, timeout: int = 15, proxy: str | None = None,
                  headers: dict | None = None, cookies: dict | None = None,
@@ -111,7 +160,9 @@ class Requester:
                  rotate_headers: bool = False,
                  jitter: float = 0.0,
                  tally: "_Tally | None" = None,
-                 max_response_bytes: int = 0):
+                 max_response_bytes: int = 0,
+                 egress: "EgressPolicy | None" = None,
+                 stop_at_cross_origin: bool = False):
         self.timeout = timeout
         self.rate_limiter = RateLimiter(rate_limit, jitter=jitter)
         # Phase 46: optional shared request budget.  Every REAL network call
@@ -123,7 +174,13 @@ class Requester:
         # scan stops instead of hammering a dead/blocking target.  Clones
         # share the same breaker instance.
         self.breaker = breaker
-        self.session = requests.Session()
+        # Phase 189: operator credentials stay on the origins the operator
+        # named.  The policy outlives clones so the block count is per-scan,
+        # not per-worker.
+        self.egress = egress if egress is not None else EgressPolicy(
+            operator_headers=headers,
+            stop_at_boundary=stop_at_cross_origin)
+        self.session = GuardedSession(self.egress)
         self.session.headers.update(DEFAULT_HEADERS)
         if headers:
             self.session.headers.update(headers)
@@ -510,7 +567,8 @@ class Requester:
                          rotate_headers=bool(self.header_rotator),
                          jitter=self.rate_limiter.jitter,
                          tally=self.tally,
-                         max_response_bytes=self.max_response_bytes)
+                         max_response_bytes=self.max_response_bytes,
+                         egress=self.egress)
         # Share ONE token bucket with the parent.  `budget` and `breaker` are
         # deliberately shared above, but `rate_limit=` above builds a *fresh*
         # limiter, and this file's callers clone per endpoint

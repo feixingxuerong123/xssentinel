@@ -28,7 +28,7 @@ import pytest
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
-from xssentinel.core.context import _attribute_context
+from xssentinel.core.context import _attribute_context  # noqa: E402
 
 MARK = "XSSCTXMARK"
 HIGH_MED = ("high", "medium", "critical")

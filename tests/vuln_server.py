@@ -1033,7 +1033,7 @@ def _sanitizer_unsafe_config_page(q: str):
     """Page with unsafe DOMPurify config (ADD_TAGS includes 'script')."""
     body = (
         '<html><body>'
-        '<script src="https://cdn.example.com/dompurify@3.0.0/dist/purify.min.js"></script>'
+        '<script src="https://cdn.example.com/dompurify@3.4.16/dist/purify.min.js"></script>'
         '<div id="out"></div>'
         '<script>'
         'var config = {ADD_TAGS: ["script"], ADD_ATTR: ["onerror"]};'
@@ -1049,7 +1049,7 @@ def _sanitizer_to_innerhtml_page(q: str):
     """Sanitizer output passed directly to innerHTML (mXSS risk)."""
     body = (
         '<html><body>'
-        '<script src="https://cdn.example.com/dompurify@3.0.0/dist/purify.min.js"></script>'
+        '<script src="https://cdn.example.com/dompurify@3.4.16/dist/purify.min.js"></script>'
         '<div id="out"></div>'
         '<script>'
         'var clean = DOMPurify.sanitize(location.hash.substring(1));'

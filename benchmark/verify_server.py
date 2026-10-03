@@ -1,10 +1,15 @@
 # -*- coding: utf-8 -*-
 """Quick verification: start benchmark server, hit every endpoint, check responses."""
-import sys, os, io, json, time, threading, http.client
+import sys
+import os
+import io
+import time
+import threading
+import http.client
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from server import run_server, load_routes, MODES
+from server import run_server, load_routes, MODES  # noqa: E402
 
 PORT = 18777
 

@@ -77,7 +77,7 @@ def _scan_prototype(scanner, url: str, html: str) -> None:
         ))
         scanner.coverage.record_finding(url, "GET")
         if scanner.verbose:
-            print(f"    [+] Prototype pollution -> XSS detected")
+            print("    [+] Prototype pollution -> XSS detected")
     except Exception as e:
         if scanner.verbose:
             print(f"    [!] prototype layer error: {e}")
@@ -333,7 +333,7 @@ def _scan_graphql(scanner, req, url: str, html: str) -> None:
                         scanner._bump()
                         scanner.coverage.record_request(url, "GET")
                         return getattr(r, "status_code", 0), (r.text or "")
-                    except Exception as e:
+                    except Exception:
                         return 0, ""
 
             probe = gql_mod.probe_graphql_endpoint(probe_endpoint, fetcher=_fetcher)

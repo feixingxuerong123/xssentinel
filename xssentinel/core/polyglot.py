@@ -24,7 +24,6 @@ Polyglot construction principles:
 """
 from __future__ import annotations
 import re
-from urllib.parse import quote
 
 # Marker regex used by the verifier to confirm execution.
 POLYGLOT_TOKEN_RE = re.compile(r"alert\('xss_poly_([a-z0-9]+)'\)")

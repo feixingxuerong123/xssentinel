@@ -37,7 +37,7 @@ _LEAF_VALID_DAYS = 825         # ~2.25y, under the 825-day Apple cap
 def available() -> bool:
     """Whether the optional TLS toolchain is importable."""
     try:
-        import cryptography  # noqa: F401
+        import cryptography  # noqa: F401  (可选依赖可用性探测:导入即使用)
         return True
     except Exception:
         return False

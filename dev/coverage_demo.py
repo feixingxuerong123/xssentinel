@@ -1,5 +1,10 @@
 """Quick coverage tracker demo (not a pytest test -- standalone run)."""
-import sys, os, time, threading, http.server, json
+import sys
+import os
+import time
+import threading
+import http.server
+import json
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from urllib.parse import urlparse, parse_qs
@@ -35,25 +40,30 @@ class H(http.server.BaseHTTPRequestHandler):
 
     def do_POST(self):
         u = urlparse(self.path)
-        l = int(self.headers.get('Content-Length', 0))
-        body = self.rfile.read(l).decode() if l else ''
+        length = int(self.headers.get('Content-Length', 0))
+        body = self.rfile.read(length).decode() if length else ''
         q = parse_qs(body).get('q', [''])[0]
         if u.path == '/store':
             PAGES['/store'](q)
-            self.send_response(200); self.end_headers(); self.wfile.write(b'stored')
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b'stored')
         else:
             self.do_GET()
 
 
-srv = http.server.HTTPServer(('127.0.0.1', 8898), H)
+# Port 18456, not the original 8898: Windows reserves 8810-9109
+# (netsh excludedportrange) and silently swallows every port in that band --
+# the symptom is a connect that never answers, not "address already in use".
+srv = http.server.HTTPServer(('127.0.0.1', 18456), H)
 threading.Thread(target=srv.serve_forever, daemon=True).start()
 time.sleep(0.3)
 
 req = Requester(timeout=5)
 sc = Scanner(requester=req, verbose=False)
-sc.scan_endpoint('http://127.0.0.1:8898/echo', 'GET', {'q': 'test'}, {})
-sc.scan_endpoint('http://127.0.0.1:8898/safe', 'GET', {'q': 'test'}, {})
-sc.scan_endpoint('http://127.0.0.1:8898/csp-weak', 'GET', {'q': 'test'}, {})
+sc.scan_endpoint('http://127.0.0.1:18456/echo', 'GET', {'q': 'test'}, {})
+sc.scan_endpoint('http://127.0.0.1:18456/safe', 'GET', {'q': 'test'}, {})
+sc.scan_endpoint('http://127.0.0.1:18456/csp-weak', 'GET', {'q': 'test'}, {})
 
 cov = sc.coverage.summary()
 print('=== Coverage summary ===')

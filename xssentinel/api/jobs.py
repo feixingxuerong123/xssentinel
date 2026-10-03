@@ -215,7 +215,7 @@ class JobManager:
                                          f"{self._job_timeout_s}s")
                             self._persist_locked(job)
                             self._gate.release()
-            except Exception:  # noqa: BLE001 - reaper never dies
+            except Exception:  # reaper never dies
                 continue
 
     def _worker_for(self, job: Job):

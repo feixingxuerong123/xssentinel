@@ -57,8 +57,8 @@ class TestPureHelpers:
         links = _extract_links(html, "http://h/dir/")
         assert "http://h/a" in links
         assert "http://h/go" in links
-        assert not any("javascript:" in l or "mailto:" in l or "#" in l
-                       for l in links)
+        assert not any("javascript:" in item or "mailto:" in item or "#" in item
+                       for item in links)
 
     def test_extract_links_bad_html_returns_list(self):
         assert isinstance(_extract_links("<html><unclosed", "http://h/"), list)

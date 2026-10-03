@@ -63,7 +63,6 @@ import os
 import threading
 import time
 from dataclasses import dataclass, field
-from typing import Any
 
 import requests
 
@@ -657,6 +656,13 @@ class LLMPool:
                 json=payload,
                 timeout=(10.0, float(timeout or self.timeout)),
                 verify=cand.verify_ssl,
+                # The bearer token here is a live cloud API key.  Following
+                # redirects would let the endpoint's Location: header carry it
+                # to an origin nobody configured (the Dalfox
+                # GHSA-mph2-gf5w-6f9f class).  OpenAI-compatible endpoints do
+                # not redirect; a 3xx is a failed attempt and falls through to
+                # _classify() below.
+                allow_redirects=False,
             )
         except requests.exceptions.RequestException as e:
             kind = _classify(None, "", e)

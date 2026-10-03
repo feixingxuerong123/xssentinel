@@ -4,7 +4,8 @@ HTML + JSON + CSV + SARIF reports covering every detection layer.
 Self-test only — the target is the bundled vulnerable server.
 """
 from __future__ import annotations
-import os, sys
+import os
+import sys
 from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -66,4 +67,4 @@ for name, content in reports.items():
 hi = sum(1 for f in sc.findings if f.data.get("severity") == "high")
 print(f"[+] {len(sc.findings)} finding(s) ({hi} high), {sc.requests_made} requests")
 print(f"[+] WAF: {sc.waf_name or 'none'}")
-print(f"[+] reports: tests/demo_report.{{html,json,csv,sarif}}")
+print("[+] reports: tests/demo_report.{html,json,csv,sarif}")

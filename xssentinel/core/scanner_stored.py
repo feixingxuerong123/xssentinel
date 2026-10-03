@@ -13,17 +13,17 @@ from typing import TYPE_CHECKING
 from . import payloads
 from . import verifier
 from . import transform
-from . import csp as csp_mod
-from . import jsonp as jsonp_mod
-from . import mutation as mxss_mod
-from . import dom_clobber as clobber_mod
-from . import template as tpl_mod
-from . import polyglot as poly_mod
-from . import dom as dommod
-from . import dom_engine
-from . import spa_crawler as spa_mod
+from . import csp as csp_mod  # noqa: F401  (Mixin 运行时引用:scanner 由 Mixin 组合,静态分析看不见)
+from . import jsonp as jsonp_mod  # noqa: F401  (Mixin 运行时引用:scanner 由 Mixin 组合,静态分析看不见)
+from . import mutation as mxss_mod  # noqa: F401  (Mixin 运行时引用:scanner 由 Mixin 组合,静态分析看不见)
+from . import dom_clobber as clobber_mod  # noqa: F401  (Mixin 运行时引用:scanner 由 Mixin 组合,静态分析看不见)
+from . import template as tpl_mod  # noqa: F401  (Mixin 运行时引用:scanner 由 Mixin 组合,静态分析看不见)
+from . import polyglot as poly_mod  # noqa: F401  (Mixin 运行时引用:scanner 由 Mixin 组合,静态分析看不见)
+from . import dom as dommod  # noqa: F401  (Mixin 运行时引用:scanner 由 Mixin 组合,静态分析看不见)
+from . import dom_engine  # noqa: F401  (Mixin 运行时引用:scanner 由 Mixin 组合,静态分析看不见)
+from . import spa_crawler as spa_mod  # noqa: F401  (Mixin 运行时引用:scanner 由 Mixin 组合,静态分析看不见)
 from .findings import (EVIDENCE_OOB, Finding, _DEFAULT_TRANSFORMS,
-                       _grade_evidence, _norm, _proof, _safe_snippet)
+                       _grade_evidence, _norm, _proof, _safe_snippet)  # noqa: F401  (Mixin 运行时引用:scanner 由 Mixin 组合,静态分析看不见)
 from .logger import get_logger
 
 if TYPE_CHECKING:  # only ever referenced inside annotations
@@ -298,7 +298,7 @@ class StoredBlindMixin:
                 self.req.invalidate(view_url)
             try:
                 hits = engine.analyze(view_url, marker=token)
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 _log.debug("stored-dom: browser analyze failed (%s)", e,
                            exc_info=self.verbose)
                 continue
@@ -490,27 +490,50 @@ class StoredBlindMixin:
             self._oob_pending = []
         confirmed = {t for t in received if t in expected}
         by_token = {p["token"]: p for p in pending}
+        # Phase 188: what the beacon CARRIED.  The blind collector payload
+        # exfiltrates cookies / storage / referrer / URL / UA / DOM snippet
+        # as query params; param NAMES go in the detail, the raw (truncated)
+        # query in proof -- names cannot leak secrets, values are what the
+        # operator (and only the operator) needs to see.
+        _COLLECT_LEGEND = ("c=cookies, l=localStorage, s=sessionStorage, "
+                           "r=referrer, p=URL, u=User-Agent, d=DOM snippet, "
+                           "e=collector error")
         for tok in confirmed:
             p = by_token.get(tok)
             if not p:
                 continue
+            _q = ""
+            if hasattr(self.oob, "hit_query"):
+                try:
+                    _q = self.oob.hit_query(tok) or ""
+                except Exception:
+                    _q = ""
+            _detail = (f"Blind XSS CONFIRMED via out-of-band callback. The "
+                       f"injected payload beaconed to the callback host "
+                       f"('{self.oob.name}'); a victim's browser executed it, "
+                       f"proving the input renders in an executable context "
+                       f"(classic blind/stored flow).")
+            _beacon_proof = {"callback": self.oob.callback_url(tok)}
+            if _q:
+                _names = sorted({kv.split("=", 1)[0]
+                                 for kv in _q.split("&") if kv})
+                _detail += (" Callback carried collection params: "
+                            + ", ".join(_names)
+                            + f"  (legend: {_COLLECT_LEGEND})")
+                _beacon_proof["callback_query"] = _q[:800]
             self._add(Finding(**{
                 "url": p["url"], "method": p["method"], "param": p["param"],
                 "type": "blind", "context": "blind_oob",
                 "payload": p["payload"], "transform": [],
                 "severity": "high", "confidence": "high",
-                "detail": (f"Blind XSS CONFIRMED via out-of-band callback. The "
-                           f"injected payload beaconed to the callback host "
-                           f"('{self.oob.name}'); a victim's browser executed it, "
-                           f"proving the input renders in an executable context "
-                           f"(classic blind/stored flow)."),
+                "detail": _detail,
                 # A beacon arriving at the callback host is execution proof,
                 # observed out-of-band.  `headless: None` above only means the
                 # dialog hook never looked; grading it as "no browser check"
                 # would understate the strongest channel this tool has.
                 "evidence_class": EVIDENCE_OOB,
                 "headless": None,
-                "proof": {"callback": self.oob.callback_url(tok)},
+                "proof": _beacon_proof,
             }))
         unconfirmed = [p for p in pending if p["token"] not in confirmed]
         if getattr(self, "oob_keep_listening", False):

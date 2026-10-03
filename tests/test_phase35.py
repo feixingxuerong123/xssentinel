@@ -221,7 +221,7 @@ class TestUrlJavascriptEscapedWindow:
     def test_escaped_meta_refresh_text_is_inert(self):
         from xssentinel.core import verifier
         html = ('<p>learn more at '
-                "&lt;meta http-equiv=refresh content=0;url=javascript:" 
+                "&lt;meta http-equiv=refresh content=0;url=javascript:"
                 "alert(&#x27;xssv_mr02&#x27;)&gt; thanks</p>")
         v = verifier.verify_semantic(html, "xssv_mr02")
         assert v["confirmed"] is False

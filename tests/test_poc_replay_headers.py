@@ -96,10 +96,10 @@ def test_upload_poc_carries_auth_header():
 # Phase 48 cookies and Phase 98 headers silently no-op'd on --async scans.
 # --------------------------------------------------------------------------
 
-import threading
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import threading  # noqa: E402
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer  # noqa: E402
 
-from tests.conftest import SOCKETPAIR_OK
+from tests.conftest import SOCKETPAIR_OK  # noqa: E402
 
 pytestmark = pytest.mark.skipif(
     not SOCKETPAIR_OK,

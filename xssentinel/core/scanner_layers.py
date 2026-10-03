@@ -10,20 +10,10 @@ import copy
 import secrets
 from typing import TYPE_CHECKING
 
-from . import payloads
+from . import payloads  # noqa: F401  (Mixin 运行时引用:scanner 由 Mixin 组合,静态分析看不见)
 from . import verifier
-from . import transform
+from . import transform  # noqa: F401  (Mixin 运行时引用:scanner 由 Mixin 组合,静态分析看不见)
 from . import context as ctx
-
-
-def _poly_non_html(resp) -> bool:
-    try:
-        ctype = (getattr(resp, "headers", None) or {}).get("Content-Type", "")
-        ctype = (ctype or "").lower()
-    except Exception:
-        return False
-    return bool(ctype) and not any(
-        t in ctype for t in ("text/html", "application/xhtml", "image/svg"))
 from . import csp as csp_mod
 from . import cors_check as cors_mod
 from . import xs_leaks as xsleak_mod
@@ -38,6 +28,17 @@ from .findings import (Finding, EVIDENCE_MODEL, EVIDENCE_NO_BROWSER,
                        _grade_evidence)
 from .logger import get_logger
 from .requester import JsonBody
+
+
+def _poly_non_html(resp) -> bool:
+    try:
+        ctype = (getattr(resp, "headers", None) or {}).get("Content-Type", "")
+        ctype = (ctype or "").lower()
+    except Exception:
+        return False
+    return bool(ctype) and not any(
+        t in ctype for t in ("text/html", "application/xhtml", "image/svg"))
+
 
 if TYPE_CHECKING:  # only ever referenced inside annotations
     import requests
@@ -122,7 +123,6 @@ class AdvancedLayerMixin:
             dyn_sinks.add(s.split(".")[-1])  # Element.innerHTML -> innerHTML
 
         def _suppressed(r) -> bool:
-            norm = (r.get("type") or "").lower()
             hay = ((r.get("type") or "") + " " + (r.get("context") or "") + " "
                    + (r.get("detail") or "")).lower()
             if not hay:

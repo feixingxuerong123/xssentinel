@@ -253,7 +253,7 @@ def probe_upload(requester, url: str, file_field: str,
                 "payload": filename, "severity": "high",
                 "confidence": "high",
                 "detail": (v.get("detail") or "") +
-                          f" (filename echoed in upload response)",
+                          " (filename echoed in upload response)",
                 "evidence": evidence,
                 "transform": ["multipart_filename"],
                 "proof": {"status": getattr(resp, "status_code", 0),

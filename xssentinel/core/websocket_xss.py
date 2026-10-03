@@ -321,7 +321,6 @@ def build_poc_html(
     if not ws_url:
         ws_url = "wss://" + target_url.split("://")[-1] + "/ws"
     # JS-string-safe versions.
-    js_url = target_url.replace("\\", "\\\\").replace("'", "\\'").replace("</", "<\\/")
     js_ws = ws_url.replace("\\", "\\\\").replace("'", "\\'").replace("</", "<\\/")
     js_payload = (
         payload.replace("\\", "\\\\")

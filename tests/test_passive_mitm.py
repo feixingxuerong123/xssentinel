@@ -213,7 +213,7 @@ class TestMitmCa:
     @requires_crypto
     def test_manager_generates_ca_and_cert_sibling(self, tmp_path):
         ca = str(tmp_path / "ca.pem")
-        mgr = MitmManager(ca)
+        MitmManager(ca)
         assert os.path.isfile(ca)
         cert_only = str(tmp_path / "ca-cert.pem")
         assert os.path.isfile(cert_only)
@@ -436,52 +436,6 @@ class TestHttpsMitm:
                        for it in items), items
         finally:
             proxy.stop()
-
-
-class TestMitmCaHardening:
-    """Phase 72: CA key file permissions + concurrent leaf signing."""
-
-    def test_key_files_restricted_posix(self, tmp_path):
-        from xssentinel.core.mitm_ca import generate_ca
-        if os.name != "posix":
-            pytest.skip("POSIX permission bits only")
-        ca = str(tmp_path / "ca.pem")
-        generate_ca(ca)
-        assert os.stat(ca).st_mode & 0o077 == 0
-
-    def test_concurrent_leaf_signing_same_host(self, tmp_path):
-        if not available():
-            pytest.skip("cryptography not installed")
-        import hashlib
-        from xssentinel.core.mitm_ca import MitmManager
-        ca = str(tmp_path / "ca.pem")
-        mgr = MitmManager(ca)
-        host = "race.test"
-        results: list = []
-        errs: list = []
-
-        def worker():
-            try:
-                results.append(mgr.leaf_cert_path(host))
-            except Exception as e:  # pragma: no cover
-                errs.append(e)
-
-        threads = [threading.Thread(target=worker) for _ in range(10)]
-        for t in threads:
-            t.start()
-        for t in threads:
-            t.join()
-        assert not errs, errs
-        assert len(set(results)) == 1          # all agree on ONE file
-        digest = hashlib.sha1(host.encode()).hexdigest()
-        leaf = os.path.join(mgr._cache_dir, f"leaf-{digest}.pem")
-        # The file is a complete, loadable key+cert pair (not interleaved).
-        from cryptography import x509
-        from cryptography.hazmat.primitives import serialization
-        pem = open(leaf, "rb").read()
-        key = serialization.load_pem_private_key(pem, password=None)
-        cert = x509.load_pem_x509_certificate(pem)
-        assert key is not None and cert.subject is not None
 
 
 class TestMitmCaHardening:

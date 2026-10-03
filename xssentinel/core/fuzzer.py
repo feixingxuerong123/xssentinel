@@ -99,7 +99,6 @@ def fuzz_param(requester, url: str, method: str, param: str,
                                           data=existing_data)
         baseline_len = len(base_resp.text or "")
         baseline_status = getattr(base_resp, "status_code", 0)
-        baseline_text = base_resp.text or ""
     except Exception as e:
         if verbose:
             print(f"    [fuzzer] baseline failed for {param}: {e}")

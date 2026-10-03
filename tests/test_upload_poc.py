@@ -18,7 +18,6 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import pytest
 
 from xssentinel.core import poc as pocmod
 from xssentinel.core import replay as replaymod
@@ -182,7 +181,7 @@ class TestProbeUploadContent:
         """Fake upload endpoint: stores the uploaded bytes and either
         serves them back verbatim (echo_content) or serves neutral text;
         the upload response exposes /uploads/<marker-file> when expose."""
-        from urllib.parse import quote, unquote
+        from urllib.parse import quote
 
         class _ContentReq:
             def __init__(self):

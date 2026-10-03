@@ -4,7 +4,6 @@ from __future__ import annotations
 import html
 import json
 import re
-from datetime import datetime
 
 from .findings import EVIDENCE_OOB
 from .logger import get_logger
@@ -201,6 +200,12 @@ def build_html(findings: list, target: str, meta: dict) -> str:
         _cf = d.get("confidence")
         if _cf:
             _bits.append(f'confidence: {_esc(_cf)}')
+        # Phase 188: kxss-style triage -- which meta characters the server
+        # left RAW for this reflection.  Metadata from the sandwich profile;
+        # `raw=` is the actionable half.
+        _rm = d.get("reflected_meta")
+        if _rm:
+            _bits.append(f'reflected meta: {_esc(_rm)}')
         _pv = d.get("poc_verified")
         if _pv is True:
             _bits.append("PoC replay: verified")
@@ -483,6 +488,7 @@ def build_sarif(findings: list, target: str, meta: dict) -> str:
         "time_based_xss":       "XSSENTINEL-XSS-TIME-BASED",
         "fuzzer_triage":        "XSSENTINEL-XSS-FUZZER-TRIAGE",
         "bav":                  "XSSENTINEL-BAV-ADJACENT",
+        "source_map_exposed":   "XSSENTINEL-SOURCE-MAP-EXPOSED",
     }
     # Human-readable rule names keyed by finding type (not rule-id suffix).
     type_name = {
@@ -517,6 +523,7 @@ def build_sarif(findings: list, target: str, meta: dict) -> str:
         "time_based_xss":       "Time-Based XSS (side-channel)",
         "fuzzer_triage":        "Fuzzer Triage (injectable param)",
         "bav":                  "BAV Adjacent Vulnerability (SSTI / open-redirect / CRLF)",
+        "source_map_exposed":   "Production Source Map Exposed",
     }
     results = []
     seen_rule_types: set[str] = set()  # finding types that appeared
@@ -765,7 +772,7 @@ def build_markdown(findings: list, target: str, meta: dict) -> str:
 
     # Summary table.
     lines: list[str] = [
-        f"# XSSentinel Scan Report\n",
+        "# XSSentinel Scan Report\n",
         f"**Target:** {target}  ",
         f"**Generated:** {meta.get('generated', '')}  ",
         f"**Requests:** {meta.get('requests', 0)}  ",
@@ -778,9 +785,9 @@ def build_markdown(findings: list, target: str, meta: dict) -> str:
     if ai_section:
         lines.append(ai_section)
     lines.extend([
-        f"## Summary Table\n",
-        f"| # | Severity | Type | URL | Param | Context |",
-        f"|---|----------|------|-----|-------|---------|",
+        "## Summary Table\n",
+        "| # | Severity | Type | URL | Param | Context |",
+        "|---|----------|------|-----|-------|---------|",
     ])
 
     for i, f in enumerate(findings, 1):
@@ -820,7 +827,7 @@ def build_markdown(findings: list, target: str, meta: dict) -> str:
         lines.append(f"- **Context:** `{context}`")
         if payload:
             fence = _md_fence(payload)
-            lines.append(f"- **Payload:**")
+            lines.append("- **Payload:**")
             lines.append(f"  {fence}")
             lines.append(f"  {payload}")
             lines.append(f"  {fence}")
@@ -828,7 +835,7 @@ def build_markdown(findings: list, target: str, meta: dict) -> str:
             lines.append(f"- **Detail:** {_md_cell(detail)}")
         if poc_curl:
             fence = _md_fence(poc_curl)
-            lines.append(f"- **PoC (curl):**")
+            lines.append("- **PoC (curl):**")
             lines.append(f"  {fence}bash")
             lines.append(f"  {poc_curl}")
             lines.append(f"  {fence}")
@@ -892,6 +899,8 @@ _INTEROP_TYPE_NAME = {
            "open redirect, or CRLF header injection)",
     "upload_xss": "Cross-site scripting via uploaded filename",
     "stored_upload": "Stored cross-site scripting (uploaded file)",
+    "source_map_exposed": "Production source map reachable; it carries the "
+                          "un-minified front-end sources in sourcesContent",
     "fuzzer_triage": "Fuzzer triage (injectable parameter)",
 }
 
@@ -1024,7 +1033,6 @@ def build_burp_xml(findings: list, target: str, meta: dict) -> str:
         transforms = ",".join(d.get("transform") or [])
         if transforms:
             detail += f" (transform ladder: {transforms})"
-        poc = d.get("poc") or {}
         # Precompute every CDATA payload so the f-string below contains NO
         # backslash / nested-f-string inside an expression part (Python 3.9
         # forbids both).
@@ -1157,10 +1165,12 @@ def _nuclei_template(f: dict, target: str) -> dict:
     # never-matching bodies (same guard verify_fix applies).
     if payload.startswith("(") and payload.endswith(")"):
         is_ob = True
-    is_doc = is_ob or ftype in ("cors_misconfig", "xs_leak_surface")
+    is_doc = is_ob or ftype in ("cors_misconfig", "xs_leak_surface",
+                                "source_map_exposed")
     doc_tag = ("oob" if is_ob
                else "cors" if ftype == "cors_misconfig"
-               else "xsleak" if ftype == "xs_leak_surface" else "")
+               else "xsleak" if ftype == "xs_leak_surface"
+               else "sourcemap" if ftype == "source_map_exposed" else "")
 
     header = [
         f"id: {tid}",

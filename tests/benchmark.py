@@ -45,7 +45,6 @@ import sys
 import threading
 import time
 import tracemalloc
-from typing import Callable
 
 # Make xssentinel importable when run from the project root.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

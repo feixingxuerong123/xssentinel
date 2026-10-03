@@ -74,6 +74,7 @@ LAYERS: list[tuple[str, str, str]] = [
     # unknown-layer fallback, so they were invisible to the stats/summary
     # and to the Phase 111 coverage matrix (which reads this table).
     ("L7_csp_nonce",       "CSP nonce leak exploitation",      "L7"),
+    ("L7_csp_gadget",      "CSP allowlist gadget chain",       "L7"),
     ("L7_css_injection",   "CSS injection",                    "L7"),
     ("L7_dangling_markup", "Dangling markup injection",        "L7"),
     ("L7_import_map",      "Import map hijacking",             "L7"),
@@ -542,7 +543,7 @@ class CoverageTracker:
                 f'<tr><th>Param</th><th>Reflected</th><th>Context</th>'
                 f'<th>Payloads</th><th>Classes</th><th>Status</th></tr>'
                 + "\n".join(rows) +
-                f'</table></details>'
+                '</table></details>'
             )
         param_html = "\n".join(param_blocks)
 

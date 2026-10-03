@@ -41,8 +41,6 @@ class _Site:
         self.port = None
 
     def start(self):
-        site = self
-
         class _H(BaseHTTPRequestHandler):
             def do_GET(self):
                 p = urlparse(self.path)

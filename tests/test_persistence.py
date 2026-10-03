@@ -6,7 +6,6 @@ close-then-use, and the job_to_store_dict / store_dict_to_job round-trip
 (including the closure-stripping of ``_``-prefixed options).
 """
 from __future__ import annotations
-import json
 import os
 import sys
 

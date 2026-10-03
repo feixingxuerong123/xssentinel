@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Run dalfox-only comparison against the 98-case benchmark (no XSSentinel).
+"""Run dalfox-only comparison against the benchmark matrix (no XSSentinel).
 
 Adds per-case progress + exception guards + guaranteed save (finally).
 """

@@ -130,7 +130,6 @@ def start_url(base: str, case: dict) -> str:
     """Build the start URL.  Cases whose carrier is a QUERY PARAM must
     name it in the URL -- the scanner mines hidden params, but a param
     outside the mining wordlist is otherwise never probed at all."""
-    from urllib.parse import urlencode
     container = case.get("container")
     param = case.get("param", "")
     if container == "b64":

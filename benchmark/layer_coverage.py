@@ -14,7 +14,6 @@ writing.
 import io
 import json
 import os
-import re
 
 ROOT = "D:/qoder/xssentinel"
 
@@ -57,6 +56,7 @@ COVERAGE = {
     # Phase 115: eleven layers that were live and dispatched but missing
     # from coverage.py's own LAYERS table (now registered).
     "L7_csp_nonce": (["csp_nonce_*"], "yes (csp_nonce_element/ui_element/ui_leak)"),
+    "L7_csp_gadget": (["csp_*"], "added in Phase 187 (allowlist gadget chain; fires on csp-gadget targets)"),
     "L7_css_injection": (["cssi_vuln"], "added in Phase 122 (static page analysis)"),
     "L7_dangling_markup": (["dangling_vuln"], "added in Phase 116"),
     "L7_import_map": (["importmap_vuln"], "added in Phase 116"),

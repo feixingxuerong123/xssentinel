@@ -522,8 +522,8 @@ def analyze_page(html: str | None, csp_header: str | None = None) -> dict:
             "type": "tt_policy_unused",
             "severity": "low",
             "title": (
-                f"Trusted Types policy registered but never called via "
-                f"policy.createHTML() -- sinks still receive raw strings"
+                "Trusted Types policy registered but never called via "
+                "policy.createHTML() -- sinks still receive raw strings"
             ),
             "evidence": policies[0]["snippet"],
             "policy_name": policies[0]["policy_name"],

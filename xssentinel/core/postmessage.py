@@ -153,13 +153,13 @@ def analyze_page(html: str) -> dict:
     }
     """
     listeners = find_message_listeners(html)
-    vulnerable = [l for l in listeners if l["exploitable"]]
+    vulnerable = [li for li in listeners if li["exploitable"]]
     return {
         "has_listener": bool(listeners),
         "vulnerable_count": len(vulnerable),
         "listeners": vulnerable,
         "missing_origin_check": any(
-            not l["has_origin_check"] for l in listeners
+            not li["has_origin_check"] for li in listeners
         ),
     }
 

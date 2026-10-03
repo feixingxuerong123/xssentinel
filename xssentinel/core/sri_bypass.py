@@ -367,24 +367,24 @@ def analyze_page(html: str | None, page_url: str = "") -> dict:
         if _is_insecure_origin(src):
             insecure_origins.append(s)
 
-    for l in links:
-        rel = (l.get("rel") or "").lower()
-        href = l["href"]
+    for li in links:
+        rel = (li.get("rel") or "").lower()
+        href = li["href"]
         # Only analyze stylesheets and script preloads.
         is_stylesheet = "stylesheet" in rel
-        is_script_preload = "preload" in rel and (l.get("as", "") or "").lower() == "script"
+        is_script_preload = "preload" in rel and (li.get("as", "") or "").lower() == "script"
         if not (is_stylesheet or is_script_preload):
             continue
         if _is_cross_origin(page_url, href):
-            if not is_valid_integrity(l.get("integrity", "")):
-                cross_origin_styles.append(l)
+            if not is_valid_integrity(li.get("integrity", "")):
+                cross_origin_styles.append(li)
             else:
-                if not l.get("crossorigin"):
-                    broken_sri.append(l)
-        if "integrity" in l.get("attrs", {}) and not is_valid_integrity(l.get("integrity", "")):
-            malformed_integrity.append(l)
+                if not li.get("crossorigin"):
+                    broken_sri.append(li)
+        if "integrity" in li.get("attrs", {}) and not is_valid_integrity(li.get("integrity", "")):
+            malformed_integrity.append(li)
         if _is_insecure_origin(href):
-            insecure_origins.append(l)
+            insecure_origins.append(li)
 
     violations: list[dict] = []
 
@@ -420,20 +420,20 @@ def analyze_page(html: str | None, page_url: str = "") -> dict:
 
     # Violation 2: cross-origin stylesheet without SRI.
     if cross_origin_styles:
-        for l in cross_origin_styles[:3]:
-            rtype = "script preload" if "preload" in (l.get("rel", "")) else "stylesheet"
+        for li in cross_origin_styles[:3]:
+            rtype = "script preload" if "preload" in (li.get("rel", "")) else "stylesheet"
             violations.append({
                 "type": "sri_missing_style",
                 "severity": "medium",
                 "title": (
-                    f"Cross-origin <link> {rtype} href=\"{l['href']}\" loaded "
+                    f"Cross-origin <link> {rtype} href=\"{li['href']}\" loaded "
                     f"without integrity= -- CDN compromise or MITM can inject "
                     f"arbitrary CSS (data exfiltration via CSS selectors, "
                     f"script execution via -moz-binding/behavior on legacy "
                     f"browsers)"
                 ),
-                "evidence": l["snippet"],
-                "resource_url": l["href"],
+                "evidence": li["snippet"],
+                "resource_url": li["href"],
                 "resource_type": rtype,
             })
 

@@ -13,8 +13,6 @@ tools):
 """
 from __future__ import annotations
 
-import copy
-import json as _json
 import re
 import secrets
 import threading
@@ -25,19 +23,21 @@ from .budget import BudgetExhausted
 from . import context as ctx
 from . import waf as wafmod
 from . import verifier
-from . import dom as dommod
+from . import dom as dommod  # noqa: F401  (Mixin 运行时引用:scanner 由 Mixin 组合,静态分析看不见)
 from . import dom_engine
 from . import poc as pocmod
 from .oob import OOBListener
-from .requester import Requester, JsonBody, CountingRequester
+from .requester import Requester, CountingRequester
 # New detection modules (Phase 1+): mXSS, DOM clobber, template SSTI,
-# JSONP callback, CSP analysis, polyglot, WAF bypass chains.
-from . import mutation as mxss_mod
-from . import dom_clobber as clobber_mod
-from . import template as tpl_mod
-from . import jsonp as jsonp_mod
+# JSONP callback, CSP analysis, polyglot, WAF bypass chains.  These modules
+# are only referenced by the Mixin classes below; import them anyway so
+# their module-level side effects (e.g. layer registration) run at startup.
+from . import mutation as mxss_mod  # noqa: F401  (Mixin 运行时引用:scanner 由 Mixin 组合,静态分析看不见)
+from . import dom_clobber as clobber_mod  # noqa: F401  (Mixin 运行时引用:scanner 由 Mixin 组合,静态分析看不见)
+from . import template as tpl_mod  # noqa: F401  (Mixin 运行时引用:scanner 由 Mixin 组合,静态分析看不见)
+from . import jsonp as jsonp_mod  # noqa: F401  (Mixin 运行时引用:scanner 由 Mixin 组合,静态分析看不见)
 from . import csp as csp_mod
-from . import polyglot as poly_mod
+from . import polyglot as poly_mod  # noqa: F401  (Mixin 运行时引用:scanner 由 Mixin 组合,静态分析看不见)
 from . import bypass as bypass_mod
 # Phase 13: advanced payload engineering.
 #   - ctx_mutation: context-aware mutation engine (replaces the static
@@ -56,9 +56,10 @@ from . import generator as gen_mod
 # into base64/JWT/JSON containers detected from the original param value.
 from . import pre_encode as pre_mod
 # Crawler enhancements (Phase 3): JS miner, form miner, param miner.
-from . import js_miner, form_miner, param_miner
+# Imported for Mixin runtime availability; scanner_crawl does its own import.
+from . import js_miner, form_miner, param_miner  # noqa: F401  (Mixin 运行时引用:scanner 由 Mixin 组合,静态分析看不见)
 # Phase 18: SPA headless crawler (Playwright-driven, replaces BS4 for SPAs).
-from . import spa_crawler as spa_mod
+from . import spa_crawler as spa_mod  # noqa: F401  (Mixin 运行时引用:scanner 由 Mixin 组合,静态分析看不见)
 # Reporting enhancements (Phase 6): CVSS scoring + replay PoC.
 from . import cvss as cvss_mod
 from . import replay as replay_mod
@@ -67,7 +68,7 @@ from . import verify_fix as verifyfix_mod
 # were exercised per endpoint so the report can prove comprehensiveness.
 from . import coverage as cov_mod
 from .logger import get_logger
-from .parser_utils import bs_parser as _bs_parser
+from .parser_utils import bs_parser as _bs_parser  # noqa: F401  (Mixin 运行时引用:scanner 由 Mixin 组合,静态分析看不见)
 
 SEVERITY_ORDER = {"high": 3, "medium": 2, "low": 1, "info": 0}
 
@@ -77,13 +78,13 @@ _log = get_logger("scanner")
 # Combinations are ordered by realistic bypass payoff; the engine stops at
 # `max_transforms` entries (default 12) so coverage scales with the flag.
 
-from .findings import (Finding, _DEFAULT_TRANSFORMS,
+from .findings import (Finding, _DEFAULT_TRANSFORMS,  # noqa: E402,F401  (Mixin 运行时引用:scanner 由 Mixin 组合,静态分析看不见)
                        _grade_evidence, _norm, _proof,
-                       _safe_snippet)  # noqa: F401
-from .scanner_stored import StoredBlindMixin
-from .scanner_layers import AdvancedLayerMixin
-from .scanner_crawl import CrawlMixin
-from .stealth import marker as _stem_marker
+                       _safe_snippet)
+from .scanner_stored import StoredBlindMixin  # noqa: E402
+from .scanner_layers import AdvancedLayerMixin  # noqa: E402
+from .scanner_crawl import CrawlMixin  # noqa: E402
+from .stealth import marker as _stem_marker  # noqa: E402
 
 
 def json_leaf_paths(obj, prefix: str = "") -> list[str]:
@@ -358,8 +359,8 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
                 if enriched:
                     endpoints = merged
                     if self.verbose:
-                        _log.debug(f"[*] param_miner: enriched endpoints with "
-                              f"hidden parameters")
+                        _log.debug("[*] param_miner: enriched endpoints with "
+                              "hidden parameters")
             except Exception as e:
                 _log.warning("param_miner integration error: %s", e,
                              exc_info=self.verbose)
@@ -666,6 +667,14 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
         bases, transform_priority, profile = self._prioritize_bases(
             req, url, method, params, data, param, is_body,
             bases, context, marker_escaped)
+        # Phase 188: keep the profile reachable at record time -- the
+        # kxss-style meta-char triage belongs on the finding (report users
+        # read it), not only in the queue ordering.
+        _prof_store = getattr(self, "_reflection_profiles", None)
+        if _prof_store is None:
+            _prof_store = {}
+            self._reflection_profiles = _prof_store
+        _prof_store[(url, param)] = profile
         # Phase 96: RCDATA breakout surfacing.  When the marker reflected
         # inside <textarea>/<title>/<xmp>, direct injections are inert
         # (the verifier correctly rejects them) while the closing-tag
@@ -742,6 +751,16 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
             confirmed = self._try_csp_nonce(
                 req, url, method, params, data, param, is_body,
                 csp_hdr, resp.text, marker, context) or confirmed
+        # Phase 187: CSP gadget chain.  A strict script-src that still
+        # allowlists a known gadget host (JSONP endpoint, Angular CDN, ...)
+        # re-opens script execution; inline payloads cannot confirm it (CSP
+        # blocks them) and only a browser can (the JSONP token rides a src
+        # attribute, so no static verdict is honest).  Attempted before the
+        # generic payload loop -- on such pages that loop is futile.
+        if not confirmed and csp_hdr and context:
+            confirmed = self._try_csp_gadget(
+                req, url, method, params, data, param, is_body,
+                csp_hdr, context) or confirmed
         if marker_escaped:
             effective_max = 3
         elif csp_strict:
@@ -857,7 +876,13 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
                               + _sample("script_gadget", 2)
                               + _sample("markdown", 2)
                               + _sample("framework_react", 1)
-                              + _sample("framework_svelte", 1))
+                              + _sample("framework_svelte", 1)
+                              # Phase 189: PortSwigger cheat-sheet events
+                              # (no-interaction handlers: hashchange,
+                              # pageshow, animation/transition family,
+                              # onsecuritypolicyviolation, ...).  Small
+                              # slice -- they ride leftover budget only.
+                              + _sample("portswigger_events", 2))
             # script_block reflection: also draw from script-shaped corpora
             # (service worker / postMessage / JSONP / prototype gadgets).
             if context == "script_block":
@@ -966,6 +991,126 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
         if self.verbose:
             _log.debug("    [+] CSP nonce leak exploited")
         return True
+
+    def _try_csp_gadget(self, req, url, method, params, data, param,
+                        is_body, csp_hdr: str, context: str):
+        """Phase 187: exploit a CSP allowlist that whitelists a script gadget.
+
+        Nuclei ships ~190 csp-bypass templates (renniepak/CSPBypass corpus)
+        whose flow is exactly this: read the CSP header, match the allowlisted
+        host against a known gadget endpoint, inject the gadget payload, watch
+        for the dialog.  This scanner already KNEW the gadget table; the chain
+        now runs it against the reflection points the L1 loop already found,
+        confirmed by the same headless path as every other reflected finding.
+
+        Attempted regardless of headless: framework-gadget payloads (Angular
+        template expressions) confirm statically via the same
+        ``template_angular`` machinery the corpus uses; JSONP-shaped payloads
+        (token rides a ``src`` attribute -- no static verdict is honest) need
+        the browser and are only confirmed when headless is available.
+        Capped at two gadget payloads per (url, param); the gadget set itself
+        is param-independent, the reflection it rides is not.
+        Returns True when a finding was added.
+        """
+        tried = getattr(self, "_csp_gadget_tried", None)
+        if tried is None:
+            tried = set()
+            self._csp_gadget_tried = tried
+        key = (url, param)
+        if key in tried:
+            return False
+        tried.add(key)
+        if not csp_mod.gadget_chain_relevant(csp_hdr):
+            return False
+        try:
+            _gadgets = csp_mod.gadget_bypass_payloads(csp_hdr)
+        except Exception:
+            return False
+        for _g in _gadgets[:2]:
+            self._check_cancel()
+            _token = "xssv_" + secrets.token_hex(4)
+            _pay = verifier.mark(_g["payload"], _token)
+            if _pay == _g["payload"]:
+                # Nothing stampable -> no dialog can be attributed to this
+                # payload; verifying it could only produce a non-proof.
+                continue
+            _probe = self._set_param(params, data, param, _pay, is_body)
+            _resp = None
+            try:
+                _resp = req.request(method, url, params=_probe["params"],
+                                    data=_probe["data"])
+                self._bump()
+                self.coverage.record_request(url, method)
+            except Exception:
+                continue
+            if _resp is None or _token not in (_resp.text or ""):
+                continue
+            self.coverage.touch_layer(
+                url, "L7_csp_gadget", method,
+                detail=f"CSP allowlists '{_g['host']}' "
+                       f"-> {_g['gadget']}")
+            _headless = None
+            _nv = None
+            try:
+                _nv = verifier.verify_semantic(
+                    _resp.text or "", _token,
+                    response_headers=dict(getattr(_resp, "headers", None)
+                                          or {}))
+            except Exception:
+                _nv = None
+            if not (_nv or {}).get("confirmed"):
+                # Framework gadgets confirmed above; JSONP-shaped payloads
+                # (token rides a src attribute) have no honest static verdict
+                # -- only a browser can measure them, and without one the
+                # static csp_bypass finding from _scan_csp stays the ceiling.
+                if not getattr(self, "use_headless", False):
+                    continue
+                try:
+                    _headless = verifier.verify_headless(
+                        url, method,
+                        params=None if is_body else _probe["params"],
+                        data=_probe["data"] if is_body else None,
+                        headers=dict(getattr(getattr(req, "session", None),
+                                             "headers", {}) or {}),
+                        token=_token)
+                except Exception:
+                    _headless = None
+                if not (_headless or {}).get("confirmed"):
+                    # No dialog: the gadget host may be unreachable or the
+                    # reflection inert.  Stay silent.
+                    continue
+            if _headless:
+                _proof_txt = ("executed in a real browser (dialog carried "
+                              "the probe token)")
+            else:
+                _proof_txt = ("landed in an executable context "
+                              "(Angular-style template expression)")
+            _cls, _conf, _det = _grade_evidence(
+                _headless, "high",
+                (f"CSP allowlists '{_g['host']}' which hosts "
+                 f"{_g['gadget']}; the gadget payload reflected and "
+                 f"{_proof_txt}"),
+                model_judged=_headless is None)
+            self._add(Finding(**{
+                "url": url, "method": method, "param": param,
+                "type": "reflected",
+                "context": ((_nv or {}).get("context")) or context,
+                "payload": _pay,
+                "transform": ["csp_gadget"],
+                "severity": "high",
+                "confidence": _conf,
+                "detail": _det,
+                "evidence_class": _cls,
+                "headless": _headless,
+                "param_in": "body" if is_body else "query",
+                "proof": _proof(_resp, method, param, _pay),
+            }))
+            self.coverage.record_finding(url, method)
+            if self.verbose:
+                _log.debug("    [+] CSP gadget chain executed (%s)",
+                           _g["gadget"])
+            return True
+        return False
 
     def _try_position_shift(self, req, url, method, params, data, param,
                             is_body, bases, context, waf_info,
@@ -1402,7 +1547,15 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
                       % ctype.split(";")[0].strip())
         evidence, confidence, detail = _grade_evidence(headless, confidence,
                                                       detail)
-        self._add(Finding(**{
+        # Phase 188: kxss-style meta-char triage, when this param was
+        # sandwich-probed.  Metadata only -- the profile never confirms or
+        # denies anything, it just tells the report reader which characters
+        # the server leaves RAW.  Attached AFTER the literal-keyed Finding
+        # construction: an evidence-coverage gate pins every Finding(**var)
+        # pass-through site, and this is not a pass-through.
+        _prof = getattr(self, "_reflection_profiles", {}).get((url, param))
+        _meta = rp_mod.triage_line(_prof)
+        finding = Finding(**{
             "url": url, "method": method, "param": param,
             "type": ftype, "context": context, "payload": payload,
             "transform": tset, "severity": severity,
@@ -1424,7 +1577,10 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
             # been blocked", while the query carrier returns 200 and reflects.
             "param_in": "body" if is_body else "query",
             "headless": headless, "proof": _proof(resp, method, param, payload),
-        }))
+        })
+        if _meta:
+            finding.data["reflected_meta"] = _meta
+        self._add(finding)
 
     def _add(self, finding: Finding):
         # Phase 48: see findings.attach_replay_ctx -- carries the CSRF /

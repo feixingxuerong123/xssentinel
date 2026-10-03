@@ -8,7 +8,6 @@ coverage of the individual detection layers.
 from __future__ import annotations
 import os
 import sys
-import json
 
 # Make xssentinel importable when run from the project root.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -20,7 +19,6 @@ from xssentinel.core import mutation as mxss_mod
 from xssentinel.core import context as ctx
 from xssentinel.core import polyglot
 from xssentinel.core import ctx_mutation
-from xssentinel.core import multi_encode
 from xssentinel.core import bypass
 from xssentinel.core import cvss
 from xssentinel.core import compliance

@@ -7,7 +7,6 @@ Covers the P0 "scalable input" work:
     refused-port retry stalls).
 """
 import io
-import json
 import os
 import subprocess
 import sys

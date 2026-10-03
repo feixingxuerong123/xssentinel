@@ -118,6 +118,15 @@ class _FakeAiohttp(types.ModuleType):
     scan() builds a real ClientSession; patching sys.modules lets the whole
     scan pipeline (baseline -> page layers -> L1 -> graceful stop) run
     against the fake session above without touching the loopback stack.
+
+    Phase 192: ``_session_kwargs`` unconditionally subclasses
+    ``aiohttp.CookieJar`` (Phase 189 egress guard) and constructs a
+    ``TraceConfig`` -- both missing here, which made every test reaching
+    ``_session_kwargs`` die on ``module 'aiohttp' has no attribute
+    'CookieJar'`` whenever no earlier test had already cached the real jar
+    class (test-order-dependent: the Phase 191 lesson, in this file's own
+    stub).  The egress SEMANTICS stay measured against the genuine aiohttp
+    in ``tests/test_egress_guard.py``.
     """
 
     def __init__(self, mode="echo", headers=None):
@@ -126,6 +135,28 @@ class _FakeAiohttp(types.ModuleType):
                                                      headers=headers)
         self.ClientTimeout = lambda **kw: kw
         self.TCPConnector = lambda **kw: kw
+
+        class _FakeCookieJar:
+            # Enough of aiohttp.CookieJar for the egress subclass: the
+            # subclass calls super().filter_cookies() and type(jar)() on
+            # the result, so both must really work.
+            def __init__(self, **kwargs):
+                self._cookies = {}
+
+            def update_cookies(self, cookies, request_url=None):
+                self._cookies.update(dict(cookies))
+
+            def filter_cookies(self, request_url=None):
+                return dict(self._cookies)
+
+        class _FakeTraceConfig:
+            # _session_kwargs appends to both hook lists.
+            def __init__(self, **kwargs):
+                self.on_request_start = []
+                self.on_request_redirect = []
+
+        self.CookieJar = _FakeCookieJar
+        self.TraceConfig = _FakeTraceConfig
 
     def ClientSession(self, **kw):
         session = self.session_factory(**kw)
@@ -140,14 +171,29 @@ class _FakeAiohttp(types.ModuleType):
         return _CM()
 
 
+_JAR_SAVED = None
+
+
 def _fake_aiohttp(mode="echo", headers=None):
     """Install the fake aiohttp module; returns the real one for restore."""
+    global _JAR_SAVED
     real = sys.modules.get("aiohttp")
     sys.modules["aiohttp"] = _FakeAiohttp(mode=mode, headers=headers)
+    # Isolate the `_EGRESS_JAR` class cache for the fake window (same
+    # contract as test_async_hidden_param_mining): results must not depend
+    # on whether some earlier test already cached the genuine class.
+    from xssentinel.core import async_scanner_common as _asc_mod
+    _JAR_SAVED = _asc_mod._EGRESS_JAR
+    _asc_mod._EGRESS_JAR = None
     return real
 
 
 def _restore_aiohttp(real):
+    global _JAR_SAVED
+    from xssentinel.core import async_scanner_common as _asc_mod
+    if _JAR_SAVED is not None:
+        _asc_mod._EGRESS_JAR = _JAR_SAVED
+    _JAR_SAVED = None
     if real is None:
         sys.modules.pop("aiohttp", None)
     else:

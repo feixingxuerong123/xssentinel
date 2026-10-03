@@ -1,6 +1,7 @@
 """Phase 23 regression tests: report XSS fix, JUnit newline, logging."""
 from __future__ import annotations
-import sys, os
+import sys
+import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from xssentinel.core.report import _safe_url, build_html, build_junit

@@ -215,7 +215,6 @@ def build_demo_html(title: str, target_url: str,
         f"catch(e) {{ window.__xssentinel_xsleak.push({{channel:'{c}',"
         "ok:false,note:'payload error: '+e.message}}); }}"
         for c in use)
-    tjs = _js_str(target)
     return f"""<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><title>{_esc(title)}</title>
 <style>body{{font:14px/1.5 monospace;margin:2rem;}}table{{border-collapse:collapse;

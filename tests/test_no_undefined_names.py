@@ -30,7 +30,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PACKAGE = os.path.join(ROOT, "xssentinel")
 
 try:
-    import pyflakes  # noqa: F401
+    import pyflakes  # noqa: F401  (可用性探测:导入即判定 _HAS_PYFLAKES)
     _HAS_PYFLAKES = True
 except Exception:
     _HAS_PYFLAKES = False

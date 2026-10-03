@@ -32,7 +32,7 @@ CALLBACK_PARAMS = [
 
 # Marker used to confirm callback injection.  Must be a valid JS identifier
 # prefix so the response stays syntactically valid as a <script>.
-from .stealth import marker as _marker
+from .stealth import marker as _marker  # noqa: E402
 
 
 def confirm_marker() -> str:

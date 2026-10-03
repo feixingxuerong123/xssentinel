@@ -7,7 +7,6 @@ from __future__ import annotations
 import json
 import os
 import sys
-import threading
 
 # Make xssentinel + the range2 fixture importable from the project root.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

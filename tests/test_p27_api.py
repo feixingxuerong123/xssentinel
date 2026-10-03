@@ -21,7 +21,6 @@ import threading
 import time
 import urllib.error
 import urllib.request
-from io import BytesIO
 
 import pytest
 
@@ -31,10 +30,10 @@ ROOT = os.path.dirname(HERE)
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
-from xssentinel.api.jobs import Job, JobManager, JobNotFoundError, JobState
-from xssentinel.api.server import (
+from xssentinel.api.jobs import Job, JobManager, JobNotFoundError, JobState  # noqa: E402
+from xssentinel.api.server import (  # noqa: E402
     StdlibServer, Response, _match_route, _version_info,
-    _handle_health, _handle_info, _scan_worker,
+    _handle_health, _handle_info,
 )
 
 
@@ -886,11 +885,11 @@ class TestSameOriginGuard:
         # urllib always rewrites Host to the connect address).
         import socket as _s
         host, port = "127.0.0.1", api_server.port
-        req = (f"POST /api/v1/jobs HTTP/1.1\r\n"
-               f"Host: evil.example.com\r\n"
-               f"Content-Type: application/json\r\n"
-               f"Content-Length: 24\r\nConnection: close\r\n\r\n"
-               f'{{"url": "http://example.com"}}')
+        req = ("POST /api/v1/jobs HTTP/1.1\r\n"
+               "Host: evil.example.com\r\n"
+               "Content-Type: application/json\r\n"
+               "Content-Length: 24\r\nConnection: close\r\n\r\n"
+               '{"url": "http://example.com"}')
         s = _s.create_connection((host, port), timeout=10)
         try:
             s.sendall(req.encode())
@@ -946,3 +945,113 @@ class TestSameOriginGuard:
         status, body, _ = client.request(
             "POST", "/api/v1/jobs", body={"url": "http://example.com"})
         assert status != 403
+
+
+def _raw_request(port: int, method: str, path: str, headers: dict,
+                 body: str = "") -> str:
+    """Send one request over a raw socket.
+
+    ``urllib`` rewrites ``Host`` to the connect address, so a test that needs
+    to name a *different* host -- the address a remote client would really put
+    there -- has to own the bytes.
+    """
+    import socket
+
+    lines = [f"{method} {path} HTTP/1.1"]
+    lines += [f"{k}: {v}" for k, v in headers.items()]
+    if body:
+        lines.append(f"Content-Length: {len(body.encode())}")
+    lines.append("Connection: close")
+    head = "\r\n".join(lines) + "\r\n\r\n"
+    sock = socket.create_connection(("127.0.0.1", port), timeout=10)
+    try:
+        sock.sendall((head + body).encode())
+        chunks = []
+        while True:
+            data = sock.recv(65536)
+            if not data:
+                break
+            chunks.append(data)
+    finally:
+        sock.close()
+    return b"".join(chunks).decode("utf-8", "replace")
+
+
+REMOTE_HOST = "192.168.1.5:8000"
+
+
+class TestKeyedExternalDeployment:
+    """Phase 190: ``--host 0.0.0.0 --api-key ...`` was advertised in the CLI
+    help and answered 403 for every legitimate remote caller.
+
+    The Phase 70 Host allowlist is the browser-facing half of the defence: a
+    page cannot forge ``Host``, so naming a non-local host means a rebound
+    page.  But once the operator configures a secret, that secret is the gate,
+    and a real remote client must be allowed to name the address it reached --
+    ``http://192.168.1.5:8000`` puts ``Host: 192.168.1.5:8000`` on the wire,
+    which the allowlist rejected.  Measured before the fix, with the key
+    present: 403 cross_origin_blocked.
+
+    The Origin half stays unconditional, and with no key configured the Host
+    allowlist still applies in full -- these two classes are what keep that
+    from being relaxation without a bound.
+    """
+
+    def test_keyed_server_serves_a_request_naming_a_remote_host(
+            self, api_server_with_key):
+        resp = _raw_request(
+            api_server_with_key.port, "GET", "/api/v1/scans",
+            {"Host": REMOTE_HOST, "X-API-Key": "secret123"})
+        assert " 200 " in resp.split("\r\n")[0], resp[:200]
+        assert "cross_origin_blocked" not in resp
+
+    def test_keyless_server_still_blocks_that_same_host(self, api_server):
+        # The relaxation is key-gated: without a secret the Host allowlist is
+        # the only thing between a rebound page and this machine's scans.
+        resp = _raw_request(api_server.port, "GET", "/api/v1/scans",
+                            {"Host": REMOTE_HOST})
+        assert "403" in resp.split("\r\n")[0]
+        assert "cross_origin_blocked" in resp
+
+    def test_keyed_server_still_blocks_cross_origin_post(
+            self, api_server_with_key):
+        # A rebound POST carries the attacker's Origin and cannot read the key
+        # to put it in a header -- and the Origin half never got relaxed.
+        resp = _raw_request(
+            api_server_with_key.port, "POST", "/api/v1/jobs",
+            {"Host": REMOTE_HOST, "Origin": "https://evil.test",
+             "Content-Type": "application/json",
+             "X-API-Key": "secret123"},
+            body='{"url": "http://example.com"}')
+        assert "403" in resp.split("\r\n")[0]
+        assert "cross_origin_blocked" in resp
+
+    def test_keyed_server_rejects_a_request_without_the_key(
+            self, api_server_with_key):
+        resp = _raw_request(api_server_with_key.port, "GET", "/api/v1/scans",
+                            {"Host": REMOTE_HOST})
+        assert "401" in resp.split("\r\n")[0]
+
+
+class TestExternalBindWarning:
+    """The CLI tells operators to use ``0.0.0.0`` to expose the API; auth is
+    optional.  The combination is an unauthenticated SSRF oracle that also
+    discloses findings, so starting that way must say so out loud."""
+
+    def _warn(self, capsys, host, api_key):
+        from xssentinel.api.server import _warn_unauthenticated_external_bind
+        _warn_unauthenticated_external_bind(host, api_key)
+        return capsys.readouterr().err
+
+    def test_external_bind_without_a_key_warns(self, capsys):
+        err = self._warn(capsys, "0.0.0.0", None)
+        assert "--api-key" in err and "0.0.0.0" in err
+
+    def test_loopback_bind_stays_silent(self, capsys):
+        assert self._warn(capsys, "127.0.0.1", None) == ""
+
+    def test_external_bind_with_a_key_stays_silent(self, capsys):
+        assert self._warn(capsys, "0.0.0.0", "secret123") == ""
+
+    def test_localhost_named_bind_stays_silent(self, capsys):
+        assert self._warn(capsys, "localhost", None) == ""

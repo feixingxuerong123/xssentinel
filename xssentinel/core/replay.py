@@ -41,7 +41,7 @@ def browser_url(url: str, method: str, params: dict | None,
                 payload: str) -> str:
     """Build a URL that can be pasted into a browser (GET only)."""
     if method.upper() != "GET":
-        return f"# POST XSS - use curl_command() instead"
+        return "# POST XSS - use curl_command() instead"
     if not params:
         return url
     sep = "&" if "?" in url else "?"

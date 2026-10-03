@@ -6,13 +6,17 @@ into the DOM.  Sanitizers are complex and have had numerous bypasses over
 the years.  This module performs STATIC analysis of a page's JavaScript to
 detect:
 
-  1. **Known-vulnerable sanitizer versions**: detects DOMPurify <= 2.0.7
-     (mutation XSS bypass), sanitize-html < 2.3.2, and other CVE-affected
-     versions by inspecting the loaded script URL or version comments.
+  1. **Known-vulnerable sanitizer versions**: DOMPurify is tracked by
+     remediation line -- < 2.0.8 (mXSS), < 3.1.3 (prototype pollution +
+     nesting mXSS), <= 3.4.15 (the 2026 cluster) -- plus sanitize-html
+     < 2.3.2 and lehh.xss < 1.0.7, matched from the loaded script URL or the
+     version banner comment.
   2. **Unsafe sanitizer configuration**: detects configurations that weaken
-     the sanitizer -- e.g. ``ADD_TAGS: ['script']``, ``ALLOW_DATA_ATTR: true``
-     combined with ``ADD_ATTR: ['href']``, or ``ALLOWED_URI_REGEXP`` set to
-     a permissive pattern.
+     the sanitizer -- e.g. ``ADD_TAGS: ['script']``, an ``on*`` name in
+     ``ADD_ATTR``, ``ALLOWED_URI_REGEXP`` set to a permissive pattern, or the
+     2026-era options (``IN_PLACE`` / ``CUSTOM_ELEMENT_HANDLING`` /
+     ``USE_PROFILES`` / ``setConfig()``) that every recent DOMPurify advisory
+     reached its bypass through.
   3. **Sanitizer output fed to dangerous sink**: detects the pattern
      ``DOMPurify.sanitize(x)`` whose result is passed to ``innerHTML``
      (sanitizer output should go through a safe insertion like
@@ -36,27 +40,78 @@ from __future__ import annotations
 import re
 
 
-# ---------------------------------------------------------------------------
-# Known vulnerable sanitizer versions
-# ---------------------------------------------------------------------------
-# (sanitizer_name, regex_pattern, min_safe_version, cve_description)
+# Version banners come in two shapes -- the ``DOMPurify 3.0.0`` header comment
+# and the ``dompurify/3.0.0/dist/...`` script path -- and the banner pattern is
+# case-insensitive, so it matches the URL too.  Both live in ONE advisory entry
+# (``patterns``) because a version is one finding, not one per regex.
+_BANNER_RE = re.compile(r"DOMPurify[^\d]*?(\d+)\.(\d+)\.(\d+)", re.IGNORECASE)
+_PKG_PATH_RE = re.compile(r"dompurify[@/](\d+)\.(\d+)\.(\d+)", re.IGNORECASE)
+
+# One dict per advisory line: sanitizer, patterns, inclusive version range,
+# severity, description.
+#
+# The ranges come from the vendor's published advisory list, not from memory:
+# DOMPurify's GitHub security advisories (25 published as of 2026-09-23, latest
+# release 3.4.16).  Grouping them by *remediation line* instead of one entry per
+# CVE keeps a detected version from producing twenty violations.
 _VULNERABLE_SANITIZERS = [
-    ("DOMPurify",
-     re.compile(r"DOMPurify[^\d]*?(\d+)\.(\d+)\.(\d+)", re.IGNORECASE),
-     (2, 0, 8),
-     "DOMPurify < 2.0.8 has multiple mXSS bypasses (CVE-2020-26870, CVE-2020-7536)"),
-    ("DOMPurify",
-     re.compile(r"dompurify[@/](\d+)\.(\d+)\.(\d+)", re.IGNORECASE),
-     (2, 0, 8),
-     "DOMPurify < 2.0.8 has multiple mXSS bypasses (CVE-2020-26870, CVE-2020-7536)"),
-    ("sanitize-html",
-     re.compile(r"sanitize-html[^\d]*?(\d+)\.(\d+)\.(\d+)", re.IGNORECASE),
-     (2, 3, 2),
-     "sanitize-html < 2.3.2 has bypass via nested tags (CVE-2021-26539)"),
-    ("xss",
-     re.compile(r"\blehh\.xss[^\d]*?(\d+)\.(\d+)\.(\d+)"),
-     (1, 0, 7),
-     "lehh.xss < 1.0.7 has regex bypass vulnerabilities"),
+    {
+        "sanitizer": "DOMPurify",
+        "patterns": (_BANNER_RE, _PKG_PATH_RE),
+        "range": ((0, 0, 0), (2, 0, 7)),
+        "severity": "high",
+        "desc": "DOMPurify < 2.0.8 has multiple mXSS bypasses "
+                "(CVE-2020-26870, CVE-2020-7536)",
+    },
+    {
+        # 2024 line: prototype-pollution tampering (CVE-2024-45801,
+        # CVE-2024-48910) and nesting-based mXSS (CVE-2024-47875).
+        # 2.x was patched in 2.5.x, the 3.x line in 3.1.3.
+        "sanitizer": "DOMPurify",
+        "patterns": (_BANNER_RE, _PKG_PATH_RE),
+        "range": ((2, 0, 8), (3, 1, 2)),
+        "severity": "high",
+        "desc": "DOMPurify < 3.1.3 is vulnerable to prototype-pollution "
+                "tampering and nesting-based mXSS (CVE-2024-45801, "
+                "CVE-2024-47875, CVE-2024-48910)",
+    },
+    {
+        # 2026 line: thirteen advisories, every one of them reaching the bypass
+        # through a CONFIG or API surface rather than the tag allowlist --
+        # IN_PLACE (six: detached subtrees keep handlers armed, clobbered root
+        # attributes, cross-realm nodes, a shadow root inside
+        # <template>.content, force-removed rawtext roots),
+        # CUSTOM_ELEMENT_HANDLING (two), SAFE_FOR_TEMPLATES (two),
+        # setConfig()/hook config pollution (three), function-form ADD_TAGS /
+        # ADD_ATTR predicates (three), and `selectedcontent` re-clone
+        # (CVE-2026-47423, high).  All closed by 3.4.16.
+        "sanitizer": "DOMPurify",
+        "patterns": (_BANNER_RE, _PKG_PATH_RE),
+        "range": ((3, 1, 3), (3, 4, 15)),
+        "severity": "medium",
+        "desc": "DOMPurify <= 3.4.15 has published bypasses around IN_PLACE, "
+                "CUSTOM_ELEMENT_HANDLING, SAFE_FOR_TEMPLATES and "
+                "setConfig()/hook config pollution (CVE-2026-41238, "
+                "CVE-2026-41239, CVE-2026-47423, CVE-2026-49458, "
+                "CVE-2026-49459, CVE-2026-49978, GHSA-cmwh-pvxp-8882); "
+                "upgrade to 3.4.16 and avoid IN_PLACE",
+    },
+    {
+        "sanitizer": "sanitize-html",
+        "patterns": (re.compile(
+            r"sanitize-html[^\d]*?(\d+)\.(\d+)\.(\d+)", re.IGNORECASE),),
+        "range": ((0, 0, 0), (2, 3, 1)),
+        "severity": "high",
+        "desc": "sanitize-html < 2.3.2 has bypass via nested tags "
+                "(CVE-2021-26539)",
+    },
+    {
+        "sanitizer": "xss",
+        "patterns": (re.compile(r"\blehh\.xss[^\d]*?(\d+)\.(\d+)\.(\d+)"),),
+        "range": ((0, 0, 0), (1, 0, 6)),
+        "severity": "medium",
+        "desc": "lehh.xss < 1.0.7 has regex bypass vulnerabilities",
+    },
 ]
 
 
@@ -96,6 +151,67 @@ _UNSAFE_CONFIG_PATTERNS = [
      "sanitizer_config_allow_unknown_protocols",
      "medium",
      "Sanitizer ALLOW_UNKNOWN_PROTOCOLS: true -- permits javascript: and data: URIs"),
+    # --- 2026 exploitation surface --------------------------------------
+    # Every DOMPurify advisory published in 2026 reaches the bypass through a
+    # CONFIG option, not through the tag allowlist.  Detecting the version
+    # alone was therefore blind to the actual hazard: an app on 3.4.x "current
+    # at the time" running IN_PLACE or CUSTOM_ELEMENT_HANDLING is the case
+    # these patterns are for.
+    (re.compile(r"IN_PLACE\s*:\s*(?:true|1)", re.IGNORECASE),
+     "sanitizer_config_in_place",
+     "medium",
+     "DOMPurify IN_PLACE: true sanitizes the caller's live subtree -- the "
+     "surface for six 2026 advisories (detached subtrees keep handlers armed, "
+     "clobbered root attributes, cross-realm nodes, shadow root inside "
+     "<template>.content); prefer the default string/fragment mode"),
+    (re.compile(r"CUSTOM_ELEMENT_HANDLING\s*:", re.IGNORECASE),
+     "sanitizer_config_custom_element_handling",
+     "medium",
+     "CUSTOM_ELEMENT_HANDLING allows custom elements whose lifecycle runs "
+     "attacker-influenced code; GHSA-c2j3-45gr-mqc4 / CVE-2026-41238 both "
+     "bypass afterSanitizeElements through this option"),
+    (re.compile(r"SAFE_FOR_TEMPLATES\s*:\s*(?:true|1)", re.IGNORECASE),
+     "sanitizer_config_safe_for_templates",
+     "low",
+     "SAFE_FOR_TEMPLATES is relied on to neutralize {{ }} expressions; "
+     "CVE-2026-41239 (with RETURN_DOM) and GHSA-gvmj-g25r-r7wr both leave "
+     "template markup intact through this exact option"),
+    (re.compile(r"DOMPurify\s*\.\s*setConfig\s*\(", re.IGNORECASE),
+     "sanitizer_config_setconfig_persistence",
+     "medium",
+     "DOMPurify.setConfig() changes the DEFAULT configuration for every later "
+     "sanitize() call; GHSA-cmwh-pvxp-8882 / GHSA-76mc-f452-cxcm show "
+     "ALLOWED_ATTR and allowedTags polluted permanently through it"),
+    (re.compile(r"USE_PROFILES\s*:", re.IGNORECASE),
+     "sanitizer_config_use_profiles",
+     "medium",
+     "USE_PROFILES replaces the allowlist wholesale rather than widening it -- "
+     "GHSA-cj63-jhhr-wcxv turned a polluted profile into event handlers"),
+    (re.compile(r"ADD_ATTR\s*:\s*\[[^\]]*['\"]on[a-z]", re.IGNORECASE),
+     "sanitizer_config_add_attr_handler",
+     "high",
+     "Sanitizer ADD_ATTR allow-lists an on* event handler attribute, which is "
+     "a direct script-execution grant"),
+    (re.compile(r"ADD_TAGS\s*:\s*\[[^\]]*['\"]template['\"]", re.IGNORECASE),
+     "sanitizer_config_add_template_tag",
+     "medium",
+     "ADD_TAGS includes <template>: its .content is a separate document tree "
+     "that sanitizers historically do not reach (CVE-2026-49978)"),
+    (re.compile(r"ADD_URI_SAFE_ATTR\s*:\s*\[", re.IGNORECASE),
+     "sanitizer_config_add_uri_safe_attr",
+     "medium",
+     "ADD_URI_SAFE_ATTR skips URI validation for the listed attributes -- "
+     "javascript:/data: URLs then pass straight through"),
+    (re.compile(r"ALLOWED_URI_REGEXP\s*:\s*[\"']?/", re.IGNORECASE),
+     "sanitizer_config_allowed_uri_regexp",
+     "medium",
+     "Custom ALLOWED_URI_REGEXP overrides the built-in scheme allowlist; a "
+     "pattern that is not anchored lets javascript:/data: through"),
+    (re.compile(r"RETURN_TRUSTED_TYPE\s*:\s*(?:true|1)", re.IGNORECASE),
+     "sanitizer_config_return_trusted_type",
+     "low",
+     "RETURN_TRUSTED_TYPE returns a TrustedHTML string; GHSA-vxr8-fq34-vvx9 "
+     "shows a policy surviving clearConfig() and poisoning later output"),
 ]
 
 
@@ -135,14 +251,9 @@ _USER_SOURCE_RE = re.compile(
 )
 
 
-def _check_version(version_tuple: tuple, min_safe: tuple) -> bool:
-    """Return True if version_tuple < min_safe (i.e. vulnerable)."""
-    for i in range(3):
-        if version_tuple[i] < min_safe[i]:
-            return True
-        if version_tuple[i] > min_safe[i]:
-            return False
-    return False  # equal == safe
+def _in_range(version_tuple: tuple, low: tuple, high: tuple) -> bool:
+    """True when ``low <= version_tuple <= high`` (inclusive on both ends)."""
+    return low <= version_tuple <= high
 
 
 def analyze_page(html: str | None, page_url: str = "") -> dict:
@@ -165,25 +276,38 @@ def analyze_page(html: str | None, page_url: str = "") -> dict:
     violations: list[dict] = []
 
     # 1. Check for vulnerable sanitizer versions.
-    for name, pattern, min_safe, cve in _VULNERABLE_SANITIZERS:
-        for m in pattern.finditer(html):
-            version = (int(m.group(1)), int(m.group(2)), int(m.group(3)))
-            if _check_version(version, min_safe):
+    #
+    # One report per (sanitizer, version): the banner pattern is
+    # case-insensitive, so a ``dompurify/3.1.2/`` URL matches both of that
+    # entry's patterns, and the same library can be referenced twice on a page.
+    reported_versions: set = set()
+    for adv in _VULNERABLE_SANITIZERS:
+        low, high = adv["range"]
+        for pattern in adv["patterns"]:
+            for m in pattern.finditer(html):
+                version = (int(m.group(1)), int(m.group(2)), int(m.group(3)))
+                if not _in_range(version, low, high):
+                    continue
+                key = (adv["sanitizer"], version)
+                if key in reported_versions:
+                    continue
+                reported_versions.add(key)
                 vstr = ".".join(str(v) for v in version)
-                entry = {
-                    "sanitizer": name,
+                vulnerable_versions.append({
+                    "sanitizer": adv["sanitizer"],
                     "version": vstr,
-                    "min_safe": ".".join(str(v) for v in min_safe),
-                    "cve": cve,
+                    "affected_range": (f"{low[0]}.{low[1]}.{low[2]}"
+                                       f" - {high[0]}.{high[1]}.{high[2]}"),
+                    "cve": adv["desc"],
                     "match": m.group(0)[:100],
-                }
-                vulnerable_versions.append(entry)
+                })
                 violations.append({
                     "type": "sanitizer_vulnerable_version",
-                    "severity": "high",
-                    "title": f"{name} {vstr} is vulnerable ({cve})",
+                    "severity": adv["severity"],
+                    "title": f"{adv['sanitizer']} {vstr} is vulnerable "
+                             f"({adv['desc']})",
                     "evidence": m.group(0)[:120],
-                    "sanitizer": name,
+                    "sanitizer": adv["sanitizer"],
                     "version": vstr,
                 })
 
@@ -295,12 +419,12 @@ def build_poc_html(page_url: str, violation_type: str = "",
         )
     if violation_type == "sanitizer_output_to_innerhtml":
         return (
-            f'<!-- PoC: mXSS payload targeting innerHTML after sanitize() -->\n'
-            f'<noscript><p title="</noscript><img src=x onerror=alert(1)>">'
+            '<!-- PoC: mXSS payload targeting innerHTML after sanitize() -->\n'
+            '<noscript><p title="</noscript><img src=x onerror=alert(1)>">'
         )
     if violation_type == "unsanitized_innerhtml_user_source":
         return (
-            f'<!-- PoC: Direct innerHTML = location.hash without sanitize() -->\n'
-            f'#<img src=x onerror=alert(document.domain)>'
+            '<!-- PoC: Direct innerHTML = location.hash without sanitize() -->\n'
+            '#<img src=x onerror=alert(document.domain)>'
         )
     return f'<!-- Sanitizer issue: {violation_type} -->'

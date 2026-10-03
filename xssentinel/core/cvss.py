@@ -105,7 +105,6 @@ def score_finding(finding: dict) -> tuple[float, str, str]:
     vec = CVSSVector()
     ftype = finding.get("type", "reflected")
     fsev = finding.get("severity", "high")
-    context = finding.get("context", "html_element")
 
     # Base: XSS is network, low complexity, requires user interaction.
     vec.av = "N"
