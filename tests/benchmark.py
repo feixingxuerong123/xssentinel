@@ -57,11 +57,18 @@ from xssentinel.core.oob import SelfHostedListener
 from tests import vuln_server
 
 
-BASE = "http://127.0.0.1:8899"
 # 8899 sits inside the Windows dynamic-reservation kill zone (netsh
 # excludedportrange: 8810-9109 on this host as of 2026-09-27) -- binds
 # fail with WinError 10013 there.  18899 is outside every observed range.
 BENCH_PORT = 18899
+# Derived, never hard-coded: Phase 179 moved the fixture to 18899 but this
+# BASE kept pointing at 8899 -- the fixture server sat healthy on 18899
+# with ZERO traffic while every scan connect went to the dead 8899, whose
+# SYNs this host's security software silently drops (connect hangs past
+# settimeout).  That was the entire test_benchmark wedge
+# (dev/WEDGE_test_benchmark_20260927.md).  Deriving BASE from BENCH_PORT
+# makes the drift structurally impossible.
+BASE = f"http://127.0.0.1:{BENCH_PORT}"
 
 # A representative subset of endpoints that exercises every detection
 # layer without being so large the benchmark takes minutes.  Each entry:

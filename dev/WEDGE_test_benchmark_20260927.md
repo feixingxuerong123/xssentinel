@@ -1,4 +1,42 @@
-# 已知未解:test_benchmark 进程内 connect 无限挂起(2026-09-27)
+# 已结案(2026-10-03):BASE/BENCH_PORT 漂移 —— 不是玄学,是扫描器瞄错了端口
+
+> 原诊断记录保留在下方(其中"已排除"一节的多数结论仍然成立,但根因不在它们
+> 排除过的任何一项)。结案结论:
+
+## 根因
+
+Phase 179 把 fixture 服务器从 8899 迁到 18899(Windows 保留段杀伤区)时,
+`tests/benchmark.py` 的 `BENCH_PORT` 更新了,但同文件第 60 行的
+`BASE = "http://127.0.0.1:8899"` **漏改**。于是:
+
+  * fixture 服务器在 18899 上健康监听(本文档"已排除"一节全部属实);
+  * 扫描器(`BASE + path`)全速连向 **8899** —— 一个无人监听的端口;
+  * 本机安全软件对死端口的 SYN 静默丢弃(而不是回 RST),connect 因此挂起
+    且**绕过 settimeout** —— 正是原假说 2 的机制,只是触发条件是"连错端口";
+
+原 py-spy 看到 `sock.connect` 挂起、18899 却零流量、"对独立进程 4-20ms 响应",
+三条证据在"扫描器瞄错端口"下全部自洽。
+
+## 修复与验证
+
+  * `tests/benchmark.py`:BASE 改为从 BENCH_PORT 派生(结构上不可能再漂移);
+  * 同族问题 range3 起靶 wedge 同日另案修复:HTTP/1.1 keep-alive 下
+    `_send` 缺 Content-Length,read-to-EOF 客户端(requests)必挂
+    (range3/server.py c0cbb45);
+  * 验证:`pytest tests/test_benchmark.py` **35 passed in 13.86s**
+    (此前每次 540s×2 超时);range3 runner sync TP20/FP0/TN6/FN0 +
+    async TP18/FP0/TN6/FN0/SKIP2,全部案例约 1s。
+
+## 经验
+
+connect 挂起 + "服务器健康却零流量" = 先查**客户端连的是不是这个服务器**
+(netstat 看进程的连接指向),再谈安全软件。端口迁移类改动必须让
+`BASE` 这类派生值从端口常量计算,而不是并存两份字面量。
+
+---
+
+# 原始诊断(2026-09-27,已由上述结案取代)
+
 
 ## 现象
 `pytest tests/test_benchmark.py` 的 `benchmark_result` fixture(tests/benchmark.py:254

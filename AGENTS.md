@@ -456,6 +456,17 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
       已按同一模式修复(补桩 + 缓存隔离,连带 file 内注释),复跑
       test_async_budget + test_async_hidden_param_mining + test_egress_guard
       3/3 文件绿(616s)。语义测量仍由真 aiohttp 的 test_egress_guard 承担。
+      **同日续(环境债清偿):两个长期"未验证"项全部根因修复并验证** ——
+      ① **test_benchmark wedge 结案**(原记账 187/192 两轮):Phase 179 迁
+      端口时 `tests/benchmark.py` 的 `BENCH_PORT`→18899 但 `BASE` 仍指 8899,
+      服务器健康监听却零流量,扫描器连向死端口、SYN 被安全软件静默丢弃 →
+      connect 挂起超 settimeout。修为 BASE 从 BENCH_PORT 派生(漂移结构上
+      不可能);复测 **35 passed in 13.86s**(此前每次 540s×2 超时)。
+      ② **range3 起靶 wedge**:HTTP/1.1 keep-alive 下 `_send` 缺
+      Content-Length(c0cbb45),requests 读 body 到 EOF 必挂;修复后 runner
+      完整跑通,sync **TP20/FP0/TN6/FN0** + async **TP18/FP0/TN6/FN0/SKIP2**,
+      每案例约 1s,双引擎零误报零漏报。dev/WEDGE_test_benchmark_20260927.md
+      已改写为结案记录(含"connect 挂起先查客户端连的是谁"的经验)。
 
 ## 环境配置
 
