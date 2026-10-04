@@ -501,7 +501,7 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
                 # L6 CSP analysis.
                 if self.advanced_layers:
                     page_tasks.append(("L6_csp", self._scan_csp_async(
-                        url, resp_headers)))
+                        url, resp_headers, text)))
 
                 # L6 JSONP callback detection.
                 if self.advanced_layers:

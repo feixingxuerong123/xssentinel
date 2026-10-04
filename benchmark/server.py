@@ -30,6 +30,27 @@ DEFAULT_PORT = 18777
 # Page wrappers
 # ---------------------------------------------------------------------------
 
+def _safe_header_value(value: str) -> str:
+    """Encode an HTTP field value the way RFC 7230 requires: octets above
+    U+00FF are not representable in a header at all.
+
+    This is a target-side defect, not a scanner one.  Our own fullwidth
+    transform family (`transform.t_fullwidth`) maps ASCII to U+FF01..U+FF5E,
+    and a `header_only` reflection mode copies the query value straight into
+    a response header -- so stdlib's `send_header` raised UnicodeEncodeError
+    inside the handler, the connection died without a response, and the
+    engine recorded an ERROR on a case it never actually got to evaluate.
+    A gate that turns *its own fixture* into "scanner did not measure this"
+    is worse than no gate, so unrepresentable codepoints now come back
+    percent-encoded: still a faithful statement of what the probe sent,
+    and it keeps the response intact.
+    """
+    return "".join(
+        ch if ord(ch) <= 0xFF
+        else "".join("%%%02X" % b for b in ch.encode("utf-8"))
+        for ch in value)
+
+
 def _page(body: str, headers: dict | None = None) -> tuple[int, dict, str]:
     """Wrap body in a minimal HTML page."""
     h = {"Content-Type": "text/html; charset=utf-8"}
@@ -2449,7 +2470,7 @@ class BenchmarkHandler(BaseHTTPRequestHandler):
     def _respond(self, status: int, headers: dict, body: str):
         self.send_response(status)
         for k, v in headers.items():
-            self.send_header(k, v)
+            self.send_header(k, _safe_header_value(v))
         self.send_header("Content-Length", str(len(body.encode("utf-8"))))
         self.end_headers()
         self.wfile.write(body.encode("utf-8"))

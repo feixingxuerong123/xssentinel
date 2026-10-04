@@ -359,9 +359,79 @@ def _scan_worker(job: Job) -> None:
 #   - query: dict of query-string values (lists)
 # Response: (status_code, headers, body_bytes) or (status, headers, body_str).
 
+# ---------------------------------------------------------------------------
+# Phase 70 (extended Phase 196): the same-origin defence, shared by every
+# front-end that speaks HTTP.
+# ---------------------------------------------------------------------------
+# This lived inside ``StdlibServer._same_origin_ok`` only, which meant the
+# documented ``--use-flask`` deployment enforced nothing: with no ``--api-key``
+# a DNS-rebound page could read scan results and a cross-site form POST could
+# start scans.  One implementation, called by both, so a fix to the gate is a
+# fix to every way we serve.
+_MUTATING_METHODS = ("POST", "PUT", "PATCH", "DELETE")
+
+
+def host_name_of(host_header: str) -> str:
+    """Strip the port from a Host header, keeping bracketed IPv6 intact."""
+    h = (host_header or "").lower()
+    if h.startswith("["):                       # [::1]:8000
+        return h.split("]", 1)[0].lstrip("[")
+    if h.count(":") == 1:
+        return h.rsplit(":", 1)[0]
+    return h
+
+
+def same_origin_ok(method: str, headers: dict | None, local_hosts: set,
+                   has_api_key: bool) -> tuple:
+    """Anti DNS-rebinding + anti cross-site state change.
+
+    * DNS rebinding: a page re-resolves its own domain to 127.0.0.1, so the
+      Host header carries the ATTACKER domain and same-origin rules then let
+      its script read our responses.
+    * Cross-site request: a browser says which site it was driven from via
+      ``Sec-Fetch-Site`` -- a header the page cannot set -- and a simple-form
+      POST also carries a foreign ``Origin`` (no preflight to block it).
+
+    Non-browser clients (curl / SDKs) send none of these and pass untouched;
+    ``--api-key`` remains an independent layer.  The Host allowlist is the
+    whole defence when no secret is configured; once one is set, the secret
+    gates and a remote caller must be allowed to name the host it actually
+    reached (``--host 0.0.0.0 --api-key ...`` used to 403 every legitimate
+    remote client -- measured in Phase 190).
+    """
+    lower = {str(k).lower(): (v or "") for k, v in (headers or {}).items()}
+    host_hdr = lower.get("host", "")
+    host_name = host_name_of(host_hdr)
+    if (host_name and host_name not in local_hosts
+            and not has_api_key):
+        return False, f"host header {host_hdr!r} is not a local host"
+    sfs = lower.get("sec-fetch-site", "").strip().lower()
+    if sfs == "cross-site":
+        return False, (f"browser reports this {method} as cross-site "
+                       "(Sec-Fetch-Site: cross-site)")
+    if method in _MUTATING_METHODS:
+        origin = lower.get("origin", "")
+        if origin:
+            try:
+                ohost = urlparse(origin).hostname or ""
+            except Exception:
+                ohost = ""
+            if ohost.lower() not in local_hosts:
+                return False, (f"cross-origin state change from "
+                               f"{origin!r} is not allowed")
+    return True, ""
+
+
+def base_local_hosts(bind_host: str | None = None) -> set:
+    """Host names a server answers for: loopback names + the bind address."""
+    hosts = {"127.0.0.1", "localhost", "[::1]", "::1", "0.0.0.0"}
+    if bind_host:
+        hosts.add(bind_host)
+    return {h.lower() for h in hosts}
+
+
 class RequestCtx:
     """Per-request context shared with route handlers."""
-
     def __init__(self, server: "StdlibServer", headers: dict) -> None:
         self.server = server
         self.headers = headers
@@ -997,54 +1067,12 @@ class StdlibServer:
     # -- Phase 70: same-origin defence (DNS rebinding / cross-site POST) ----
     def _local_hosts(self) -> set:
         """Host names this server answers for (loopback + bound address)."""
-        hosts = {"127.0.0.1", "localhost", "[::1]", "::1", "0.0.0.0"}
-        if self.host:
-            hosts.add(self.host)
-        return {h.lower() for h in hosts}
+        return base_local_hosts(self.host)
 
     def _same_origin_ok(self, method: str, headers: dict) -> tuple:
-        """Every request must be ADDRESSED to a local host (anti DNS
-        rebinding -- a rebound GET reads scan data same-origin); state-
-        changing requests must additionally not carry a foreign browser
-        Origin (anti cross-site POST -- simple forms skip preflight).
-
-        * DNS rebinding: a malicious page re-resolves its own domain to
-          127.0.0.1 -- the Host header then carries the ATTACKER domain,
-          and same-origin policy lets its JS READ the responses.
-        * Cross-site POST: a simple-form POST from an evil page carries an
-          Origin of the evil site (no preflight to block it).
-        Non-browser clients (curl / SDKs) send neither and pass untouched;
-        API-key auth remains an independent layer.
-        """
-        lower = {k.lower(): v for k, v in headers.items()}
-        host_hdr = (lower.get("host") or "").lower()
-        if host_hdr.startswith("["):          # [::1]:8000
-            host_name = host_hdr.split("]", 1)[0].lstrip("[")
-        elif host_hdr.count(":") == 1:
-            host_name = host_hdr.rsplit(":", 1)[0]
-        else:
-            host_name = host_hdr
-        # The Host allowlist is the whole defence when no secret is
-        # configured, so it must hold.  Once the operator sets --api-key the
-        # secret is the gate, and a remote client must be allowed to name the
-        # host it actually reached -- otherwise the advertised external mode
-        # (`--host 0.0.0.0 --api-key ...`) answered 403 to every legitimate
-        # caller (measured: Host: 192.168.1.5:8000 -> cross_origin_blocked).
-        # The Origin check below stays unconditional; that is the CSRF half.
-        if host_name and host_name not in self._local_hosts():
-            if not self.api_key:
-                return False, f"host header {host_hdr!r} is not a local host"
-        if method in ("POST", "PUT", "PATCH", "DELETE"):
-            origin = lower.get("origin")
-            if origin:
-                try:
-                    ohost = urlparse(origin).hostname or ""
-                except Exception:
-                    ohost = ""
-                if ohost.lower() not in self._local_hosts():
-                    return False, (f"cross-origin state change from "
-                                   f"{origin!r} is not allowed")
-        return True, ""
+        """See :func:`same_origin_ok` -- the shared gate, not a second one."""
+        return same_origin_ok(method, headers, self._local_hosts(),
+                              bool(self.api_key))
 
     def _check_api_key(self, headers: dict) -> bool:
         """Return True if the request is authorised.
@@ -1167,6 +1195,38 @@ class FlaskServer:
                 from flask import jsonify as _jsonify
                 return _jsonify({"error": "request_body_too_large",
                                  "max_bytes": self.max_body_bytes}), 413
+
+        # Phase 196: the same-origin gate the stdlib front-end has enforced
+        # since Phase 70 -- this front-end enforced none of it, so a
+        # DNS-rebound page could read scan results and a cross-site form POST
+        # could start scans whenever no --api-key was configured.  Registered
+        # as before_request so it runs BEFORE routing and before auth, which
+        # is how the stdlib dispatch does it.
+        @self.app.before_request
+        def _same_origin_gate():
+            from flask import jsonify as _jsonify, request as _req
+            # CORS preflight is not a state change and carries no data; the
+            # stdlib front-end answers it in a separate do_OPTIONS that never
+            # consults this gate.  Gating it here would 403 the preflight of
+            # exactly the origins --cors-origins exists to allow (measured:
+            # an allowed cross-site OPTIONS got 403), so the browser would
+            # never reach the real request that the gate does police.
+            if _req.method == "OPTIONS":
+                return None
+            ok, reason = self._same_origin_ok(_req.method,
+                                              dict(_req.headers))
+            if not ok:
+                return _jsonify({"error": "cross_origin_blocked",
+                                 "reason": reason}), 403
+
+    def _local_hosts(self) -> set:
+        """Same allowlist the stdlib front-end enforces (FlaskServer has no
+        bind host of its own -- it is mounted into an app by the caller)."""
+        return base_local_hosts()
+
+    def _same_origin_ok(self, method: str, headers: dict) -> tuple:
+        return same_origin_ok(method, headers, self._local_hosts(),
+                              bool(self.api_key))
 
     def _check_api_key(self, headers) -> bool:
         if not self.api_key:

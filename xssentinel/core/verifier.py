@@ -170,14 +170,8 @@ def _in_rcdata_raw(html_text: str, token_idx: int) -> bool:
     return False
 
 
-def _csp_of(headers: dict | None) -> str:
-    if not headers:
-        return ""
-    return (headers.get("Content-Security-Policy")
-            or headers.get("content-security-policy") or "")
-
-
-def _csp_blocks_family(headers: dict | None, family: str) -> bool:
+def _csp_blocks_family(headers: dict | None, family: str,
+                       html: str | None = None) -> bool:
     """Whether CSP stops inline script of ONE delivery family.
 
     Delegated to :mod:`csp` because the answer depends on which directive
@@ -190,34 +184,44 @@ def _csp_blocks_family(headers: dict | None, family: str) -> bool:
     reflected ``<script>`` under a host-allowlist policy that never mentions
     'unsafe-inline' at all (false positive).
 
+    Phase 196: ``html`` lets a `<meta http-equiv="Content-Security-Policy">`
+    count as the enforcing policy it is.  Measured on this host, Chromium
+    silences the dialog for a meta-protected inline reflection exactly as it
+    does for the header, while Report-Only (header or meta) stays inert --
+    so ignoring the meta channel was a false-positive source, not a
+    false-negative one.
+
     The nonce-leak path stays alive regardless: ``_script_nonce_allowed()``
     re-allows a script carrying a nonce the policy itself declares.
     """
-    csp_header = _csp_of(headers)
-    if not csp_header:
+    from . import csp as csp_mod
+    pol = csp_mod.policies(headers, html)
+    if not pol["enforcing"]:
         return False
-    from .csp import inline_blocked
-    return inline_blocked(csp_header, family)
+    return csp_mod.blocks_family(pol, family)
 
 
-def _csp_blocks_inline(headers: dict | None) -> bool:
-    """Return True if the CSP header blocks inline <script> execution."""
-    return _csp_blocks_family(headers, "elem")
+def _csp_blocks_inline(headers: dict | None,
+                       html: str | None = None) -> bool:
+    """Return True if CSP blocks inline <script> execution (header or meta)."""
+    return _csp_blocks_family(headers, "elem", html)
 
 
-def _csp_blocks_attr(headers: dict | None) -> bool:
-    """Return True if the CSP header blocks ``on*`` event-handler attributes."""
-    return _csp_blocks_family(headers, "attr")
+def _csp_blocks_attr(headers: dict | None,
+                     html: str | None = None) -> bool:
+    """Return True if CSP blocks ``on*`` event-handler attributes."""
+    return _csp_blocks_family(headers, "attr", html)
 
 
-def _csp_blocks_js_uri(headers: dict | None) -> bool:
+def _csp_blocks_js_uri(headers: dict | None,
+                       html: str | None = None) -> bool:
     """Return True if CSP blocks javascript: URI execution.
 
     In modern browsers (CSP Level 2+), javascript: URIs are governed by
     script-src.  If script-src lacks 'unsafe-inline', javascript: URIs
     are blocked — same policy that blocks inline <script> and on* handlers.
     """
-    return _csp_blocks_family(headers, "uri")
+    return _csp_blocks_family(headers, "uri", html)
 
 
 def _token_in_js_string(script_text: str, token: str) -> bool:
@@ -369,27 +373,26 @@ def _extract_script_block(html_text: str, token_idx: int) -> str | None:
     return html_text[best_tag_end + 1: close_pos]
 
 
-def _script_nonce_allowed(script_tag, headers) -> bool:
+def _script_nonce_allowed(script_tag, headers, html: str | None = None) -> bool:
     """Phase 36: a script whose nonce is declared by the page's own CSP
-    header is ALLOWED to execute (the nonce-leak exploitation path).
+    is ALLOWED to execute (the nonce-leak exploitation path).
 
     If the server rotates nonces per request, the injected script's nonce
     will NOT match the fresh response header and this returns False --
     which is exactly the real-browser behavior we want to mirror.
+
+    Phase 196: the nonce may be declared by any enforcing policy the browser
+    acts on -- the response header OR a `<meta http-equiv=...>` in the body.
     """
-    if not headers:
-        return False
     sn = (script_tag.get("nonce") or "").strip("'\" ")
-    if not sn:
-        return False
-    csp = (headers.get("Content-Security-Policy")
-           or headers.get("content-security-policy") or "")
-    if not csp:
+    if not sn or not (headers or html):
         return False
     try:
         from . import csp as csp_mod
-        return sn in [n.strip("'\" ")
-                      for n in csp_mod.extract_nonces_from_csp(csp)]
+        declared = [n.strip("'\" ")
+                    for policy in csp_mod.policies(headers, html)["enforcing"]
+                    for n in csp_mod.extract_nonces_from_csp(policy)]
+        return sn in declared
     except Exception:
         return False
 
@@ -535,10 +538,14 @@ def verify_semantic(response_text: str, token: str,
         return verdict
     headers = response_headers or {}
     csp_known = response_headers is not None
-    csp_present = any(str(k).lower() in ("content-security-policy",
-                                         "x-content-security-policy",
-                                         "content-security-policy-report-only")
-                      for k in headers)
+    # Phase 196: what gates promotion is an ENFORCING policy -- from the
+    # header or from <meta http-equiv=Content-Security-Policy>.  Report-Only
+    # used to count here and it must not: it blocks nothing (measured, both
+    # channels), so refusing to promote under a report-only policy was a
+    # false negative the browser would not have.
+    from . import csp as _csp_gate_mod
+    csp_present = bool(_csp_gate_mod.policies(
+        headers, response_text)["enforcing"])
     try:
         from .sandbox import judge
         sv = judge(response_text, token, sink="parser")
@@ -613,8 +620,10 @@ def _verify_semantic_impl(response_text: str, token: str,
                 "detail": "token not reflected"}
 
     # -- CSP gate: if a strict Content-Security-Policy blocks inline scripts,
-    #    reflected <script>/on* handlers won't execute in a real browser. --
-    csp_blocks = _csp_blocks_inline(response_headers)
+    #    reflected <script>/on* handlers won't execute in a real browser.
+    #    Both delivery channels count: the response header AND a
+    #    <meta http-equiv="Content-Security-Policy"> in the body. --
+    csp_blocks = _csp_blocks_inline(response_headers, response_text)
 
     # -- Raw RCDATA gate BEFORE structural parsing (Phase 35 hardening). --
     #    lxml's HTML tree fixup can hoist a tag written inside
@@ -634,7 +643,7 @@ def _verify_semantic_impl(response_text: str, token: str,
         soup = BeautifulSoup(response_text, _bs_parser())
         token_attr_host = _attribute_hosting_token(soup, token)
         verdict = _structural_confirm(soup, token, csp_blocks,
-                                      response_headers)
+                                      response_headers, response_text)
         if verdict is not None:
             return verdict
     except Exception:
@@ -651,7 +660,7 @@ def _verify_semantic_impl(response_text: str, token: str,
     # families, because this path cannot say which delivery form the adjacency
     # implies.  Refuting on the <script> answer alone would drop a reflected
     # handler that the policy still lets run.
-    if csp_blocks and _csp_blocks_attr(response_headers):
+    if csp_blocks and _csp_blocks_attr(response_headers, response_text):
         return {"confirmed": False, "context": "script_block",
                 "detail": "token reflected but CSP blocks inline execution"}
 
@@ -715,7 +724,8 @@ def _verify_semantic_impl(response_text: str, token: str,
 
 
 def _structural_confirm(soup, token: str, csp_blocks: bool,
-                        response_headers: dict | None) -> dict | None:
+                        response_headers: dict | None,
+                        html: str | None = None) -> dict | None:
     """Authoritative BeautifulSoup-based confirmation (verify_semantic
     steps 1-4).  Returns a verdict dict or None when no structural sink
     matched and parsing should fall through to the raw-text fallback."""
@@ -728,8 +738,8 @@ def _structural_confirm(soup, token: str, csp_blocks: bool,
             # CSP guard: strict CSP blocks inline script execution.
             # Phase 36 exception: a script carrying a nonce declared in
             # the CSP header itself is allowed (nonce-leak exploit).
-            if csp_blocks and not _script_nonce_allowed(s,
-                                                         response_headers):
+            if csp_blocks and not _script_nonce_allowed(
+                    s, response_headers, html):
                 return {"confirmed": False, "context": "script_block",
                         "detail": "token in <script> but CSP blocks inline execution"}
             # JS string trapping: token inside a properly escaped string
@@ -751,7 +761,7 @@ def _structural_confirm(soup, token: str, csp_blocks: bool,
             if not isinstance(val, str):
                 continue
             if attr.lower().startswith("on") and token in val:
-                if _csp_blocks_attr(response_headers):
+                if _csp_blocks_attr(response_headers, html):
                     return {"confirmed": False, "context": "event_handler",
                             "detail": f"token in {attr} but CSP blocks inline "
                                       "handler execution"}
@@ -776,7 +786,7 @@ def _structural_confirm(soup, token: str, csp_blocks: bool,
                 el = (tag.name or "").lower()
                 attr_l = attr.lower()
                 if (el, attr_l) in _JS_URI_EXECUTES:
-                    if csp_blocks and _csp_blocks_js_uri(response_headers):
+                    if csp_blocks and _csp_blocks_js_uri(response_headers, html):
                         return {"confirmed": False, "context": "url_javascript",
                                 "detail": "token in javascript: URI but CSP "
                                           "blocks script execution"}
@@ -784,7 +794,7 @@ def _structural_confirm(soup, token: str, csp_blocks: bool,
                             "detail": f"token reflected in {el}.{attr_l}"
                                       f"=javascript: URI"}
                 if (el, attr_l) in _JS_URI_ACTIVATION:
-                    if csp_blocks and _csp_blocks_js_uri(response_headers):
+                    if csp_blocks and _csp_blocks_js_uri(response_headers, html):
                         return {"confirmed": False, "context": "url_javascript",
                                 "detail": "token in javascript: URI but CSP "
                                           "blocks script execution"}
@@ -806,7 +816,7 @@ def _structural_confirm(soup, token: str, csp_blocks: bool,
             if not isinstance(val, str):
                 continue
             if attr.lower().lstrip("/").startswith("on") and token in val and attr.lower() != "on":
-                if _csp_blocks_attr(response_headers):
+                if _csp_blocks_attr(response_headers, html):
                     return {"confirmed": False, "context": "event_handler",
                             "detail": f"token in {attr} but CSP blocks inline "
                                       "handler execution"}
@@ -826,7 +836,7 @@ def _structural_confirm(soup, token: str, csp_blocks: bool,
         if token in txt and re.search(
                 r"expression\s*\(|javascript:|@import", txt, re.I):
             if "javascript:" in txt.lower() and _csp_blocks_js_uri(
-                    response_headers):
+                    response_headers, html):
                 return {"confirmed": False, "context": "css_context",
                         "detail": "token in <style> javascript: sink but CSP "
                                   "blocks script execution"}
@@ -837,7 +847,7 @@ def _structural_confirm(soup, token: str, csp_blocks: bool,
         if isinstance(style, str) and token in style and re.search(
                 r"expression\s*\(|javascript:|@import", style, re.I):
             if "javascript:" in style.lower() and _csp_blocks_js_uri(
-                    response_headers):
+                    response_headers, html):
                 return {"confirmed": False, "context": "css_context",
                         "detail": "token in style= javascript: sink but CSP "
                                   "blocks script execution"}

@@ -27,6 +27,13 @@ _PROJECT_ROOT = _HERE.parent
 _MANIFEST_PATH = _HERE / "manifest.json"
 _RESULTS_DIR = _HERE / "results"
 
+# The budgets every published f1 number was measured at.  adapters.py imports
+# these instead of copying them: the cross-tool comparison ran XSSentinel at
+# 10/6 while the gate ran 14/12, so it was scoring a weaker build than the one
+# we publish -- the same class of drift as a document quoting a stale slice.
+DEFAULT_MAX_PAYLOADS = 14
+DEFAULT_MAX_TRANSFORMS = 12
+
 sys.path.insert(0, str(_HERE))
 from server import run_server, DEFAULT_PORT  # noqa: E402
 
@@ -209,7 +216,8 @@ atexit.register(_cleanup_report_tmps)
 
 
 def _invoke_scanner(url: str, timeout: int = 60,
-                    max_payloads: int = 14, max_transforms: int = 12,
+                    max_payloads: int = DEFAULT_MAX_PAYLOADS,
+                    max_transforms: int = DEFAULT_MAX_TRANSFORMS,
                     extra_args: list | None = None,
                     engine: str = "sync") -> tuple[dict | None, float, str]:
     """Invoke XSSentinel CLI and parse JSON report.
@@ -536,8 +544,9 @@ def _quick_subset(cases: list, per_class: int = 0) -> list:
 
 
 def run_benchmark(port: int = DEFAULT_PORT, concurrency: int = 1,
-                  timeout: int = 60, max_payloads: int = 14,
-                  max_transforms: int = 12, quick: bool = False,
+                  timeout: int = 60, max_payloads: int = DEFAULT_MAX_PAYLOADS,
+                  max_transforms: int = DEFAULT_MAX_TRANSFORMS,
+                  quick: bool = False,
                   verbose: bool = False, engine: str = "sync") -> BenchmarkResult:
     """Run the full benchmark suite.
 
@@ -803,9 +812,9 @@ def main():
                     help="Parallel scanner invocations")
     ap.add_argument("--timeout", type=int, default=90,
                     help="Per-case scanner timeout (seconds)")
-    ap.add_argument("--max-payloads", type=int, default=14,
+    ap.add_argument("--max-payloads", type=int, default=DEFAULT_MAX_PAYLOADS,
                     help="Scanner payload budget")
-    ap.add_argument("--max-transforms", type=int, default=12,
+    ap.add_argument("--max-transforms", type=int, default=DEFAULT_MAX_TRANSFORMS,
                     help="Scanner transform budget")
     ap.add_argument("--quick", action="store_true",
                     help="Quick mode: stratified push slice (one case per "

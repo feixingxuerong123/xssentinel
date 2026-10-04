@@ -22,7 +22,47 @@ import time
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _ROOT = os.path.dirname(_HERE)
 
+# The gate's budgets, imported rather than copied: this adapter used to run
+# XSSentinel at 10/6 while benchmark/runner.py ran it at 14/12, so the
+# comparison scored a weaker build than the one we publish numbers for.
+try:
+    from benchmark.runner import (DEFAULT_MAX_PAYLOADS,
+                                 DEFAULT_MAX_TRANSFORMS, _build_target_url,
+                                 _case_extra_args)
+except ImportError:  # loaded through the sys.path shim as a top-level module
+    from runner import (DEFAULT_MAX_PAYLOADS, DEFAULT_MAX_TRANSFORMS,
+                        _build_target_url, _case_extra_args)
 
+
+# Wall-clock ceiling for one third-party CLI run.  Generous on purpose:
+# a timeout is recorded as "not measured", and an unmeasured case tells
+# us nothing about the tool -- while 180s of a hung tool is still caught.
+THIRD_PARTY_CEILING_S = 180
+
+
+def not_comparable(case: dict) -> str:
+    """Why a third-party CLI cannot be aimed at this case the way the gate
+    aims XSSentinel at it -- empty string when it can.
+
+    Scored as ERR ("not measured"), never as a miss: a tool that was never
+    handed the parameter is not evidence about that tool.
+    """
+    if str(case.get("method", "GET")).upper() != "GET":
+        return "non-GET case (the gate injects the parameter in -d)"
+    for key, label in (("view_path", "stored"),
+                       ("second_order_view_path", "second-order"),
+                       ("scenario_file", "scenario DSL"),
+                       ("upload_field", "multipart upload"),
+                       ("stored_dom", "browser-verified stored")):
+        if case.get(key):
+            return f"{label} flow needs two-step CLI wiring"
+    return ""
+
+
+# Each child process is decoded as UTF-8 on purpose: the locale codec on
+# this host is GBK, and one non-GBK byte in a tool's own output raised
+# inside subprocess.run, which used to be scored as "not detected" rather
+# than "not measured".
 def _scan_case_dict(detected, raw_output, elapsed, error=None):
     """Normalize adapter result. `error` marks incomplete runs (timeout/crash),
     which must NOT be counted as TN/FN by the comparison runner."""
@@ -129,9 +169,7 @@ class XSSentinelAdapter:
 
     def scan_case(self, base_url: str, case: dict) -> dict:
         """Invoke XSSentinel CLI against a single benchmark case."""
-        path = case["path"]
-        param = case.get("param", "q")
-        url = f"{base_url}{path}?{param}=test"
+        url = _build_target_url(base_url, case)
 
         # Phase 107 fix: -f json writes to the -o FILE, not stdout.  The
         # old stdout parse therefore always saw an empty string, which
@@ -150,16 +188,19 @@ class XSSentinelAdapter:
             "-o", out_path,
             "--progress", "none",
             "--log-level", "error",
-            "--max-payloads", "10",
-            "--max-transforms", "6",
+            "--max-payloads", str(DEFAULT_MAX_PAYLOADS),
+            "--max-transforms", str(DEFAULT_MAX_TRANSFORMS),
             "--threads", "2",
             "--timeout", "10",
         ]
+        # ...and the per-case flags the gate passes (host alias,
+        # --oob self, --audit-xs-leaks, stored / second-order flows).
+        cmd += list(_case_extra_args(base_url, case) or [])
 
         t0 = time.time()
         try:
             proc = subprocess.run(
-                cmd, capture_output=True, text=True, timeout=90,
+                cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=90,
                 cwd=_ROOT,
             )
             elapsed = time.time() - t0
@@ -213,9 +254,11 @@ class DalfoxAdapter:
             return _scan_case_dict(False, "dalfox not installed", 0.0,
                                     "not-installed")
 
-        path = case["path"]
-        param = case.get("param", "q")
-        url = f"{base_url}{path}?{param}=test"
+        reason = not_comparable(case)
+        if reason:
+            return _scan_case_dict(False, reason, 0.0,
+                                    f"not-comparable: {reason}")
+        url = _build_target_url(base_url, case)
 
         cmd = [
             self._binary, "url", url,
@@ -228,7 +271,7 @@ class DalfoxAdapter:
         t0 = time.time()
         try:
             proc = subprocess.run(
-                cmd, capture_output=True, text=True, timeout=60,
+                cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=THIRD_PARTY_CEILING_S,
             )
             elapsed = time.time() - t0
             stdout = proc.stdout or ""
@@ -245,7 +288,7 @@ class DalfoxAdapter:
                     error = f"dalfox rc={proc.returncode}"
             return _scan_case_dict(detected, stdout[:500], elapsed, error)
         except subprocess.TimeoutExpired:
-            return _scan_case_dict(False, "TIMEOUT", 60.0, "timeout")
+            return _scan_case_dict(False, "TIMEOUT", THIRD_PARTY_CEILING_S, "timeout")
         except Exception as e:  # noqa: BLE001
             return _scan_case_dict(False, str(e), 0.0, f"exception: {e}")
 
@@ -272,9 +315,11 @@ class XSStrikeAdapter:
             return _scan_case_dict(False, "XSStrike not installed", 0.0,
                                     "not-installed")
 
-        path = case["path"]
-        param = case.get("param", "q")
-        url = f"{base_url}{path}?{param}=test"
+        reason = not_comparable(case)
+        if reason:
+            return _scan_case_dict(False, reason, 0.0,
+                                    f"not-comparable: {reason}")
+        url = _build_target_url(base_url, case)
 
         cmd = [
             sys.executable, self._script,
@@ -287,7 +332,7 @@ class XSStrikeAdapter:
         t0 = time.time()
         try:
             proc = subprocess.run(
-                cmd, capture_output=True, text=True, timeout=60,
+                cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=THIRD_PARTY_CEILING_S,
                 cwd=self._path,
             )
             elapsed = time.time() - t0
@@ -310,7 +355,7 @@ class XSStrikeAdapter:
                     r"confirmed|is vulnerable|vulnerable to", output, re.I))
             return _scan_case_dict(detected, output[:500], elapsed, error)
         except subprocess.TimeoutExpired:
-            return _scan_case_dict(False, "TIMEOUT", 60.0, "timeout")
+            return _scan_case_dict(False, "TIMEOUT", THIRD_PARTY_CEILING_S, "timeout")
         except Exception as e:  # noqa: BLE001
             return _scan_case_dict(False, str(e), 0.0, f"exception: {e}")
 
@@ -358,9 +403,11 @@ class NucleiAdapter:
             return _scan_case_dict(False, "nuclei or its DAST xss templates "
                                           "are not installed", 0.0,
                                    "not-installed")
-        path = case["path"]
-        param = case.get("param", "q")
-        url = f"{base_url}{path}?{param}=test"
+        reason = not_comparable(case)
+        if reason:
+            return _scan_case_dict(False, reason, 0.0,
+                                    f"not-comparable: {reason}")
+        url = _build_target_url(base_url, case)
 
         cmd = [
             self._binary, "-u", url,
@@ -374,7 +421,7 @@ class NucleiAdapter:
         ]
         t0 = time.time()
         try:
-            proc = subprocess.run(cmd, capture_output=True, text=True,
+            proc = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace",
                                   timeout=240, cwd=_ROOT)
             elapsed = time.time() - t0
             out = (proc.stdout or "")

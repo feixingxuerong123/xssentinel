@@ -17,6 +17,7 @@ _scan_graphql and _scan_websocket from this module).
 from __future__ import annotations
 
 
+from . import csp as csp_mod
 from . import layer_guard
 from .layers.common import _make_finding  # noqa: F401  (re-export)
 from .layers.client_layers import (  # noqa: F401  (re-exports)
@@ -77,9 +78,14 @@ def run_page_layers(scanner, req, url: str, response_text: str | None = None,
         # is usually a cache hit.
         resp2 = req.get(url)
         scanner._bump()
-        csp_header = (resp2.headers.get("Content-Security-Policy")
-                      or resp2.headers.get("Content-Security-Policy-Report-Only")
-                      or "") if hasattr(resp2, "headers") else ""
+        # Phase 196: the nonce-reuse chain and the Trusted-Types layer both
+        # need the policy the browser will actually enforce -- header OR
+        # <meta>.  Report-Only is not one: it never blocks, so treating it as
+        # the in-force policy described a protection that does not exist.
+        _hdrs = ({k: v for k, v in resp2.headers.items()}
+                 if hasattr(resp2, "headers") else {})
+        _enf = csp_mod.policies(_hdrs, text)["enforcing"]
+        csp_header = _enf[0] if _enf else ""
     except Exception:
         pass
     layer_guard.run_layer(scanner, "postmessage", _scan_postmessage, scanner,

@@ -392,9 +392,18 @@ class AsyncDetectionLayersMixin:
             _log.warning("async advanced param layers error: %s", e,
                          exc_info=self.verbose)
 
-    async def _scan_csp_async(self, url: str, resp_headers: dict
+    async def _scan_csp_async(self, url: str, resp_headers: dict,
+                              html: str = ""
                               ) -> AsyncIterator[Finding]:
         """L6 CSP analysis (runs in thread) -- sync _scan_csp parity.
+
+        Phase 196: `html` carries the page body because a policy can also
+        arrive as `<meta http-equiv="Content-Security-Policy">`, which
+        Chromium enforces exactly like the header (measured, 196b).  Report-
+        Only is not consulted: it blocks nothing, so "bypassable CSP" would
+        describe a protection that is not in force.  Sync reached this state
+        first; the two engines now resolve policies through the same
+        `csp.policies()` call rather than each reading a different header set.
 
         Phase 62: the previous version treated the CSPReport OBJECT returned
         by csp_mod.analyze as a dict (results.get('bypassable')), so every
@@ -404,15 +413,21 @@ class AsyncDetectionLayersMixin:
         """
         try:
             from . import csp as csp_mod
+            # Same policy resolution as sync `_scan_csp`: the browser acts on
+            # the response header AND a `<meta http-equiv=...>`, while
+            # Report-Only enforces nothing and is therefore not a protection
+            # we can claim to bypass.
+            policy = ""
+            for candidate in csp_mod.policies(resp_headers, html)["enforcing"]:
+                policy = candidate
+                break
+            if not policy:
+                return
             # Run CSP analysis in a thread.
-            report = await asyncio.to_thread(
-                csp_mod.analyze,
-                resp_headers.get("Content-Security-Policy", ""))
+            report = await asyncio.to_thread(csp_mod.analyze, policy)
             if not report.bypassable:
                 return
-            best = await asyncio.to_thread(
-                csp_mod.best_bypass,
-                resp_headers.get("Content-Security-Policy", "")) or {}
+            best = await asyncio.to_thread(csp_mod.best_bypass, policy) or {}
             yield Finding(
                 url=url, method="GET", param="(header)",
                 context="csp_header",
@@ -421,7 +436,7 @@ class AsyncDetectionLayersMixin:
                 evidence="; ".join(report.weak),
                 type="csp_bypass",
                 confidence="medium",
-                csp_header=resp_headers.get("Content-Security-Policy", ""),
+                csp_header=policy,
                 bypass_type=best.get("type", ""),
                 bypass_reason=best.get("reason", ""),
                 evidence_class=EVIDENCE_NO_BROWSER,

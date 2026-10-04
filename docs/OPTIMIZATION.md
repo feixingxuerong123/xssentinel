@@ -27,7 +27,40 @@
 
 ## 1. 高优先级(下轮必做)
 
-### 1.0 外部效度:先补"能不能打赢商业工具"的证据(排在最前)
+### 1.0 外部效度:先补"能不能打赢商业工具"的证据 —— **已量(2026-10-04),但结论与本文原假设不同**
+**2026-10-04 已落地(Phase 196b)**:同一批靶、三条腿、逐例矩阵 —— 见
+`benchmark/results/phase196_cross_tool.{json,md}`。60 例按 `(ground_truth, context)`
+分层确定性切片(60/64 族各取一条),三个工具拿到**完全相同**的目标 URL
+(共用 `runner._build_target_url`,含 cookie-tossing 需要的 `sub.localhost` host 别名)。
+
+| 工具 | 版本 | TP | FP | TN | FN | ERR | precision | recall | f1 | 墙钟 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| XSSentinel | 本仓(14/12 预算,与门禁同口径) | 35 | 0 | 24 | 1 | 0 | 1.000 | 0.972 | **0.986** | 346s |
+| dalfox | v2.13.0(Go,`go install` 经 goproxy.cn 构建) | 26 | 1 | 22 | 10 | 1 | 0.963 | 0.722 | **0.825** | 1173s |
+| nuclei-dast-xss | v3.9.0 + `dast/vulnerabilities/xss` | 26 | 0 | 23 | 10 | 1 | 1.000 | 0.722 | **0.839** | 49s |
+
+三条必须一起读的限定,否则这张表会被读成"我们赢了":
+- 我方唯一那条 FN 是**打分口径**:XS-Leaks 审计层按设计给 low/firm,而这里
+  "检出"定义为 high/medium/critical 的 XSS 级 finding —— 不是判定错误,也不是
+  对手的优势;该层两个第三方工具根本没有。
+- 靶场是**我们自己写的** 192 例矩阵的分层切片,所以"别人出的题"只到位一半:
+  判定语料(nuclei dast 模板、dalfox 载荷)是第三方的,目标仍是我们构造的。
+  真正的独立靶场(Juice Shop / 商业工具对跑)仍然没做。
+- 速度维度我们既不是最快也不是最慢:nuclei 用 49s 拿到 f1 0.839,我们用 346s
+  拿 0.986。任何"性能优于同类"的说法都要按这张表校准。
+
+**环境复核(推翻本文 2026-10-03 那段"完全出不了网")**:GitHub API 与
+`raw.githubusercontent.com` 可达;Go 模块代理 `goproxy.cn` 可达并成功构建
+`hahwul/dalfox` v2.13.0;`nuclei` v3.9.0 与完整 `nuclei-templates` 早在机上。
+不可达的是 **github.com 的 release 资产下载**(v3.2.3 Rust 版拿不到)与 docker/npm。
+所以"dalfox 装不了"从来不是网络问题,是**没试过 Go 代理 + GOPATH 解析**
+(`benchmark/adapters.py::_find_tool` 本来就查 `$GOPATH/bin`)。
+
+**顺带量出来的尺子缺陷(已修,详见 3.7)**:预算比门禁低、目标构造丢掉 host 别名
+与 per-case 旗标、子进程按 GBK 解码、错误形状只认两种 —— 首跑因此把 3 个"我方 FN"
+里的 2 个记成了漏检。**如果没先修尺子,这轮会去"修"两个根本不存在的检测缺口。**
+
+
 
 **问题**:项目的对外目标是"超越所有商业 XSS 工具",但支撑这个结论的证据
 目前只有 **28 个第三方用例**(nuclei 18 + dalfox 10,且 dalfox 那次是跑在
@@ -37,7 +70,7 @@
 现有的 192 例自编矩阵 sync 已满分(f1=1.000),**再加题只是给满分的考试加题**;
 继续扩大自编基准不产生新的外部信息。真正缺的是"别人出的题"。
 
-**本机结论(2026-09-30 实测,不要再试)**:这台机器**装不了任何第三方扫描器**
+**本机结论(2026-09-30 实测,不要再试)** —— **此段已被 2026-10-04 的上表推翻,保留原文以记录它错在哪**:这台机器**装不了任何第三方扫描器**
 —— 出网走代理 `127.0.0.1:17054`,ZAP 2.11.1 的 release 下载 502 CONNECT
 tunnel failed(重试 3 次 + SourceForge 镜像 404)、`docker info` 失败
 (daemon 未启动)、`dalfox`/`xsstrike` 本机没有、npm 的 `juice-shop` 包 2019
@@ -281,10 +314,41 @@ pyproject 一处;README 的安装段落同步(它现在两种装法都在教)。
 
 ---
 
+### 3.7 Phase 196b 新增待办(按投入 × 收益)
+
+1. **async 引擎看不见 `<meta>` CSP**:sync 侧已把阻断判定接到 header + meta 两条
+   通道,`async_scanner_layers._scan_csp_async` 签名里仍只有 headers。补它需要
+   在调用点(`async_scanner.py`)把页面 body 传进来 —— 本轮那个文件是另一路的
+   在制品,没动。异步的**判定**(verifier 链)已共享,所以缺的只是 L7 报告层。
+2. ~~**DOM sink 面缺口(dalfox v3.2.0 对位)**~~ **已实测并部分闭合(Phase 197)**:
+   `dev/_p197_sinkoracle/probe_sink_oracle.py` 把每条候选形状在真 Chromium 里用可归因源
+   (`location.search` / `location.hash`)跑一遍,同时问我们的引擎在同一页看见什么:
+   `setAttributeNS(null,'onclick', attacker)` **执行**且我们**看不见**(DOM 通道只 hook
+   `setAttribute`)→ 已补 hook,`tests/test_phase197_dom_sinks.py` 双层(纯断言 + 活体
+   端到端)并带变异对照(摘掉 hook 后活体命中集合变空)。
+   `var f = eval; f(x)` 与 `window['eval'](x)` **执行且已命中**(hook 替换 `window.eval`
+   之后别名读到的就是包装函数)——不是缺口。
+   `document.parseHTMLUnsafe(attacker)` 再 append 进文档 **不执行**;
+   `dataTransfer` / `navigator.clipboard.readText()` 的源扫描器不可归因
+   ——这三类**刻意不加**:加了就是替浏览器否认的形状背书。
+   剩余真待办只有一个:`FileReader.onload → innerHTML`(Blob 源)执行且当前只在
+   `innerHTML` 这一跳被看见,源侧没有 FileReader 建模 —— 属污点源建模,需按 176i/176j
+   的路子先造可控/不可控对照再动,不当作本轮已完成项。
+
+3. **对照产物的 scoring 口径应进产物本身**:`benchmark/adapters.py` 里"检出 =
+   high/medium/critical 且 type 不以 `csp_` 开头"是硬编码在解析逻辑里的;
+   应写成 `run_cross_tool.py` 输出中的 `scoring` 字段,让 JSON 自己说清口径。
+4. **`flask.app.test_client()` 在本机不可用**:装的 Werkzeug 已移除
+   `__version__`,而 Flask 2.2.5 的 `EnvironBuilder` 要读它,于是 `test_client()`
+   在建请求前就抛。`tests/test_phase196_api_gate.py` 改用 `werkzeug.test.Client`
+   直接驱动同一个 WSGI app(测的是真路径),但这是一条**环境漂移**,依赖治理
+   (3.2 那一族)应把 Flask/Werkzeug 组合钉住。
+
 ## 5. 执行顺序建议
 
 ```
-已完成: 1.2 async 拆分(Phase 191,纯移动 + 逐用例取证)
+已完成: 1.2 async 拆分(Phase 191)/ 1.0 外部效度对照(Phase 196b,60 例三工具同靶)
+已完成: CSP 投递通道判定(header+meta、report-only 不再冒充保护)/ API 前端门对齐(196b)
 本轮:  1.0 (外部效度对照集 -- 唯一能支撑对外目标的证据;需换机器)
 下一轮: 1.4 _probe_param 拆分(683 行单方法,属改逻辑,验收配全量矩阵)
 再下轮: 1.3 sandbox 拆分 → 2.1 双引擎去重 → 2.3 range5

@@ -18,6 +18,7 @@ it gives the auditor a clear, actionable finding.
 from __future__ import annotations
 import re
 from dataclasses import dataclass, field
+from html import unescape
 
 # Known CDN/script gadget hosts that, if whitelisted by CSP, enable a
 # bypass.  Each entry: (host_pattern, gadget_type, bypass_payload_or_note)
@@ -202,6 +203,76 @@ def parse_csp(header: str) -> dict:
         name = parts[0].lower()
         out[name] = parts[1:]
     return out
+
+
+# ---------------------------------------------------------------------------
+# Where a policy arrives from: HTTP header OR <meta>, enforcing OR report-only
+# ---------------------------------------------------------------------------
+# Chromium honours `<meta http-equiv="Content-Security-Policy">` exactly like
+# the response header -- measured on this host (dev/_p196_csp_delivery): an
+# inline reflection under a meta policy raises no dialog, the same shape that
+# the header does silence.  Report-Only blocks nothing in either channel.
+# Reading only the enforcing header therefore over-claimed execution on
+# meta-protected pages (false positive) and let a non-enforcing policy be
+# reported as a bypass.
+_META_TAG_RE = re.compile(r"""<meta\b(?:[^>"']|"[^"]*"|'[^']*')*>""",
+                          re.I | re.S)
+_ATTR_RE = re.compile(
+    r"""([a-zA-Z-]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))""")
+
+
+def _meta_attributes(tag: str) -> dict:
+    """name -> value for one <meta> start tag; browsers unescape entities in
+    attribute values, so a `&quot;`-wrapped policy parses as real quotes."""
+    out: dict[str, str] = {}
+    for m in _ATTR_RE.finditer(tag):
+        name = m.group(1).lower()
+        value = next((g for g in m.group(2, 3, 4) if g is not None), "")
+        out.setdefault(name, unescape(value))
+    return out
+
+
+def meta_policies(html: str | None) -> tuple[list, list]:
+    """Return ([enforcing], [report-only]) policies carried by <meta> tags."""
+    enforcing: list[str] = []
+    report_only: list[str] = []
+    for tag in _META_TAG_RE.findall(html or ""):
+        attrs = _meta_attributes(tag)
+        equiv = (attrs.get("http-equiv") or "").strip().lower()
+        content = (attrs.get("content") or "").strip()
+        if not content:
+            continue
+        if equiv == "content-security-policy":
+            enforcing.append(content)
+        elif equiv == "content-security-policy-report-only":
+            report_only.append(content)
+    return enforcing, report_only
+
+
+def policies(headers: dict | None = None, html: str | None = None) -> dict:
+    """Every policy the browser will act on, split by enforcement mode.
+
+    More than one enforcing policy can be in force (header AND meta); a
+    script runs only when all of them allow it, so "is inline blocked?" is
+    any() over this list rather than a lookup of the first entry.
+    """
+    lower = {str(k).lower(): (v or "") for k, v in (headers or {}).items()}
+    meta_enf, meta_ro = meta_policies(html)
+    header_enf = [lower["content-security-policy"]] \
+        if lower.get("content-security-policy") else []
+    header_ro = [lower["content-security-policy-report-only"]] \
+        if lower.get("content-security-policy-report-only") else []
+    return {"enforcing": header_enf + meta_enf,
+            "report_only": header_ro + meta_ro}
+
+
+def blocks_family(pol: dict | None, family: str) -> bool:
+    """Whether ANY enforcing policy blocks this delivery family.
+
+    Report-only policies are never consulted: they only generate reports.
+    """
+    return any(inline_blocked(p, family)
+               for p in (pol or {}).get("enforcing", []) if p)
 
 
 # ---------------------------------------------------------------------------

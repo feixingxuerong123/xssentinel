@@ -408,6 +408,17 @@ def _init_script(marker: str) -> str:
     return oSA.call(this, name, val);
   };
 
+  // Phase 197: setAttributeNS delivers an on* handler exactly the same way,
+  // and it executes (measured in Chromium: setAttributeNS(null,'onclick',
+  // <attacker string>) runs on the next click).  Hooking only setAttribute
+  // left the namespaced call invisible to the DOM channel -- a sink we could
+  // not see even though the browser honored it.
+  var oSAN = Element.prototype.setAttributeNS;
+  Element.prototype.setAttributeNS = function(ns, name, val){
+    if (typeof name === 'string' && name.toLowerCase().indexOf('on') === 0 && has(val))
+      hit('setAttributeNS('+name+')', val);
+    return oSAN.apply(this, arguments);
+  };
 
   // jQuery sinks (may load after this script)
   function wrapJQ(){

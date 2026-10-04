@@ -105,6 +105,43 @@ python benchmark/portswigger_corpus_coverage.py --html pw.html \
 `transitionrun` 等 40 个事件处理器；标签侧缺 `slot`、`address`、`camera`、`span`、`br`、`b`。
 
 
+## 外部参照：同类开源扫描器同靶跑分（2026-10-04）
+
+覆盖对照说明"检测面提到没提到"，它回答不了另一个问题：**同一批靶，别人扫得出多少**。
+所以把 XSSentinel、[DalFox](https://github.com/hahwul/dalfox) 与
+[nuclei](https://github.com/projectdiscovery/nuclei) 的官方 DAST XSS 模板放到**完全相同的
+目标**上各跑一遍——同一个 URL 构造（含 cookie-tossing 用例需要的 `sub.localhost` host 别名）、
+同一个探针值，逐例对照 manifest 里独立撰写的 ground truth。
+
+```bash
+# dalfox 经 Go 模块代理安装（落 $GOPATH/bin，适配器会自己找到）
+go install github.com/hahwul/dalfox/v2@latest
+python benchmark/run_cross_tool.py --sample 60 \
+    --tools XSSentinel,dalfox,nuclei-dast-xss \
+    --out benchmark/results/phase196_cross_tool.json \
+    --md  benchmark/results/phase196_cross_tool.md
+```
+
+60 例是按 `(ground_truth, context)` 分层的确定性切片（64 个族各取一条，不靠随机种子）：
+
+| 工具 | 版本 | TP | FP | TN | FN | ERR | recall | f1 | 墙钟 |
+|---|---|---|---|---|---|---|---|---|---|
+| **XSSentinel** | 本仓（与门禁同口径 14/12 预算） | 35 | 0 | 24 | 1 | 0 | 0.972 | **0.986** | 346s |
+| DalFox | v2.13.0 | 26 | 1 | 22 | 10 | 1 | 0.722 | **0.825** | 1173s |
+| nuclei（dast/xss 模板） | v3.9.0 | 26 | 0 | 23 | 10 | 1 | 0.722 | **0.839** | 49s |
+
+**这张表的三条限定，缺一条就会被误读**：
+
+- **目标仍是我们自己构造的**。判定语料（nuclei 模板、DalFox 载荷与挖掘策略）来自第三方，
+  靶场不是——所以"别人出的题"只到位一半。真正的独立验证（真实应用、商业工具对跑）仍未做。
+- **我方唯一那条 FN 是打分口径，不是漏检**：XS-Leaks 审计层按设计产出 low/firm 结论，
+  而这里"检出"定义为 high/medium/critical 的 XSS 级 finding；这一层两个第三方工具根本没有。
+- **速度不是单向优势**：nuclei 用 49s 拿到 0.839，比我们先完成 7 倍。任何"性能优于同类"的
+  说法都得对着这一行校准。
+
+ERR 记的是"没测到"（超时 / 该工具结构上无法接收这条用例的输入形状），不计入 TN/FN——
+一次没跑成的扫描不该伪装成一个否证结论。
+
 ## Range #3 —— 第三方意见应用靶场
 
 `range3/` 是一个刻意与 benchmark 异形的**应用**靶场:SQLite 持久化、登录会话与

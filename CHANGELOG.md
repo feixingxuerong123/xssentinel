@@ -109,9 +109,74 @@
   DOM 引擎合成事件集 25→~60 型、interaction_events 语料 27→63 条,
   requires_interaction events **15.4%→73.1%**(剩余为设备传感器/导航
   生命周期等不可诚实派发项,记账不追)。
+- **外部效度对照第一次量出来(Phase 196b)**:`benchmark/run_cross_tool.py` 让
+  XSSentinel / dalfox / nuclei 在**同一批靶**上跑分。文档 1.0 长期写"第三方对照
+  需换机器",本机复核推翻了它:GitHub API 与 raw 可达、Go 代理(goproxy.cn)能
+  构建 `hahwul/dalfox` v2.13.0(落 `C:\GoWorkspace\bin`,适配器的 `_find_tool`
+  本来就按 GOPATH 解析)、nuclei v3.9.0 与完整 `nuclei-templates/dast` 早在机上
+  —— 不可达的只有 github.com 的 release 资产下载。**60 例确定性分层切片**
+  (按 `(ground_truth, context)` 每族先各取一条,不靠随机种子):
+  XSSentinel TP35/FP0/TN24/FN1 **f1=0.986**(346s);dalfox v2.13.0
+  TP26/FP1/TN22/FN10/ERR1 **f1=0.825**(1173s,3.4× 慢);nuclei v3.9.0 dast
+  TP26/FP0/TN23/FN10/ERR1 **f1=0.839**(49s,7× 快)。产物
+  `benchmark/results/phase196_cross_tool.{json,md}` 带工具版本与逐例矩阵。
+  我方唯一那条 FN(`pos-xs-01`)是**打分口径**不是判定错误:XS-Leaks 审计层按
+  设计给 low/firm,而这里"检出"定义为 high/medium/critical 的 XSS 级 finding;
+  该层两个第三方工具根本没有。
 
 ### Fixed
 
+- **DOM 汇聚点面:先问浏览器,再决定跟不跟竞品清单**(Phase 197 测量,
+  `dev/_p197_sinkoracle/probe_sink_oracle.py`)。dalfox v3.2.0 宣称新增
+  `FileReader` / `setAttributeNS` / `parseHTMLUnsafe` / 拖放 / 剪贴板 / 间接
+  `eval` 一批 sink;把每条形状在真 Chromium 里用可归因源(location.search /
+  hash)实测后:
+  `setAttributeNS(null,'onclick', 攻击者串)` **执行**(下次点击即触发)、
+  `var f = eval; f(串)` 与 `window['eval'](串)` **执行**、`setTimeout(串)` /
+  `new Function(串)()` **执行**;而 `document.parseHTMLUnsafe(攻击者串)` 后
+  append 进文档 **不执行**,`dataTransfer` / `navigator.clipboard.readText()`
+  的源不是扫描器可归因的位置。所以"竞品加了"里有一条是我们不该加的
+  (加了就是给浏览器否认的东西背书的静态主张),而有一条我们真的看不见:
+  DOM 通道只 hook 了 `setAttribute`,`setAttributeNS` 投递的 `on*` 处理器
+  全程无痕迹。已补 hook 并配**双层测试**(`tests/test_phase197_dom_sinks.py`:
+  纯断言 hook 在位且顺序不破坏既有 hook + 真浏览器端到端报命中),
+  守卫另做**变异对照**:把 hook 摘掉重跑同一条活体路径,命中集合变为空 ——
+  证明这条测试依赖改动本身,不是"修好之后当然过"。
+- **基准靶场自己把用例打成 ERROR**(Phase 196b,`benchmark/server.py`):
+  `neg-header-01` 的 mode 是 `header_only` —— 把 query 值原样写进**响应头**;
+  而全角变形族 `transform.t_fullwidth` 把 0x21-0x7E 整段映射到 U+FF01..U+FF5E
+  (整条载荷都越过 U+00FF)。HTTP 字段值按 RFC 7230 只能是 latin-1,stdlib 的
+  `send_header` 用 strict 编码 → 处理器内 `UnicodeEncodeError` → **连接在没有响应
+  的情况下关闭** → async 侧把 90s 预算全花在一条它根本没拿到答案的用例上,
+  严格门因此报 ERROR1。错的是尺子不是扫描器:加 `_safe_header_value()`,
+  ≤U+00FF 逐字节原样通过(既有 header 反射期望一个都没动),>U+00FF 转百分比
+  转义。**守卫带变异对照**(`tests/test_benchmark_fixture_header.py` 5 例):
+  把 helper 打回恒等函数后同一请求必须仍然炸连接 —— 只测"修好之后"的测试
+  证明不了任何东西。修后双引擎 strict 切片 **FP0/FN0/ERROR0**
+  (sync TP36/TN28,async TP36/TN27 + 1 例 sync-only SKIP),产物
+  `benchmark/results/phase196d_quick_{sync,async}.json`。
+  范围说明:覆盖靶场 `_respond` 这条汇聚路径(GET `header_only` 模式实测触发);
+  POST 与自定义头走同一个 `_respond` 因此同样受保护,但未单独设例。
+  range3/range4 靶场当前没有任何"把请求值写进响应头"的模式,该缺陷对它们是
+  潜在而非现实,未预先加代码。
+- **`<meta http-equiv="Content-Security-Policy">` 不在判定视野里,造成一类 FP**
+  (Phase 196b):阻断问询、nonce 复用、gadget 相关性全都只读响应头,而 Chromium
+  对 meta 策略与头策略一视同仁。**先实测再改**(五条形状 × 真浏览器,
+  `dev/_p196_csp_delivery/probe_csp_delivery.py`):头 enforcing 与 meta enforcing
+  都让 dialog 沉默;头/meta 两种 report-only 都不阻断 —— 所以漏看 meta 是**过报**
+  而不是漏报。`csp.policies(headers, html)` 把两条通道收进一个结构并区分强制模式,
+  `csp.blocks_family()` 读**全部** enforcing 策略(多条同时生效时任一条阻断即阻断,
+  不是取第一条就完事);`verifier` 的 inline / attr / js-uri 三个门与 sandbox 的
+  升级门同改(sandbox 那条原先把 report-only 也算成"有策略",于是拒绝对一个根本不
+  生效的策略做升级 —— 反向的 FN)。报告侧:`scanner_layers` 的 L7 不再拿
+  report-only 当"可绕过的 CSP"(没有生效的保护,谈不上绕过),同时第一次能看见
+  meta-only 页面的弱策略。测试 `tests/test_phase196_csp_delivery.py` 17 例,
+  含 4 例真 Chromium 对照,把判定钉在浏览器行为上而不是钉在这份文件自己的意见上。
+  **双引擎同步闭合**:`_scan_csp_async` 加 `html` 形参、调用点
+  (`async_scanner.py:503`)传页面 body,两条引擎走同一个 `csp.policies()` 解析;
+  测试按 (header, meta) 六种组合逐对比较 finding 数与 `csp_header`,防止再退化成
+  "async 只读头"——本仓为这类漂移付过 concat 重试、content-type 降置信、
+  JSONP gadget 三次账。
 - **被扫页面可以选择接收操作者凭据的源**(Phase 189,工具自身安全):实测
   (requests 2.32.5 / urllib3 2.6.3)跨 host 302 只剥 `Authorization` 与
   header 形 `Cookie`,且按 **host 字符串**判跨源(`localhost→127.0.0.1` 算跨,
@@ -219,6 +284,19 @@
   那道门),未配置 key 时白名单照旧全量生效;`Origin` 那一半(跨站状态变更)保持
   无条件。四条新测试锁住这个边界,含两条反向对照:无 key 同样请求仍 403、
   有 key 但带外来 `Origin` 的 POST 仍 403、有 key 不带 key 头的请求 401。
+- **Flask 前端此前一道同源门都不执行**(Phase 196b,dalfox #1356 同一条修复的
+  我方版本):Phase 70 的防 DNS 重组 / 跨站状态变更门写在 `StdlibServer` 里,
+  而 `--use-flask`(以及"挂进现有服务"这条文档化用法)走 `FlaskServer`,在未配置
+  `--api-key` 时(190 起会告警但仍允许的默认形态)重组页面可以直接 GET 读走扫描
+  结果、跨站表单 POST 可以起扫描。测试套件里没有一条走 Flask 路径,于是这个不对称
+  活了八个 phase。门抽成共享纯函数 `same_origin_ok()` 由两条前端各自调用(改一次门
+  = 改所有对外形态),并补 `Sec-Fetch-Site: cross-site` 拒绝 —— 重组攻击下 `Host`
+  与 `Origin` 都"看起来同源",只有浏览器说的这句不是。OPTIONS 预检走例外:它是
+  协商不是状态变更,stdlib 的 `do_OPTIONS` 从不经过这道门,拦下来只会让
+  `--cors-origins` 明确放行的源连真实请求都到不了(这条功能回归是我落地后实测
+  才发现的,已修并补测试)。测试 12 例:共享函数五态 + 两条前端**逐用例同构**断言 +
+  反向对照(本地客户端与不带浏览器头的 curl/SDK 不受影响)。MCP 走 stdio,不适用。
+
 
 ### Changed
 
@@ -249,6 +327,23 @@
   那些是死注释(其中"reaper never dies"这类设计说明作为普通注释保留)。
 - `docs/OPTIMIZATION.md` 修订:现状数字按当前工作树重取(三个大文件原偏差
   100~220 行)、1.1(ruff CI 门禁)标记为已完成、新增 1.0 外部效度章节。
+
+- **对照尺子的四处失真,每一处都先让尺子自证(Phase 196b)**:
+  ① 适配器用 `--max-payloads 10 --max-transforms 6` 而门禁跑 14/12 —— 对照里测的
+  是比发布口径更弱的自己;预算改为 `benchmark/runner.py` 单一定义
+  (`DEFAULT_MAX_PAYLOADS` / `DEFAULT_MAX_TRANSFORMS`),适配器 import 而不是再抄。
+  ② 适配器把所有目标拼成 `<path>?q=test`,丢掉了 cookie-tossing 用例需要的
+  `sub.localhost` host 别名与 6 条用例的 per-case 旗标(`--oob self` /
+  `--audit-xs-leaks`);改为共用 `runner._build_target_url` + `_case_extra_args`。
+  **这一改直接改写了结论**:首跑我方 3 个 FN 里有两个(`pos-ctoss-01`、`pos-tb-01`)
+  是尺子造成的,修完变 TP —— 差一点就被当成"检测面漏了"去改判定。
+  ③ 子进程输出按 locale(本机 GBK)解码,第三方工具吐一个非 GBK 字节就在
+  `subprocess.run` 里抛异常;旧错误记账只认两种形状,其余被当成"未检出"计分。
+  现在显式 UTF-8 + `errors="replace"`,且**任何** error 一律记 ERR("没测到"),
+  不再伪装成 TN/FN。④ 默认端口 8896 落在 Windows 动态保留段的惯用区间(179 的
+  教训)→ 迁 18896;新增 `--sample N` 确定性分层切片、被比工具版本戳,以及
+  `engine_fingerprint_start/end` —— 我方每条用例都是新起子进程重新 import 引擎,
+  树在动的时候逐例数字没法归因,本轮两次作废的 run 就是靠它确认的。
 
 ## [1.0.0] - 2026-09-29
 

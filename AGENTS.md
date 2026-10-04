@@ -534,9 +534,92 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
       test_async_headless_verify 双跑 TIMEOUT 为纯环境慢(全桩套件,
       与本轮改动零交集;门禁后单文件复跑 **19 passed in 0.91s**)。
 
+- [x] **196b 外部效度对照 + CSP 投递通道判定 + API 前端门对齐(竞品吸收第八轮)**:
+      ① **把"能不能打赢同类"从声称变成测量**(补 OPTIMIZATION 1.0 长期挂着的缺口):
+      `benchmark/run_cross_tool.py` 让 XSSentinel / dalfox v2.13.0 / nuclei v3.9.0 在
+      **同一批目标**上跑 60 例分层确定性切片(64 个 `(ground_truth, context)` 族各取一条)。
+      终局 **XSSentinel TP35/FP0/TN24/FN1 f1=0.986(346s)**,dalfox TP26/FP1/FN10/ERR1
+      f1=0.825(1173s),nuclei TP26/FP0/FN10/ERR1 f1=0.839(49s)。产物
+      `benchmark/results/phase196_cross_tool.{json,md}` 带工具版本 + 逐例矩阵 +
+      `engine_fingerprint_start/end`(我方每条用例都新起子进程重新 import 引擎,
+      树在动的时候逐例数字无法归因 —— 本轮两次作废的 run 就是靠它确认的)。
+      环境结论更正:GitHub API/raw 与 goproxy.cn 可达(**`go install
+      hahwul/dalfox/v2` 装得上**,`_find_tool` 本就查 `$GOPATH/bin`),
+      不可达的只有 github.com release 资产(dalfox v3 Rust 版拿不到)。
+      ② **先修尺子,再谈结论**(四处失真,每一处都会伪装成"检测缺口"):预算
+      10/6 vs 门禁 14/12 → 改 `runner.py` 单一定义;目标拼成 `?q=test` 丢掉
+      `sub.localhost` host 别名与 6 条用例的 per-case 旗标(`--oob self` /
+      `--audit-xs-leaks`)→ 共用 `_build_target_url` + `_case_extra_args`,
+      **首跑 3 个"我方 FN"里 2 个因此是尺子造成的,修完变 TP**;子进程按本机
+      GBK 解码,第三方输出一个非 GBK 字节就在 `subprocess.run` 抛异常 → 显式
+      UTF-8,且**任何** error 一律 ERR(旧口径只认两种形状,其余被计成"未检出");
+      默认端口 8896 迁 18896(179 的保留段教训)。**我方唯一剩余 FN
+      (`pos-xs-01`)定性为打分口径**:XS-Leaks 审计层按设计给 low/firm,而"检出"
+      定义为 high/medium/critical XSS 级 finding —— 不改成判定去凑数字。
+      ③ **CSP 投递通道判定(先测浏览器再改判定)**:判定链只读响应头,而
+      Chromium 对 `<meta http-equiv="Content-Security-Policy">` 一视同仁。
+      五形态 × 真浏览器实测(`dev/_p196_csp_delivery/`):两种 enforcing 都沉默,
+      两种 report-only 都不阻断 → 漏看 meta 是**过报**(FP)不是漏报。
+      `csp.policies(headers, html)` 统一两通道并区分强制模式,
+      `csp.blocks_family()` 读**全部** enforcing 策略(多条并立时任一条阻断即阻断);
+      `verifier` 的 inline/attr/js-uri 三门 + sandbox 升级门 + `scanner_layers` L7
+      同改(L7 不再把 report-only 当"可绕过的保护",同时第一次看见 meta-only 页面)。
+      测试 `tests/test_phase196_csp_delivery.py` 20 例含 4 例真 Chromium 对照。
+      **双引擎已对称**:`_scan_csp_async` 增加 `html` 形参、调用点
+      (`async_scanner.py`)传页面 body,两条引擎经同一 `csp.policies()` 解析;
+      同构断言按 (header, meta) 六种组合逐对比较 finding 数与 `csp_header`,
+      防止再退化成"async 只读头"(本仓为此付过三次账)。
+      ④ **API 前端门对齐(dalfox #1356 的我方版本)**:Phase 70 的同源门只写在
+      `StdlibServer`,`--use-flask` 在未配 `--api-key` 时**一道都不执行**
+      (重组页面可 GET 读走结果、跨站表单可起扫描),且测试套件里没有一条走 Flask。
+      抽成共享纯函数 `same_origin_ok()` 两条前端各自调用 + 新增
+      `Sec-Fetch-Site: cross-site` 拒绝(重组下 Host/Origin 都显示同源,只有浏览器
+      这句不是);OPTIONS 走例外(stdlib 的 `do_OPTIONS` 从不过这道门,拦预检只会
+      让 `--cors-origins` 放行的源到不了真实请求 —— 这条回归是我落地后实测发现的)。
+      测试 `tests/test_phase196_api_gate.py` 12 例:共享函数五态 + 两条前端逐用例
+      同构 + 反向对照(非浏览器客户端不受影响)。
+      ⑤ **DOM 汇聚点面:测量先行,不照抄竞品 changelog**。dalfox v3.2.0 宣称
+      新增 FileReader/setAttributeNS/parseHTMLUnsafe/拖放/剪贴板/间接 eval;真
+      Chromium 实测后可归因源下:`setAttributeNS(null,'onclick',attacker)` 执行、
+      `var f=eval;f(x)` 与 `window['eval'](x)` 执行、`setTimeout/new Function`
+      执行;而 **`parseHTMLUnsafe` + append 不执行**,`dataTransfer`/`clipboard`
+      源不可归因 —— 所以"跟清单"会加进一条浏览器否认的主张,同时漏掉我们真的
+      看不见的那条(DOM 通道只 hook `setAttribute`)。补 `setAttributeNS` hook,
+      `tests/test_phase197_dom_sinks.py` 双层(纯断言 + 活体端到端)并做**变异
+      对照**(摘掉 hook 重跑活体路径,命中变空)证明守卫吃劲。
+      ⑥ **靶场自己制造 ERROR(尺子缺陷,不是检测缺陷)**:`neg-header-01` mode
+      `header_only` 把 query 值写进响应头,而全角变形族把整条载荷推到 U+00FF 之上;
+      RFC 7230 下 stdlib `send_header` strict latin-1 直接抛异常 → 连接无响应关闭 →
+      async 把 90s 全花在没拿到答案的用例上,严格门 ERR1。修在靶场:
+      `_safe_header_value()` 让 ≤U+00FF 逐字节原样通过(既有期望零变动)、
+      >U+00FF 百分比转义。守卫 `tests/test_benchmark_fixture_header.py` 5 例
+      **含变异对照**:把 helper 打回恒等,同一请求必须仍然炸连接 —— 否则这条测试
+      就只是"修好之后当然过"的空断言(本仓已被空守卫咬过多次)。
+      门禁(本机空机复跑,非引用他人数字):strict 切片双引擎
+      **FP0/FN0/ERROR0 f1=1.000** —— sync TP36/FP0/TN28/FN0/ERR0,
+      async TP36/FP0/TN27/FN0/ERR0(1 SKIP = `neg-stored-02`,stored-dom 属
+      sync-only);**补 `setAttributeNS` hook 之后再次复跑,数字逐项不变**
+      (`benchmark/results/phase197_quick_{sync,async}.json`)——新 hook 若会自命中
+      (Phase 193 那类:探针自身代码被当成页面命中),这一步就是它该被抓出来的地方;
+      产物 `benchmark/results/phase196d_quick_{sync,async}.json`(修靶场后首验);
+      修前同一切片 async 为 ERR1(`neg-header-01` 超时)—— 这条差值就是靶场
+      造成的,归因走实测不是猜。range4 门禁 exit 0(首跑 async 两条 180s 超时
+      核实为另一项目并发负载,空机重跑全对 —— 同形问题 187 就发生过);
+      红队常驻 15 例 + CSP/verifier/API/MCP 定点批全绿;改动文件 ruff 零基线。
+      **本轮新记缺口(`docs/OPTIMIZATION.md` 3.7)**:DOM 汇聚点面
+      (`FileReader` / `setAttributeNS` / `parseHTMLUnsafe` / `dataTransfer` /
+      `clipboard.writeText` / 间接 `eval`)全仓零命中 —— dalfox v3.2.0 加的正是这批,
+      但动判定面必须先用 Chromium oracle 造可控/不可控对照,不为对齐清单直接加 sink;
+      另:`werkzeug` 已移除 `__version__` 而 Flask 2.2.5 的 `test_client()` 要读它
+      (测试改用 `werkzeug.test.Client` 驱动同一 WSGI app),依赖治理需钉住组合。
+
 ## 环境配置
 
 - 依赖: requirements.txt;测试: `python tests/run_all_batched.py --quiet`(2026-09-25 实测
   129 个 test_*.py 文件;裸跑单进程会卡死,必须分批 —— `test_async_budget.py` 在本机
   会挂满 2×540s 预算,按"未验证"记账而不是当回归)
 - benchmark: benchmark/ 目录;报告产物: report.html
+- 三方对照(dalfox / nuclei)本机可跑:`go install github.com/hahwul/dalfox/v2@latest`
+  经 goproxy.cn 构建到 `$GOPATH/bin`(本机为 `C:\GoWorkspace\bin`),nuclei v3.9.0 与
+  `~/nuclei-templates/dast` 已在位;github.com 的 release 资产下载仍被拦(v3 Rust 版装不上)。
+  跑法见 README"同类开源扫描器同靶跑分"一节;产物 `benchmark/results/phase196_cross_tool.json`

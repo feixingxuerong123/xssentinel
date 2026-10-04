@@ -302,16 +302,24 @@ class AdvancedLayerMixin:
                 self.coverage.record_request(url, "GET")
             except Exception:
                 return
-        # CSP can be in Content-Security-Policy or Content-Security-Policy-Report-Only.
+        # Phase 196: a policy reaches the browser through the response header
+        # OR a <meta http-equiv="Content-Security-Policy">.  Report-Only
+        # (either channel) enforces nothing -- measured in Chromium, it stops
+        # no dialog -- so it is not analysed as a protection we can bypass.
+        # The old loop fell back to Report-Only and reported "CSP bypassable"
+        # for a policy that was never in force.
+        try:
+            body_text = resp.text if hasattr(resp, "text") else ""
+        except Exception:
+            body_text = ""
+        headers_dict = ({k: v for k, v in resp.headers.items()}
+                        if hasattr(resp, "headers") else {})
         csp_header = ""
-        for h in ("Content-Security-Policy",
-                   "Content-Security-Policy-Report-Only"):
-            val = resp.headers.get(h) if hasattr(resp, "headers") else None
-            if val:
-                csp_header = val
-                break
+        for policy in csp_mod.policies(headers_dict, body_text)["enforcing"]:
+            csp_header = policy
+            break
         if not csp_header:
-            return  # No CSP -> nothing to analyze (no finding either).
+            return  # No enforcing CSP -> nothing to analyze (no finding either).
         report = csp_mod.analyze(csp_header)
         if not report.bypassable:
             return
