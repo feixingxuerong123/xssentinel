@@ -314,6 +314,23 @@ pyproject 一处;README 的安装段落同步(它现在两种装法都在教)。
 
 ---
 
+### 3.8 观测记录:async 每条响应的线程 CPU(2026-10-04 剖析得到,未优化)
+
+补 async HPP 体位测试时顺手量到的事实,记下来免得下轮重新猜:
+
+- 一条 `_probe_param` 走完后总耗时 ~55s,而 **20 个请求全部在毫秒内发出**
+  (在桩 session 里打时间戳测得 gap 合计 ≈ 0.4s),`asyncio.sleep` 调用数为 **0**。
+- cProfile 的累积时间几乎全在 `GetQueuedCompletionStatus`(IOCP 等待),
+  主线程只见等待不见计算 —— 因为真正的工作在 `asyncio.to_thread` 的线程里,
+  **cProfile 默认不跟线程**。收缩 `max_payloads` 3→1 只把 55.2s 降到 54.7s,
+  关沙箱门(`XSS_SANDBOX_GATE=0`)降到 50.1s:说明成本不在载荷条数也不只在沙箱。
+- 结论:这是**每响应的判定 CPU**,不是测试人为成本 —— 与门禁里 async 单例
+  ~5s 的量级一致。值得作为性能项单独量:先建"每响应判定耗时"基线
+  (线程内计时,不是 cProfile 总时间),再谈优化;优化前不要被
+  "测试很慢"引导去删测试。
+- 处置:新测试保留两条必须分开跑的用例(体位确认 + 取首值反例),
+  query 位的 `param_in` 断言并入既有那条 async HPP 测试(零额外耗时)。
+
 ### 3.7 Phase 196b 新增待办(按投入 × 收益)
 
 1. **async 引擎看不见 `<meta>` CSP**:sync 侧已把阻断判定接到 header + meta 两条

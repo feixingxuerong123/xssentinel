@@ -234,6 +234,10 @@ def test_hpp_async_confirms_through_first_occurrence_filter():
     hpp = [d for d in got if "hpp" in tuple(d.get("transform") or [])]
     assert hpp, f"async HPP produced no finding: {[d.get('transform') for d in got]}"
     assert hpp[0]["confidence"] == "high"
+    # position claim must match the position used: this engine sends the
+    # pair as query pairs here.  sync once hardcoded "query" for the body
+    # position too (Phase 196 follow-up), so both arms are pinned.
+    assert hpp[0].get("param_in") == "query", hpp[0].get("param_in")
 
 
 # ---------------------------------------------------------------------------
