@@ -231,19 +231,33 @@ import 仍可用 —— 它靠的是 `sandbox.py` 里带原因的 re-export,而�
 
 ## 2. 中优先级(收益明确,可排期)
 
-### 2.1 双引擎层逻辑去重
+### 2.1 双引擎对等:不是"去重代码",是"锁住行为"
 
-sync 与 async 的层实现(L7 各高级层、pre-encode、reflection profile)存在
-结构性复制。历史上已发生两次"async 漏了 sync 的修复"(concat 重试、
-content-type 降置信)。
+> **原文假设已被实测推翻(2026-10-05)**,下面的改法已按实测重写。
 
-**改法**:把纯判定逻辑(无 I/O)下沉为共享纯函数,引擎只保留 I/O 差异。
-候选:`_grade_evidence` 已共享,下一步是 `_non_html_grade`(目前
-async_scanner 内部复制了 scanner._record 的逻辑)。
+**实测**:两边 ≥6 行的函数共 sync 81 个 / async 50 个,**同名仅 4 个**,内容完全一致的
+只有 1 个(`_suppressed`),文本相似度 ≥0.75 的平行实现只有 2 对(`_suppressed`、
+`_resolve_dom_engine`)。**几乎不存在函数级复制** —— 两边早就各自演化了。
 
-**验收**:共享函数抽出后,177 Phase 那类"双引擎漂移"在结构上不可能发生;
-每次下沉都要补一条"双引擎同输入同输出"的 parity 测试(项目已有
-`test_async_*_parity` 系列,沿用其写法)。
+那历史那两次事故(177 的 concat 重试、178c 的 content-type 降置信)到底是什么?
+**不是"复制的代码忘了同步改",而是"一边有某个分支、另一边根本没有"** —— 是行为
+不对等,不是代码重复。所以原文"把纯判定逻辑下沉为共享纯函数"这条路会扑空:
+没有多少可抽的东西(`_grade_evidence` 已经共享了,这是早就做完的部分)。
+
+**真正的改法**:把 parity 从"出一次事故补一条"变成系统性的门。现有 5 个 parity
+测试文件共 **15 例**(`test_async_param_stage_parity`、`test_async_phase196_hpp_body_parity`、
+`test_coverage_matrix_parity`、`test_csp_nonce_async_parity`、`test_layer_registry_parity`),
+全都是**点状**的 —— 每条对应一个具体修过的 bug,而不是"同输入 → 同输出"的通用门。
+事故每发生一次,门才补一条;没发生的那一类,门就是空的。
+
+**候选做法(未做,开工前先估成本)**:同一组输入分别走双引擎,逐字段比对产物
+(type / severity / confidence / param / 证据词),差异即失败。**难点不在写断言,
+而在先钉死"可比"的定义** —— async 的请求调度与重放顺序天然不同,必须先约定比较
+的是"finding 集合的规范化形式",否则这条门会天天红、然后被关掉。
+
+**验收(关键)**:新门必须能**复现历史那两次事故** —— 把 async 的 concat 重试摘掉、
+把 async 的 content-type 降置信摘掉,门必须红。**不能用"跑通就交差"**:一个
+抓不到已知事故的门,等于没有门(这条教训在 pyflakes 门禁那次已经付过一次学费)。
 
 ### 2.2 报告层性能
 
