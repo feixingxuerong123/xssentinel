@@ -521,14 +521,31 @@ def interaction_dispatch_js(needle: str) -> str:
   var EVTS = [["pointerdown","PointerEvent"],["pointerup","PointerEvent"],
     ["pointermove","PointerEvent"],["pointerover","PointerEvent"],
     ["pointerout","PointerEvent"],["pointerenter","PointerEvent"],
+    ["gotpointercapture","PointerEvent"],["lostpointercapture","PointerEvent"],
     ["mousedown","MouseEvent"],["mouseup","MouseEvent"],
     ["mousemove","MouseEvent"],["mouseover","MouseEvent"],
     ["mouseout","MouseEvent"],["mouseenter","MouseEvent"],
     ["dblclick","MouseEvent"],["wheel","WheelEvent"],["click","MouseEvent"],
     ["copy","ClipboardEvent"],["paste","ClipboardEvent"],
     ["dragstart","DragEvent"],["dragover","DragEvent"],["drop","DragEvent"],
-    ["touchstart","Event"],["touchmove","Event"],
-    ["submit","Event"],["invalid","Event"],["select","Event"]];
+    ["dragend","DragEvent"],["dragleave","DragEvent"],
+    ["touchstart","Event"],["touchmove","Event"],["touchend","Event"],
+    ["touchcancel","Event"],
+    ["keydown","KeyboardEvent"],["keyup","KeyboardEvent"],
+    ["keypress","KeyboardEvent"],
+    ["submit","Event"],["invalid","Event"],["select","Event"],
+    ["input","Event"],["beforeinput","Event"],["reset","Event"],
+    ["search","Event"],["cut","Event"],["selectstart","Event"],
+    ["toggle","Event"],["beforetoggle","Event"],
+    ["fullscreenchange","Event"],["scroll","Event"],
+    ["mouseleave","MouseEvent"],["pointerleave","PointerEvent"],
+    ["focusout","FocusEvent"],["focusin","FocusEvent"],
+    ["selectionchange","Event"],["cancel","Event"],["afterprint","Event"],
+    ["pause","Event"],["play","Event"],["volumechange","Event"],
+    ["ratechange","Event"],["seeking","Event"],["seeked","Event"],
+    ["ended","Event"],["waiting","Event"],["canplay","Event"],
+    ["loadedmetadata","Event"],["durationchange","Event"],
+    ["progress","Event"],["suspend","Event"]];
   window.__xss_dispatching = 1;
   var n = 0;
   try {

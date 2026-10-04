@@ -372,6 +372,12 @@ def _run_scan(args, url: str, requester, oob, progress, checkpoint,
     if getattr(args, "param_wordlist", None):
         from .core.param_miner import load_wordlist
         _param_wl = load_wordlist(args.param_wordlist)
+    # Phase 195: GraphQL introspection names (--gql) merge into the mining
+    # wordlist ahead of the built-in candidates -- they are the parameter
+    # names the application ACTUALLY renders.
+    _gql_names = getattr(args, "gql_params", None) or []
+    if _gql_names:
+        _param_wl = list(dict.fromkeys(list(_param_wl or []) + _gql_names))
 
     scanner = Scanner(
         requester=requester, use_headless=args.headless,

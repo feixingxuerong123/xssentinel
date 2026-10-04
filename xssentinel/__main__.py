@@ -150,6 +150,15 @@ def build_parser():
                             " named host follow the HAR scope rules (dropped"
                             " unless --allow-host / --allow-any-host);"
                             " pairs with -o DIR.")
+    g_tgt.add_argument("--gql", default=None, metavar="ENDPOINT_URL",
+                       help="Introspect a GraphQL endpoint and feed the"
+                            " schema to the scanner (Phase 195, inQL"
+                            " parity): mutation arguments, input-object"
+                            " fields and query arguments (String-typed"
+                            " first) merge into the param-mining wordlist,"
+                            " and the endpoint itself becomes a scan"
+                            " target.  Pairs with --stored-view for"
+                            " stored-XSS verification of API writes.")
     # Phase 176l: authorization scope for IMPORTED targets.  A browser HAR
     # carries the site's CDN / analytics / SSO / ad domains next to the app, and
     # those are other people's systems.  Payloads must never reach them just
@@ -1020,6 +1029,24 @@ def main(argv=None):
                            " scan. Re-run with --allow-host.")
                 return 2
         print(f"[*] Wayback {args.wayback}: {len(urls)} URL(s) imported")
+    elif getattr(args, "gql", None):
+        from .core.gql_import import gql_param_candidates
+        try:
+            gql_names = gql_param_candidates(args.gql,
+                                             timeout=max(args.timeout, 15))
+        except Exception as e:
+            _log.error("GraphQL introspection failed: %s", e)
+            return 2
+        if not gql_names:
+            _log.error("GraphQL %s exposed zero usable parameter names.",
+                       args.gql)
+            return 2
+        # The names ride args into the scan setup, where they merge into
+        # the param-mining wordlist; the endpoint itself is the target.
+        args.gql_params = gql_names
+        urls = [args.gql]
+        print(f"[*] GraphQL {args.gql}: {len(gql_names)} parameter name(s) "
+              f"introspected into the mining wordlist")
     if spec_targets:
         urls = [t["url"] for t in spec_targets]
         print(f"[*] {src_label}: {len(spec_targets)} endpoint(s) imported")
@@ -1027,8 +1054,8 @@ def main(argv=None):
     if not urls:
         ap.print_help()
         print("\n[!] No target specified. Use -u URL, --batch FILE, "
-              "--batch-stdin, --har FILE, --openapi FILE, --sitemap or "
-              "--wayback.",
+              "--batch-stdin, --har FILE, --openapi FILE, --sitemap, "
+              "--wayback or --gql.",
               file=sys.stderr)
         return 2
 

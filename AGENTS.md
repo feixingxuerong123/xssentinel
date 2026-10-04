@@ -517,6 +517,23 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
       (TypeError 被扫描器的 continue 吞掉曾伪装成"未确认")。
       全量分批门禁随跑随记(_regress_phase194_full.log)。
 
+- [x] **195 GraphQL introspection 输入面 + 交互事件长尾(竞品吸收第七轮)**:
+      ① **`--gql ENDPOINT`**(inQL 对位,库存清单最后一个命名输入面缺口):
+      `core/gql_import.py` —— 标准 introspection 查询(响应 8MB 安全带)→
+      提取 String 型 mutation 参数 / input-object 字段 / query 参数 / 字段名,
+      按"写入侧优先"排序去重(上限 200),合并进挖矿词表(cli_runner 三行
+      合并,--param-wordlist 同款),端点本身成为扫描目标;GraphQL errors
+      /非 JSON/无 queryType 显式报错。测试 8 例(fetch 注入解析/排序/去重/
+      上限/错误面 + 一条真 HTTP 回环 + CLI flag)。
+      ② **交互事件长尾**:dispatch 事件集 25→~60 型(键盘/编辑/媒体状态/
+      toggle/指针捕获/生命周期),语料 27→63 条,requires_interaction
+      events **15.4%→73.1%**;剩余 28 个(设备传感器/导航生命周期/prompt
+      类/Safari 手势/私有 webkit)不可诚实派发,记账不追。
+      门禁:定向 26+86 全绿、benchmark quick TP36/FP0/FN0、ruff 过;
+      全量分批门禁 **155/156 文件绿(7481s)** —— 唯一失败
+      test_async_headless_verify 双跑 TIMEOUT 为纯环境慢(全桩套件,
+      与本轮改动零交集;门禁后单文件复跑 **19 passed in 0.91s**)。
+
 ## 环境配置
 
 - 依赖: requirements.txt;测试: `python tests/run_all_batched.py --quiet`(2026-09-25 实测

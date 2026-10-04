@@ -35,7 +35,8 @@ from xssentinel.core.payloads import _CROSS_CONTEXT  # noqa: E402
 
 def test_interaction_corpus_loads_and_is_registered():
     fam = payloads.by_context("interaction_events")
-    assert len(fam) == 27
+    # Phase 195: long-tail batch grew the family 27 -> 63
+    assert len(fam) == 63
     assert "interaction_events" in payloads.contexts()
     for p in fam:
         assert "alert(1)" in (p.get("payload") or ""), p["id"]

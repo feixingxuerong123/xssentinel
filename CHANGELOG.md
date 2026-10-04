@@ -102,6 +102,13 @@
   REGEX` 把失效探测扩展到响应体(200 页"请先登录" defeating 状态码检
   查),`--on-session-loss {relogin,abort}` 让死会话可以诚实停扫而不是
   无限重登;abort 走既有 BudgetExhausted 优雅停机。
+- **GraphQL introspection 输入面 + 交互事件长尾(Phase 195)**:①
+  `--gql ENDPOINT` introspect GraphQL schema,String 型 mutation 参数 /
+  input-object 字段 / query 参数 / 字段名按写入侧优先合并进挖矿词表,
+  端点成为扫描目标(inQL 对位;库存清单最后一个命名输入面缺口);②
+  DOM 引擎合成事件集 25→~60 型、interaction_events 语料 27→63 条,
+  requires_interaction events **15.4%→73.1%**(剩余为设备传感器/导航
+  生命周期等不可诚实派发项,记账不追)。
 
 ### Fixed
 
