@@ -1043,7 +1043,21 @@ class DynamicDomAnalyzer:
         except Exception:
             pass
 
-    def analyze(self, url: str, marker: str | None = None) -> list:
+    def analyze(self, url: str, marker: str | None = None,
+                dialog_token: str | None = None) -> list:
+        """Render ``url`` in the instrumented browser and report sink hits.
+
+        ``dialog_token`` (Phase 194, stored-XSS closure): when set, a
+        dialog whose message carries it counts as a hit -- the marker was
+        embedded in the STORED PAYLOAD's own code, so ``alert('token')``
+        firing proves the payload executed even when it flows through no
+        instrumented sink (a pure ``<script>alert(...)</script>`` stored
+        payload was invisible to the sink hooks).  This channel is for
+        callers whose marker rides inside injected code ONLY: for URL
+        source probes a page simply displaying the marker
+        (``alert(location.hash)``) is not XSS, and claiming it would be an
+        over-claim -- hence opt-in, never on by default.
+        """
         if not self.available():
             return []
         try:
@@ -1087,7 +1101,18 @@ class DynamicDomAnalyzer:
                                url, exc_info=True)
             try:
                 page.add_init_script(_init_script(marker))
-                page.on("dialog", lambda d: d.dismiss())
+                # Phase 194: record dialog messages while still dismissing
+                # them (unhandled dialogs would stall the page).
+                dialog_msgs: list[str] = []
+
+                def _on_dialog(d):
+                    try:
+                        dialog_msgs.append(d.message)
+                    except Exception:
+                        pass
+                    d.dismiss()
+
+                page.on("dialog", _on_dialog)
                 # Phase 147: bound the total cost of probing this url (see
                 # _DOM_PROBE_BUDGET_S).  Findings are collected per probe, so
                 # stopping early keeps everything already confirmed.
@@ -1223,6 +1248,18 @@ class DynamicDomAnalyzer:
                         hits = page.evaluate("window.__xss_dom_hits || []")
                     except Exception:
                         hits = []
+                    # Phase 194: the dialog channel as a FALLBACK -- when no
+                    # instrumented sink saw the marker but a dialog carried
+                    # the stored payload's token, the payload executed.
+                    # Fallback-only: sink hits name the specific sink and
+                    # are the stronger, more specific evidence.
+                    if not hits and dialog_token:
+                        _tok = [m for m in dialog_msgs
+                                if dialog_token in (m or "")]
+                        if _tok:
+                            hits.append({"sink": "dialog",
+                                         "snippet": _tok[0][:200],
+                                         "via": "dialog"})
                     for h in hits:
                         sink = h.get("sink")
                         key = (sink, probe["source"])

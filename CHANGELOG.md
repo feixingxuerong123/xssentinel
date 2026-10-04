@@ -93,6 +93,15 @@
   (参照基准 requires_interaction events 15.4%→49.0%)。门禁抓到并修复:
   派发 JS 自身含 marker 被 eval 钩子记为命中(12 个 strict 切片 FP),
   按既有 harness 旗标契约隔离。
+- **stored-XSS dialog 闭环 + session 失效策略(Phase 194)**:①
+  stored-dom 增加 opt-in 的 dialog 通道(dalfox --sxss / nuclei
+  waitdialog 语义)—— 纯 `<script>alert('token')</script>` 存储载荷执行
+  时不经过任何被钩 sink,曾是盲区;dialog 消息含 token 即记执行证据,
+  仅作 sink 命中为空时的 fallback,且只对"marker 在注入代码里"的调用方
+  开放(URL 源探针的 alert 只是显示,不是 XSS)。② `--session-check
+  REGEX` 把失效探测扩展到响应体(200 页"请先登录" defeating 状态码检
+  查),`--on-session-loss {relogin,abort}` 让死会话可以诚实停扫而不是
+  无限重登;abort 走既有 BudgetExhausted 优雅停机。
 
 ### Fixed
 

@@ -118,6 +118,20 @@ def _do_login(requester, args) -> "SessionManager | None":
     mgr = SessionManager(requester)
     interval = getattr(args, "auth_refresh_interval", 1800.0) or 1800.0
     mgr.refresh_threshold = float(interval)
+    # Phase 194: body-regex session-loss detection + loss policy
+    # (dalfox --session-check / --on-session-loss parity).  A bad regex is
+    # an operator error and must fail loudly before the scan starts, not
+    # silently never match.
+    _re_src = getattr(args, "session_check", None)
+    if _re_src:
+        import re as _re
+        try:
+            mgr.session_check_re = _re.compile(_re_src)
+        except _re.error as e:
+            raise SystemExit(f"[!] --session-check is not a valid regex: {e}")
+    _loss = getattr(args, "on_session_loss", None)
+    if _loss:
+        mgr.on_session_loss = _loss
     ok = False
 
     try:

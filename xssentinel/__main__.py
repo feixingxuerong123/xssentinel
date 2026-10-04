@@ -588,6 +588,19 @@ def build_parser():
     g_auth.add_argument("--auth-relogin-on-loss", action="store_true",
                         help="Detect 401/403/redirect-to-login during the "
                              "scan and re-authenticate automatically")
+    g_auth.add_argument("--session-check", default=None, metavar="REGEX",
+                        help="Response-BODY regex that means the session "
+                             "died (Phase 194, dalfox --session-check "
+                             "parity): a 200 page saying 'please log in' "
+                             "defeats every status-based check.  Requires "
+                             "an auth configuration (--login-* / --cookie).")
+    g_auth.add_argument("--on-session-loss", default="relogin",
+                        choices=["relogin", "abort"],
+                        help="What to do when --session-check / status "
+                             "checks detect a dead session (Phase 194): "
+                             "'relogin' re-authenticates and retries once "
+                             "(default); 'abort' stops the scan with an "
+                             "honest reason -- findings so far are kept.")
     # Config / Resume / Progress
     g_cfg = ap.add_argument_group("Config & Resume")
     g_cfg.add_argument("--config", default=None,

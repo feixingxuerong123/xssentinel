@@ -494,6 +494,29 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
       async/MCP 46 + stored/static 62 全绿;range4 门禁过;ruff 全过;
       全量分批门禁随跑随记(_regress_phase193_full.log)。
 
+- [x] **194 stored-XSS dialog 闭环 + session 失效策略(竞品吸收第六轮)**:
+      调研清单上最后一个"需自查"项落地。① **stored-dom dialog 通道**
+      (dalfox --sxss waitdialog / nuclei waitdialog 语义):自查发现
+      Phase 152 的 stored-dom 已有"注入→真浏览器回访→sink 证据"闭环,但
+      纯 `<script>alert('token')</script>` 存储载荷执行时**不经过任何被钩
+      sink** → 漏报。`analyze()` 增加显式 opt-in 的 `dialog_token` 参数
+      (dialog 消息含 token 即记 sink='dialog' 命中,仅作 sink 命中为空时
+      的 fallback —— sink 命中指名具体 sink,是更强证据)。**流程特异性是
+      硬约束**:marker 只在调用方注入的代码里时 dialog 才是执行证明;URL
+      源探针(alert(location.hash) 只是显示)绝不能开,默认关。async 无
+      stored 流程(已在 _ASYNC_SYNC_ONLY_FLAGS 文档化),无需对位。
+      ② **--session-check REGEX + --on-session-loss {relogin,abort}**
+      (dalfox 对位):失效探测从 401/403/登录重定向扩展到**响应体正则**
+      (200 页写"请先登录" defeating 状态码检查;正则未配置不读 body,钩子
+      里零开销);abort 策略经 BudgetExhausted 走既有优雅停机(findings
+      保留、原因记账),keep_alive 的吞异常路径显式放行 BudgetExhausted。
+      测试 9 例:正则四态(命中/未命中/未配置/状态码并存)、abort 经钩子
+      与 keep_alive 双路径抛出、relogin 不抛、CLI flag 存在、纯 alert 存储
+      载荷真 Chromium 经 dialog 通道确认(EVIDENCE_BROWSER_EXECUTED)。
+      顺带修测试替身契约:_FakeEngine.analyze 增补 dialog_token 形参
+      (TypeError 被扫描器的 continue 吞掉曾伪装成"未确认")。
+      全量分批门禁随跑随记(_regress_phase194_full.log)。
+
 ## 环境配置
 
 - 依赖: requirements.txt;测试: `python tests/run_all_batched.py --quiet`(2026-09-25 实测

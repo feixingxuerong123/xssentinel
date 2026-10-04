@@ -297,7 +297,13 @@ class StoredBlindMixin:
             if hasattr(self.req, "invalidate"):
                 self.req.invalidate(view_url)
             try:
-                hits = engine.analyze(view_url, marker=token)
+                # Phase 194: dialog_token arms the dialog channel -- a pure
+                # `<script>alert('token')</script>` stored payload executes
+                # without ever flowing through an instrumented sink, and
+                # used to be invisible here (dalfox/nuclei waitdialog
+                # semantics).
+                hits = engine.analyze(view_url, marker=token,
+                                      dialog_token=token)
             except Exception as e:
                 _log.debug("stored-dom: browser analyze failed (%s)", e,
                            exc_info=self.verbose)
@@ -313,6 +319,11 @@ class StoredBlindMixin:
                 else:
                     confidence = "high"
                     note = "view page rendered the stored payload in a real browser"
+                if any((h.get("sink") == "dialog") for h in hits
+                       if isinstance(h, dict)):
+                    note += (" (dialog carried the probe token: the stored "
+                             "payload executed without flowing through an "
+                             "instrumented sink)")
                 # The DOM engine ran a real browser and the marker reached an
                 # executable sink, so this finding DOES have browser-grade
                 # proof.  It used to be filed with `headless: None`, which would

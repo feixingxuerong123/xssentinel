@@ -17,6 +17,8 @@ Usage:
 from __future__ import annotations
 import time
 
+from .budget import BudgetExhausted
+
 try:
     import requests  # noqa: F401  (可选依赖可用性探测:导入即使用)
     _HAS_REQUESTS = True
@@ -47,6 +49,14 @@ class SessionManager:
         # later be replicated in clients that do NOT go through
         # requests.Session -- currently the real-browser DOM engine.
         self.auth_header_names: set = set()
+        # Phase 194 (dalfox --session-check / --on-session-loss parity):
+        # an optional response-BODY regex that means the session died (a
+        # 200 page saying "please log in" defeats every status-based
+        # check), and what to do about a detected loss -- "relogin" (the
+        # Phase-45 default: re-auth and retry once) or "abort" (stop the
+        # scan; a dead session means every further finding is suspect).
+        self.session_check_re = None
+        self.on_session_loss = "relogin"
 
     def login_form(self, login_url: str, credentials: dict,
                    method: str = "POST",
@@ -122,6 +132,21 @@ class SessionManager:
             login_path = urlparse(self._login_url).path.rstrip("/").lower()
             loc_path = urlparse(loc).path.rstrip("/").lower()
             return bool(login_path) and login_path in loc_path
+        # Phase 194: body-content check (dalfox --session-check parity).
+        # A 200 page whose body says "please log in" is a dead session no
+        # status code will ever report.  The body is only read when a
+        # regex was configured -- this method also runs in the per-response
+        # hook, and reading every body unconditionally would cost real
+        # memory/time on large responses.
+        if self.session_check_re is not None:
+            try:
+                body = resp.text
+            except Exception:
+                return False
+            try:
+                return bool(self.session_check_re.search(body or ""))
+            except Exception:
+                return False
         return False
 
     def reauth(self) -> bool:
@@ -306,7 +331,12 @@ class SessionManager:
                                                     "timeout", 20),
                                     allow_redirects=False)
             if self.looks_logged_out(resp):
+                if self.on_session_loss == "abort":
+                    raise BudgetExhausted(
+                        "session lost during scan (--on-session-loss abort)")
                 return self.reauth()
+        except BudgetExhausted:
+            raise            # a policy stop must not be swallowed below
         except Exception:
             return False
         return False
@@ -366,6 +396,16 @@ class SessionManager:
         def _hook(resp, req, method, url, params, data):
             if not self.looks_logged_out(resp):
                 return None
+            # Phase 194: abort policy (dalfox --on-session-loss abort
+            # parity) -- a dead session makes every further finding
+            # suspect; stop the scan with an honest reason instead of
+            # re-authenticating and carrying on.  BudgetExhausted is the
+            # scanner's own cooperative-stop signal, so this lands in the
+            # existing graceful-stop machinery (findings so far are kept,
+            # the reason is recorded).
+            if self.on_session_loss == "abort":
+                raise BudgetExhausted(
+                    "session lost during scan (--on-session-loss abort)")
             if not self.reauth():
                 return None
             # Propagate the refreshed credentials to the requester that saw

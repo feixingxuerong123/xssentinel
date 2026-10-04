@@ -36,8 +36,8 @@ class _FakeEngine:
     def available(self):
         return True
 
-    def analyze(self, url, marker=None):
-        self.calls.append((url, marker))
+    def analyze(self, url, marker=None, dialog_token=None):
+        self.calls.append((url, marker, dialog_token))
         return list(self._hits)
 
 
