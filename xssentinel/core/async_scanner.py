@@ -1293,13 +1293,13 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
                     )
                     break
 
-        # Phase 193: HPP (HTTP Parameter Pollution, sync _try_hpp parity).
-        # The parameter is sent twice -- first occurrence benign, second the
-        # payload; a filter inspecting only the first occurrence passes the
-        # request while the backend renders the payload occurrence.  WAF
-        # gate mirrors sync (no WAF, no reason); query position only this
-        # round; capped at two payloads per (url, param).
-        if self.waf_name and not param_confirmed and not is_body:
+        # Phase 193/196: HPP (HTTP Parameter Pollution, sync _try_hpp
+        # parity).  The parameter is sent twice -- first occurrence benign,
+        # second the payload; a filter inspecting only the first occurrence
+        # passes the request while the backend renders the payload
+        # occurrence.  WAF gate mirrors sync; both positions (query pairs /
+        # raw urlencoded body); capped at two payloads per (url, param).
+        if self.waf_name and not param_confirmed:
             _htried = getattr(self, "_hpp_tried", None)
             if _htried is None:
                 _htried = set()
@@ -1311,18 +1311,32 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
                     _hpay = verifier.mark(_cand, _htok)
                     if _hpay == _cand:
                         continue
-                    _hpairs = [(k, v) for k, v in (params or {}).items()
-                               if k != param]
-                    _hpairs.append((param, "xsssafe"))
-                    _hpairs.append((param, _hpay))
+                    if is_body:
+                        from urllib.parse import urlencode as _ue
+                        _bpairs = [(k, v) for k, v in (data or {}).items()
+                                   if k != param]
+                        _bpairs.append((param, "xsssafe"))
+                        _bpairs.append((param, _hpay))
+                        _hparams = params
+                        _hdata = _ue(_bpairs)
+                        _hheaders = dict(self._req_headers(self.headers))
+                        _hheaders["Content-Type"] = \
+                            "application/x-www-form-urlencoded"
+                    else:
+                        _hparams = [(k, v) for k, v in (params or {}).items()
+                                    if k != param]
+                        _hparams.append((param, "xsssafe"))
+                        _hparams.append((param, _hpay))
+                        _hdata = data
+                        _hheaders = self._req_headers(self.headers)
                     try:
                         async with self._semaphore:
                             await self._throttle(url)
                             async with session.request(
-                                method, url, params=_hpairs,
-                                headers=self._req_headers(self.headers),
+                                method, url, params=_hparams or None,
+                                headers=_hheaders,
                                 proxy=self._next_proxy(),
-                                **_body_kwargs(data),
+                                **_body_kwargs(_hdata),
                             ) as hresp:
                                 _htext = await hresp.text()
                                 _hhdrs = dict(
@@ -1352,7 +1366,7 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
                         type="reflected",
                         confidence="high",
                         transform=["hpp"],
-                        param_in="query",
+                        param_in="body" if is_body else "query",
                         evidence_class=EVIDENCE_MODEL,
                         detail=(
                             "HPP: the parameter was sent twice (first "

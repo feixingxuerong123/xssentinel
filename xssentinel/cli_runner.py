@@ -379,6 +379,41 @@ def _run_scan(args, url: str, requester, oob, progress, checkpoint,
     if _gql_names:
         _param_wl = list(dict.fromkeys(list(_param_wl or []) + _gql_names))
 
+    # Phase 196: browser-rendered input discovery (--discover).  One
+    # render of the target harvests the LIVE input face -- SPA form field
+    # names merge into the mining wordlist, and the same-origin API
+    # endpoints the page itself fetched are scanned right after the main
+    # target.  Best-effort: a missing browser or a dead page degrades to
+    # the static wordlist, never to a failed scan.
+    _discovered_urls: list[str] = []
+    if getattr(args, "discover", False):
+        try:
+            from .core.dom_engine import DynamicDomAnalyzer
+            _h, _c, _ls = (auth_state or (None, None, None))
+            _disc = DynamicDomAnalyzer(timeout=args.timeout,
+                                       auth_headers=_h or {},
+                                       auth_cookies=_c or [],
+                                       auth_local_storage=_ls or {})
+            if _disc.available():
+                _res = _disc.harvest(base_url)
+                _names = _res.get("names") or []
+                if _names:
+                    _param_wl = list(dict.fromkeys(
+                        list(_param_wl or []) + _names))
+                    print(f"[*] Discover: {len(_names)} live input field "
+                          f"name(s) merged into the mining wordlist")
+                _discovered_urls = _res.get("resource_urls") or []
+                if _discovered_urls:
+                    print(f"[*] Discover: {len(_discovered_urls)} same-origin "
+                          f"endpoint(s) the page itself fetched -- they will "
+                          f"be scanned after the main target")
+            else:
+                print("[!] Discover: playwright/chromium not available -- "
+                      "continuing with the static wordlist")
+        except Exception as e:
+            _log.warning("Discover pass failed (continuing): %s", e,
+                         exc_info=args.verbose)
+
     scanner = Scanner(
         requester=requester, use_headless=args.headless,
         max_transforms=args.max_transforms, max_payloads=args.max_payloads,
@@ -487,6 +522,18 @@ def _run_scan(args, url: str, requester, oob, progress, checkpoint,
     scanner.scan_target(base_url, method=args.method, params=params,
                         data=data, oob_collect=False)
 
+    # Phase 196: the same-origin endpoints the rendered page itself
+    # fetched get their own scan (bounded) -- SPA API surfaces the static
+    # target list could never name.
+    for _du in _discovered_urls[:10]:
+        if args.verbose:
+            print(f"[*] Discover: scanning {args.method} {_du}")
+        try:
+            scanner.scan_target(_du, method="GET", params={},
+                                data=None, oob_collect=False)
+        except Exception as e:
+            _log.warning("discovered-endpoint scan failed (%s): %s", _du, e)
+
     # Phase 44 standalone fast checks (--sqli-check / --check-outdated-js).
     _maybe_run_fast_checks(args, requester, base_url, args.method,
                            params, data, scanner.findings)
@@ -552,6 +599,7 @@ def _stealth_proxy_pool(args):
 # uses, wrapped at the outermost scan generator with a dedicated thread pool
 # and replay-tuple dedup -- see AsyncScanner.scan.
 _ASYNC_SYNC_ONLY_FLAGS = ("fuzz", "bav", "scenarios", "stored_inject",
+                          "discover",
                           "stored_dom", "second_order_inject")
 
 

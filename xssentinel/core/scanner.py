@@ -1131,16 +1131,19 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
 
     def _try_hpp(self, req, url, method, params, data, param,
                  is_body, bases, context):
-        """Phase 193: HTTP Parameter Pollution attempt (dalfox --hpp parity).
+        """Phase 193/196: HTTP Parameter Pollution attempt (dalfox --hpp).
 
         The parameter is duplicated -- first occurrence keeps its benign
         baseline value, second carries the marked payload.  Confirmation is
         the standard ``verify_semantic`` on the response, so nothing here
         changes verdict semantics: this only ADDS a request shape the
-        ladder never tried.  Query position only this round (form-body
-        duplication needs a raw-encoded body and a Content-Type the server
-        parses -- different mechanism, not smuggled in here).  Capped at
-        two payloads per (url, param).
+        ladder never tried.  Both positions (Phase 196): query parameters
+        duplicate as a list of pairs; form-encoded bodies duplicate as a
+        raw urlencoded string with an explicit ``application/x-www-form-
+        urlencoded`` Content-Type (a dict cannot carry duplicate keys).
+        JSON carriers are skipped -- duplicate-key semantics there belong
+        to the pre-encode machinery.  Capped at two payloads per
+        (url, param).
         Returns True when a finding was added.
         """
         tried = getattr(self, "_hpp_tried", None)
@@ -1151,7 +1154,7 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
         if key in tried:
             return False
         tried.add(key)
-        if is_body:
+        if is_body and self.json_body is not None:
             return False
         self.coverage.touch_layer(
             url, "L2_hpp", method,
@@ -1166,16 +1169,35 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
             marked = verifier.mark(payload, token)
             if marked == payload:
                 continue          # nothing stampable -> no attributable proof
-            pairs = [(k, v) for k, v in (params or {}).items()
-                     if k != param]
-            pairs.append((param, "xsssafe"))
-            pairs.append((param, marked))
-            try:
-                resp = req.request(method, url, params=pairs, data=data)
-                self._bump()
-                self.coverage.record_request(url, method)
-            except Exception:
-                continue
+            if is_body:
+                # Phase 196: form-body duplication -- a dict cannot carry
+                # duplicate keys, so the body goes out as a raw urlencoded
+                # string with an explicit Content-Type.
+                from urllib.parse import urlencode
+                body_pairs = [(k, v) for k, v in (data or {}).items()
+                              if k != param]
+                body_pairs.append((param, "xsssafe"))
+                body_pairs.append((param, marked))
+                try:
+                    resp = req.request(
+                        method, url, params=params, data=urlencode(body_pairs),
+                        headers={"Content-Type":
+                                 "application/x-www-form-urlencoded"})
+                    self._bump()
+                    self.coverage.record_request(url, method)
+                except Exception:
+                    continue
+            else:
+                pairs = [(k, v) for k, v in (params or {}).items()
+                         if k != param]
+                pairs.append((param, "xsssafe"))
+                pairs.append((param, marked))
+                try:
+                    resp = req.request(method, url, params=pairs, data=data)
+                    self._bump()
+                    self.coverage.record_request(url, method)
+                except Exception:
+                    continue
             if resp is None or token not in (resp.text or ""):
                 continue
             try:

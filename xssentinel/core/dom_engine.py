@@ -408,6 +408,7 @@ def _init_script(marker: str) -> str:
     return oSA.call(this, name, val);
   };
 
+
   // jQuery sinks (may load after this script)
   function wrapJQ(){
     if (window.jQuery && window.jQuery.fn){
@@ -496,6 +497,46 @@ def _init_script(marker: str) -> str:
 _CLIENT_JS_RE = re.compile(
     r"<script\b|on\w+\s*=|javascript:|addEventListener\(\s*['\"]message|"
     r"ng-app|v-html|dangerouslySetInnerHTML", re.I)
+
+
+def _normalize_harvest(raw: dict, url: str, max_names: int = 200,
+                       max_urls: int = 50) -> dict:
+    """Phase 196: normalize one harvest -> (names, same-origin resource URLs).
+
+    The raw evaluate result is untrusted page output: names are kept
+    non-empty strings only; resource URLs must parse as http(s) AND match
+    the target's host exactly (the operator named THIS host -- a
+    third-party analytics call is someone else's system, mirroring the
+    Phase 176l import scope rule).  Both lists dedup in first-seen order
+    and are capped.
+    """
+    from urllib.parse import urlparse
+    out: dict = {"names": [], "resource_urls": []}
+    if not isinstance(raw, dict):
+        return out
+    host = urlparse(url).netloc.lower()
+    seen_n: set = set()
+    for n in (raw.get("names") or []):
+        if isinstance(n, str) and n.strip() and n not in seen_n:
+            seen_n.add(n)
+            out["names"].append(n)
+            if len(out["names"]) >= max_names:
+                break
+    seen_u: set = set()
+    for u in (raw.get("urls") or []):
+        if not isinstance(u, str):
+            continue
+        p = urlparse(u)
+        if p.scheme not in ("http", "https") or p.netloc.lower() != host:
+            continue
+        clean = u.split("#", 1)[0]
+        if clean in seen_u:
+            continue
+        seen_u.add(clean)
+        out["resource_urls"].append(clean)
+        if len(out["resource_urls"]) >= max_urls:
+            break
+    return out
 
 
 def interaction_dispatch_js(needle: str) -> str:
@@ -936,6 +977,93 @@ class DynamicDomAnalyzer:
         # an unscoped seed would copy the session token into the storage
         # of any third-party origin the page embeds.
         self.auth_local_storage: dict = dict(auth_local_storage or {})
+
+    def harvest(self, url: str) -> dict:
+        """Phase 196: render ``url`` once and harvest the input face the
+        RENDERED page exposes.
+
+        Static mining guesses parameter names from a static wordlist; an
+        SPA builds its forms and fires its API calls in the browser, where
+        the static HTML never showed them.  One render yields:
+
+          * ``names`` -- form/textarea/select/button field names of the
+            live DOM, merged into the param-mining wordlist by the caller;
+          * ``resource_urls`` -- the URLs the page itself fetched
+            (``performance`` resource entries), same-origin filtered (the
+            operator named this host; a third-party analytics call is
+            someone else's system), deduped, capped -- SPA API endpoints
+            nobody would have guessed.
+
+        Auth state (headers/cookies/localStorage) applies so authenticated
+        pages render exactly as a victim sees them.  Best-effort: every
+        failure degrades to an empty dict.
+        """
+        empty: dict = {"names": [], "resource_urls": []}
+        if not self.available():
+            return empty
+        try:
+            browser = get_shared_browser()
+            page = browser.new_page(
+                extra_http_headers=self.auth_headers or None)
+        except Exception:
+            return empty
+        try:
+            if self.auth_cookies:
+                try:
+                    page.context.add_cookies(
+                        _auth_cookie_dicts(self.auth_cookies, url))
+                except Exception:
+                    pass
+            if self.auth_local_storage:
+                try:
+                    import json as _json
+                    from urllib.parse import urlparse as _up
+                    origin = "{0.scheme}://{0.netloc}".format(_up(url))
+                    pairs = "; ".join(
+                        "try { window.localStorage.setItem(%s, %s); "
+                        "} catch (e) {}"
+                        % (_json.dumps(k), _json.dumps(v))
+                        for k, v in self.auth_local_storage.items())
+                    page.add_init_script(
+                        "if (location.origin === %s) { %s }"
+                        % (_json.dumps(origin), pairs))
+                except Exception:
+                    pass
+            try:
+                page.goto(url, wait_until="commit",
+                          timeout=int(self.timeout * 1000))
+                page.wait_for_timeout(_DOM_SETTLE_MS)
+            except Exception:
+                pass
+            try:
+                raw = page.evaluate(r"""
+(function(){
+  var names = [];
+  try {
+    document.querySelectorAll(
+      "input[name],textarea[name],select[name],button[name]"
+    ).forEach(function(e){
+      var n = e.getAttribute("name");
+      if (n) names.push(n);
+    });
+  } catch(e) {}
+  var urls = [];
+  try {
+    (performance.getEntriesByType("resource") || []).forEach(function(r){
+      if (r && r.name) urls.push(r.name);
+    });
+  } catch(e) {}
+  return {names: names, urls: urls};
+})()
+""")
+            except Exception:
+                return empty
+        finally:
+            try:
+                page.close()
+            except Exception:
+                pass
+        return _normalize_harvest(raw, url)
 
     @staticmethod
     def available() -> bool:

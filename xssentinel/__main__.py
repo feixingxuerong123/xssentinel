@@ -435,6 +435,14 @@ def build_parser():
                             "per line (# comments). Prepended to the "
                             "built-in list for --fuzz triage and crawl-time "
                             "param mining.")
+    g_det.add_argument("--discover", action="store_true",
+                       help="Browser-rendered input discovery (Phase 196):"
+                            " render the target once in the headless"
+                            " browser; SPA form-field names merge into the"
+                            " mining wordlist and the same-origin API"
+                            " endpoints the page itself fetched are scanned"
+                            " after the main target (bounded).  Requires"
+                            " playwright; sync engine only.")
     g_det.add_argument("--upload-field", dest="upload_field", default=None,
                        action="append",
                        help="Name of a file-upload form field to multipart-"
