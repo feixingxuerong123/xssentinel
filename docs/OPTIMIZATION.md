@@ -228,32 +228,46 @@ JS config line(那本身就是 script-string sink),四例全 confirmed、safe
 ## 3. 低优先级(顺手做)
 
 > 2026-10-01 复核:以下三条清单**均属实**,3.2 的实际问题比初版写的更重。
+> 2026-10-04 复核:3.1 / 3.2 已做完(见下),3.3 只剩 SECURITY.md 联系方式
+> 这条——它必须由仓库归属者填,agent 不能替 maintainers 编一个邮箱或表单。
 
-### 3.1 死代码清理
+### 3.1 ✅ 死代码清理 —— 已完成(2026-10-01)
 
-- `tests/test_param_miner.py::_crawl_self`(第 300 行)— 无调用方
-- `tests/_test_coverage_demo.py` — 下划线前缀的非 pytest 脚本(4.2KB),
-  确认无 CI 引用后移入 `dev/`
-- `dev/verify_*_20260902.py` 系列(3 个)— 一次性验证脚本,已在
-  `docs/archive` 有对应报告,可归档
+- `tests/test_param_miner.py::_crawl_self`(原第 300 行)— **已删**。它是重构
+  残留:同一个类里两个真实测试各自内联构造 fake,全库零调用方;删后
+  `tests/test_param_miner.py` 21 例全过。
+- `tests/_test_coverage_demo.py` → **`dev/coverage_demo.py`**(git mv)。确认无
+  CI 引用(CI 走 `pytest tests/`,下划线前缀本来就不被收集)。顺手把它的端口
+  **8898 → 18456**:8898 正落在 Windows 保留段 8810-9109 里,而项目的端口
+  约定已是 18xxx 段。
+- `dev/verify_*_20260902.py`(3 个)→ **`dev/attic/`**。全库无引用。
 
-### 3.2 依赖治理
+### 3.2 ✅ 依赖治理 —— 已完成(2026-10-01)
 
-`requirements.txt` 与 `pyproject.toml` 双源并存。**实际不只是"版本漂移",
-而是语义不一致**:`requirements.txt` 把 aiohttp / playwright / flask /
-esprima / pytest* **全部平铺**成必装,而 `pyproject.toml` 是 core 3 个
-+ `[project.optional-dependencies]` 分组。两条安装路径装出来的环境完全不同
-(按 requirements.txt 装会连 dev 测试依赖一起装上)。
+原描述把问题写轻了(只说"版本漂移"),实际是**语义不一致**:`requirements.txt`
+把 aiohttp / playwright / flask / esprima / pytest* 全部平铺成必装,而
+`pyproject.toml` 是 core 3 个 + `[project.optional-dependencies]` 分组 ——
+两条安装路径装出来的环境根本不是同一种(按 requirements.txt 装会连 dev 测试
+依赖一起装上)。
 
-**改法**:`requirements.txt` 改为 `-e .[dev]` 单行委托,版本约束只留
-pyproject 一处;README 的安装段落同步(它现在两种装法都在教)。
+**已改为单行委托** `-e .[dev,async,ast,api]`,版本约束只留 pyproject 一处;
+文件顶部写清了"为什么这里不再手列包"。比原建议的 `-e .[dev]` 多带三个 extra,
+是为了与**旧文件的实际安装结果等价**(旧文件确实装了 aiohttp/flask/esprima),
+避免这次治理顺手把别人的环境降级。**刻意不含 `headless`**:playwright 还需要
+`playwright install chromium`,CI 与 README 都把它当独立可选步骤。
+
+**验证**(不是"看起来对"):`pip install -r requirements.txt --dry-run` 能解析到
+`Would install xssentinel-1.0.0`;四个 extra 名与 pyproject 逐字核对无缺失。
+
+**一处更正**:本条原文说"README 的安装段落同步(它现在两种装法都在教)"—— 实测
+不成立。README 安装段只有 `pip install -e .` 加独立的 playwright 步骤,
+**全文从不提 requirements.txt**,因此本次没动 README。
 
 ### 3.3 文档
 
-- `SECURITY.md` 的举报联系方式仍空缺("联系方式待补充"),仓库归属者需填写
-- CHANGELOG:1.0.0(2026-09-29)之后到今天的所有改动(含 lint 清零 313 条、
-  Phase 185/186、noqa 卫生门禁)**都没有条目** —— 本次补 `Unreleased` 段,
-  但后续仍需每次改动顺手记
+- `SECURITY.md` 的举报联系方式仍空缺("联系方式待补充"),**仓库归属者需填写**
+- CHANGELOG:`Unreleased` 段已于 2026-10-01 补起,现已记到 Phase 197;
+  后续仍需每次改动顺手记
 
 ---
 

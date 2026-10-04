@@ -344,6 +344,21 @@
   教训)→ 迁 18896;新增 `--sample N` 确定性分层切片、被比工具版本戳,以及
   `engine_fingerprint_start/end` —— 我方每条用例都是新起子进程重新 import 引擎,
   树在动的时候逐例数字没法归因,本轮两次作废的 run 就是靠它确认的。
+- **依赖双源治理(`requirements.txt`,2026-10-01)**:改为 `-e .[dev,async,ast,api]`
+  单行委托,版本约束只留 `pyproject.toml` 一处。此前它把 aiohttp / playwright /
+  flask / esprima / pytest* 全部平铺成必装,与 pyproject 的 core + extras 分组
+  **语义不一致** —— 两条安装路径装出来的环境不是同一种(按 requirements.txt 装
+  会连 dev 测试依赖一起装上)。比文档原建议的 `-e .[dev]` 多带三个 extra,是为了
+  与旧文件的**实际安装结果等价**,避免治理顺手把别人的环境降级;刻意不含
+  `headless`,因为 playwright 还需 `playwright install chromium`,CI 与 README 都
+  把它当独立可选步。已用 `pip install -r requirements.txt --dry-run` 验证可解析
+  (`Would install xssentinel-1.0.0`),四个 extra 名与 pyproject 逐字核对无缺失。
+- **死代码清理(2026-10-01)**:删 `tests/test_param_miner.py::_crawl_self`
+  (重构残留 —— 同一个类里两个真实测试各自内联构造 fake,全库零调用方;删后该
+  文件 21 例全过);`tests/_test_coverage_demo.py` → `dev/coverage_demo.py`,并把
+  它自带的端口 **8898 → 18456**(8898 正落在 Windows 保留段 8810-9109 内,与上条
+  端口迁移是同一个坑);`dev/verify_*_20260902.py` 三个一次性验证脚本归档进
+  `dev/attic/`。
 
 ## [1.0.0] - 2026-09-29
 
