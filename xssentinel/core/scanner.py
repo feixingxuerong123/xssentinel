@@ -1227,7 +1227,9 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
                 "detail": _det,
                 "evidence_class": _cls,
                 "headless": None,
-                "param_in": "query",
+                # the position the payload actually went out in: a body probe
+                # recorded as "query" makes the PoC reproduce the wrong place
+                "param_in": "body" if is_body else "query",
                 "proof": _proof(resp, method, param, marked),
             }))
             self.coverage.record_finding(url, method)

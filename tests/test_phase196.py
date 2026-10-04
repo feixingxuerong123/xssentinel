@@ -18,6 +18,7 @@ import sys
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import urlsplit
 
 import pytest
 
@@ -112,8 +113,13 @@ def test_harvest_names_and_resources():
             assert name in res["names"], (name, res)
         assert any(u.startswith(base + "/api/comments")
                    for u in res["resource_urls"]), res
-        assert all(u.split("/")[2] == res["resource_urls"] and True
-                   for u in res["resource_urls"][:1])
+        # same-origin is the whole authorization point: every harvested
+        # resource must carry THIS host, nothing else (the first draft of this
+        # line compared a netloc string against the whole list, which can never
+        # be true -- an assertion that cannot pass proves nothing)
+        base_netloc = base.split("//", 1)[1]
+        assert all(urlsplit(u).netloc == base_netloc
+                   for u in res["resource_urls"]), res
     finally:
         server.shutdown()
         server.server_close()
@@ -184,7 +190,11 @@ def test_hpp_body_skips_json_carrier(hpp_body_site):
     from xssentinel.core.scanner import Scanner
 
     sc = Scanner(requester=Requester(timeout=8), use_headless=False,
-                 verbose=False, json_body={"q": "probe"})
+                 verbose=False)
+    # json_body is an attribute the request shape sets (Scanner.__init__ has no
+    # such parameter); _try_hpp's JSON-carrier skip guard reads self.json_body,
+    # so that is what has to carry the JSON container here.
+    sc.json_body = {"q": "probe"}
     ok = sc._try_hpp(sc.req, f"{hpp_body_site}/write", "POST",
                      {}, {}, "q", True,
                      [{"payload": "<svg onload=alert(1)>"}], "html_element")
