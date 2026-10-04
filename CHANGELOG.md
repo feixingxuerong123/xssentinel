@@ -359,6 +359,22 @@
   它自带的端口 **8898 → 18456**(8898 正落在 Windows 保留段 8810-9109 内,与上条
   端口迁移是同一个坑);`dev/verify_*_20260902.py` 三个一次性验证脚本归档进
   `dev/attic/`。
+- **sandbox.py 第一刀拆分(纯移动,docs 1.3)**:2395 行 → `sandbox_common.py`
+  (136 行,两边共用的 Node / Doc / VOID / serialize_text 等 7 个名)+
+  `sandbox_parser.py`(1125 行,`_Parser` 与其 32 个专属表)+ `sandbox.py`
+  (1320 行,判定半边与 CLI)。依赖严格单向 `common ← parser ← sandbox`,无循环。
+  选**兄弟模块**而非 `sandbox/` 包(沿用 `scanner.py` + `scanner_crawl.py` 的既有
+  惯例),是为了**外部 import 路径一行不改**,包括 `benchmark/probe_svg_case.py`
+  直接引用的私有名 `_SVG_ATTR_CASE` / `_MATHML_ATTR_CASE`,以及 `probe_breakout.py`
+  读的 `sandbox.FOREIGN_BREAK`。
+  搬运过程中识别并修掉三个"搬家伤":① 定义上方的 `#:` 来源注释会随行区间被丢掉
+  (第一版丢了 362 行,而那正是写着"MEASURED, not recalled from the spec"和数据出处
+  benchmark 的部分);② 文件尾的 `if __name__ == "__main__":` 不属于任何
+  def/Assign,第一版直接删掉了 `python -m xssentinel.core.sandbox` 这个 CLI,
+  **而没有任何测试发现**;③ 分区顺序必须**先取 common 闭包再划 parser**,反过来会让
+  `serialize_text → NO_ESCAPE_TEXT` 变成 common 对 parser 的反向依赖,直到运行时
+  才炸 `NameError`。验收:`ruff check .` 全绿、引用 sandbox 的 12 个测试文件
+  **174 例全过**(与拆分前基线逐条一致)、CLI 实跑通过(`state=LIVE`)。
 
 ## [1.0.0] - 2026-09-29
 

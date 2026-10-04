@@ -166,15 +166,49 @@ findings_count 与拆分前完全一致,请求数 7415 → 7415。
 "边搬边改"的提交里。本轮唯一一处改逻辑(`sourcemap.disclosure` 的 emit 形状)
 是在等价性取证**之后**单独做的,标尺重跑即如实报出该方法哈希变化。
 
-### 1.3 sandbox.py 拆分(2395 行)
+### 1.3 sandbox.py 拆分 —— 第一刀已完成(2395 → 1320 行)
 
 **问题**:纯 Python 浏览器沙箱承担了"HTML 解析 + JS 模拟 + DOM 状态机"
 三个职责,是评分体系的核心依赖(1680-case oracle 的对照臂),单文件
 改动风险高。
 
-**改法**:按职责拆 `sandbox/` 包:`parser.py`(HTML 重放)、`js_vm.py`
-(JS 求值模拟)、`dom_state.py`(DOM 树与事件)、`__init__.py`(公共 API
-再导出,外部调用方零改动)。
+**已完成(2026-10-04,第一刀:纯移动)**。走的是**兄弟模块**而不是原文建议的
+`sandbox/` 包 —— 项目本来就有 `scanner.py` + `scanner_crawl.py` 这个惯例,而且
+保持 `sandbox.py` 仍是模块可以让**每一个**外部 import 路径零改动:
+
+| 文件 | 行数 | 职责 |
+|---|---|---|
+| `sandbox_common.py` | 136 | 两边都要的 7 个名:Node / Doc / VOID / serialize_text 等 |
+| `sandbox_parser.py` | 1125 | `_Parser` + 32 个专属表与 helper(tokeniser / 建树) |
+| `sandbox.py` | 1320 | 判定半边:_handler_state / find_live_nodes / judge / CLI |
+
+依赖严格单向:`sandbox_common ← sandbox_parser ← sandbox`,无循环。
+
+**为什么必须有个 common 层**:`_Parser` 依赖 `Node` / `VOID`,判定半边也依赖它们;
+只切两半则必然出现 `sandbox → sandbox_parser → sandbox` 的环。
+
+**三个坑(下一刀直接复用,别重踩)**:
+1. **注释会被悄悄丢掉**。按定义自身的行号区间搬,会漏掉定义**上方**的 `#:` 属性注释
+   —— 第一版丢了 **362 行**,而那些正是写数据来源的部分("MEASURED, not recalled
+   from the spec"、"benchmark/probe_breakout.py → foreign_breakout.json")。必须把定义
+   连同其上方的注释块一起搬。
+2. **文件尾会被丢掉**。`if __name__ == "__main__":` 不属于任何 def/Assign,第一版直接
+   删了 `python -m xssentinel.core.sandbox` 这个 CLI,**而没有任何测试发现**。
+3. **分区顺序不能反**。先划 parser 再补 common,会得到"common 反向依赖 parser"
+   (`serialize_text` 用到被判给 parser 的 `NO_ESCAPE_TEXT`),**运行时才**炸
+   `NameError`。正确顺序:**先取 common 的闭包,再划 parser**。
+
+**验收(已做)**:`ruff check .` 全绿;引用 sandbox 的 12 个测试文件 **174 例全过**
+(与拆分前基线逐条一致);`python -m xssentinel.core.sandbox --payload ...` 实跑通过
+(`state=LIVE`);`benchmark/probe_svg_case.py` 对私有名 `_SVG_ATTR_CASE` 的直接
+import 仍可用 —— 它靠的是 `sandbox.py` 里带原因的 re-export,而不是运气。
+
+**下一刀(未做)**:`sandbox.py` 剩 1320 行里还可拆出 `js_vm`(脚本体能否编译、token
+落在代码还是数据串)与 `dom_state`(事件语义)。**开刀前先把这轮的搬运脚本
+`dev/sandbox_split.py` 改成可指定目标的通用入口**,别再临时写一遍。
+
+**注**:原文给出的 `sandbox/` 包 + `__init__.py` 再导出方案已被替代 —— 用兄弟模块后
+根本不需要 `__init__` 再导出表,这正好省掉"重导出清单会忘记某个私有名"的风险。
 
 **验收**:`tests/test_sandbox_fidelity.py` 8/8;`__init__.py` 再导出保持
 现有 import 路径全部可用(回归测试锁)。
