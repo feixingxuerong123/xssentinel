@@ -1206,6 +1206,18 @@ def verify_headless(url: str, method: str, params: dict | None,
                                      timeout=timeout * 1000)
         except Exception:
             pass
+        # Phase 193: synthetic interaction dispatch.  Requires-interaction
+        # payloads (onpointerdown/onclick/... from the interaction_events
+        # corpus) are live attributes once reflected; a browser never clicks
+        # by itself, so without this the dialog can only fire for load-time
+        # handlers.  Dispatch the bounded event set on the token-bearing
+        # elements, give sinks a beat, THEN judge the dialogs.
+        try:
+            from .dom_engine import interaction_dispatch_js
+            page.evaluate(interaction_dispatch_js(token))
+            page.wait_for_timeout(300)
+        except Exception:
+            pass
         # Phase 46 (pentest-readiness): the previous rule
         # ``any(token in m) or len(fired) > 0`` confirmed ANY dialog as
         # execution -- a page that pops its own alert() (cookie banners,

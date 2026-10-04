@@ -42,7 +42,8 @@ def _init_script(marker: str) -> str:
   var MARKER = "__MARKER__";
   window.__xss_dom_hits = [];
   function hit(sink, snippet){
-    window.__xss_dom_hits.push({sink: sink, snippet: String(snippet||'').slice(0,200)});
+    window.__xss_dom_hits.push({sink: sink, snippet: String(snippet||'').slice(0,200),
+                                via: window.__xss_dispatching ? 'interaction' : 'auto'});
     try { alert(MARKER); } catch(e){}
   }
   // Phase 144: do NOT require a primitive string.  Angular (Trusted Types)
@@ -495,6 +496,69 @@ def _init_script(marker: str) -> str:
 _CLIENT_JS_RE = re.compile(
     r"<script\b|on\w+\s*=|javascript:|addEventListener\(\s*['\"]message|"
     r"ng-app|v-html|dangerouslySetInnerHTML", re.I)
+
+
+def interaction_dispatch_js(needle: str) -> str:
+    """Phase 193: JS that dispatches synthetic interaction events on every
+    element carrying ``needle`` (the probe token / DOM marker).
+
+    Requires-interaction handlers (``onpointerdown``/``onclick``/... from
+    the ``interaction_events`` corpus) are live attributes the moment they
+    reflect -- the only thing missing is the interaction, which an
+    attacker performs and a scanner must simulate.  DOM Invader clicks;
+    we dispatch the bounded event set below on each marker-bearing
+    element.  Untrusted dispatch (``isTrusted=false``) means handlers that
+    check it under-fire -- an under-measurement, never an over-claim.
+
+    Events are bounded (first 30 matching elements among the first 500)
+    and the whole loop is one ``page.evaluate`` call.  While dispatching,
+    ``window.__xss_dispatching`` is set so the sink harness can attribute
+    hits to an interaction.
+    """
+    return r"""
+(function(){
+  var NEEDLE = __NEEDLE__;
+  var EVTS = [["pointerdown","PointerEvent"],["pointerup","PointerEvent"],
+    ["pointermove","PointerEvent"],["pointerover","PointerEvent"],
+    ["pointerout","PointerEvent"],["pointerenter","PointerEvent"],
+    ["mousedown","MouseEvent"],["mouseup","MouseEvent"],
+    ["mousemove","MouseEvent"],["mouseover","MouseEvent"],
+    ["mouseout","MouseEvent"],["mouseenter","MouseEvent"],
+    ["dblclick","MouseEvent"],["wheel","WheelEvent"],["click","MouseEvent"],
+    ["copy","ClipboardEvent"],["paste","ClipboardEvent"],
+    ["dragstart","DragEvent"],["dragover","DragEvent"],["drop","DragEvent"],
+    ["touchstart","Event"],["touchmove","Event"],
+    ["submit","Event"],["invalid","Event"],["select","Event"]];
+  window.__xss_dispatching = 1;
+  var n = 0;
+  try {
+    var all = document.body ? document.body.querySelectorAll("*") : [];
+    var els = [];
+    for (var i = 0; i < all.length && els.length < 30; i++){
+      if (i >= 500) break;
+      try {
+        if ((all[i].outerHTML || "").indexOf(NEEDLE) !== -1) els.push(all[i]);
+      } catch(e){}
+    }
+    for (var k = 0; k < els.length; k++){
+      var el = els[k];
+      for (var j = 0; j < EVTS.length; j++){
+        try {
+          var C = window[EVTS[j][1]] || Event;
+          el.dispatchEvent(new C(EVTS[j][0], {bubbles: true, cancelable: true}));
+          n++;
+        } catch(e){
+          try { el.dispatchEvent(new Event(EVTS[j][0], {bubbles: true})); n++; }
+          catch(e2){}
+        }
+      }
+      try { if (el.focus) el.focus(); } catch(e){}
+    }
+  } catch(e) {}
+  window.__xss_dispatching = 0;
+  return n;
+})()
+""".replace("__NEEDLE__", json.dumps(needle))
 
 
 # ---------------------------------------------------------------------------
@@ -1134,6 +1198,27 @@ class DynamicDomAnalyzer:
                         _log.debug("dom: probe %r skipped for %s",
                                    probe.get("kind"), url, exc_info=True)
                         continue
+                    # Phase 193: synthetic interaction dispatch.  Reflected
+                    # requires-interaction handlers (onpointerdown/onclick/...)
+                    # are live attributes the moment the page renders; the
+                    # only missing ingredient is the interaction.  Dispatch
+                    # the bounded event set on marker-bearing elements, then
+                    # re-read the sink log -- hits carry via='interaction'.
+                    # Phase 193 (measured, the hard way): the dispatch JS
+                    # itself CONTAINS the marker (the NEEDLE line), so the
+                    # eval hook would record the dispatch source as a
+                    # page-initiated eval on EVERY page -- a dozen strict-gate
+                    # FPs.  Raise the Phase-162 harness flag around it, same
+                    # contract as the window_name probe below.
+                    try:
+                        page.evaluate("window.__xss_dom_harness = 1;")
+                        try:
+                            page.evaluate(interaction_dispatch_js(marker))
+                            page.wait_for_timeout(200)
+                        finally:
+                            page.evaluate("window.__xss_dom_harness = 0;")
+                    except Exception:
+                        pass
                     try:
                         hits = page.evaluate("window.__xss_dom_hits || []")
                     except Exception:
@@ -1161,6 +1246,11 @@ class DynamicDomAnalyzer:
                                 "(https://attacker.example / sandboxed null) "
                                 "and still reached the sink, so origin "
                                 "validation is absent or ineffective.")
+                        if h.get("via") == "interaction":
+                            findings[-1]["detail"] += (
+                                " Sink fired after synthetic interaction "
+                                "events were dispatched on the injected "
+                                "element (requires-interaction handler).")
             finally:
                 # Pages are disposable; the shared browser is NOT closed.
                 try:

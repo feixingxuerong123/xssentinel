@@ -1293,6 +1293,76 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
                     )
                     break
 
+        # Phase 193: HPP (HTTP Parameter Pollution, sync _try_hpp parity).
+        # The parameter is sent twice -- first occurrence benign, second the
+        # payload; a filter inspecting only the first occurrence passes the
+        # request while the backend renders the payload occurrence.  WAF
+        # gate mirrors sync (no WAF, no reason); query position only this
+        # round; capped at two payloads per (url, param).
+        if self.waf_name and not param_confirmed and not is_body:
+            _htried = getattr(self, "_hpp_tried", None)
+            if _htried is None:
+                _htried = set()
+                self._hpp_tried = _htried
+            if (url, param) not in _htried:
+                _htried.add((url, param))
+                for _cand in cands[:2]:
+                    _htok = "xssv_" + secrets.token_hex(4)
+                    _hpay = verifier.mark(_cand, _htok)
+                    if _hpay == _cand:
+                        continue
+                    _hpairs = [(k, v) for k, v in (params or {}).items()
+                               if k != param]
+                    _hpairs.append((param, "xsssafe"))
+                    _hpairs.append((param, _hpay))
+                    try:
+                        async with self._semaphore:
+                            await self._throttle(url)
+                            async with session.request(
+                                method, url, params=_hpairs,
+                                headers=self._req_headers(self.headers),
+                                proxy=self._next_proxy(),
+                                **_body_kwargs(data),
+                            ) as hresp:
+                                _htext = await hresp.text()
+                                _hhdrs = dict(
+                                    getattr(hresp, "headers", None) or {})
+                                self.requests_made += 1
+                                self._record_status(
+                                    getattr(hresp, "status", 200))
+                    except (BudgetExhausted, CircuitOpen):
+                        raise
+                    except Exception:
+                        continue
+                    if not _htext or _htok not in _htext:
+                        continue
+                    _hv = await asyncio.to_thread(
+                        verifier.verify_semantic, _htext, _htok,
+                        response_headers=_hhdrs)
+                    if not _hv.get("confirmed"):
+                        continue
+                    _hidx = _htext.find(_htok)
+                    yield Finding(
+                        url=url, method=method, param=param,
+                        context=_hv.get("context") or context,
+                        payload=_hpay,
+                        severity="high",
+                        evidence=_htext[max(0, _hidx - 30):
+                                        _hidx + len(_htok) + 30],
+                        type="reflected",
+                        confidence="high",
+                        transform=["hpp"],
+                        param_in="query",
+                        evidence_class=EVIDENCE_MODEL,
+                        detail=(
+                            "HPP: the parameter was sent twice (first "
+                            "occurrence benign, second the payload) and "
+                            "the payload-carrying occurrence is what the "
+                            "application rendered -- a filter inspecting "
+                            "only the first occurrence was bypassed"),
+                    )
+                    break
+
         # Phase 132: L7 parameter layers (mutation / DOM clobber / template
         # / polyglot / markdown).  Sync reaches these at the end of
         # ``_scan_param``; async stopped after the CSP-nonce block, so the

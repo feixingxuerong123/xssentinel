@@ -468,6 +468,32 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
       每案例约 1s,双引擎零误报零漏报。dev/WEDGE_test_benchmark_20260927.md
       已改写为结案记录(含"connect 挂起先查客户端连的是谁"的经验)。
 
+- [x] **193 HPP 探针 + 交互事件可测量化(竞品吸收第五轮)**:
+      ① **HPP 参数污染探针**(dalfox `--hpp`):同参数投递两次 —— 首现 benign、
+      次现 payload;后端取首/取尾不一致,只查首次出现的过滤器看到 benign 放行,
+      应用渲染的却是 payload。sync `_try_hpp` + async 对位块,双门禁
+      (WAF 存在 + 标准梯子未确认),query 位本轮,上限 2/(url,param),确认走
+      标准 verify_semantic(transform=["hpp"],EVIDENCE_MODEL)。层名 L2_hpp
+      一次注册两处(coverage.LAYERS + layer_coverage 矩阵,187 的教训)。
+      测试:首现过滤服务器(sync 直调 + async 专用桩驱动 _probe_param)+
+      取首值后端反例 + (url,param) 去重。
+      ② **requires-interaction 事件可测量化**(该组原覆盖 15.4%,README
+      方法论里它"仅参考"的根因是不可测量):`interaction_events` 语料 27 条
+      (pointer/mouse/clipboard/drag/touch/submit/select,宿主轮换)+ DOM
+      引擎 `interaction_dispatch_js`(token/marker 承载元素上派发有界事件集,
+      isTrusted=false 只会欠测不会过报)+ 双接线(verify_headless 派发后判
+      dialog;dom 引擎每探针派发后重读 sink 日志,hit 带 via='interaction'
+      并写进 detail)。复测 requires_interaction events **15.4%→49.0%**
+      (剩余为 pause/reset/drag 单发等长尾,记账不追)。
+      **门禁抓到 12/11 FP,根因即修**:派发 JS 自身含 NEEDLE 行,eval 钩子把
+      派发器源码记成页面发起的 eval 命中 —— strict 切片 12 个"反射原始+浏览器
+      防御"neg 用例全数翻红。修法沿用 Phase 162 契约(派发前后抬/清
+      `__xss_dom_harness` 旗标,旗标只护 eval 钩子、交互期 sink 命中不受影
+      响),复测双引擎 **TP36/FP0/FN0 F1=1.0**。
+      验证:phase193 10 例(含 2 例真 Chromium 交互确认)+ 跨 phase 106 +
+      async/MCP 46 + stored/static 62 全绿;range4 门禁过;ruff 全过;
+      全量分批门禁随跑随记(_regress_phase193_full.log)。
+
 ## 环境配置
 
 - 依赖: requirements.txt;测试: `python tests/run_all_batched.py --quiet`(2026-09-25 实测

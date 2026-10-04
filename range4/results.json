@@ -1,7 +1,7 @@
 {
   "meta": {
     "range": "range4",
-    "generated": "2026-10-03 22:20:02",
+    "generated": "2026-10-04 12:22:24",
     "engines": [
       "sync",
       "async"
@@ -34,7 +34,7 @@
       "verdict": "TP",
       "findings": 12,
       "confirmed": 12,
-      "elapsed_s": 12.8,
+      "elapsed_s": 16.0,
       "findings_detail": [
         {
           "type": "reflected",
@@ -117,7 +117,7 @@
       "verdict": "TN",
       "findings": 0,
       "confirmed": 0,
-      "elapsed_s": 8.2,
+      "elapsed_s": 10.2,
       "findings_detail": [],
       "error": ""
     },
@@ -127,7 +127,7 @@
       "verdict": "TP",
       "findings": 12,
       "confirmed": 12,
-      "elapsed_s": 12.4,
+      "elapsed_s": 16.0,
       "findings_detail": [
         {
           "type": "reflected",
@@ -210,7 +210,7 @@
       "verdict": "TN",
       "findings": 0,
       "confirmed": 0,
-      "elapsed_s": 8.3,
+      "elapsed_s": 10.2,
       "findings_detail": [],
       "error": ""
     },
@@ -220,7 +220,7 @@
       "verdict": "TP",
       "findings": 23,
       "confirmed": 23,
-      "elapsed_s": 14.9,
+      "elapsed_s": 23.8,
       "findings_detail": [
         {
           "type": "reflected",
@@ -369,7 +369,7 @@
       "verdict": "TN",
       "findings": 0,
       "confirmed": 0,
-      "elapsed_s": 8.4,
+      "elapsed_s": 10.4,
       "findings_detail": [],
       "error": ""
     },
@@ -379,7 +379,7 @@
       "verdict": "TP",
       "findings": 23,
       "confirmed": 23,
-      "elapsed_s": 14.9,
+      "elapsed_s": 23.9,
       "findings_detail": [
         {
           "type": "reflected",
@@ -528,7 +528,7 @@
       "verdict": "TN",
       "findings": 0,
       "confirmed": 0,
-      "elapsed_s": 8.4,
+      "elapsed_s": 10.3,
       "findings_detail": [],
       "error": ""
     }

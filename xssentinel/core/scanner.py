@@ -800,6 +800,18 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
             self._try_position_shift(
                 req, url, method, params, data, param, is_body,
                 bases, context, waf_info, transform_priority)
+        # Phase 193: HPP (HTTP Parameter Pollution, dalfox --hpp parity).
+        # Same parameter sent TWICE -- first occurrence benign, second the
+        # payload.  Backends disagree about which occurrence wins (PHP/ASP
+        # take the last, some stacks the first) while a filter that inspects
+        # only the first occurrence sees the benign value and passes the
+        # request through.  Same WAF gate as the position shift, and the
+        # standard ladder has already failed here.
+        if (not confirmed and not marker_escaped and not csp_strict
+                and waf_info and waf_info.get("waf")):
+            confirmed = self._try_hpp(
+                req, url, method, params, data, param, is_body,
+                bases, context) or confirmed
         # L5 Blind XSS: inject out-of-band callback payloads when an OOB
         # listener is configured. Confirmation happens later in collect_oob().
         if self.oob:
@@ -882,7 +894,12 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
                               # pageshow, animation/transition family,
                               # onsecuritypolicyviolation, ...).  Small
                               # slice -- they ride leftover budget only.
-                              + _sample("portswigger_events", 2))
+                              + _sample("portswigger_events", 2)
+                              # Phase 193: requires-interaction handlers
+                              # (pointer/mouse/clipboard/drag family) --
+                              # live attributes once reflected; the headless
+                              # verifier dispatches the synthetic events.
+                              + _sample("interaction_events", 2))
             # script_block reflection: also draw from script-shaped corpora
             # (service worker / postMessage / JSONP / prototype gadgets).
             if context == "script_block":
@@ -1109,6 +1126,91 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
             if self.verbose:
                 _log.debug("    [+] CSP gadget chain executed (%s)",
                            _g["gadget"])
+            return True
+        return False
+
+    def _try_hpp(self, req, url, method, params, data, param,
+                 is_body, bases, context):
+        """Phase 193: HTTP Parameter Pollution attempt (dalfox --hpp parity).
+
+        The parameter is duplicated -- first occurrence keeps its benign
+        baseline value, second carries the marked payload.  Confirmation is
+        the standard ``verify_semantic`` on the response, so nothing here
+        changes verdict semantics: this only ADDS a request shape the
+        ladder never tried.  Query position only this round (form-body
+        duplication needs a raw-encoded body and a Content-Type the server
+        parses -- different mechanism, not smuggled in here).  Capped at
+        two payloads per (url, param).
+        Returns True when a finding was added.
+        """
+        tried = getattr(self, "_hpp_tried", None)
+        if tried is None:
+            tried = set()
+            self._hpp_tried = tried
+        key = (url, param)
+        if key in tried:
+            return False
+        tried.add(key)
+        if is_body:
+            return False
+        self.coverage.touch_layer(
+            url, "L2_hpp", method,
+            detail=f"param='{param}' duplicated: first occurrence benign, "
+                   f"second carries the payload")
+        for base in bases[:2]:
+            self._check_cancel()
+            payload = base.get("payload") if isinstance(base, dict) else None
+            if not payload:
+                continue
+            token = "xssv_" + secrets.token_hex(4)
+            marked = verifier.mark(payload, token)
+            if marked == payload:
+                continue          # nothing stampable -> no attributable proof
+            pairs = [(k, v) for k, v in (params or {}).items()
+                     if k != param]
+            pairs.append((param, "xsssafe"))
+            pairs.append((param, marked))
+            try:
+                resp = req.request(method, url, params=pairs, data=data)
+                self._bump()
+                self.coverage.record_request(url, method)
+            except Exception:
+                continue
+            if resp is None or token not in (resp.text or ""):
+                continue
+            try:
+                nv = verifier.verify_semantic(
+                    resp.text or "", token,
+                    response_headers=dict(getattr(resp, "headers", None)
+                                          or {}))
+            except Exception:
+                continue
+            if not nv.get("confirmed"):
+                continue
+            _cls, _conf, _det = _grade_evidence(
+                None, "high",
+                ("HPP: the parameter was sent twice (first occurrence "
+                 "benign, second the payload) and the payload-carrying "
+                 "occurrence is what the application rendered -- a filter "
+                 "inspecting only the first occurrence was bypassed"),
+                model_judged=True)
+            self._add(Finding(**{
+                "url": url, "method": method, "param": param,
+                "type": "reflected",
+                "context": nv.get("context") or context,
+                "payload": marked,
+                "transform": ["hpp"],
+                "severity": "high",
+                "confidence": _conf,
+                "detail": _det,
+                "evidence_class": _cls,
+                "headless": None,
+                "param_in": "query",
+                "proof": _proof(resp, method, param, marked),
+            }))
+            self.coverage.record_finding(url, method)
+            if self.verbose:
+                _log.debug("    [+] HPP confirmed (%s)", param)
             return True
         return False
 

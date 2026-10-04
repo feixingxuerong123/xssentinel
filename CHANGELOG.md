@@ -84,6 +84,15 @@
   标签作宿主 + other 组 6 事件),参照基准 no_interaction events
   **23.1%→100%**、tags 71.4%→100%。不动 `html_element` 主族(205 条步长
   采样点零位移),双引擎各取样 2 条只花剩余预算;家族大小入测试钉。
+- **HPP 探针 + 交互事件可测量化(Phase 193)**:① 同参数投递两次的
+  HPP 探针(dalfox `--hpp`;首现 benign 次现 payload,只查首现的过滤器被
+  绕过),双引擎 WAF 门控 + 标准验证 machinery;② requires-interaction
+  事件可测量化 —— `interaction_events` 语料 27 条 + DOM 引擎/
+  verify_headless 在 token 承载元素上派发合成事件集,headless 确认与
+  dom_dynamic 命中从此覆盖 onpointerdown/onclick/ondragstart 族
+  (参照基准 requires_interaction events 15.4%→49.0%)。门禁抓到并修复:
+  派发 JS 自身含 marker 被 eval 钩子记为命中(12 个 strict 切片 FP),
+  按既有 harness 旗标契约隔离。
 
 ### Fixed
 

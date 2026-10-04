@@ -69,7 +69,10 @@ _CROSS_CONTEXT: dict[str, list[tuple[str, int]]] = {
                      # Phase 189: PortSwigger no-interaction event handlers
                      # (hashchange/pageshow/animation family/CSP-violation
                      # self-trigger).  Small slice, rides leftover budget.
-                     ("portswigger_events", 2)],
+                     ("portswigger_events", 2),
+                     # Phase 193: requires-interaction handlers; the
+                     # headless verifier dispatches the synthetic events.
+                     ("interaction_events", 2)],
     "script_block": [("service_worker", 2), ("postmessage_source", 2),
                      ("prototype_gadget", 2)],
 }

@@ -75,6 +75,7 @@ LAYERS: list[tuple[str, str, str]] = [
     # and to the Phase 111 coverage matrix (which reads this table).
     ("L7_csp_nonce",       "CSP nonce leak exploitation",      "L7"),
     ("L7_csp_gadget",      "CSP allowlist gadget chain",       "L7"),
+    ("L2_hpp",             "HTTP Parameter Pollution",         "L2"),
     ("L7_css_injection",   "CSS injection",                    "L7"),
     ("L7_dangling_markup", "Dangling markup injection",        "L7"),
     ("L7_import_map",      "Import map hijacking",             "L7"),
