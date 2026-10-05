@@ -123,6 +123,9 @@
   findings 视图缺主循环裁定,polyglot fallback 只在 async 误发 —— 已修
   (shim seed + param_confirmed 哨兵),并修复两引擎 polyglot finding
   缺 confidence 键的报告元数据缺陷。
+- **报告层性能基线(Phase 199,OPTIMIZATION 2.2)**:1000 条真实形状合成
+  finding 八格式实测 —— html 0.053s,比 2s 验收线快 38 倍,报告层不是
+  瓶颈,不做重写;基准脚本 `benchmark/report_load.py` 与结果入库可复跑。
 - **外部效度对照第一次量出来(Phase 196b)**:`benchmark/run_cross_tool.py` 让
   XSSentinel / dalfox / nuclei 在**同一批靶**上跑分。文档 1.0 长期写"第三方对照
   需换机器",本机复核推翻了它:GitHub API 与 raw 可达、Go 代理(goproxy.cn)能

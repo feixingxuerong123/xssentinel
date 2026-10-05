@@ -665,3 +665,13 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
       契约疏漏、门禁抓到即修 —— test_async_param_stage_parity 的替身缺
       `param_confirmed` kwarg(TypeError 被吞成"层未达")与 sentinel
       Finding 缺 `evidence_class`(evidence-coverage 门预算 0),复跑全绿。
+
+- [x] **199 报告层性能基线(OPTIMIZATION 2.2,结论:不做)**:2.2 自己的
+      方法论是"先建基准,没有基线就别谈优化了多少"。`benchmark/report_load.py`
+      生成 N 条真实形状合成 finding(_record 字段全带,类型/上下文/严重度/
+      证据级混合),八格式实测:**html 0.053s @1000 findings**(1.37MB),
+      比 2s 验收线快 38 倍 —— 报告层不是瓶颈,f-string→join 重写不做。
+      基准脚本 + 结果 JSON 入库可复跑;报告层再演进时先重测。
+      测试 test_report_load.py 2 例(全格式跑通 + 合成 finding 确定性/字段
+      完整);report 套件 67 例回归绿。**未跑全量门禁:零生产代码改动**
+      (新增基准脚本 + 测试 + 文档)。

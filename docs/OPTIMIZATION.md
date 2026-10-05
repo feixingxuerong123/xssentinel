@@ -277,8 +277,12 @@ import 仍可用 —— 它靠的是 `sandbox.py` 里带原因的 re-export,而�
 **改法**:HTML 构建从 f-string 拼接改 `list.append` + `"".join`;
 大报告 benchmark 化(`benchmark/` 加一例 1000-finding 合成负载)。
 
-**验收**:1000 findings 的 HTML 生成 < 2s(**当前未测量,先建基准**——
-没有基线就别谈"优化了多少")。
+> **已测(2026-10-05,`benchmark/report_load.py`,结论:不做)**:1000 条
+> 真实形状合成 finding(类型/上下文/严重度/证据级混合,proof/headless 全带),
+> 八格式实测 —— html **0.053s**(1.37MB)、sarif 0.069s、burp 0.077s、json
+> 0.044s、其余 <0.02s。HTML 比 2s 验收线快 **38 倍**,报告层不是瓶颈;
+> f-string→join 重写属于没有测量支撑的优化,不做。基准脚本与结果 JSON
+> 入库可复跑,报告层再演进时先重测。
 
 ### 2.3 靶场覆盖扩展
 

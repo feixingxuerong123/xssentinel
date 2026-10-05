@@ -1,0 +1,38 @@
+{
+  "findings": 1000,
+  "seed": 20261005,
+  "results": {
+    "html": {
+      "seconds": 0.0533,
+      "bytes": 1368640
+    },
+    "json": {
+      "seconds": 0.044,
+      "bytes": 1227961
+    },
+    "csv": {
+      "seconds": 0.0122,
+      "bytes": 394549
+    },
+    "sarif": {
+      "seconds": 0.0686,
+      "bytes": 1068661
+    },
+    "junit": {
+      "seconds": 0.011,
+      "bytes": 304807
+    },
+    "markdown": {
+      "seconds": 0.0197,
+      "bytes": 597863
+    },
+    "burp": {
+      "seconds": 0.0772,
+      "bytes": 2445344
+    },
+    "nuclei": {
+      "seconds": 0.0625,
+      "bytes": 843856
+    }
+  }
+}
