@@ -116,6 +116,13 @@
   扩展到 form 体(裸 urlencoded 字符串重复参数,dict 无法携带重复键),
   JSON 载体仍归 pre-encode 管线。后续修复:sync body 位 finding 的
   `param_in` 曾硬编码 query(PoC 重放错位),已修并加 async 专项回归锁。
+- **双引擎行为对等门(Phase 198,OPTIMIZATION 2.1 落地)**:12 端点反射
+  切片双引擎同预算对跑,比较 (type, severity, confidence) 多重集 ——
+  验收按 2.1 硬要求双向通过(摘掉 async 的 content-type 降置信 / concat
+  重试,门各自变红)。门当天抓到第一类新分歧:async L7 层 shim 的
+  findings 视图缺主循环裁定,polyglot fallback 只在 async 误发 —— 已修
+  (shim seed + param_confirmed 哨兵),并修复两引擎 polyglot finding
+  缺 confidence 键的报告元数据缺陷。
 - **外部效度对照第一次量出来(Phase 196b)**:`benchmark/run_cross_tool.py` 让
   XSSentinel / dalfox / nuclei 在**同一批靶**上跑分。文档 1.0 长期写"第三方对照
   需换机器",本机复核推翻了它:GitHub API 与 raw 可达、Go 代理(goproxy.cn)能

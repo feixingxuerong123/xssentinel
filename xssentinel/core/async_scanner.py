@@ -1384,7 +1384,8 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
         # actually reflected, matching the sync call site.
         async for _f in self._scan_advanced_param_layers(
                 url, method, params, data, param, is_body, marker,
-                probe_text or text or ""):
+                probe_text or text or "",
+                param_confirmed=param_confirmed):
             yield _f
 
         # Phase 176s: time-based (OOB) fallback -- sync parity with

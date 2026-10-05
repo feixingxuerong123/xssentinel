@@ -12,16 +12,16 @@
 
 ---
 
-## 0. 现状快照(2026-10-03 重取)
+## 0. 现状快照(2026-10-05 重取)
 
 | 维度 | 数据 |
 |---|---|
-| 核心代码 | 119 模块 / 49193 行(Phase 191 把 async_scanner.py 拆成 5 个文件,净 +128 行全是新模块头) |
-| 测试 | 151 文件 / 41361 行(用例数未按新文件重算,引用前先重跑 `pytest --collect-only -q`) |
-| ruff 基线 | **0 条**(E/F/W,忽略 E501),`ruff check .` 全仓实测 |
+| 核心代码 | 122 模块 / 50396 行(2026-10-05 实测;含 Phase 193–197 与 sandbox 首刀拆分) |
+| 测试 | 177 文件 / 43683 行,其中 `test_*.py` 162 文件 / 38086 行;`pytest --collect-only -q` = **2622 用例**(引用前先重跑,别抄这里的数字当活数) |
+| ruff 基线 | **0 条**(E/F/W,忽略 E501),`ruff check` 全仓实测 |
 | lint 门禁 | ① CI `ruff check`(2026-09-30 落地,fail-fast 在 tests job 之前)<br>② `tests/test_noqa_hygiene.py`(2026-10-01 落地,锁"F401 抑制必须带原因") |
 | 精度 | sync 192 例 TP113/FP0/TN79/FN0,f1=1.000;async TP108/FP0/TN74/FN0(10 例 sync-only SKIP);range4 双引擎 8/8;**push 门 64 例分层切片双引擎 FP0/FN0/ERROR0** |
-| 最大模块 | sandbox.py **2395** 行 / scanner.py **1737** 行 / async_scanner.py **1534** 行(拆分后)/ report.py **1428** 行 |
+| 最大模块 | scanner.py **1869** 行 / async_scanner.py **1618** 行 / __main__.py **1511** 行 / dom_engine.py **1455** 行 / report.py **1440** 行(sandbox.py 已拆为 sandbox 1320 + sandbox_parser 1125 + sandbox_common 136) |
 
 ---
 
@@ -259,6 +259,16 @@ import 仍可用 —— 它靠的是 `sandbox.py` 里带原因的 re-export,而�
 把 async 的 content-type 降置信摘掉,门必须红。**不能用"跑通就交差"**:一个
 抓不到已知事故的门,等于没有门(这条教训在 pyflakes 门禁那次已经付过一次学费)。
 
+
+> **已落地(2026-10-05,`tests/test_engine_parity_gate.py`)**:12 端点反射切片
+> 双引擎同预算对跑,比较 (type, severity, confidence) 有序多重集 —— context
+> 排除已被实测论证(同一参数多向量时"哪个 payload 先确认"是梯子顺序问题,
+> /s/flt05 上 sync 确认 concat-stamp svg、async 确认 javascript:-URI,皆为真)。
+> **验收双向通过**:monkeypatch 摘掉 async 的 content-type 降置信(178c 事故)
+> 与 concat 重试(177 事故),门各自变红。**门落地的当天就抓到第一类新分歧**:
+> async 的 L7 层 shim findings 视图缺主循环裁定,polyglot fallback 只在 async
+> 误发(/r/jsonct01 多一条)—— 已修(shim seed + param_confirmed 哨兵),顺带
+> 修复两个引擎 polyglot finding 缺 confidence 键的报告元数据缺陷。
 ### 2.2 报告层性能
 
 [report.py](file:///d:/qoder/xssentinel/xssentinel/core/report.py) **1428 行**,

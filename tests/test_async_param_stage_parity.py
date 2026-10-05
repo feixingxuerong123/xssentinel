@@ -69,7 +69,7 @@ def _collect(params, escape=False, monkeypatch=None):
     advanced_calls = []
 
     async def _stub(self, url, method, params, data, param, is_body,
-                    marker, resp_text):
+                    marker, resp_text, param_confirmed=False):
         advanced_calls.append((param, is_body))
         if False:                     # pragma: no cover -- makes it a gen
             yield None

@@ -645,3 +645,23 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
   经 goproxy.cn 构建到 `$GOPATH/bin`(本机为 `C:\GoWorkspace\bin`),nuclei v3.9.0 与
   `~/nuclei-templates/dast` 已在位;github.com 的 release 资产下载仍被拦(v3 Rust 版装不上)。
   跑法见 README"同类开源扫描器同靶跑分"一节;产物 `benchmark/results/phase196_cross_tool.json`
+
+- [x] **198 双引擎行为对等门(OPTIMIZATION 2.1 落地,门当天抓到第一类新分歧)**:
+      `tests/test_engine_parity_gate.py` —— 12 端点反射切片(manifest 既有
+      用例,含 /s/flt05 与 /r/jsonct01 两个事故形状 + 两个 safe 孪生)双引擎
+      同预算对跑,比较 **(type, severity, confidence) 有序多重集**。context
+      排除是被实测论证的:同一参数多向量时"哪个 payload 先确认"是梯子顺序
+      问题(/s/flt05: sync 确认 concat-stamp svg、async 确认 javascript:-URI,
+      皆为真);count/severity/confidence 是 dedup/报告/PoC 重放实际消费的
+      契约。**验收(2.1 硬要求)双向通过**:monkeypatch 摘掉 async 的
+      content-type 降置信(178c)与 concat 重试(177),门各自变红。
+      **门当天抓到第一类新分歧并修复**:async 的 L7 层 shim findings 视图
+      缺主循环裁定(引擎不累积 finding,直接 yield)→ 共享 `_run_advanced_layers`
+      的 polyglot fallback("仅当 (url,param) 无确认时")在 async 侧恒空转
+      误发 —— 修为 shim seed(父 findings + param_confirmed 哨兵,yield 跳过
+      seed);顺带修复两个引擎 polyglot finding 缺 `confidence` 键的报告元数据
+      缺陷(消费者读 None)。回归 117 例 + benchmark async F1=1.0 + ruff 过。
+      全量分批门禁 **161/163 文件绿(3035s)**:两个失败均为本条目自己的
+      契约疏漏、门禁抓到即修 —— test_async_param_stage_parity 的替身缺
+      `param_confirmed` kwarg(TypeError 被吞成"层未达")与 sentinel
+      Finding 缺 `evidence_class`(evidence-coverage 门预算 0),复跑全绿。

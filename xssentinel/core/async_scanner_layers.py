@@ -350,7 +350,8 @@ class AsyncDetectionLayersMixin:
                                           params: dict, data: dict,
                                           param: str, is_body: bool,
                                           marker: str,
-                                          resp_text: str
+                                          resp_text: str,
+                                          param_confirmed: bool = False
                                           ) -> AsyncIterator[Finding]:
         """L7 parameter layers (mutation / DOM clobber / template /
         polyglot / markdown).
@@ -377,6 +378,33 @@ class AsyncDetectionLayersMixin:
         try:
             req = self._get_sync_requester()
             shim.req = req
+            # Phase 198: the shim's findings accumulator starts EMPTY and
+            # the async engine does not accumulate main-loop verdicts at
+            # all (findings are yielded straight to the consumer) -- so
+            # the shared ``_run_advanced_layers`` fallback guard ("the
+            # polyglot layer only runs when no other finding was confirmed
+            # for this (url, param)") always saw an empty list here and
+            # the fallback fired on async while sync correctly skipped it
+            # (first catch of the OPTIMIZATION 2.1 parity gate).  Seed the
+            # view instead: the parent's own findings for this (url,
+            # param), plus -- because async yields verdicts without ever
+            # storing them -- a sentinel Finding when the main loop
+            # reported param_confirmed.  The sentinel exists ONLY for the
+            # guard; the yield below skips every seeded entry.
+            _seed = [f for f in (self.findings or [])
+                     if (f.data.get("url") == url
+                         and f.data.get("param") == param)]
+            if param_confirmed and not _seed:
+                # guard-only sentinel: it satisfies the shared fallback
+                # check and is never yielded (the seed slice is skipped).
+                # evidence_class is stated because the evidence-coverage
+                # gate audits every Finding() site, and "main loop
+                # confirmed via the semantic model" is exactly what it
+                # represents.
+                _seed = [Finding(url=url, method=method, param=param,
+                                 type="reflected",
+                                 evidence_class=EVIDENCE_MODEL)]
+            shim.findings.extend(_seed)
             await asyncio.to_thread(
                 shim._run_advanced_layers,
                 req, url, method, params, data, param, is_body, marker,
@@ -384,7 +412,7 @@ class AsyncDetectionLayersMixin:
             # The sub-layers bump the shim's own counter; fold it in so the
             # scan's request accounting stays honest.
             self.requests_made += shim.requests_made
-            for f in shim._findings:
+            for f in shim._findings[len(_seed):]:
                 yield f
         except (BudgetExhausted, CircuitOpen):
             raise        # a budget/circuit stop is NOT a layer bug

@@ -7,9 +7,9 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
 
 ## 规则约定
 
-- scanner.py 已 Mixin 拆分(1101 行核心 + 三 Mixin + findings):新增能力进对应 Mixin,不堆回主文件
-- async_scanner.py 已同样 Mixin 化(1534 行核心 + layers/crawl/verify 三 Mixin + common,Phase 191):新增 async 能力进对应 Mixin,不堆回主文件;搬代码与改逻辑绝不混在同一轮
-- fix_advice.py 数据化(141 行引擎 + JSON 语料):改建议优先改语料
+- scanner.py 已 Mixin 拆分(2026-10-05 实测:核心 1869 行 + layers 769 + crawl 406 + stored 579 + findings 216):新增能力进对应 Mixin,不堆回主文件
+- async_scanner.py 已同样 Mixin 化(2026-10-05 实测:核心 1618 行 + layers 1006 + crawl 321 + verify 136 + common 270,Phase 191):新增 async 能力进对应 Mixin,不堆回主文件;搬代码与改逻辑绝不混在同一轮
+- fix_advice.py 数据化(2026-10-05 实测:127 行引擎 + JSON 语料):改建议优先改语料
 - 多步检测优先写场景 DSL,而非过程式代码
 
 ## 任务与进度

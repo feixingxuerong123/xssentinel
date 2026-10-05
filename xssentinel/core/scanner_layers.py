@@ -692,6 +692,13 @@ class AdvancedLayerMixin:
                         # triage it like a live sink.
                         severity=("low" if _poly_non_html(resp) else "medium"),
                         type="polyglot_reflection",
+                        # Phase 198: this finding had NO confidence at all
+                        # -- every consumer (report table, SARIF level,
+                        # sorting) read None.  A polyglot reflection is a
+                        # broader claim than a context-specific reflected
+                        # hit (the polyglot tries many breakouts), so
+                        # medium is the honest model-only default.
+                        confidence="medium",
                         evidence_class=EVIDENCE_MODEL,
                         evidence=f"polyglot ({kind}) token '{msg}' reflected: "
                                  f"{v['detail']}",
