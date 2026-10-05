@@ -7,9 +7,9 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
 
 ## 规则约定
 
-- scanner.py 已 Mixin 拆分(1101 行核心 + 三 Mixin + findings):新增能力进对应 Mixin,不堆回主文件
-- async_scanner.py 已同样 Mixin 化(1534 行核心 + layers/crawl/verify 三 Mixin + common,Phase 191):新增 async 能力进对应 Mixin,不堆回主文件;搬代码与改逻辑绝不混在同一轮
-- fix_advice.py 数据化(141 行引擎 + JSON 语料):改建议优先改语料
+- scanner.py 已 Mixin 拆分(2026-10-05 实测:核心 1869 行 + layers 769 + crawl 406 + stored 579 + findings 216):新增能力进对应 Mixin,不堆回主文件
+- async_scanner.py 已同样 Mixin 化(2026-10-05 实测:核心 1618 行 + layers 1006 + crawl 321 + verify 136 + common 270,Phase 191):新增 async 能力进对应 Mixin,不堆回主文件;搬代码与改逻辑绝不混在同一轮
+- fix_advice.py 数据化(2026-10-05 实测:127 行引擎 + JSON 语料):改建议优先改语料
 - 多步检测优先写场景 DSL,而非过程式代码
 
 ## 任务与进度
@@ -534,6 +534,28 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
       test_async_headless_verify 双跑 TIMEOUT 为纯环境慢(全桩套件,
       与本轮改动零交集;门禁后单文件复跑 **19 passed in 0.91s**)。
 
+- [x] **196 浏览器渲染输入发现 + HPP body 位(竞品吸收第八轮)**:
+      ① **`--discover`**(库存清单最后一个命名缺口:"无基于浏览器渲染后的
+      动态输入发现"):`DynamicDomAnalyzer.harvest(url)` 渲染目标一次,
+      收割 LIVE 输入面 —— SPA 表单字段名(input/textarea/select/button)
+      合并进挖矿词表(`--param-wordlist` 同款),页面自己 fetch 的
+      **同源** API 端点(performance resource entries,严格同源过滤,
+      176l 授权纪律)作为附加目标在主目标后扫描(上限 10);认证状态
+      随行,全部 best-effort 降级不炸扫描;async 经
+      _ASYNC_SYNC_ONLY_FLAGS 文档化不支持。`_normalize_harvest` 纯函数
+      单测(去重/上限/大小写同源/分片剥除/垃圾降级)+ 真 Chromium 渲染
+      收割测试。② **HPP body 位补全**(193 记账的"query 位本轮"):
+      form 体以裸 urlencoded 字符串 + 显式 Content-Type 重复参数(dict
+      无法携带重复键),JSON 载体仍归 pre-encode 管线;async 对位同形状。
+      测试:body 首现过滤正例 + JSON 载体跳过反例。
+      **后续修复(并发会话,0814661/df64e29,均为本条目代码的真缺陷)**:
+      sync `_try_hpp` 曾硬编码 `param_in="query"`(body 位探针也记 query)
+      —— poc.py 按 param_in 造重放,body 位的 PoC 全部打在错误位置;
+      两处断言本身跑不过(同源检查比较对象写错、`Scanner(json_body=)`
+      构造参数不存在,应为 `sc.json_body` 属性)。已修 + async body 位
+      专项回归锁(test_async_phase196_hpp_body_parity.py,线上/字段
+      双半断言 + 取首值后端反例)。
+
 - [x] **196b 外部效度对照 + CSP 投递通道判定 + API 前端门对齐(竞品吸收第八轮)**:
       ① **把"能不能打赢同类"从声称变成测量**(补 OPTIMIZATION 1.0 长期挂着的缺口):
       `benchmark/run_cross_tool.py` 让 XSSentinel / dalfox v2.13.0 / nuclei v3.9.0 在
@@ -615,8 +637,8 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
 
 ## 环境配置
 
-- 依赖: requirements.txt;测试: `python tests/run_all_batched.py --quiet`(2026-09-25 实测
-  129 个 test_*.py 文件;裸跑单进程会卡死,必须分批 —— `test_async_budget.py` 在本机
+- 依赖: requirements.txt;测试: `python tests/run_all_batched.py --quiet`(2026-10-05 实测
+  162 个 test_*.py 文件 / 38086 行,`pytest --collect-only -q` 收集 2622 用例;裸跑单进程会卡死,必须分批 —— `test_async_budget.py` 在本机
   会挂满 2×540s 预算,按"未验证"记账而不是当回归)
 - benchmark: benchmark/ 目录;报告产物: report.html
 - 三方对照(dalfox / nuclei)本机可跑:`go install github.com/hahwul/dalfox/v2@latest`

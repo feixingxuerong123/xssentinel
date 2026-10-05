@@ -109,6 +109,13 @@
   DOM 引擎合成事件集 25→~60 型、interaction_events 语料 27→63 条,
   requires_interaction events **15.4%→73.1%**(剩余为设备传感器/导航
   生命周期等不可诚实派发项,记账不追)。
+- **浏览器渲染输入发现 + HPP body 位(Phase 196)**:① `--discover`
+  渲染目标一次收割 LIVE 输入面 —— SPA 表单字段名并入挖矿词表,页面
+  自己 fetch 的同源 API 端点(严格同源过滤)作为附加目标扫描(库存
+  清单最后一个命名缺口:"无基于浏览器渲染后的动态输入发现");② HPP
+  扩展到 form 体(裸 urlencoded 字符串重复参数,dict 无法携带重复键),
+  JSON 载体仍归 pre-encode 管线。后续修复:sync body 位 finding 的
+  `param_in` 曾硬编码 query(PoC 重放错位),已修并加 async 专项回归锁。
 - **外部效度对照第一次量出来(Phase 196b)**:`benchmark/run_cross_tool.py` 让
   XSSentinel / dalfox / nuclei 在**同一批靶**上跑分。文档 1.0 长期写"第三方对照
   需换机器",本机复核推翻了它:GitHub API 与 raw 可达、Go 代理(goproxy.cn)能
