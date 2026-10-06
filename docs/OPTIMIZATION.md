@@ -260,11 +260,14 @@ import 仍可用 —— 它靠的是 `sandbox.py` 里带原因的 re-export,而�
 抓不到已知事故的门,等于没有门(这条教训在 pyflakes 门禁那次已经付过一次学费)。
 
 
-> **DOM 静态端点扩容尝试后搁置(2026-10-06)**:/dom、/postmsg、/proto、/sw、
-> /worker 五端点双引擎对比全部"空对空"——L3_dom_static 在这些 manifest 固件上
-> 本就无所获(benchmark 的 dom TP 由动态引擎确认),parity 比较成立但没有检测力;
-> 静态网为何在 eval 形状上空手是另一个独立问题,与引擎分歧无关。
-> **已落地(2026-10-05,`tests/test_engine_parity_gate.py`)**:12 端点反射切片
+> **DOM 家族扩容已落地(2026-10-06,Phase 203)**:manifest 的 12 个 DOM 端点
+> (6 阳性 + 3 safe 孪生 + 原型污染对)以 dom_engine="auto" 入门 —— 动态引擎
+> 代码共享,但层接线(sync `_scan_dom` vs async Phase-65 路径)正是事故高发区。
+> 首次尝试的"空对空"结论是用错靶场服务器所致(vuln_server 的 /dom 打到
+> manifest 服务器 → 404 页对比),静态网本身没坏(dom.analyze 在
+> eval(URLSearchParams.get) 形状上正常命中)。harness 教训:dom_engine="auto"
+> 的 sync 扫描会让 Playwright 把 asyncio loop 绑到测试线程,async 半场必须
+> 跑在独立线程。**已落地(2026-10-05,`tests/test_engine_parity_gate.py`)**:12 端点反射切片
 > 双引擎同预算对跑,比较 (type, severity, confidence) 有序多重集 —— context
 > 排除已被实测论证(同一参数多向量时"哪个 payload 先确认"是梯子顺序问题,
 > /s/flt05 上 sync 确认 concat-stamp svg、async 确认 javascript:-URI,皆为真)。

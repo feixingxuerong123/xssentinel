@@ -27,6 +27,10 @@ PER_FILE_TIMEOUT = 540        # seconds
 # even though nothing is wrong.  The file is the FPR regression gate, so
 # it gets its own, larger budget instead of being trimmed down.
 PER_FILE_TIMEOUT_OVERRIDES = {
+    # Phase 203: the parity gate runs a 12-endpoint reflection slice AND a
+    # 12-endpoint DOM slice (real browser renders) through BOTH engines --
+    # legitimately the slowest gate file in the suite.
+    "test_engine_parity_gate.py": 1500,
     "test_benchmark_fp.py": 1800,
     # Measured 2026-09-26: 11 passed in 3112s on this host -- the budget
     # accounting tests are legitimately slow on the degraded loopback,

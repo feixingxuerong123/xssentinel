@@ -702,6 +702,17 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
       挪用页面自带脚本需先有另一漏洞 —— 反射面上无可行路径,检出+修复建议
       即终点,不写投机逻辑。
 
+- [x] **203 对等门扩容到 DOM 家族(2.1 收尾)**:`test_engine_parity_gate.py`
+      增 DOM 切片 —— manifest 12 端点(6 阳性 DOM + 3 safe 孪生 + 原型污染对),
+      dom_engine="auto" 双引擎对跑。三段排错记实:①首轮"空对空"结论是**用错
+      靶场服务器**(把 vuln_server 的 /dom 打到 manifest 服务器 → 404 页对比,
+      "静态网在 eval 形状上空手"亦为该假象 —— dom.analyze 实测正常命中);
+      ②真失败原因是 Playwright sync API 把 asyncio loop 绑到测试线程,
+      dom_engine="auto" 的 sync 半场之后 asyncio.run 同线程即炸 —— harness 改为
+      async 半场跑独立线程;③文件超 540s 预算,照 test_benchmark_fp 惯例加
+      1500s override。终态:**全门 4/4 绿(875.77s,含一次首发抖动重跑)**,
+      DOM 切片双引擎零分歧、safe 孪生双方沉默。
+
 - [x] **200 `--self-test` 首次跑完 + 归因出两个被 wedge 掩盖的真缺陷**:
       `--self-test` 自 Phase 182 起反复撞 900s 超时(Phase 187/192 记为
       "未验证"),本轮先修掉了 wedge 的**两个**成因:① self-test 靶场

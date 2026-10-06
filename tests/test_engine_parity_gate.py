@@ -88,39 +88,55 @@ def _norm(findings) -> list:
     return sorted(r for r in rows if r[0] != "fuzzer_triage")
 
 
-def _run_sync(base: str, slice_=_PARITY_SLICE) -> dict:
+def _run_sync(base: str, slice_=_PARITY_SLICE, dom_engine: str = "off") -> dict:
     from xssentinel.core.requester import Requester
     from xssentinel.core.scanner import Scanner
 
     out: dict = {}
-    for path, param in slice_:
-        sc = Scanner(requester=Requester(timeout=8), dom_engine="off",
+    for entry in slice_:
+        path, param = entry[0], entry[1]
+        value = entry[2] if len(entry) > 2 else "probe"
+        sc = Scanner(requester=Requester(timeout=8), dom_engine=dom_engine,
                      verbose=False, **_BUDGETS)
-        sc.scan_endpoint(base + path, "GET", {param: "probe"}, {})
+        sc.scan_endpoint(base + path, "GET", {param: value}, {})
         out[path] = _norm(sc.findings)
     return out
 
 
-def _run_async(base: str, slice_=_PARITY_SLICE) -> dict:
+def _run_async(base: str, slice_=_PARITY_SLICE,
+               dom_engine: str = "off") -> dict:
     from xssentinel.core.async_scanner import AsyncScanner
 
-    async def _one(path, param):
+    async def _one(entry):
+        path, param = entry[0], entry[1]
+        value = entry[2] if len(entry) > 2 else "probe"
         asc = AsyncScanner(max_concurrent=4, per_host_delay=0, jitter=0,
-                           timeout=8, dom_engine="off",
+                           timeout=8, dom_engine=dom_engine,
                            advanced_layers=True, **_BUDGETS)
         got = []
         async for f in asc.scan(base + path, method="GET",
-                                params={param: "probe"}):
+                                params={param: value}):
             got.append(f.data if hasattr(f, "data") else dict(f))
         return _norm(got)
 
     async def _all():
         out = {}
-        for path, param in slice_:
-            out[path] = await _one(path, param)
+        for entry in slice_:
+            out[entry[0]] = await _one(entry)
         return out
 
-    return asyncio.run(_all())
+    # Phase 203: run in a FRESH thread.  The sync pass with
+    # dom_engine="auto" starts Playwright's sync API, which binds an
+    # asyncio loop to THIS thread -- asyncio.run() here would die with
+    # "cannot be called from a running event loop" (measured, DOM slice).
+    # The async engine's own thread-bound browser gets a fresh thread and
+    # a fresh loop either way.
+    out: dict = {}
+    t = threading.Thread(target=lambda: out.update(
+        res=asyncio.run(_all())))
+    t.start()
+    t.join()
+    return out["res"]
 
 
 def _diff(sync_out: dict, async_out: dict) -> dict:
@@ -161,6 +177,42 @@ class TestEngineParity:
         diffs = _diff(sync_out, async_out)
         assert not diffs, (
             "dual-engine behavioral divergence on the parity slice:\n"
+            + "\n".join(f"  {p}: sync={v['sync']} async={v['async']}"
+                        for p, v in diffs.items()))
+
+
+class TestEngineParityDOM:
+    """The gate extended to the manifest's DOM family (Phase 203).
+
+    These endpoints confirm through the DYNAMIC engine (the shared
+    dom_engine harness), but the LAYER WIRING differs between engines
+    (sync ``_scan_dom`` vs the async Phase-65 path) -- wiring drift is
+    exactly what this gate exists to catch, and every historical incident
+    lived in the plumbing.  The three safe twins must stay silent on both
+    engines; the prototype pair probes the static ``dom`` hint path.
+    """
+
+    _DOM_SLICE = [
+        ("/dom/hash-innerhtml", "q"),
+        ("/dom/search-eval", "q"),
+        ("/dom/postmsg", "q"),
+        ("/dom/hash-docwrite", "q"),
+        ("/dom/jquery-html", "q"),
+        ("/dom/hash-settimeout", "q"),
+        ("/dom/hash-route#/route", "q"),
+        ("/dom/hash-route-safe#/route", "q"),
+        ("/dom/tt-innerhtml#/route", "q"),
+        ("/dom/tt-innerhtml-safe#/route", "q"),
+        ("/r/prt01", "q", "{}"),
+        ("/s/prt01", "q", "{}"),
+    ]
+
+    def test_dom_slice_finding_sets_match(self, bench_base):
+        sync_out = _run_sync(bench_base, self._DOM_SLICE, dom_engine="auto")
+        async_out = _run_async(bench_base, self._DOM_SLICE, dom_engine="auto")
+        diffs = _diff(sync_out, async_out)
+        assert not diffs, (
+            "dual-engine DOM divergence:\n"
             + "\n".join(f"  {p}: sync={v['sync']} async={v['async']}"
                         for p, v in diffs.items()))
 
