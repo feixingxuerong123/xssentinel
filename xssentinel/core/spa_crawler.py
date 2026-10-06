@@ -84,6 +84,33 @@ def _route_template(url: str) -> str:
     return f"{p.scheme}://{p.netloc}{path}"
 
 
+def _merge_endpoints(primary: list, secondary: list) -> list:
+    """Union two endpoint lists, keeping the first occurrence of each.
+
+    Used when the browser crawl aborts partway (see crawl()'s except
+    branch) and the caller's static crawler fills the gap: endpoints the
+    browser already registered must not be dropped, and the static pass
+    must not introduce duplicates.  Dedup key mirrors the endpoint shape
+    (url, method, sorted param names, sorted data keys) -- exactly what
+    Scanner._dedupe_endpoint_signatures later collapses on, so merging
+    first cannot change the final scan set, only the order of discovery.
+    """
+    out: list = []
+    seen: set = set()
+    for eps in list(primary or []) + list(secondary or []):
+        try:
+            url, method, params, data = eps
+        except (TypeError, ValueError):
+            out.append(eps)
+            continue
+        key = (url, method, tuple(sorted(params or {})), tuple(sorted(data or {})))
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(eps)
+    return out
+
+
 # JS snippet injected via add_init_script.  Hooks SPA navigation APIs and
 # records every route change into a window-level array we can read back.
 # Mirrors the init-script pattern from dom_engine._init_script().
@@ -298,6 +325,21 @@ class SpaCrawler:
                     except Exception as e:
                         if self.verbose:
                             print(f"[spa] goto failed for {url}: {e}")
+                        # Phase 200 follow-up: a goto that raises leaves
+                        # Chromium holding a PROVISIONAL navigation, and
+                        # every later page.evaluate on this page then
+                        # blocks.  Measured (dev/_dom_links_wedge_probe.py):
+                        # 117.02s per evaluate, returning [] -- i.e. the
+                        # crawl kept running while silently reporting an
+                        # SPA with no links, no routes and no forms.  The
+                        # recovery is dom_engine's, measured there at 0.02s.
+                        # Fixing it HERE rather than at each evaluate site
+                        # is deliberate: the per-site handlers only run
+                        # AFTER an evaluate has already spent its ~117s,
+                        # which is exactly what the first attempt at this
+                        # fix measured (117.02s, no improvement).
+                        from .dom_engine import _recover_nav
+                        _recover_nav(page)
                         continue
 
                     # 1) Extract post-render <a href> links from the DOM.
@@ -314,6 +356,11 @@ class SpaCrawler:
                         routes = page.evaluate(
                             "() => (window.__xss_routes || [])")
                     except Exception:
+                        # The provisional-navigation wedge is handled at
+                        # its cause -- the goto failure branch above, which
+                        # recovers the page before any evaluate runs.  A
+                        # handler here would fire only after the ~117s
+                        # block this file measured.
                         routes = []
                     for r in routes or []:
                         if not self._in_scope(r, start_url):
@@ -355,8 +402,41 @@ class SpaCrawler:
                 except Exception:
                     pass
         except Exception as e:
+            # Phase 200 (measured, dev/_loop_causality.py): the failure this
+            # handler most often sees is "It looks like you are using
+            # Playwright Sync API inside the asyncio loop."  It is NOT an
+            # exotic crash -- it is the ordinary consequence of an earlier
+            # scan having started the shared sync browser, which leaves a
+            # running loop in this thread for the rest of the process.
+            # Measured four-point sequence, identical on pre-Phase-200 code
+            # (dev/_wedge_is_regression.py ran the same probe against
+            # stashed changes, so this is long-standing, not a regression
+            # introduced here):
+            #
+            #   fresh process          loop_running=False  -> 10 endpoints
+            #   after one DOM scan    loop_running=True   ->  0 endpoints
+            #   after shutdown_thread_browser()  False     -> 10 endpoints
+            #
+            # Returning the partial list made crawl capability disappear
+            # SILENTLY: the caller had no way to tell "the SPA has no
+            # routes" from "the browser could not start", so a crawl scan
+            # quietly degraded to a single-endpoint scan (measured: 40
+            # requests / 0.1s and zero discovered endpoints vs 427 requests
+            # and 16 findings when the browser path works).
+            #
+            # Fix: an aborted browser crawl must still fall back to the
+            # caller's static crawler, which needs no browser and therefore
+            # no loop-free thread.  Partial browser endpoints are kept
+            # only when the fallback is unavailable, so a caller that passed
+            # no fallback does not lose what was already discovered.
             if self.verbose:
                 print(f"[spa] crawl aborted: {e}")
+            if fallback_crawler is not None:
+                if self.verbose:
+                    print("[spa] falling back to the static BS4 crawler")
+                fallback = fallback_crawler(start_url)
+                return fallback if not endpoints else _merge_endpoints(
+                    endpoints, fallback)
             return endpoints
 
         if self.verbose:
@@ -380,7 +460,15 @@ class SpaCrawler:
             return False
 
     def _extract_dom_links(self, page, base_url: str) -> list[str]:
-        """Extract all <a href> from the rendered DOM (post-JS)."""
+        """Extract all <a href> from the rendered DOM (post-JS).
+
+        Phase 200 follow-up: measured 117.02s per call with a [] result
+        when Chromium held a PROVISIONAL navigation (dev/_dom_links_wedge
+        _probe.py).  The cause is fixed at the goto failure branch in
+        crawl(), which recovers the page before any evaluate runs -- a
+        handler here fired only AFTER the 117s was already spent, which
+        the first attempt at this fix measured (117.02s, unchanged).
+        """
         try:
             raw = page.evaluate("""() => {
                 const out = [];
@@ -462,6 +550,8 @@ class SpaCrawler:
                 return out;
             }""")
         except Exception:
+            # Wedge handled at the goto failure branch; see the note at
+            # the SPA-route read above.
             return
         for form in forms or []:
             action = urljoin(base_url, form.get("action") or base_url)

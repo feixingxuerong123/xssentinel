@@ -1237,3 +1237,50 @@ class TestPhase27FixAdvice:
     def test_sri_missing_advice_mentions_integrity(self):
         advice = fix_advice.get_advice("sri_missing_script")
         assert "integrity" in advice["detail"].lower()
+
+
+# --- corpus-derived coverage -------------------------------------------------
+# The parametrised lists above can only check the types they name.  They
+# name 9 of the 129 finding types in data/compliance.json, so the other
+# 120 were unverified -- measured by dev/_compliance_coverage_probe.py:
+#   corpus finding_type_map entries : 129
+#   types listed in the test         :   9
+#   in corpus but NOT listed         : 114 (after prefix fallback)
+#
+# The lists stay as fast spot checks for the types the scanner emits most;
+# the tests below derive their cases from the corpus instead, so a type
+# added to the corpus is covered the moment it lands, with nobody having
+# to remember to update a hand-written list.
+
+def _corpus_finding_types() -> list:
+    """Every explicit finding type in the compliance corpus."""
+    import json
+    import os
+
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    raw = json.load(open(os.path.join(root, "xssentinel", "data",
+                                      "compliance.json"), encoding="utf-8"))
+    return sorted(raw["finding_type_map"].keys())
+
+
+@pytest.mark.parametrize("ftype", _corpus_finding_types())
+def test_every_corpus_finding_type_maps_to_compliance(ftype):
+    entries = compliance.compliance_for_finding({"type": ftype})
+    assert entries, (
+        f"finding type '{ftype}' is in compliance.json but "
+        f"compliance_for_finding() returned nothing for it")
+
+
+@pytest.mark.parametrize("ftype", _corpus_finding_types())
+def test_every_corpus_finding_type_has_entry_shape(ftype):
+    """The mapping exists AND every entry is well formed.
+
+    The hand-written list checked only "non-empty"; a corpus entry with a
+    missing url or requirement_id would pass it.  Shape is checked here
+    because a malformed entry renders as a blank row in the report.
+    """
+    required = ("framework", "requirement_id", "title", "url")
+    for entry in compliance.compliance_for_finding({"type": ftype}):
+        for key in required:
+            assert entry.get(key), (
+                f"'{ftype}' -> entry missing {key!r}: {entry}")

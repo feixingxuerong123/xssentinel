@@ -76,7 +76,10 @@ def main():
         print("\n[*] Running横向对比 (dalfox / XSStrike)...")
         from benchmark.adapters import get_adapters, run_comparison
         from benchmark.server import load_routes, BenchmarkHandler
-        from http.server import HTTPServer
+        # Phase 200: ThreadingHTTPServer -- BenchmarkHandler is HTTP/1.1
+        # keep-alive, and a single-thread server lets one idle connection
+        # starve every other client (PROJECT.md lab-service rule).
+        from http.server import ThreadingHTTPServer
         import threading
 
         adapters = get_adapters(only_available=True)
@@ -87,7 +90,7 @@ def main():
             port = args.port + 1
             routes = load_routes()
             BenchmarkHandler.routes = routes
-            server = HTTPServer(("127.0.0.1", port), BenchmarkHandler)
+            server = ThreadingHTTPServer(("127.0.0.1", port), BenchmarkHandler)
             thread = threading.Thread(target=server.serve_forever, daemon=True)
             thread.start()
             time.sleep(0.5)

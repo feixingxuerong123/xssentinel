@@ -130,8 +130,23 @@ _CSSOM_SINK_RES = [
 # @font-face with unicode-range + external src:url().  The unicode-range
 # and src may appear in either order, so we match the whole @font-face
 # block and check for both properties inside it.
+# Phase 200 (measured, dev/_fontface_block_probe.py): the block body was
+# matched with ``[^}]*``, which truncates at the FIRST closing brace.  A
+# server-side template interpolation is exactly that case -- ``url({{
+# asset }})`` or ``.../{{ font }}.woff2`` both contain ``}`` -- so the
+# captured body stopped before ``unicode-range:`` and the exfil gadget
+# was silently missed while the structurally identical ``@import``
+# template form was reported:
+#
+#     @import + {{ }}   -> css_import_injection fires
+#     @font-face + {{ }} -> only css_template_reflection, exfil LOST
+#
+# Allow one level of nested braces (enough for {{ x }} and for a data
+# URI), keeping the match bounded so a missing close brace cannot run
+# away across the rest of the stylesheet.
 _FONT_FACE_BLOCK_RE = re.compile(
-    r"@font-face\s*\{([^}]*)\}", re.IGNORECASE | re.DOTALL,
+    r"@font-face\s*\{((?:[^{}]|\{(?:[^{}]|\{[^{}]*\})*\})*)\}",
+    re.IGNORECASE | re.DOTALL,
 )
 _FONT_FACE_UNICODE_RE = re.compile(
     r"unicode-range\s*:", re.IGNORECASE,

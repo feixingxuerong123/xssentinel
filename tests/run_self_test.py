@@ -105,9 +105,16 @@ ENDPOINTS = [
     ("/sanitizer-missing",     "GET", {}, {}),                # innerHTML = userVar without sanitizer
     ("/sanitizer-strong",      "GET", {}, {}),                # Control: safe version + textContent, no finding
     # Phase 30-1: CSS Injection (CSSI) fixtures.
-    ("/cssi-font-face",        "GET", {}, {}),                # @font-face unicode-range exfil gadget
+    # Phase 200: the two gadget rules are gated on the CSS being
+    # user-controlled (Phase 140, measured on OWASP Juice Shop), so these
+    # two endpoints are scanned WITH a parameter -- without one the
+    # fixture reflects nothing and the gate is right to stay shut.  The
+    # clean twins below prove the gate is not simply always-open.
+    ("/cssi-font-face",        "GET", {"q": "xssent"}, {}),    # @font-face unicode-range exfil gadget
+    ("/cssi-font-face-safe",   "GET", {"q": "xssent"}, {}),    # Control: same gadget, no user-controlled CSS
     ("/cssi-keylogger",        "GET", {}, {}),                # CSS keylogger (input[value^=...] + url())
-    ("/cssi-import",           "GET", {}, {}),                # @import external stylesheet
+    ("/cssi-import",           "GET", {"q": "xssent"}, {}),    # @import external stylesheet
+    ("/cssi-import-safe",      "GET", {"q": "xssent"}, {}),    # Control: CDN @import, no user-controlled CSS
     ("/cssi-cssom",            "GET", {}, {}),                # CSSOM sinks (cssText/insertRule/background)
     ("/cssi-template",         "GET", {}, {}),                # Template placeholder inside <style>
     ("/cssi-legacy",           "GET", {}, {}),                # expression/behavior/moz-binding
@@ -406,6 +413,25 @@ if cssi_strong_findings:
           f"CSSI finding ({len(cssi_strong_findings)})")
 else:
     print("[+] PASS: /cssi-strong => no false-positive CSSI finding")
+
+# Phase 200: the two gadget rules are gated (Phase 140), so "they fire" is
+# only half the measurement -- the clean twins ship the SAME gadget shape
+# with nothing user-controlled in the CSS and must stay silent.  Without
+# these, a change that simply deleted the gate would look like a pass.
+_CSSI_GATED = {"css_font_face_exfil", "css_import_injection"}
+for _twin, _expected in (("/cssi-font-face-safe", "css_font_face_exfil"),
+                         ("/cssi-import-safe", "css_import_injection")):
+    _hits = [f for f in sc.findings
+             if f.data.get("url", "").endswith(_twin)
+             and f.data.get("type") == _expected]
+    if _hits:
+        ok = False
+        print(f"\n[!] FAIL: {_twin} produced a false-positive "
+              f"{_expected} ({len(_hits)}) -- the Phase-140 "
+              f"user-control gate reported a non-user-controlled gadget")
+    else:
+        print(f"[+] PASS: {_twin} => no {_expected} "
+              f"(gate correctly shut)")
 
 # Phase 30-2: Dangling Markup Injection assertions.
 # /dangling-risk and /dangling-hidden should produce dangling_markup

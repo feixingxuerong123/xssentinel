@@ -13,6 +13,15 @@ as a text node.
 Bundles come from registry.npmjs.org tarballs (unpkg is unreachable from this
 host).  Only .js / .js.map-free files are kept; the README records the exact
 versions so a re-run is reproducible.
+
+STATUS: ``range5/`` DOES NOT EXIST YET.  This script is the vendoring half
+of an unstarted range (the Lit ``unsafeHTML`` family, the analogue of
+range4's React ``dangerouslySetInnerHTML`` / Vue ``v-html``), kept here so
+the vendor fetch is reproducible instead of re-derived later.  Running it
+now creates ``range5/vendor/`` for a target that has no pages, no ground
+truth and no runner -- harmless, but it does not make the range runnable.
+It lives in ``dev/`` rather than under the ``_``-prefix convention because,
+unlike the probes, it is meant to be kept and re-run.
 """
 from __future__ import annotations
 

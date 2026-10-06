@@ -61,7 +61,19 @@ def test_bounded_goto_survives_a_failed_navigation():
     # sink can fire before the error surfaces, and the caller reads the
     # hit log afterwards either way.  An exception escaping here used to
     # cost every remaining probe.
+    #
+    # Phase 200: the failed navigation is now followed by ONE recovery
+    # navigation to about:blank.  Chromium keeps the navigation
+    # provisional after a timeout, and the next page.evaluate then blocks
+    # until the browser gives up -- measured 763s (dev/_silent_nav_probe.py).
+    # The contract that matters is still "does not raise"; the call count
+    # grew by exactly the recovery step.
     page = _FakePage(raise_on_goto=True)
     DynamicDomAnalyzer(timeout=20)._bounded_goto(
         page, "http://t/p", time.monotonic() + 30.0)
-    assert len(page.calls) == 1
+    assert len(page.calls) == 2
+    assert page.calls[0]["url"] == "http://t/p"
+    assert page.calls[1]["url"] == "about:blank", (
+        "the recovery must cancel the provisional navigation")
+    # and no exception escaped this fake even though its goto always
+    # raises -- _recover_nav is best-effort by contract.

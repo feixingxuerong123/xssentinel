@@ -404,52 +404,36 @@ JS config line(那本身就是 script-string sink),四例全 confirmed、safe
 
 ---
 
-### 3.8 观测记录:async 每条响应的线程 CPU(2026-10-04 剖析得到,未优化)
+### 3.8 ~~观测记录:async 每条响应的线程 CPU~~ 已结案(2026-10-06):诊断是错的,真凶是 L7 层网络泄漏
 
-补 async HPP 体位测试时顺手量到的事实,记下来免得下轮重新猜:
+> 原记录(见 git 历史)把 ~55s/_probe_param 归因为"每响应的判定 CPU",
+> 并计划建"线程内计时基线"。实测推翻:
+>
+> * **判定 CPU 是清白的**:包住 verify_semantic/sandbox/transform/analyze_all
+>   等全部热点函数计时,210 次调用合计 **0.11s** —— 每响应判定 ~0.5ms,
+>   与"门禁 async 单例 ~5s"从来对不上;
+> * 成本不随 max_payloads/advanced_layers 变化(9 个请求也要 61.7s)
+>   —— 按 _probe_param 调用次数计,不按请求;
+> * faulthandler 周期转储线程栈:执行器线程**全程卡在
+>   socket.getaddrinfo** —— 有人在桩 session 的测试里发**真实 HTTP 请求**;
+> * 全局钩 `requests` 的 send 计数:6 次真实请求,全是 L7 层
+>   (mutation `{{7*7}}` / dom_clobber / template / polyglot)的载荷探针,
+>   经 `_get_sync_requester()` 的真实 Requester 发往测试用的假主机名,
+>   每次不可解析域名在本机劣化 DNS 上超时 **7-11s**,6 x ~9s = 55s。
 
-- 一条 `_probe_param` 走完后总耗时 ~55s,而 **20 个请求全部在毫秒内发出**
-  (在桩 session 里打时间戳测得 gap 合计 ≈ 0.4s),`asyncio.sleep` 调用数为 **0**。
-- cProfile 的累积时间几乎全在 `GetQueuedCompletionStatus`(IOCP 等待),
-  主线程只见等待不见计算 —— 因为真正的工作在 `asyncio.to_thread` 的线程里,
-  **cProfile 默认不跟线程**。收缩 `max_payloads` 3→1 只把 55.2s 降到 54.7s,
-  关沙箱门(`XSS_SANDBOX_GATE=0`)降到 50.1s:说明成本不在载荷条数也不只在沙箱。
-- 结论:这是**每响应的判定 CPU**,不是测试人为成本 —— 与门禁里 async 单例
-  ~5s 的量级一致。值得作为性能项单独量:先建"每响应判定耗时"基线
-  (线程内计时,不是 cProfile 总时间),再谈优化;优化前不要被
-  "测试很慢"引导去删测试。
-- 处置:新测试保留两条必须分开跑的用例(体位确认 + 取首值反例),
-  query 位的 `param_in` 断言并入既有那条 async HPP 测试(零额外耗时)。
+**根因**:async 的桩测试不密闭 —— 桩 session 挡住了 L1 主流,但 L7 层经
+独立的 sync Requester 泄漏到真网络。生产路径下这些请求本来就合法
+(层的载荷探针必须发),但测试里它们既慢又不确定。
 
-### 3.7 Phase 196b 新增待办(按投入 × 收益)
-
-1. **async 引擎看不见 `<meta>` CSP**:sync 侧已把阻断判定接到 header + meta 两条
-   通道,`async_scanner_layers._scan_csp_async` 签名里仍只有 headers。补它需要
-   在调用点(`async_scanner.py`)把页面 body 传进来 —— 本轮那个文件是另一路的
-   在制品,没动。异步的**判定**(verifier 链)已共享,所以缺的只是 L7 报告层。
-2. ~~**DOM sink 面缺口(dalfox v3.2.0 对位)**~~ **已实测并部分闭合(Phase 197)**:
-   `dev/_p197_sinkoracle/probe_sink_oracle.py` 把每条候选形状在真 Chromium 里用可归因源
-   (`location.search` / `location.hash`)跑一遍,同时问我们的引擎在同一页看见什么:
-   `setAttributeNS(null,'onclick', attacker)` **执行**且我们**看不见**(DOM 通道只 hook
-   `setAttribute`)→ 已补 hook,`tests/test_phase197_dom_sinks.py` 双层(纯断言 + 活体
-   端到端)并带变异对照(摘掉 hook 后活体命中集合变空)。
-   `var f = eval; f(x)` 与 `window['eval'](x)` **执行且已命中**(hook 替换 `window.eval`
-   之后别名读到的就是包装函数)——不是缺口。
-   `document.parseHTMLUnsafe(attacker)` 再 append 进文档 **不执行**;
-   `dataTransfer` / `navigator.clipboard.readText()` 的源扫描器不可归因
-   ——这三类**刻意不加**:加了就是替浏览器否认的形状背书。
-   剩余真待办只有一个:`FileReader.onload → innerHTML`(Blob 源)执行且当前只在
-   `innerHTML` 这一跳被看见,源侧没有 FileReader 建模 —— 属污点源建模,需按 176i/176j
-   的路子先造可控/不可控对照再动,不当作本轮已完成项。
-
-3. **对照产物的 scoring 口径应进产物本身**:`benchmark/adapters.py` 里"检出 =
-   high/medium/critical 且 type 不以 `csp_` 开头"是硬编码在解析逻辑里的;
-   应写成 `run_cross_tool.py` 输出中的 `scoring` 字段,让 JSON 自己说清口径。
-4. **`flask.app.test_client()` 在本机不可用**:装的 Werkzeug 已移除
-   `__version__`,而 Flask 2.2.5 的 `EnvironBuilder` 要读它,于是 `test_client()`
-   在建请求前就抛。`tests/test_phase196_api_gate.py` 改用 `werkzeug.test.Client`
-   直接驱动同一个 WSGI app(测的是真路径),但这是一条**环境漂移**,依赖治理
-   (3.2 那一族)应把 Flask/Werkzeug 组合钉住。
+**修复(Phase 200)**:`scan()` 创建真实 aiohttp 会话时置
+`_sync_layers_online = True`;`_get_sync_requester()` 无此旗标即拒绝
+("sync-layer transport is offline"),层的既有 try/except 将其如实降级为
+"层不可用"。效果:14/12 预算的 _probe_param **62.7s → 0.44s**(142 倍),
+196/197 系列的 HPP body 测试 55s+ → 0.66s。回归测试
+`tests/test_phase200_hermeticity.py` 3 例(桩环境零真请求 + 守卫拒绝 +
+生产路径置位)。遗留记账:sync 层 Requester 共享限速/代理/超时/cookie,
+但**不经过** async 的 per-host throttle 与 189 的 egress jar —— 一次真实
+不对称,待有需求再对齐。
 
 ## 5. 执行顺序建议
 

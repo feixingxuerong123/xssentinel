@@ -18,6 +18,39 @@ from .async_scanner_common import (
 )
 
 
+class _OfflineSession:
+    """Refuses every request (Phase 200 hermeticity guard).
+
+    Stands in for ``Requester.session`` while no real aiohttp transport
+    is active: the sync layers' probes must not leak to the real network
+    from a stubbed session.  Implements the small surface the layers and
+    the Requester touch -- everything raises, the attributes exist so
+    unrelated attribute reads do not explode.
+    """
+
+    headers: dict = {}
+    proxies: dict = {}
+    cookies: dict = {}
+    verify = True
+
+    def request(self, method, url, **kw):
+        raise RuntimeError(
+            "sync-layer transport is offline: no aiohttp-backed session "
+            "is active, so this probe would leak to the real network")
+
+    def get(self, url, **kw):
+        return self.request("GET", url, **kw)
+
+    def post(self, url, **kw):
+        return self.request("POST", url, **kw)
+
+    def send(self, request, **kw):
+        return self.request(request.method, request.url)
+
+    def close(self):
+        pass
+
+
 class AsyncCrawlMixin:
     """Hidden-parameter mining, endpoint/source-map mining, BFS crawl.
 
@@ -76,6 +109,17 @@ class AsyncCrawlMixin:
         shim's ``req`` is None and those layers' own try/except used to
         degrade to no-ops.  Build one sharing the scan's timeout / headers
         / cookies / proxy / TLS / rate-limit settings, once per scan.
+
+        Phase 200 hermeticity guard: this requester hits the REAL network,
+        which is only legitimate while a real aiohttp transport is active
+        (``scan()`` sets ``_sync_layers_online``).  CONSTRUCTION stays
+        legal -- wiring tests capture the requester and assert it is
+        passed through -- but while no live transport exists its session
+        is replaced with one that REFUSES every request, so the layers
+        degrade to "unavailable" (their own try/except) instead of
+        leaking probes to the real network from a stubbed session:
+        measured, 6 leaked L7 probes x 7-11s of DNS timeout each was the
+        "55s per _probe_param" recorded in OPTIMIZATION 3.8.
         """
         req = getattr(self, "_sync_requester", None)
         if req is None:
@@ -89,6 +133,8 @@ class AsyncCrawlMixin:
                 rate_limit=self.rate_limit,
                 jitter=self.jitter_ratio,
             )
+            if not getattr(self, "_sync_layers_online", False):
+                req.session = _OfflineSession()
             self._sync_requester = req
         return req
 

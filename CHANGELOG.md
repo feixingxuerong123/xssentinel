@@ -123,6 +123,12 @@
   findings 视图缺主循环裁定,polyglot fallback 只在 async 误发 —— 已修
   (shim seed + param_confirmed 哨兵),并修复两引擎 polyglot finding
   缺 confidence 键的报告元数据缺陷。
+- **async 测试密闭性守卫(Phase 200,OPTIMIZATION 3.8 结案)**:3.8 记录的
+  ~55s/_probe_param"判定 CPU"被实测推翻 —— 真凶是 L7 层载荷探针经
+  独立 sync Requester 泄漏真网络(桩 session 的测试里每次不可解析域名
+  DNS 超时 7-11s)。`_get_sync_requester()` 现在要求活跃的真实 aiohttp
+  传输(`scan()` 置旗),否则拒绝、层如实降级。14/12 预算
+  _probe_param 62.7s→0.44s。
 - **报告层性能基线(Phase 199,OPTIMIZATION 2.2)**:1000 条真实形状合成
   finding 八格式实测 —— html 0.053s,比 2s 验收线快 38 倍,报告层不是
   瓶颈,不做重写;基准脚本 `benchmark/report_load.py` 与结果入库可复跑。

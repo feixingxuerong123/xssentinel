@@ -675,3 +675,313 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
       测试 test_report_load.py 2 例(全格式跑通 + 合成 finding 确定性/字段
       完整);report 套件 67 例回归绿。**未跑全量门禁:零生产代码改动**
       (新增基准脚本 + 测试 + 文档)。
+
+- [x] **200 async 测试密闭性守卫(OPTIMIZATION 3.8 结案,诊断被实测推翻)**:
+      3.8 把 ~55s/_probe_param 记为"每响应判定 CPU"。复现后逐层排除:
+      全部热点函数合计 0.11s/210 次、成本不随预算变化、faulthandler 线程栈
+      显示执行器线程全程卡在 `getaddrinfo`、钩 `requests` send 计数确认
+      **6 次真实请求 = L7 层(mutation/clobber/template/polyglot)载荷探针**
+      经 `_get_sync_requester()` 的真实 Requester 发往测试假主机,本机劣化
+      DNS 上每次 7-11s。修为密闭性守卫:`scan()` 建真实 aiohttp 会话时置
+      `_sync_layers_online`,`_get_sync_requester()` 无旗标即拒绝(层的
+      try/except 如实降级"层不可用")。效果:14/12 预算 _probe_param
+      **62.7s→0.44s**(142 倍),HPP body 测试 55s+→0.66s。回归
+      `tests/test_phase200_hermeticity.py` 3 例;async 套件 56 例绿;
+      遗留记账:sync 层 Requester 不过 async throttle/egress jar。
+
+- [x] **200 `--self-test` 首次跑完 + 归因出两个被 wedge 掩盖的真缺陷**:
+      `--self-test` 自 Phase 182 起反复撞 900s 超时(Phase 187/192 记为
+      "未验证"),本轮先修掉了 wedge 的**两个**成因:① self-test 靶场
+      `tests/vuln_server.py` 用单线程 `HTTPServer` + HTTP/1.1 keep-alive
+      → 一条空闲连接就饿死其余全部客户端(实测 netstat: LISTENING 与
+      ESTABLISHED 并存,新客户端全部超时);改 `ThreadingHTTPServer` +
+      handler `timeout=10`,并用一把只包住**请求处理**的 `_SIDE_CHANNEL_LOCK`
+      保住 `/header-reflect`、`/graphql` raw_body、cookie_theme 的
+      单线程语义(不包 keep-alive 空闲读,故不会饿死自己)。② 产品级
+      **provisional navigation 陷阱**(与靶场无关,影响真实用户):
+      `page.goto(wait_until="commit")` 抛超时后 Chromium 保持导航为
+      provisional,下一个 `page.evaluate` 会一直阻塞到浏览器放弃 ——
+      **实测 763.16s**(dev/_silent_nav_probe.py 三分支对照:失败 goto 2.02s
+      → evaluate 763s;`goto("about:blank")` 恢复 0.02s → evaluate 0.0s);
+      现场对应 `scan_endpoint('/evt')` 里 436s 的停顿,而 faulthandler
+      只能看到 asyncio/greenlet 帧、报不出方法名。修复 `dom_engine`
+      新增 `_recover_nav()`(失败 goto 后 about:blank,5s 上限,best-effort),
+      `_bounded_goto` 与 `harvest()` 各接一处;测试
+      `tests/test_nav_recovery.py` 9 例(含真 Chromium 静默服务器 <60s 界
+      + 两个变异对照)、`test_vuln_server_concurrency.py` 6 例、
+      `test_server_threading_audit.py` 3 例(repo 级规则审计,防旧形状复活)。
+      **self-test 由此第一次跑完:790s、exit 1、5 项 FAIL** —— 而此前所有
+      失败尝试都死在 wedge 上,所以这 5 项**没有任何历史基线**,
+      必须实测归因,不能猜("判定不确定时必须返回 UNKNOWN 交回浏览器")。
+      差分法:把本轮改动 `git stash` 后在**旧代码**上跑同一归因探针,
+      同一探针同一靶场只换代码版本。
+      归因结论(三项既缺陷 + 两项尺子/靶场缺陷):
+      ① **`spa_crawler.crawl` 静默吞异常且从不回退**(最重):任何一次
+      先前扫描启动了共享 sync 浏览器(`dom_engine.get_shared_browser`
+      → `sync_playwright().start()`),该线程就**永久**留一个 running
+      loop,之后每次 `SpaCrawler.crawl` 立刻死于
+      "It looks like you are using Playwright Sync API inside the asyncio
+      loop." —— 而 `spa_crawler.py` 的 `except Exception: return endpoints`
+      只返回(通常为空的)部分结果,**不查 fallback**,于是爬取能力**无声
+      消失**:调用方无法区分"这个 SPA 没有路由"和"浏览器起不来"。
+      实测四点序列(**旧代码逐项相同**,故为长期既有缺陷而非本轮回归,
+      被 900s wedge 掩盖了 18 个 Phase):全新进程 loop=False→10 端点;
+      一次 DOM 扫描后 loop=True→**0 端点**;`shutdown_thread_browser()`
+      后 loop=False→10 端点。对扫描的影响:爬取目标退化成单端点扫描
+      (**40 请求 / 0.1s / 0 条发现**,而浏览器可用时是 **427 请求 /
+      16 findings**),self-test 的"L7 爬到 /dom"与"L7 爬到 /echo|/script
+      反射"两项即由此失败。修复:abort 时回退到调用方的静态 BS4 爬虫
+      (新增 `_merge_endpoints` 并集助手,浏览器已登记的端点不丢);
+      实测 wedged 态 **0 → 9 端点**、`dedupe 1→1` 变 `10→10`、
+      scan_target 回到 **427 请求 / 16 findings / 1.48s**。
+      测试 `tests/test_spa_crawler_fallback.py` 13 例,含一个**对照**
+      ——同款输入下 pre-fix 形状返回空、修复形状返回端点,证明守卫吃劲
+      而非空断言。
+      ② **`_FONT_FACE_BLOCK_RE` 用 `[^}]*` 截断块体**(真 FN):模板插值
+      天然产生 `}`(`url({{ asset }})`、`.../{{ font }}.woff2`),块体在
+      第一个 `}` 处被截断,`unicode-range` 落到块外 → gadget 漏报。
+      不对称可测:同构的 `@import` 模板形态**会**报
+      `css_import_injection`,`@font-face` 形态**只**报 template 而丢 exfil。
+      改为容一层嵌套花括号(有界,缺右括号不会吞掉整张样式表);
+      `tests/test_css_injection_template.py` 15 例含缺右括号有界性、
+      双 `@font-face` 仍各自匹配。
+      ③ **CSSI 层只传参数名当证据**:`_scan_css_injection` 传
+      `extra_markers=list(params.keys())`,而真正落进样式表的是**参数值**,
+      于是反射型命中根本开不了门(只剩模板占位符一条路)。改为名+值都传;
+      名字仍传是有理由的(样式表可能只引用变量名而不回显其值)。
+      **Phase 140 的门本身完全正确,一个字没动** —— 它的存在依据是
+      OWASP Juice Shop 实测(当时唯一的 finding 就是假的
+      `css_font_face_exfil`,而两个真 XSS 全漏),所以修的是"喂给门的
+      证据"和"块体正则",不是门。靶场同步补两条干净孪生
+      `/cssi-font-face-safe`、`/cssi-import-safe`(此前只有正例,这条层
+      只能证明"会报",证不了"不乱报");实测正例 fire、孪生沉默。
+      ④ 靶场陈旧 `_sanitizer_strong_page` 仍钉 `dompurify@3.0.5`,而
+      Phase 189 语料(`<= 3.4.15` 及 `< 3.1.3` 两条线,取自厂商
+      advisory)判定其易受攻击 —— **发现为真,是靶场时基陈旧**,与
+      Phase 189 修 `neg-sanitizer-01` 同族(那两处已升 3.4.16,此处漏升)。
+      升 3.4.16 并补 `integrity`+`crossorigin`(Phase 189 记过:摘掉
+      integrity 会撞 sri_bypass high,把一个 FP 换成另一个 FP)。
+      ⑤ 另两页 CSSI fixture 自 Phase 140 起就不再表达"用户可控 CSS"
+      (`q` 无占位符也不被反射进样式表),预期本身陈旧,随 ②③ 一并修。
+      本轮自省要点:**"从未跑完过的门禁"等于没有门禁** —— 790s 首次
+      跑完立刻暴露两个 18 个 Phase 未见的真缺陷,而其中最重的那个
+      (爬取静默失效)在结构上**根本不可能**被任何单端点测试发现,
+      因为它只在"先扫过一个用浏览器的端点、再爬取"这个顺序下现形。
+      **门禁终态(本机实测,非引用)**:全量分批 **168/169 文件绿(4535s)**,
+      唯一失败 `test_phase196_csp_delivery.py` 两次 attempt 均 TIMEOUT、
+      门禁后单文件复跑 **21 passed in 9.66s** → 同机另一项目并发 pytest
+      抢占 loopback 的资源争用形态,**与本轮改动零交集**(该文件测 Phase 196b
+      的 CSP 投递通道),按环境形态记账。`--self-test` **ALL CHECKS PASSED**
+      (Phase 182 以来首次);strict 64 例切片双引擎 FP0/FN0/ERROR0 exit 0
+      (`phase200_quick_{sync,async}.json`);range4 双引擎 TP2/FP0/TN2/FN0/ERR0
+      exit 0(`results_verify_phase200.json`);benchmark 既有三条 CSSI 用例
+      定点复跑 TP/TN/TN(`dev/_cssi_bench_cases.py`,因 64 例切片只含其中
+      一条负例,阳性 `pos-cssi-01` 不在切片内 —— **切片绿灯不等于这层没变**)。
+      另 `--self-test` 自身也修了尺子:CSSI 两个端点原本以 `params={}` 扫描,
+      而门要求"用户可控"的 CSS 才有资格触发 —— 门是对的、**测试是陈旧的**,
+      改为带 `q=xssent` 扫,并补两条反向断言(干净孪生必须沉默),
+      否则"删掉门"会看起来像通过。
+      **两个本轮记下但已测清的开放问题**:① `about:blank` 恢复是否破坏
+      `window_name` 探针 —— 实测**不影响**(两臂对照均存活;Chromium 规范上
+      恢复后探针会重新设置 `window.name`,恢复只发生在**失败 goto 之后**,
+      而 window_name 探针自己的 goto 不失败);② Juice Shop 外部效度实测
+      (v20.2.0 官方包,MD5 与官方 `.md5` 逐字节匹配,ground truth 取自
+      上游 `challenges.yml` 而非本仓:**9 XSS / 69 非 XSS / 38 其他**)
+      —— **结论是"还不能测",不是"测过了"**:9 条 XSS 里 7 条需登录态 +
+      持久化写入、2 条是纯 DOM 层、**0 条是未认证 query 反射型**,与无头
+      CLI 扫描的覆盖边界交集接近空,故 53 请求 0 findings 是**预期而非漏报**。
+      记录见 `dev/_JUCESHOP_EXTERNAL_VALIDITY.md`;按 190 的纪律不进
+      README、不进门禁 —— 外部效度需要一个"登录→持久化注入→跨会话回访"
+      的驱动器(range3 已有该三段流程,是独立的一个 Phase)。
+      **本轮自己也踩了三次尺子错,都记在案**:① 用 `-match` 判"反射",
+      命中的是数据库里真实产品名"Apple Juice" —— **看似反射 ≠ 反射**;
+      ② 从 `dev/` 跑脚本时本机另一份 editable 安装(`D:\op\xssentinel`)
+      **静默劫持导入**,探针会量到另一棵树,症状是"仓库里明明有这个符号
+      却 ImportError" —— 已加 `dev/_pin_repo.py` 强制校验解析结果;
+      ③ 外部效度的尺子本身尚未建好,差点把"测不了"写成"通过"。
+- [x] **201 同族 wedge 的收尾(一处真修复 + 一处否证 + 一处方法论教训)**:
+      200 的回退修的是"爬取整体中止",留下一个更窄的洞。顺着同一模式查下去:
+      ① **否证 —— `verifier.verify_headless` 没有这个 wedge**
+      (`dev/_VERIFY_HEADLESS_WEDGE.md`)。它是"candidate → 浏览器确认证据"
+      的主路径,若同病则受害的是最关键的确认环节,所以值得先查。
+      实测两臂打同一台静默服务器:arm A 失败 goto 后,下一次调用
+      (`wait_for_load_state`)**5.02s 后按约定抛 TimeoutError**;arm B
+      `about:blank` 恢复 0.02s、其后调用 0.00s。**关键差异不是 try/except,
+      而是每次浏览器调用都带 timeout** —— dom_engine 那个 763s 是
+      `page.evaluate` 挂到浏览器放弃,这里有界。**结论:不改。**
+      按纪律"没量过的改动不进代码,量过是不需要的更不该进"记档 ——
+      同族问题最容易被顺手一起修掉。
+      ② **真缺陷 —— `spa_crawler` 的 goto 失败分支把页面留在 provisional 态**
+      (`dev/_dom_links_wedge_probe.py`):`crawl()` 里 `page.goto` 抛异常时
+      只 `continue`,**不恢复页面**,于是该页此后每次 `page.evaluate`
+      阻塞。实测 `_extract_dom_links` **117.02s** 后返回 `[]` —— 比 200 修的
+      顶层中止更隐蔽:爬取继续跑,只是把"这个 SPA 没有链接/路由/表单"
+      当结论报出来,四类采集(DOM 链接、SPA 路由、表单、XHR)全部静默归零。
+      修复放在 **goto 失败分支**(而非四个 evaluate 站点):接
+      `dom_engine._recover_nav`,复用已验证的 about:blank 形状。
+      **修法位置是被实测纠正的,不是设计出来的**:先在
+      `_extract_dom_links` 里加恢复,复测仍是 **117.02s、一秒没省** ——
+      因为 handler 只在 evaluate **抛异常之后**才触发,而它在那 117 秒里
+      根本没返回。**"在异常处理器里修一个"先阻塞 117 秒再抛异常的问题"
+      是无效修法**。端到端复测(crawl 入口):**117.02s → 3.69s**,
+      0 端点仍是**正确结果**(页面确实不存在),变的只是耗时与沉默。
+      测试 `tests/test_spa_crawler_nav_recovery.py` 4 例:恢复先于 evaluate /
+      恢复用 about:blank / **健康页绝不多做一次导航**(防"无条件恢复"把
+      SPA 路由 init script 的状态每次访问后都毁掉)/ 变异对照。
+      ③ **有据的不对称,不是漏修**:`async_scanner_crawl.py` 全文件零
+      `goto`/`evaluate` —— async 爬取是 aiohttp + JS 静态挖掘,不经浏览器,
+      这个 wedge 在 async 引擎上**结构上不存在**,故无对位块可写。
+      **门禁(本机实测)**:strict 64 例切片 **双引擎** FP0/FN0/ERROR0 exit 0
+      (sync 64 例 0 SKIP / async 63 例 1 SKIP = stored-dom 属 sync-only,与 200 同;
+      `phase201_quick_{sync,async}.json`);range4 双引擎 TP2/FP0/TN2/FN0/ERR0 exit 0。
+      range4 sync 首跑曾 `r4-pos-react-dsi` 180s timeout,但**单文件复跑
+      15.9s TP / 12 findings / browser-confirmed=12** —— 与 187/200 记过的
+      同机并发争用形态一致(当时 strict 切片正在同机跑),按环境形态记账。
+      受影响面 63 例全绿(spa_crawler 4 文件 + dom 导航 2 文件),改动文件 ruff 零债。
+      **续测(同日)**:受影响面扩到 **68 例 2.27s** 全绿;crawl/layer/coverage/
+      parity/engine/dom_engine/spa **21 文件族**在跑时被同机另一项目的批处理门禁
+      拖死(栈卡 `socket.socketpair()` 的 `accept()`,905s 超时)。
+      `--self-test` **ALL CHECKS PASSED、exit 0、778s**(200 之后第二次连续通过)。
+      **全量分批门禁本轮三次撞同一形态,按"未验证"记账**:187(range4 180s 超时)、
+      200(`test_phase196_csp_delivery.py` 双 TIMEOUT、单文件复跑 9.66s 通过)、
+      201(**687 分钟只落盘 2 个文件**,同期 `D:\qoder\vuln-agent` 的
+      `run_tests_batched.py` 连续跑了 604 分钟且仍在 fork pytest,双方同一秒
+      各起一个 pytest)。差三个数量级即是证据:清理后同一受影响面 **2.27s**。
+      **用户已两次拍板**:先"等对方跑完"、对方换了一轮又起(15:28 新 PID 3608)
+      后改为"不等了,按未验证收口"。故 Phase 201 **不声称全量门禁通过** ——
+      下一轮环境干净时必须补跑,且跑前先执行下面的进程表检查。
+      完整归因、进程表读数与**给下一轮的可执行前置检查**记于
+      `dev/_WEDGE_gate_20261006.md` —— 三次的形态完全一致
+      (同机并发 → loopback/Chromium 争用 → 超时或停滞,而单文件复跑一律全绿),
+      故本轮**不拿受污染的数字做结论**。
+      读日志的坑也记一笔:`test_async_budget.py` 常态触发重试
+      (`attempt 0 rc=TIMEOUT` / `attempt 1 rc=0`,`11 passed in 528.98s`),
+      **只看 "11 passed" 会低估整轮真实耗时**,必须读 `attempt 0`。
+      **门禁脚本的副作用也踩了一次**:`range4/runner.py` 分臂跑会把入库的
+      `range4/results.json` 覆写成**单臂 4 行**(原为双引擎 8 行,
+      `git status` 显示 332 deletions),已 `git checkout --` 恢复、单臂结果
+      另存 `results_verify_phase201_async.json`。**要么用 `--out` 指定新文件,
+      要么跑完检查 `git diff range4/`** —— 门禁顺手覆盖版本控制里的历史产物,
+      下一个人会以为双引擎结果变了。
+      **本轮的方法论教训**:"同族问题"值得查(本轮就查出一个真的),
+      但**每一条都必须各自测量** —— 同一个假设下,一条真缺陷、一条否证、
+      一条结构上不存在。三条都记在案,免得下轮把否证的那条顺手"修"了。
+      **工具入库(用户拍板)**:`dev/_pin_repo.py` → **`dev/pin_repo.py`
+      去前缀入库**(仿 `dev/fetch_range5_vendor.py` 的先例 ——
+      **可复跑的取证属版本控制**)。它强制 sys.path 指向本仓,并在解析到
+      别的树时抛错:本机那份 `D:/op/xssentinel` editable 安装会**静默劫持**
+      从 `dev/` 跑的探针,症状是"仓库里明明有这个符号却 ImportError",
+      极易误读成被测代码坏了。改名后实跑依赖它的探针验证可用:
+      `_verify_headless_wedge_probe.py` exit 0 且**否证结论复现**
+      (arm A 5.02s 有界 / recovery 0.00s / wedge=False)。
+      **顺手修了改名时自己造成的一个事故**:`Set-Content -Encoding UTF8`
+      给三个探针加了 **BOM**,AST 解析直接 SyntaxError(U+FEFF)——
+      **改文件后必须 AST 复验,不能只看 ruff**(ruff 当时报的全是别的);
+      同批还清掉 `_verify_headless_wedge_probe.py` 里被否证假设遗留的未用
+      局部变量(`recovered`,探针算出一个谁也不读的裁决,正是假设悄悄变成
+      结论的路径)与 `_window_name_recovery_probe.py` 的两个真冗余导入。
+      **续:又一次否证 + 一条新守卫**。修复加的那行
+      `from .dom_engine import _recover_nav` 在 `except` 块内、**自身无 guard**,
+      而 `_recover_nav` 的 docstring 承诺"recovery must never turn one
+      failure into a crash" —— 那承诺覆盖它自己的函数体,**不覆盖抵达它的导入**。
+      看起来是我自己引入的新失败面。**实测:不是**(`dev/_recover_import_probe.py`,
+      记于 `dev/_RECOVER_IMPORT.md`):三臂打同一个抛 goto 的假页面 ——
+      A 真导入 `ok` 且页面收到 `[app, about:blank]`;**B 让导入抛 ImportError
+      仍 `ok`**(外层 `except Exception` 兜住);**C 让 `_recover_nav` 抛也 `ok`**;
+      `import_failure_escapes_crawl=False recover_nav_contract_broken=False`。
+      **结论:不加 guard**,三条理由都基于读数:① 不可达(实测外层已兜住);
+      ② 再套一层 try 是"看起来更安全"的假象、零可测量收益(与 ① 同一条纪律);
+      ③ 真发生时后果是**退化不是崩溃** —— 退回静态爬虫正是 200 建立的
+      已测量降级路径。否证顺带产出**三条新守卫**:recovery 抛异常不逃出 crawl /
+      导入失败降级到 fallback / **`BaseException` 不被吞**
+      (Ctrl-C 必须真能停扫描 —— 把"recovery 绝不崩溃"钉住它的边界,
+      免得下一个人把这条边界当成疏漏去"修")。写第二条时测试当场抓到我自己
+      漏了 `import pytest`。
+      **续二:替身保真度也是量出来的**(`dev/_double_fidelity_probe.py`)。
+      拿 `_WedgedPage` 与真实 Playwright 的 surface 对比,抓到**三处不忠实**:
+      ① `page.url` 缺失;② `wait_for_load_state(**kwargs)` 放行了真实签名会拒的
+      调用;③ **`page.new_page` 是凭空发明的**(真实 Page 没这个方法)。第 ③ 条
+      最危险 —— **替身能响应真实代码不可能发出的调用**;而缺失属性会抛
+      AttributeError **被它本该检验的那些 `except Exception` 吃掉**,于是测试
+      看着绿、实际什么都没量。修完(拆 `_FakeContext`、
+      `wait_for_load_state` 改 keyword-only、补 `url`)复测 `faithful=True`。
+      顺带修了 `_WedgedPage` 类 docstring **说谎**(写"evaluate 会阻塞",
+      实现是 raise)—— 本项目反复记录的"文档刻度失真"形态。
+      **续三:变异对照差点造成一条假记录**(`dev/_MUTATION_CONTROL_LESSON.md`)。
+      首次变异用正则替换 recovery 调用,结果 **7 passed**,看着像"守卫是空的";
+      **但那是假的 —— 正则没匹配上真实缩进,所谓"变异后运行"跑的是原始代码**。
+      若就此下结论,会写出两条都错的记录(误判守卫无效→删掉有用的断言;
+      或反过来因为"仍绿"去加强本来没问题的断言)。改成严格脚本
+      `dev/_recovery_mutation_control.py`:**先断言文本存在再变异**
+      (找不到就 `MUTATION ABORTED` 退出码 2,绝不"跑一遍看看")+ **跑三遍**
+      (baseline/mutated/restored 都在转录里)+ **只有 mutated 红且 restored 绿
+      才算通过**。实测 `baseline rc=0 / mutated rc=1(3 failed)/ restored rc=0`
+      → `guard_is_load_bearing=True`。
+      **一句话教训:变异对照的输出和被测代码一样需要被怀疑 —— "跑完了"不等于
+      "变异生效了",判据是有证据证明源码确实变了。**
+      **续四:守卫自己也要被变异检验,而且它咬出了三个 100% 空转的断言**
+      (`dev/_double_fidelity_mutation.py`)。给替身保真加的 2 条新守卫,一做
+      变异就塌了:① `assert "kwargs" not in sig.parameters` 读起来正是"不能是
+      catch-all",**实际完全空转** —— `inspect` 只在参数是 keyword-only 时把它
+      命名为 `kwargs`,裸 `**kw` 显示为 `kw`;② 用 `Page ∪ Browser ∪
+      BrowserContext` 的**名字并集**比对,而 `new_page` 真实 `Page` 上没有、
+      `BrowserContext` 上有 → **并集正好放行了 `_WedgedPage.new_page`**,
+      恰是它要抓的凭空发明;③ 守卫只查"多出来的成员",**纯删除方向完全不设防**
+      —— 删掉 `url` 仍 9 passed。
+      修法都是回到"比较的是什么":判据从**参数名**改成**参数 kind**;
+      比对从**并集**改成**按角色**(Page 替身只比 Page,Context 替身只比
+      BrowserContext);补 11 条 `REQUIRED_PAGE_MEMBERS` 参数化断言堵删除方向。
+      最终四个变异(重加 `new_page` / goto 退化 / wfls 退化 / 删 `url`)
+      **全部变红** → `double_guards_are_load_bearing=True`。
+      顺带修掉变异脚本自身的真问题:`finally: shutil.move(BAK, TARGET)` 在
+      Windows 失败过一次,**把测试文件留在变异态**,`restored` 一直红,差点被读成
+      "守卫有问题" —— 改成字节写回 + 还原后逐字节自校验,不一致即退 2。
+      **三条可复用判据**:① 判据要测被测物本身,不是它的某个表示;② 比对要按
+      角色不要按并集(并集把"A 没有 B 有"变成两边都合法);③ 守卫只覆盖一个
+      漂移方向时必须明写另一方向无人看守。
+      **续五:参数化守卫自己也会被装饰**(`dev/_required_members_probe.py`)。
+      上面那条 11 名的 `REQUIRED_PAGE_MEMBERS`,探针读生产 AST 一查,**有 4 个
+      (`content`/`context`/`is_closed`/`url`)在整个 `xssentinel/` 里零引用** ——
+      我是凭"Page 应该有"加进去的。它们是**装饰**:只有有人改列表才可能失败的
+      用例,只会虚增例数、什么都不保护。删到 7 个(每个带 `spa_crawler.py` 的
+      行号注释),7/7 全部 `USED`,`every_listed_member_is_load_bearing=True`;
+      并把"列表成员必须被生产代码引用"这条**内联进测试**(读 AST 而非靠人记得
+      跑 dev 脚本)。**参数化守卫的特有失效模式:名字来自信念而非推导。**
+      **续六:守卫集合本身也可被增删而无告警。** 变异"从
+      `REQUIRED_PAGE_MEMBERS` 删掉 `goto`"→ **16 passed,全绿**:列表 7→6、
+      参数化用例 7→6,**没有任何东西察觉**,因为没有断言看着集合本身。
+      补双向断言(`expected - LIST` 与 `LIST - expected` 都必须为空),与已有的
+      "必须被生产代码引用"合成三向闭合:**不许多、不许少、不许是信念**。
+      **五种失效形状**:① 测了表示没测被测物(查参数名);② 测了错误的对照集
+      (并集);③ 测了一半方向(只查增加);④ 测了列表没测被测物(凭信念列名单);
+      ⑤ 集合本身可被增删而无告警。**参数化守卫的验证对象是集合的每个成员
+      和集合本身,不只是断言。**
+      **续七:端到端数字当场重测,不引用。** 单元守卫全是替身,只证明 recovery
+      被调用,不证明它有效果 → 重跑端到端(`dev/_spa_wedge_recheck.py`,
+      真实浏览器 + 接受连接后永不回字节的服务器):**elapsed 3.67s**,
+      `crawl_under_90s=True fixed_present=True`,与当初记录的 3.69s 一致。
+      **"117s → 3.7s"是一句关于某一次跑完的运行的断言;fixture 或修复一旦漂移,
+      它会静默变成假话,而所有单元测试照样全绿 —— 本轮没复现过的引用数字不是
+      证据。** 顺带:该探针第一次 `from core.spa_crawler import` 报
+      ModuleNotFoundError —— 与"导入了 D:\op\xssentinel 那棵树"同类,
+      **路径决定你量的是哪棵树**。
+      **续八:第一次找到指向产品数据面的真实缺口**
+      (`dev/_CORPUS_DERIVED_GUARDS.md`)。顺着"参数化守卫的成员应从被测对象
+      派生"横扫 tests/,找到 25 处字面量 parametrize 列表 —— **但 25 不是
+      结论**:抽查后大多数是正确的(列的正是契约本身),凭计数去改会把对的改成
+      错的。逐个抽查找到**一处真实的单向断言**:
+      `test_p27.py::test_compliance_mapping_exists` 的 docstring 写着
+      "Each new finding type must map to at least one compliance entry",
+      却只能检查它自己列的 9 个类型,而权威集合在
+      `data/compliance.json` 的 `finding_type_map`(**没有任何东西对比两者**)。
+      实测:语料 **129** 类型 / 测试列 **9** / **114 零覆盖**(扣除 prefix
+      fallback);`stale=0` 但**无机制保证它干净**。同型的
+      `test_finding_type_has_compliance_mapping` 只查 `len(entries) > 0`,
+      **不查条目形状** —— 缺 `url`/`requirement_id` 的条目能通过却在报告里
+      渲染成空行。
+      修法:保留手写列表作重点快测,**另补从语料派生的两条**(有映射 + 条目
+      四字段齐全)→ **246 例通过,0.81s**,语料全部合规且形状完整。
+      **三条判据**:① docstring 声称的范围必须能被检查,否则那句话在说谎;
+      ② 方向要对称(只查"列出的都在"就漏掉"该有的没列");③ **非空不等于正确**。
+      **前七轮修的都是测试代码自身;这一轮第一次靠一条测试侧的规则找到了产品
+      数据面的缺口 —— 边界不在文件里,在"谁在断言什么"上。**

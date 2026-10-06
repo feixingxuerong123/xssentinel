@@ -401,6 +401,16 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
                                              connector=connector,
                                              **self._session_kwargs(url)
                                              ) as session:
+                # Phase 200: a real aiohttp transport is now active, so the
+                # thread-offloaded sync layers (L7 advanced params, crawl
+                # mining, transport layers) may use their sync Requester.
+                # Without this flag, tests that drive _probe_param with a
+                # STUB session leaked the layers' probes through a real
+                # Requester to whatever host the test named -- each
+                # unresolvable lookup costing seconds of DNS timeout on a
+                # degraded resolver (measured: 6 leaked requests x 7-11s
+                # = the "55s per _probe_param" recorded in 3.8).
+                self._sync_layers_online = True
                 # 1) Baseline: get the page for reflection + DOM + advanced.
                 try:
                     async with self._semaphore:

@@ -150,10 +150,17 @@ def ensure_server() -> None:
     global _server_thread, _server
     if _server is not None:
         return
-    from http.server import HTTPServer
+    # Phase 200: ThreadingHTTPServer, not HTTPServer.  vuln_server.H speaks
+    # HTTP/1.1 keep-alive; a single-thread server parks its only thread in
+    # readline() on the scanner session's idle connection and never accept()s
+    # a second client (measured: a browser goto behind such a connection got
+    # no response for its whole 20s budget).  This in-process entry had the
+    # same shape as tests/vuln_server.py::__main__ -- the rule in PROJECT.md
+    # covers "lab services", so both entry points are fixed together.
+    from http.server import ThreadingHTTPServer
     try:
-        _server = HTTPServer(("127.0.0.1", BENCH_PORT),
-                             vuln_server.H)
+        _server = ThreadingHTTPServer(("127.0.0.1", BENCH_PORT),
+                                      vuln_server.H)
     except OSError as exc:
         raise RuntimeError(
             "cannot bind the xssentinel fixture server on 127.0.0.1:%d (%s); "

@@ -510,9 +510,25 @@ def _scan_css_injection(scanner, url: str, html: str,
     scanner.coverage.touch_layer(url, "L7_css_injection", "GET",
                                  detail="static CSSI analysis")
     try:
+        # Phase 200 (measured, dev/_cssi_gate_matrix.py): the gate needs to
+        # see the string that actually lands in the CSS.  This used to pass
+        # only ``params.keys()`` -- parameter NAMES -- but a page that
+        # interpolates a parameter into its stylesheet puts the VALUE
+        # there, so the name was almost never present in the block and the
+        # gadget rules (css_font_face_exfil / css_import_injection) could
+        # not fire except through the template-placeholder branch.  Names
+        # are still passed: a stylesheet may name the variable
+        # (``@font-face { font-family: {{ family }}; }``) without echoing
+        # its value, and the conservative >=4-char rule inside
+        # _css_user_controlled keeps short names from matching unrelated CSS
+        # identifiers.
+        markers: list[str] = []
+        for k, v in (params or {}).items():
+            markers.append(str(k))
+            if isinstance(v, str) and v:
+                markers.append(v)
         result = cssi_mod.analyze_page(html, page_url=url,
-                                       extra_markers=list(params.keys())
-                                       if params else None)
+                                       extra_markers=markers or None)
         if not result["violations"]:
             return
         for v in result["violations"][:5]:

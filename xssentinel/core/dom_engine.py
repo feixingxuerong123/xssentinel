@@ -837,6 +837,40 @@ _DOM_SETTLE_MS = 700
 # reads as an error rather than a result.
 _DOM_PROBE_BUDGET_S = 30.0
 
+# Phase 200: budget for the post-failure recovery navigation (see
+# _recover_nav).  Measured at 0.02s against a silent server -- 5s is a
+# bound, not an expectation; about:blank needs no network round-trip, so
+# hitting this cap means the BROWSER is wedged, not the target.
+_RECOVER_TIMEOUT_S = 5000
+
+
+def _recover_nav(page) -> None:
+    """Cancel a failed/provisional navigation so the page is evaluable again.
+
+    Phase 200, measured (dev/_silent_nav_probe.py, three branches against a
+    server that accepts and never responds):
+
+      A  goto(wait_until="commit", timeout=2s) raises after 2.02s, then
+         ``page.evaluate`` blocks **763s** -- Chromium keeps the navigation
+         provisional and Playwright's evaluate waits for an execution
+         context that never arrives (probe A ended with "Execution context
+         was destroyed").  In the field this was a 436s stall inside
+         scan_endpoint('/evt'), and faulthandler could not name it: the
+         thread sits in Playwright's greenlet event loop, so the dump shows
+         asyncio frames and nothing about the page.
+      B  after the same failed goto, ``page.goto("about:blank")`` returns
+         in **0.02s** and the following evaluate in **0.0s**.
+      C  control evaluate without a dangling navigation: 0.0s.
+
+    Best-effort by design: if the recovery navigation itself fails the
+    page is left as-is and the caller's next Playwright call raises
+    normally -- recovery must never turn one failure into a crash.
+    """
+    try:
+        page.goto("about:blank", timeout=_RECOVER_TIMEOUT_S)
+    except Exception:
+        pass
+
 
 def _query_param_names(url: str) -> list:
     """Ordered, de-duplicated query parameter names of ``url``."""
@@ -1043,6 +1077,15 @@ class DynamicDomAnalyzer:
             try:
                 page.goto(url, wait_until="commit",
                           timeout=int(self.timeout * 1000))
+            except Exception:
+                # Phase 200: same provisional-navigation trap as
+                # _bounded_goto -- harvest's page.evaluate below would
+                # otherwise block up to 763s (measured) on a page whose
+                # navigation never committed.  A recovery to about:blank
+                # costs 0.02s and the evaluate then honestly reports the
+                # empty harvest (no render => no live input face).
+                _recover_nav(page)
+            try:
                 page.wait_for_timeout(_DOM_SETTLE_MS)
             except Exception:
                 pass
@@ -1191,13 +1234,39 @@ class DynamicDomAnalyzer:
         too (variant C: commit + readyState poll capped at 5s) and buys
         nothing -- readyState stays 'loading' for exactly as long as
         DOMContentLoaded was blocked: 27s, 6 probes.
+
+        Phase 200 (measured, dev/_silent_nav_probe.py): when goto fails
+        against a server that accepts the connection but never responds,
+        Chromium's navigation stays PROVISIONAL and the NEXT
+        ``page.evaluate`` blocks until the browser gives the navigation
+        up -- **763s** in probe A (the sync-API thread parks inside
+        Playwright's event loop; faulthandler shows only greenlet frames,
+        which is why the field wedge looked like "no stack").  Recovery
+        (probe B): navigating to ``about:blank`` commits in 0.02s and the
+        evaluate then returns in 0.0s.  So a failed goto must NOT hand a
+        half-navigated page to the caller -- this is the same unbounded
+        cost Phase 148/155 were eliminating, just entering through the
+        caller's evaluate instead of goto itself.
         """
         remaining = deadline - time.monotonic()
         timeout_ms = int(max(1.0, min(self.timeout, remaining)) * 1000)
         try:
             page.goto(url, wait_until="commit", timeout=timeout_ms)
         except Exception:
-            pass
+            # Recover BEFORE returning (see docstring).  Phase-141
+            # compatibility: under wait_until="commit" a raised goto means
+            # the target document never committed, so its scripts never
+            # ran and there are no NEW sink hits to collect; hits from the
+            # previous probe's document were already read unconditionally
+            # at the end of that probe iteration (analyze reads
+            # window.__xss_dom_hits after EVERY probe, including failed
+            # ones).  Residual risk, accepted and bounded: a commit that
+            # lands in the microseconds between the timeout raising and
+            # this navigation would be discarded -- under the old code
+            # that same page's evaluate did not run for 763s either, so
+            # the recovery never converts a finding into a miss, it
+            # converts a 763s stall into a 0.02s empty read.
+            _recover_nav(page)
 
     def analyze(self, url: str, marker: str | None = None,
                 dialog_token: str | None = None) -> list:

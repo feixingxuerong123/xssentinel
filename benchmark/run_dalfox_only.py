@@ -17,7 +17,10 @@ sys.path.insert(0, _ROOT)
 
 from benchmark.server import load_routes, BenchmarkHandler  # noqa: E402
 from benchmark.adapters import get_adapters, run_comparison  # noqa: E402
-from http.server import HTTPServer  # noqa: E402
+# Phase 200: ThreadingHTTPServer -- BenchmarkHandler is HTTP/1.1 keep-alive;
+# a single-thread server lets one idle connection starve every other client
+# (PROJECT.md lab-service rule, same fix as run_benchmark.py).
+from http.server import ThreadingHTTPServer  # noqa: E402
 import threading  # noqa: E402
 
 PORT = 8878
@@ -31,7 +34,7 @@ def main():
 
     routes = load_routes()
     BenchmarkHandler.routes = routes
-    server = HTTPServer(("127.0.0.1", PORT), BenchmarkHandler)
+    server = ThreadingHTTPServer(("127.0.0.1", PORT), BenchmarkHandler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     time.sleep(0.5)
