@@ -334,13 +334,42 @@ python -m xssentinel --wayback target.com -o reports/ -f json
 # 路径前缀收窄：--wayback target.com/app
 ```
 
-**MCP stdio server（Phase 192，dalfox v3 同款）**——把扫描器作为工具暴露给
-LLM Agent（JSON-RPC over stdin/stdout）：
+**MCP stdio server（Phase 192/202，dalfox v3 同款）**——把扫描器作为工具暴露给
+LLM Agent（JSON-RPC over stdin/stdout），三个工具组成侦察链：
 
 ```bash
 python -m xssentinel --mcp
-# MCP 客户端配置里注册该命令即可;工具 xssentinel_scan 返回压缩后的
-# finding 判定(type/severity/confidence/evidence_class),无发现=成功。
+# xssentinel_scan    全量扫描,返回压缩后的 finding 判定,无发现=成功
+# xssentinel_discover  无头渲染一次,回 SPA 表单字段名 + 同源 API 端点
+# xssentinel_profile   单请求反射画像(context + raw=/stripped=/encoded= 元字符分类)
+```
+
+**浏览器渲染输入发现（`--discover`，Phase 196）**——渲染目标一次：SPA 表单
+字段名并入挖矿词表，页面自己 fetch 的同源 API 端点在主目标后扫描（上限 10）；
+需要 playwright，sync 引擎专属：
+
+```bash
+python -m xssentinel -u "https://target.com/app" --discover -o reports/
+```
+
+**GraphQL introspection 输入面（`--gql`，Phase 195）**——schema 里 String 型
+mutation 参数 / input 字段 / query 参数按写入侧优先并入挖矿词表，端点本身
+成为扫描目标；与 `--stored-view` 配对即得 API 写入的存储型验证链：
+
+```bash
+python -m xssentinel --gql https://target.com/graphql -o reports/ -f json
+```
+
+**HPP 参数污染探针（`--hpp` 语义内建，Phase 193/196）**——检测到 WAF 且标准
+梯子未确认时自动尝试：同参数投递两次（首现 benign、次现 payload），只查首现
+的过滤器被绕过；query 与 form 体双位置。
+
+**会话失效策略（`--session-check` / `--on-session-loss`，Phase 194）**——
+响应体正则检测死会话（200 页写"请先登录"defeating 状态码检查）；
+`--on-session-loss abort` 让死会话诚实停扫（findings 保留、原因记账）：
+
+```bash
+python -m xssentinel -u "https://target.com/admin" --login-url ...   --session-check "please log in" --on-session-loss abort
 ```
 
 **跳过指定参数（`--skip-param`）**——命中的参数 L1/L2 不再探测、隐藏参数

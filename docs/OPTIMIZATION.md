@@ -260,6 +260,10 @@ import 仍可用 —— 它靠的是 `sandbox.py` 里带原因的 re-export,而�
 抓不到已知事故的门,等于没有门(这条教训在 pyflakes 门禁那次已经付过一次学费)。
 
 
+> **DOM 静态端点扩容尝试后搁置(2026-10-06)**:/dom、/postmsg、/proto、/sw、
+> /worker 五端点双引擎对比全部"空对空"——L3_dom_static 在这些 manifest 固件上
+> 本就无所获(benchmark 的 dom TP 由动态引擎确认),parity 比较成立但没有检测力;
+> 静态网为何在 eval 形状上空手是另一个独立问题,与引擎分歧无关。
 > **已落地(2026-10-05,`tests/test_engine_parity_gate.py`)**:12 端点反射切片
 > 双引擎同预算对跑,比较 (type, severity, confidence) 有序多重集 —— context
 > 排除已被实测论证(同一参数多向量时"哪个 payload 先确认"是梯子顺序问题,
