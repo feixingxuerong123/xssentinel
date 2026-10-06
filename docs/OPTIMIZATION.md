@@ -369,10 +369,14 @@ JS config line(那本身就是 script-string sink),四例全 confirmed、safe
    `on_request_redirect` 改不了下一跳目标(实测),故 async 只做到剥凭据 ——
    真要让 async 也停,得把 async 的取页路径改成手工跳链(20 余个 `session.request`
    调用点),投入产出不匹配,除非有真实需求。
-2. **`'unsafe-hashes'` 从"检出"走到"利用"**:Phase 189 只在 `analyze().weak` 里点名
-   `unsafe-hashes` 可以让 hash 授权 `on*` 属性,还没据此选 payload。表内 hash 是
-   页面自带脚本的 hash,不是我们能控制的反射值 —— 真要利用需要"反射内容恰好等于
-   某条已声明 hash 的前缀"这类条件,先做可行性测量再决定,别写投机逻辑。
+2. **`'unsafe-hashes'` 从"检出"走到"利用"** —— **评估后关闭(2026-10-06,不可行)**:
+   hash 授权要求脚本内容**精确匹配** `sha256-...` —— 攻击者经反射注入的脚本要被
+   执行必须先求出该 hash 的原像(密码学不可行)。现实向量逐一排除:
+   base-uri 劫持改写相对 src 后内容改变 → hash 失配被拦;移动/复制页面**自带**
+   的已授权脚本不改内容、hash 仍有效 —— 但那需要先有另一个漏洞(DOM clobbering
+   或 XSS),unsafe-hashes 不是短板。结论:对反射型输入面,unsafe-hashes 的
+   "利用"没有可行路径,检出 + 修复建议(避免对可反射路径声明 unsafe-hashes)
+   就是正确终点,不写投机 payload 逻辑。
 3. **SSR hydration state 作为污点源**(`__NEXT_DATA__` / `window.__NUXT__` /
    `INITIAL_STATE`):Phase 189 评估后**决定不动**。理由:端点挖矿侧它已经被
    `js_miner.INLINE_SCRIPT_RE` 覆盖(JSON 里的 `"path": "…"` 走的正是同一个

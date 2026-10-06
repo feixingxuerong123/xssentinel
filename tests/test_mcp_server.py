@@ -57,8 +57,11 @@ class TestProtocol:
     def test_tools_list_catalogue(self):
         (resp,) = _session(MCPServer(), {**REQ, "method": "tools/list"})
         tools = resp["result"]["tools"]
-        assert [t["name"] for t in tools] == ["xssentinel_scan"]
+        assert [t["name"] for t in tools] == ["xssentinel_scan",
+                                              "xssentinel_discover",
+                                              "xssentinel_profile"]
         assert tools[0]["inputSchema"]["required"] == ["url"]
+        assert tools[2]["inputSchema"]["required"] == ["url", "param"]
 
     def test_ping_and_notification_silence(self):
         resps = _session(MCPServer(),
@@ -91,6 +94,40 @@ class TestProtocol:
                                                     "arguments": {}}})
         assert resp["result"]["isError"] is True
         assert "unknown tool" in resp["result"]["content"][0]["text"]
+
+
+# ---------------------------------------------------------------------------
+# run_profile_tool / run_discover_tool against loopback pages
+# ---------------------------------------------------------------------------
+
+class TestProfileTool:
+    def test_full_reflection_profiles_cleanly(self):
+        from tests.conftest import loopback_healthy
+        if not loopback_healthy():
+            import pytest
+            pytest.skip("loopback degraded mid-session")
+        server = ThreadingHTTPServer(("127.0.0.1", 0), _XssHandler)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        time.sleep(0.2)
+        base = f"http://127.0.0.1:{server.server_address[1]}"
+        try:
+            res = mcp_server.run_profile_tool({"url": base + "/",
+                                               "param": "q"})
+            assert not res.get("isError")
+            payload = json.loads(res["content"][0]["text"])
+            assert payload["reflected"] is True
+            assert payload["context"] == "html_element"
+            assert payload["full_reflection"] is True
+            # every probed meta char came back RAW
+            assert 'raw="' in payload["meta_chars"]
+            assert "stripped=" not in payload["meta_chars"]
+        finally:
+            server.shutdown()
+            server.server_close()
+
+    def test_profile_requires_url_and_param(self):
+        res = mcp_server.run_profile_tool({"url": "http://t/"})
+        assert res.get("isError") is True
 
 
 # ---------------------------------------------------------------------------

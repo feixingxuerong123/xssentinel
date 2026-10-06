@@ -132,6 +132,11 @@
 - **报告层性能基线(Phase 199,OPTIMIZATION 2.2)**:1000 条真实形状合成
   finding 八格式实测 —— html 0.053s,比 2s 验收线快 38 倍,报告层不是
   瓶颈,不做重写;基准脚本 `benchmark/report_load.py` 与结果入库可复跑。
+- **MCP 侦察工具 + unsafe-hashes 评估关闭(Phase 202)**:`xssentinel_discover`
+  (headless 渲染收割 SPA 输入面)与 `xssentinel_profile`(kxss 式单请求
+  反射画像,raw=/stripped=/encoded= 元字符分类)加入 MCP 工具面,Agent 可
+  按 discover → profile → scan 链式侦察;unsafe-hashes 的"利用"经评估确认
+  无反射面可行路径(精确 hash 匹配 = preimage 不可行),检出即终点。
 - **外部效度对照第一次量出来(Phase 196b)**:`benchmark/run_cross_tool.py` 让
   XSSentinel / dalfox / nuclei 在**同一批靶**上跑分。文档 1.0 长期写"第三方对照
   需换机器",本机复核推翻了它:GitHub API 与 raw 可达、Go 代理(goproxy.cn)能

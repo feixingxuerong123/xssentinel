@@ -689,6 +689,19 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
       `tests/test_phase200_hermeticity.py` 3 例;async 套件 56 例绿;
       遗留记账:sync 层 Requester 不过 async throttle/egress jar。
 
+- [x] **202 MCP 侦察工具 + 3.6 unsafe-hashes 关闭**:
+      ① `api/mcp_server.py` 增两工具,面向 Agent 的侦察链(discover →
+      profile → scan):**`xssentinel_discover`**(196 的 harvest 包装:渲染
+      一次,回 SPA 表单字段名 + 同源 API 端点;playwright 缺失显式报错)+
+      **`xssentinel_profile`**(kxss 式单请求 triage:sandwich 探针 + 共享
+      context/反射画像 machinery,回 context/extra_contexts/meta_chars
+      (raw=/stripped=/encoded=)/full_reflection/rcdata_tag,纯元数据零判定
+      语义)。tools/list 三工具;MCP 套件 13 例全绿。② OPTIMIZATION 3.6
+      item 2(unsafe-hashes 走到"利用")评估后关闭:hash 授权要求内容精确
+      匹配,反射注入需 preimage(不可行);base-uri 劫持改内容即失配;
+      挪用页面自带脚本需先有另一漏洞 —— 反射面上无可行路径,检出+修复建议
+      即终点,不写投机逻辑。
+
 - [x] **200 `--self-test` 首次跑完 + 归因出两个被 wedge 掩盖的真缺陷**:
       `--self-test` 自 Phase 182 起反复撞 900s 超时(Phase 187/192 记为
       "未验证"),本轮先修掉了 wedge 的**两个**成因:① self-test 靶场

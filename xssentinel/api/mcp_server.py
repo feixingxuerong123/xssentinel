@@ -29,6 +29,7 @@ caller's responsibility, exactly as with the CLI and the REST API.
 from __future__ import annotations
 
 import json
+import os
 import sys
 from urllib.parse import urlparse
 
@@ -84,6 +85,58 @@ _TOOL_SCAN_SCHEMA = {
     "required": ["url"],
 }
 
+_TOOL_DISCOVER_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "url": {
+            "type": "string",
+            "description": "Page to render and harvest (must be http(s)).",
+        },
+        "headers": {
+            "type": "object", "additionalProperties": {"type": "string"},
+            "description": "Extra HTTP headers (auth, etc.).",
+        },
+        "cookies": {
+            "type": "object", "additionalProperties": {"type": "string"},
+            "description": "Session cookies for authenticated pages.",
+        },
+        "timeout": {
+            "type": "integer", "default": 20, "minimum": 5, "maximum": 120,
+            "description": "Render timeout in seconds.",
+        },
+    },
+    "required": ["url"],
+}
+
+_TOOL_PROFILE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "url": {
+            "type": "string",
+            "description": ("Target URL; ``param`` is submitted with a "
+                            "sandwich probe value and the reflection is "
+                            "classified."),
+        },
+        "param": {
+            "type": "string",
+            "description": "The parameter to profile.",
+        },
+        "headers": {
+            "type": "object", "additionalProperties": {"type": "string"},
+            "description": "Extra HTTP headers (auth, etc.).",
+        },
+        "cookies": {
+            "type": "object", "additionalProperties": {"type": "string"},
+            "description": "Session cookies for authenticated pages.",
+        },
+        "timeout": {
+            "type": "integer", "default": 15, "minimum": 1, "maximum": 120,
+            "description": "Per-request timeout in seconds.",
+        },
+    },
+    "required": ["url", "param"],
+}
+
 TOOL_DEFINITIONS = [
     {
         "name": "xssentinel_scan",
@@ -94,6 +147,26 @@ TOOL_DEFINITIONS = [
             "type/severity/confidence/evidence_class. Only scan targets "
             "you are authorized to test."),
         "inputSchema": _TOOL_SCAN_SCHEMA,
+    },
+    {
+        "name": "xssentinel_discover",
+        "description": (
+            "Render a page in a headless browser and harvest the LIVE "
+            "input face: SPA form-field names and the same-origin API "
+            "endpoints the page itself fetched. Use BEFORE xssentinel_scan "
+            "to find what is actually worth scanning (Phase 196 machinery; "
+            "requires playwright)."),
+        "inputSchema": _TOOL_DISCOVER_SCHEMA,
+    },
+    {
+        "name": "xssentinel_profile",
+        "description": (
+            "Cheap one-request reflection triage (kxss-style): submit a "
+            "sandwich probe through the parameter and return the reflection "
+            "context, which meta characters survive RAW/stripped/encoded, "
+            "and whether the context is RCDATA. Use it to decide whether a "
+            "full scan is worthwhile."),
+        "inputSchema": _TOOL_PROFILE_SCHEMA,
     },
 ]
 
@@ -191,6 +264,122 @@ def run_scan_tool(args: dict) -> dict:
                                             indent=2)}]}
 
 
+def run_discover_tool(args: dict) -> dict:
+    """``xssentinel_discover``: render + harvest the live input face."""
+    from .server import _build_requester
+    from ..core.dom_engine import DynamicDomAnalyzer
+
+    url = (args.get("url") or "").strip()
+    if not url:
+        return {"content": [{"type": "text", "text": "url is required"}],
+                "isError": True}
+    from urllib.parse import urlparse
+    p = urlparse(url)
+    if not p.scheme or not p.netloc:
+        return {"content": [{"type": "text",
+                             "text": f"not an absolute http(s) URL: {url}"}],
+                "isError": True}
+
+    engine = DynamicDomAnalyzer(timeout=int(args.get("timeout", 20)))
+    if not engine.available():
+        return {"content": [{"type": "text",
+                             "text": ("playwright/chromium is not "
+                                      "installed -- xssentinel_discover "
+                                      "requires a headless browser")}],
+                "isError": True}
+    # auth state flows through the analyzer the same way the CLI's
+    # --discover pass wires it (headers ride the page, cookies the context)
+    _built = _build_requester({
+        "headers": args.get("headers") or {},
+        "cookies": args.get("cookies") or {},
+        "timeout": args.get("timeout", 20),
+    })
+    engine.auth_headers = dict(getattr(_built, "headers", None) or {})
+    try:
+        res = engine.harvest(url)
+    except Exception as e:
+        return {"content": [{"type": "text",
+                             "text": f"discover failed: "
+                                     f"{type(e).__name__}: {e}"}],
+                "isError": True}
+    return {"content": [{"type": "text",
+                         "text": json.dumps({
+                             "url": url,
+                             "input_field_names": res.get("names") or [],
+                             "same_origin_endpoints":
+                                 res.get("resource_urls") or [],
+                         }, ensure_ascii=False, indent=2)}]}
+
+
+def run_profile_tool(args: dict) -> dict:
+    """``xssentinel_profile``: one-request reflection triage.
+
+    The sandwich probe (kxss lineage, Phase 31 machinery) reveals which
+    meta characters the server leaves RAW -- the cheapest honest answer to
+    "is a full scan worth it, and what class of payload could work".
+    Metadata only: nothing here confirms or denies a vulnerability.
+    """
+    from .server import _build_requester
+    from ..core import context as ctx_mod
+    from ..core import reflection_profile as rp_mod
+    from ..core import verifier as _unused  # noqa: F401  (import parity)
+
+    url = (args.get("url") or "").strip()
+    param = (args.get("param") or "").strip()
+    if not url or not param:
+        return {"content": [{"type": "text",
+                             "text": "url and param are required"}],
+                "isError": True}
+    from urllib.parse import urlparse
+    p = urlparse(url)
+    if not p.scheme or not p.netloc:
+        return {"content": [{"type": "text",
+                             "text": f"not an absolute http(s) URL: {url}"}],
+                "isError": True}
+
+    token = "xssp_" + os.urandom(4).hex()
+    probe_value = rp_mod.build_probe(token)
+    try:
+        requester = _build_requester({
+            "headers": args.get("headers") or {},
+            "cookies": args.get("cookies") or {},
+            "timeout": args.get("timeout", 15),
+        })
+        resp = requester.request("GET", url, params={param: probe_value})
+        text = resp.text or ""
+        status = getattr(resp, "status_code", 0)
+    except Exception as e:
+        return {"content": [{"type": "text",
+                             "text": f"profile probe failed: "
+                                     f"{type(e).__name__}: {e}"}],
+                "isError": True}
+
+    profile = rp_mod.profile_reflection(text, token)
+    if profile is None or not profile.get("reflected"):
+        result = {"url": url, "param": param, "status": status,
+                  "reflected": False,
+                  "note": "the sandwich probe value did not reflect -- "
+                          "the parameter is probably not rendered"}
+    else:
+        sel = ctx_mod.analyze_all(text, token)
+        result = {
+            "url": url, "param": param, "status": status,
+            "reflected": True,
+            "context": sel.get("context"),
+            "extra_contexts": [c for c in sel.get("contexts", [])
+                               if c != sel.get("context")][:2],
+            "meta_chars": rp_mod.triage_line(profile),
+            "full_reflection": profile.get("full_reflection"),
+            "rcdata_tag": profile.get("rcdata_tag"),
+            "note": ("raw= lists the meta characters the server leaves "
+                     "unencoded at the reflection point; a raw '<' plus a "
+                     "raw quote usually means a plain breakout works"),
+        }
+    return {"content": [{"type": "text",
+                         "text": json.dumps(result, ensure_ascii=False,
+                                            indent=2)}]}
+
+
 class MCPServer:
     """JSON-RPC/MCP dispatch over two text streams (injectable for tests)."""
 
@@ -251,6 +440,18 @@ class MCPServer:
                                      "text": "arguments must be an object"}],
                         "isError": True}
             return run_scan_tool(arguments)
+        if name == "xssentinel_discover":
+            if not isinstance(arguments, dict):
+                return {"content": [{"type": "text",
+                                     "text": "arguments must be an object"}],
+                        "isError": True}
+            return run_discover_tool(arguments)
+        if name == "xssentinel_profile":
+            if not isinstance(arguments, dict):
+                return {"content": [{"type": "text",
+                                     "text": "arguments must be an object"}],
+                        "isError": True}
+            return run_profile_tool(arguments)
         return {"content": [{"type": "text",
                              "text": f"unknown tool: {name}"}],
                 "isError": True}
