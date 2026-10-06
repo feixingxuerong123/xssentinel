@@ -56,6 +56,16 @@ SOCKETPAIR_OK = True
 def _probe_socketpair(timeout: float = 3.0, rounds: int = 2) -> bool:
     """True only if socketpair succeeds `rounds` times in a row — the
     interference is intermittent, so a single lucky pass is not enough."""
+    # Override so the gate can be TESTED, not only observed.  The
+    # `no_loopback` waiver below cannot be demonstrated on a healthy host,
+    # and a waiver nobody can demonstrate is a waiver nobody can trust.
+    # Named XSSENTINEL_* so it reads as a test hook rather than an
+    # environment knob production might consult.
+    forced = os.environ.get("XSSENTINEL_FORCE_SOCKETPAIR", "").lower()
+    if forced in ("bad", "0", "false", "degraded"):
+        return False
+    if forced in ("good", "1", "true", "healthy"):
+        return True
     for _ in range(rounds):
         result = {"ok": False}
 
@@ -114,6 +124,45 @@ def loopback_healthy(timeout: float = 3.0) -> bool:
     th.start()
     th.join(timeout * 2 + 1)
     return result["ok"]
+
+
+# ---------------------------------------------------------------------------
+# Loopback gate: measurement
+# ---------------------------------------------------------------------------
+# Several files carry a module-level
+#     pytestmark = [pytest.mark.skipif(not SOCKETPAIR_OK, ...)]
+# which is right for the live tests in them -- and wrong for the tests
+# that need no network at all.  A file-level skipif lives on the Module
+# node and CANNOT be waived by a marker on an individual test: the
+# correct fix is to move the gate down to the tests that need it.
+#
+# That is not a speculative cleanup.  Measured 2026-10-06
+# (test_verify_carriers_live.py): on a throttled host the whole file
+# skipped -- 21 skipped -- including the paramless-carrier cases, which
+# record the outgoing request through a stub and never touch the network.
+# The branch they pin is the one a DOM-family finding depends on, so it
+# is exactly the coverage that must not go quiet.
+#
+# XSSENTINEL_FORCE_SOCKETPAIR=bad|good (see _probe_socketpair) is what
+# makes that measurable instead of accidental.  It earned its place here:
+# the first attempt at the waiver was an `item.own_markers` filter in
+# `pytest_collection_modifyitems`, which cannot reach a module-level
+# skipif at all.  Run with the gate forced bad, it reported "21 passed"
+# -- on a host whose gate happened to be healthy -- and only
+# XSSENTINEL_FORCE_SOCKETPAIR=bad exposed it as 21 skipped.
+#
+# The lesson generalises past pytest: an override that only exists to
+# test infrastructure is worth adding exactly when the infrastructure
+# otherwise reports success by accident.
+#
+# Set this to verify a gate-related change, and unset it afterwards.
+
+
+def pytest_configure(config):
+    config.addinivalue_line(
+        "markers",
+        "no_loopback: this test makes no network request, so a host whose "
+        "loopback is degraded must not skip it")
 
 
 # ---------------------------------------------------------------------------

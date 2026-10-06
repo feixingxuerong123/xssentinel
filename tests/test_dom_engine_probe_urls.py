@@ -83,16 +83,81 @@ def test_href_probe_keeps_query_separator_when_url_has_query():
         assert "&__xss__" not in u.split("?")[0], f"malformed href probe: {u}"
 
 
-@pytest.mark.parametrize("url", [
+#: The five the guard has always checked, kept verbatim: each one is a
+#: historical regression point (the audit bug above was found among them).
+HISTORIC_URLS = [
     "http://h/p?q=1",
     "http://h/p?q=1&r=2",
     "http://h/p",
     "http://h/p?q=1#frag",
     "http://h/p#frag",
-])
+]
+
+#: Shapes the historic five do NOT contain.  `url` here is the scanned
+#: target -- production calls self._probes(url, marker) at
+#: dom_engine.py:1345 with whatever the scan was pointed at, so the set
+#: of shapes is not bounded by anything this test chooses.
+#:
+#: Measured with dev/_probe_url_shape_probe.py before being added: all of
+#: these ALREADY hold, so this is a latent gap being closed, not a live
+#: bug being fixed.  That distinction matters -- the write-up says so
+#: rather than claiming a defect.
+SHAPE_URLS = [
+    "http://h/p?q=",                       # empty value
+    "http://h/p?q=a%20b",                  # percent-encoded value
+    "http://h/p?q[]=1",                    # array-style key
+    "http://h?q=1",                        # no path
+    "http://h/p/?q=1",                     # trailing slash
+    "http://h//p?q=1",                     # double slash
+    "HTTP://h/p?q=1",                      # uppercase scheme
+    "http://h:8080/p?q=1",                 # explicit port
+    "http://u:p@h/p?q=1",                  # userinfo
+    "http://h/p?q=MK",                     # marker already present
+    "http://h/p?a%5B%5D=1",                # encoded key
+]
+
+ALL_URLS = HISTORIC_URLS + SHAPE_URLS
+
+#: The list must stay covered, for the reason the compliance corpus guard
+#: pins its own member list: a hand-written list that can lose entries
+#: silently is not a guard.  Both directions -- the historic five are
+#: documented regression points and must not be dropped, and the added
+#: shapes are what justified this file's expansion and must not be
+#: quietly removed either.  (dev/_probe_url_mutation.py reported this as
+#: a known gap; closing it here rather than leaving it written down.)
+_EXPECTED_URL_SET = {
+    "http://h/p?q=1", "http://h/p?q=1&r=2", "http://h/p",
+    "http://h/p?q=1#frag", "http://h/p#frag",
+    "http://h/p?q=", "http://h/p?q=a%20b", "http://h/p?q[]=1",
+    "http://h?q=1", "http://h/p/?q=1", "http://h//p?q=1",
+    "HTTP://h/p?q=1", "http://h:8080/p?q=1", "http://u:p@h/p?q=1",
+    "http://h/p?q=MK", "http://h/p?a%5B%5D=1",
+}
+
+
+def test_shape_url_list_has_not_silently_shrunk():
+    lost = _EXPECTED_URL_SET - set(ALL_URLS)
+    assert not lost, (
+        f"{sorted(lost)} dropped out of the URL list; the parametrised "
+        f"guard would silently lose cases and the suite would stay green")
+    extra = set(ALL_URLS) - _EXPECTED_URL_SET
+    assert not extra, (
+        f"unexpected entries {sorted(extra)}: a new shape needs a reason "
+        f"recorded here, not just a line in the list")
+
+
+@pytest.mark.parametrize("url", ALL_URLS)
 def test_every_search_probe_carries_marker_in_query(url):
     """Every location.search/href probe must put the marker in a real query
-    string -- never in the path, which is what the old bug did."""
+    string -- never in the path, which is what the old bug did.
+
+    The name says "every", so the case list is built from URL syntax
+    dimensions (empty value, encoded, array key, no path, uppercase
+    scheme, port, userinfo, pre-existing marker) rather than from five
+    examples someone remembered.  A single new shape would otherwise
+    enter production unnoticed -- and the URL under test is the scan
+    target, so its shape is not this file's to choose.
+    """
     for source, urls in _probe_urls(url).items():
         assert urls, f"{source} emitted no probe for {url!r}"
         for u in urls:
