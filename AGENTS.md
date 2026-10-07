@@ -1197,3 +1197,53 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
       进入目标状态,它测的是运气**;② **门禁放在依赖所在处,不是文件顶部** ——
       文件级 `pytestmark` 会覆盖同文件里不需要该依赖的测试,而它覆盖的往往正是
       最关键的那部分覆盖。
+
+## Phase 207:交付面的一致性审计(修复建议 + 报告类型表)
+
+前 200 多个 Phase 都在问"**检测**对不对"。Phase 207 把同一问题问到**交付面**:
+引擎判完之后,报告交给用户的东西是否自洽。
+
+成果不是"新增能力",是**三处从没人量过的静默不一致**,以及把它们钉住的 10 例门。
+
+### 三方交叉是方法,不是修辞
+
+| 证据源 | 取法 |
+|---|---|
+| report.py 认不认 | 有 SARIF rule id 就叫认(build_sarif 的 type_rule 表) |
+| 代码会不会发 | core/ 下 `"type": "..."` 字典 **与** `type="..."` 关键字,两种形态都要走 |
+| 语料有没有 | data/fix_advice.json |
+
+**第二种形态不能漏** —— 头一版提取器只走字典字面量,`cors_misconfig` 直接隐身
+(两个引擎都写成 `Finding(type="cors_misconfig")` 关键字形态)。
+**门漏掉一个类型,就永远报不出这个类型** —— 这正是这个门要防的失效,
+而它先发生在了门自己身上。
+
+### 量出来的两类缺口
+
+1. **7 个真实发射的 type 掉进通用兜底建议**:
+   `cors_misconfig` / `xs_leak_surface` / `upload_xss` / `stored_upload` /
+   `stored_dom` / `source_map_exposed` / `bav`。
+   用户可见症状:报告对一个 CORS 头回显问题、一个 `.js.map` 泄漏问题,
+   统一建议"对输出做上下文编码" —— **方向错了**。
+2. **`stored_dom` 在 report 的三张表里全部缺席**:它由 `scanner_stored.py`
+   发射、带真浏览器证据(`headless.outcome="fired"`),Burp/Nuclei 导出却渲染
+   成 fallback slug `"stored dom (XSS)"`,SARIF 塌成通用 `XSSENTINEL-XSS` ——
+   **存储型 + 浏览器确认的 finding,在 code-scanning 里与反射型不可区分**。
+   同类还有 `upload_xss` / `stored_upload`:有 interop 名、无 SARIF rule id。
+
+### 三条可复用规则
+
+1. **清单分散在 N 处时,缺的不是细心,是把它们钉在一起的测试。**
+   `type_rule` / `type_name` / `_INTEROP_TYPE_NAME` / `fix_advice.json` 四条
+   各自维护、互不校验,于是漂移了很久没人发现。与 1.1 / 3.5 的教训同类
+   (那两次是"文档写完没回头核对代码"),但换了一层:**这次缺的是一道门**。
+2. **判据要收窄到"两边都认",不要引入豁免名单。**
+   `"type": "..."` 也出现在 JSON schema(`"type": "object"`)和 DOM 子结果
+   (`"type": "dom_sink"`,会被扫描器折叠成 `type: "dom"`)里,所以"发射集"
+   刻意取宽,**只在与 report 的两张面向浏览器的表求交之后才下结论**。
+   子结果名天然出局,不需要豁免 —— 而豁免名单正是 3.9 端口门刚刚删掉的
+   那种"看起来安全的例外"。
+3. **反证要用真的检测函数跑,不要在旁边重算一遍集合减法。**
+   第一版反证自己手写了一个 `only_half = {...}` 断言 —— 那只证明"集合会做减法",
+   不证明门接线到了这个函数。改成给 `report_type_map_offenders` 注入合成表,
+   才是真的在测门。

@@ -465,3 +465,47 @@ JS config line(那本身就是 script-string sink),四例全 confirmed、safe
 —— 代理 `127.0.0.1:17054` 无监听(netstat 空),直连 `raw.githubusercontent.com`
 curl exit 28。上面"GitHub API 是通的"那条反向实测写于 2026-10-02,已过期。
 结论:1.0 的可执行性**逐日变化**,每次开工前先 `curl -m 10` 复测,不要引用旧条目。
+
+## 6. Phase 207 新增:交付面(修复建议 + 报告类型表)的一致性审计
+
+本文档此前所有条目都在问"**检测**对不对"(召回、误报、覆盖、性能)。
+Phase 207 把同一个问题问到**交付面**:引擎判完之后,报告给用户的东西是否自洽。
+
+方法:**三方交叉**,不靠猜 ——
+① `report.py` 认不认(有 SARIF rule id 就叫认);
+② 代码真的会不会发(`core/*.py` 里 `"type": "..."` 字典 **与** `type="..."`
+关键字两种形态都要走,漏一种就漏一类);
+③ 语料里有没有(`data/fix_advice.json`)。
+
+结果量出两类真实缺口(均非崩溃、非误报,**所以此前没有任何测试会红**):
+
+| 缺口 | 对象 | 用户可见症状 |
+|---|---|---|
+| 语料缺失 | `cors_misconfig` / `xs_leak_surface` / `upload_xss` / `stored_upload` / `stored_dom` / `source_map_exposed` / `bav` / `scenario` | 报告对 CORS 头回显、源码泄漏、上传文件名回显,统一建议"对输出做上下文编码" —— **方向错了** |
+| 报告表缺项 | `stored_dom`(三表全缺)、`upload_xss` / `stored_upload`(缺 SARIF rule id)、`scenario`(三表全缺) | Burp/Nuclei 导出渲染 fallback slug `"stored dom (XSS)"` / `"scenario (XSS)"`;SARIF 塌成通用 `XSSENTINEL-XSS`,存储型浏览器确认的 finding 与反射型**不可区分** |
+
+**落地**:语料 123 → 131 条;`report.py` 三张表补齐 5 个类型;
+新门 `tests/test_fix_advice_coverage.py`(**12 例**)钉住**三条**不变量,含
+**两条反证**(删语料 / 合成单表报告,门必须各自变红)与**一次真实注入验证**
+(把 `scenario` 从三表移掉 ⇒ 门变红并指名 `['scenario']`),
+外加**三条防空转断言**(表提取必须解出 ≥25 键、交集非空、`Finding(...)` 构造点 ≥8)。
+
+**判据分两层是关键**:`"type": "..."` 也出现在 JSON schema(`"type": "object"`)
+和 DOM 子结果里(`"type": "dom_sink"`,会被扫描器折叠成 `type: "dom"`),所以
+第一层"发射集"刻意取宽,**只在与 report 的两张面向浏览器的表求交之后才下结论**
+—— 子结果名天然出局,不需要豁免名单。
+但**求交式判据看不见"根本不在任何表里"的类型**:`scenario` 就是这样漏掉的,
+所以第二层用更严的判据(`Finding(...)` 调用的 `type=` 关键字)单独抓这类孤儿。
+**豁免名单是上一轮刚从这个项目里删掉的东西**(见 3.9 的端口门:"18xxx 段碰撞概率低"
+正是 9002 当初留下来的同一个理由)。
+
+**教训(与 1.1 / 3.5 同类,但换了一层)**:前两次是"文档写完没回头核对代码",
+这次是"四条各自维护的清单(`type_rule` / `type_name` / `_INTEROP_TYPE_NAME` /
+`fix_advice.json`)之间没有门"。**清单分散在 N 处时,缺的从来不是细心,是把它们
+钉在一起的测试。** 门落地当天就先抓到了自己的一处漏抓(提取器只走字典字面量,
+`cors_misconfig` 因为走关键字形态而隐身)。
+
+**下一步候选**(仍未做,按价值排):
+1. **2.1 parity 门扩容**到全 192 例(现只覆盖 12 个 DOM 端点);
+2. **1.0 真独立靶场**(Juice Shop 全集 / 商业工具对跑);
+3. **2.3 range5**(Angular/Svelte/Lit,构造效度先行)。

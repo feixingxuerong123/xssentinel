@@ -8,7 +8,7 @@
       "primary_cwe": "CWE id",
       "also_consider": "list of extra hardening steps"
     },
-    "entry_count": 123,
+    "entry_count": 131,
     "version": 1
   },
   "default_advice": {
@@ -1214,6 +1214,97 @@
       "primary_cwe": "CWE-79",
       "also_consider": [
         "Block <altGlyph> in your sanitizer's allow-list."
+      ]
+    },
+    "cors_misconfig": {
+      "headline": "Never echo the request Origin back in Access-Control-Allow-Origin; use an explicit server-side allowlist.",
+      "detail": "The server reflects the request's Origin header verbatim in Access-Control-Allow-Origin. When that is combined with Access-Control-Allow-Credentials: true, any attacker page can read the victim's authenticated responses cross-origin with the victim's cookies attached -- a data-exfiltration primitive that needs no injection point of its own and chains with any XSS that is found. The fix is to validate Origin against a fixed allowlist of your own origins and emit exactly that value (or emit nothing), never the reflected input. Note that a bare Access-Control-Allow-Origin: * is not itself a finding here -- browsers refuse credentialed '*' responses -- but '*' plus Allow-Credentials: true is a spec-violating misconfiguration that should still be corrected.",
+      "code_example": "# WITHOUT the vulnerability: validate, then echo the ALLOWLIST entry\n# (Python / Flask)\nALLOWED = {\"https://app.example.com\", \"https://admin.example.com\"}\n\n@app.after_request\ndef cors(resp):\n    origin = request.headers.get(\"Origin\")\n    if origin in ALLOWED:/n        resp.headers[\"Access-Control-Allow-Origin\"] = origin\n        resp.headers[\"Access-Control-Allow-Credentials\"] = \"true\"\n        resp.headers[\"Vary\"] = \"Origin\"\n    # any other origin gets NO CORS headers at all\n    return resp\n\n# Prefer same-origin architecture: serve the API and the app from one\n# origin so no cross-origin grant is needed in the first place.\n",
+      "primary_cwe": "CWE-942",
+      "also_consider": [
+        "Add `Vary: Origin` when the ACAO value depends on the request Origin, or caches will serve one origin's header to another.",
+        "Do not treat a bearer token in a header as safe just because cookies are not involved: permissive CORS still hands readable data to any site that can send it.",
+        "Set `Access-Control-Max-Age` deliberately; a long preflight cache keeps a bad policy alive after you fix the server.",
+        "Chain fix: any XSS on the target plus permissive CORS turns same-origin-only APIs into cross-site readable ones."
+      ]
+    },
+    "xs_leak_surface": {
+      "headline": "Turn on cross-origin isolation (COOP / CORP / COEP) and a framing guard to close side-channel leaks.",
+      "detail": "The page sends none of the cross-origin isolation headers and sets no framing restriction, which leaves the whole XS-Leaks side-channel surface open. An attacker who already runs script in any origin (including via an XSS elsewhere) can then infer the victim's state in THIS origin by observing channels the browser cannot fully hide: no-cors resource load success/failure, frame load timing, window.name across navigations, history.length growth, and window references. This is an amplifier finding, not an injection: the scanner cannot scan a third origin's state by itself. Fix it by sending `Cross-Origin-Opener-Policy: same-origin`, `Cross-Origin-Resource-Policy: same-origin` (or `same-site` where shared), `Cross-Origin-Embedder-Policy: require-corp`, plus `X-Frame-Options: DENY` and a CSP `frame-ancestors 'none'`. Note COEP requires every embedded subresource to opt in with CORP or CORS, so stage the rollout.",
+      "code_example": "# WITHOUT the vulnerability: cross-origin isolation + framing guard\n# (nginx)\nadd_header Cross-Origin-Opener-Policy   \"same-origin\"    always;\nadd_header Cross-Origin-Resource-Policy \"same-origin\"    always;\nadd_header Cross-Origin-Embedder-Policy \"require-corp\"   always;\nadd_header X-Frame-Options              \"DENY\"           always;\nadd_header Content-Security-Policy      \"frame-ancestors 'none'\" always;\n\n# Django example (per-response middleware)\nresponse[\"Cross-Origin-Opener-Policy\"] = \"same-origin\"\nresponse[\"Cross-Origin-Resource-Policy\"] = \"same-origin\"\nresponse[\"X-Frame-Options\"] = \"DENY\"\n",
+      "primary_cwe": "CWE-346",
+      "also_consider": [
+        "Roll COEP out in report-only mode first (`Cross-Origin-Embedder-Policy-Report-Only`) -- it breaks third-party embeds that have not opted in with CORP.",
+        "Stateful endpoints should not be distinguishable by status code alone; return a uniform response for logged-out and logged-in states where the business logic allows.",
+        "Framing: `X-Frame-Options: DENY` protects older browsers that ignore CSP `frame-ancestors`.",
+        "This is a hardening finding: validate it against the threat model before treating it as a vulnerability in triage."
+      ]
+    },
+    "upload_xss": {
+      "headline": "Never reflect the upload filename back; generate a server-side name and escape it wherever the original is displayed.",
+      "detail": "The multipart upload's filename field is attacker-controlled and the server echoes it into the response body, where it reaches an executable context. The filename is sent inside the Content-Disposition header of the multipart part, so it bypasses body-field validation entirely; browsers historically also let it carry `\"`, `<` and `>` unfiltered. Two fixes are needed together: (1) ignore the supplied filename for storage -- generate your own identifier and keep the original only as opaque metadata; (2) apply context-aware output encoding wherever the original name is rendered back to a user (file lists, error messages, upload receipts), and set `Content-Disposition: attachment` plus `X-Content-Type-Options: nosniff` on any response that serves user content.",
+      "code_example": "# WITHOUT the vulnerability: server-side name, escaped when displayed\nimport os, secrets, html\n\n# 1) Storage name is ours, never the client's\next = os.path.splitext(stored_name)[1].lower()\nif ext not in {\".png\", \".jpg\", \".pdf\"}:\n    raise ValueError(\"unsupported type\")\nsafe_name = f\"{secrets.token_hex(16)}{ext}\"\n\n# 2) Display the ORIGINAL name only as escaped text\nreturn f\"<div>Uploaded: {html.escape(original_name)}</div>\"\n\n# 3) Serve user content inert\nresponse.headers[\"Content-Disposition\"] = \"attachment\"\nresponse.headers[\"X-Content-Type-Options\"] = \"nosniff\"\n",
+      "primary_cwe": "CWE-79",
+      "also_consider": [
+        "Validate the file's real type from its magic bytes, not from the filename extension or the client-sent Content-Type.",
+        "Strip path separators and null bytes from any name you do echo; `../` in a filename is a separate traversal issue.",
+        "Store uploads on a separate origin (or a dedicated bucket domain) so even a stored HTML file cannot run script in your app's origin."
+      ]
+    },
+    "stored_upload": {
+      "headline": "Serve uploaded files as inert downloads from a separate origin; never render stored file content as HTML in your app's origin.",
+      "detail": "A previously uploaded file is served back to visitors and its content is interpreted as live markup (HTML/SVG), so the payload executes for every viewer of the file URL -- this is stored XSS with the uploaded file as the storage medium. The scanner confirmed it by fetching the stored URL and matching a marker inside executable markup. Fix it at three layers: (1) serve every user upload with `Content-Type: application/octet-stream` (or a vetted type) plus `Content-Disposition: attachment` and `X-Content-Type-Options: nosniff` so the browser never interprets it inline; (2) host user content on a separate origin (a sandbox domain or object-storage bucket) so even a successfully rendered document cannot reach your application's cookies or DOM; (3) re-encode images to strip embedded markup rather than storing the bytes as received. SVG in particular is an XML document that can carry <script>, so treat it as active content, not as an image.",
+      "code_example": "# WITHOUT the vulnerability: inert delivery + separate origin\n# nginx: content served from a sandbox host with no cookies\nlocation /uploads/ {\n    add_header Content-Type        \"application/octet-stream\" always;\n    add_header Content-Disposition \"attachment\"               always;\n    add_header X-Content-Type-Options \"nosniff\"              always;\n    add_header Content-Security-Policy \"default-src 'none'; sandbox\" always;\n}\n\n# Python: never write raw upload bytes to a path that is\n# served as text/html -- and re-encode images instead of\n# storing client bytes verbatim.\nfrom PIL import Image\nImage.open(upload_stream).convert(\"RGB\").save(dest, \"PNG\")\n",
+      "primary_cwe": "CWE-79",
+      "also_consider": [
+        "SVG is active content: sanitize with a dedicated SVG profile (or rasterise) rather than a generic HTML sanitizer.",
+        "Set `Content-Security-Policy: sandbox` on the upload host as a last line of defence.",
+        "Add an anti-virus / content scanner on ingest; a stored HTML file is also a phishing and malware delivery channel."
+      ]
+    },
+    "stored_dom": {
+      "headline": "Sanitize on output at the DOM sink, not only on input; treat all persisted data as untrusted on every render.",
+      "detail": "The payload was persisted by the server and later reached an executable DOM sink in a real browser when the view page was rendered -- stored DOM-based XSS. It is distinct from reflected DOM XSS because the tainted value survives in storage and detonates for a different viewer (and often a different session), so the injection point and the execution point are separate requests. Fix it where the taint lands, not only where it enters: apply a context-aware sanitizer (DOMPurify with an explicit allowlist) or, better, use safe DOM APIs (`textContent`, `setAttribute` with validated values) instead of `innerHTML` / `outerHTML` / `insertAdjacentHTML` / `document.write` when rendering stored data. If the browser confirmed execution only in the same session's self-view, persistence for other viewers is not proven -- re-run with an explicit view URL before scoring severity.",
+      "code_example": "// WITHOUT the vulnerability: safe DOM APIs + sanitizer at the sink\nconst el = document.getElementById(\"profile-bio\");\n\n// Preferred: text only -- markup is never parsed\nel.textContent = storedBio;\n\n// When rich text is a requirement, sanitize with an explicit policy\nimport DOMPurify from \"dompurify\";\nel.innerHTML = DOMPurify.sanitize(storedBio, {\n  ALLOWED_TAGS: [\"b\", \"i\", \"em\", \"strong\", \"a\", \"p\", \"br\"],\n  ALLOWED_ATTR: [\"href\"],\n  ALLOW_DATA_ATTR: false,\n});\n\n// Never: el.innerHTML = storedBio;\n",
+      "primary_cwe": "CWE-79",
+      "also_consider": [
+        "Input validation is not sufficient for stored XSS: the same record may be rendered by an admin console, an email template and a mobile webview with different encoders.",
+        "Combine with a strict CSP (`script-src 'nonce-...' 'strict-dynamic'`) so a sink that does slip through cannot load external script.",
+        "Audit every renderer of the persisted field, not just the one the scanner proved -- the fix must hold for each sink."
+      ]
+    },
+    "source_map_exposed": {
+      "headline": "Do not deploy production source maps to the public web (or gate them behind authentication).",
+      "detail": "A build emits `.js.map` files that reference the minified bundles, and the map is reachable on the live site. Because it carries `sourcesContent` -- the original, un-minified source of every file -- an attacker can read your internal module structure, comments, feature flags, hidden endpoints and API shapes without any exploit. This is an information-disclosure finding rather than an XSS, and it is one of the highest value-per-effort findings to fix. Either stop generating maps for production, upload them to your error-tracking service only (never to the CDN), strip `sourcesContent` from the published map, or serve maps only to authenticated internal users.",
+      "code_example": "// WITHOUT the vulnerability: keep maps internal\n// webpack.config.js\nmodule.exports = {\n  mode: \"production\",\n  devtool: \"hidden-source-map\",  // a map exists, but no //# sourceMappingURL\n  // ...and upload it to error tracking, not to the public CDN:/n  // SentryWebpackPlugin({ sourceMaps: { urlPrefix: \"~/static/js\" } }),\n};\n\n// Alternative: strip source content from the published map\n// (then the map only helps map line numbers, not reveal source)\n// { \"version\": 3, \"mappings\": \"...\" }   // no \"sourcesContent\"\n\n# nginx: block public access as defence-in-depth\nlocation ~* \\.map$ {\n    deny all;\n}\n",
+      "primary_cwe": "CWE-540",
+      "also_consider": [
+        "Check for `.js.map` in the same pass as `.git/`, `.env` and backup files -- it is the same class of build-artifact leakage.",
+        "Removing `//# sourceMappingURL=` alone does not help if the well-known `<bundle>.js.map` path still resolves.",
+        "Rotate any secret that the exposed source revealed (API keys, internal hostnames, admin routes)."
+      ]
+    },
+    "bav": {
+      "headline": "Fix the confirmed adjacent class per its kind: template-inject without evaluation, allowlist redirect targets, strip CR/LF from header-bound input.",
+      "detail": "An adjacent-vulnerability probe confirmed a non-XSS flaw on this parameter. Three kinds are confirmed separately, and each has its own fix: (1) SSTI -- a template expression in the input was evaluated by the server, so the value reached a template engine as code; never build templates from user input, and if you must, use a logic-less engine with the value passed as data. (2) Open redirect -- the parameter controls a 3xx Location header, so an attacker can push users to their own site; validate the target against an allowlist of your own hosts or paths, and prefer relative paths or a signed mapping over raw URLs. (3) CRLF injection -- the value reached a response header, so injected CR/LF split the response and can set arbitrary headers (including cookies and a second response body); strip or reject CR and LF from anything that is copied into a header.",
+      "code_example": "# SSTI: pass data, never build the template from input\n# BAD   render_template_string(user_input)\n# GOOD  render_template(\"page.html\", value=user_input)\n\n# Open redirect: allowlist by host, not by prefix match\nfrom urllib.parse import urlparse\nALLOWED_HOSTS = {\"example.com\", \"www.example.com\"}\n\ndef safe_next(target: str) -> str:/n    p = urlparse(target)\n    if not p.netloc or p.netloc in ALLOWED_HOSTS:/n        return target\n    return \"/\"          # silently fall back, do not echo the input\n\n# Header injection: never copy raw input into a header\nvalue = user_input.replace(\"\\r\", \"\").replace(\"\\n\", \"\")\nresponse.headers[\"X-Item\"] = value\n",
+      "primary_cwe": "CWE-79",
+      "also_consider": [
+        "Each BAV kind has its own CWE: SSTI CWE-1336, open redirect CWE-601, CRLF injection CWE-113 -- cite the matching one in the ticket, not CWE-79 generally.",
+        "SSTI often escalates past XSS to remote code execution; treat a confirmed SSTI as high severity even though this finding is filed at medium.",
+        "Open redirect is a phishing enabler that also defeats some OAuth redirect_uri checks; audit every other endpoint that takes a redirect target.",
+        "These were found by side-effect probes (response content, Location header, injected header) -- re-test the specific parameter after the fix rather than assuming the class is gone site-wide."
+      ]
+    },
+    "scenario": {
+      "headline": "Fix the confirmed step in the scenario chain; a multi-step flow proved the injection reaches an executable sink.",
+      "detail": "A declarative multi-step scenario (a sequence of requests the operator authored in a scenario file) confirmed that this parameter reaches an executable context. Unlike a single-request reflection, the confirmation crossed at least one intermediate step -- a stored write then a render, a redirect then a sink, or similar -- so the fix belongs at the step where the tainted value lands, not only at the step where it enters. Locate the confirmed step in the scenario's own detail text, then apply context-aware output encoding (or a safe DOM API) at that render point. Because the flow is multi-step, patching only the visible input handler usually leaves the second step exploitable.",
+      "code_example": "# A scenario confirms a chain like: POST /comment -> GET /post/<id>\n# The injection point and the execution point are DIFFERENT requests.\n\n# 1) encode on OUTPUT where the value is rendered, not only on input\nfrom markupsafe import escape\nreturn render_template(\n    \"post.html\",\n    comment=escape(stored_comment),   # the render step is the one that matters\n)\n\n# 2) if rich text is required, sanitize with an explicit allow-list\n#    DOMPurify.sanitize(stored, {ALLOWED_TAGS: [...], ALLOWED_ATTR: [...]})\n\n# 3) verify by REPLAYING the whole scenario after the fix -- testing only the\n#    first request will pass while the chain is still live.\n",
+      "primary_cwe": "CWE-79",
+      "also_consider": [
+        "Replay the full scenario, not just the first request -- a multi-step chain has more than one place to fix.",
+        "The scanning scenario id is in the finding's transform/proof; cite it so the fix can be re-verified against the same flow.",
+        "Check whether the intermediate step persists data: a stored variant means every future viewer is affected, not just the operator's session."
       ]
     }
   }

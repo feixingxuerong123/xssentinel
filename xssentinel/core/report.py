@@ -462,7 +462,13 @@ def build_sarif(findings: list, target: str, meta: dict) -> str:
         "second_order":         "XSSENTINEL-XSS-SECOND-ORDER",
         "dom":                  "XSSENTINEL-XSS-DOM",
         "dom_dynamic":          "XSSENTINEL-XSS-DOM-DYNAMIC",
+        # Phase 207: stored_dom was emitted by scanner_stored.py but missing
+        # here, so SARIF consumers collapsed it into the generic
+        # XSSENTINEL-XSS rule -- a stored, browser-confirmed finding was
+        # indistinguishable from a reflected one in code-scanning triage.
+        "stored_dom":           "XSSENTINEL-XSS-STORED-DOM",
         "blind":                "XSSENTINEL-XSS-BLIND",
+        "scenario":             "XSSENTINEL-XSS-SCENARIO",
         "mutation_xss":         "XSSENTINEL-XSS-MUTATION",
         "dom_clobber":          "XSSENTINEL-XSS-DOM-CLOBBER",
         "template_ssti_angularjs": "XSSENTINEL-XSS-SSTI-ANGULARJS",
@@ -484,6 +490,11 @@ def build_sarif(findings: list, target: str, meta: dict) -> str:
         "error_page_xss":       "XSSENTINEL-XSS-ERROR-PAGE",
         "cors_misconfig":       "XSSENTINEL-CORS-MISCONFIG",
         "xs_leak_surface":      "XSSENTINEL-XSLEAK-SURFACE",
+        # Phase 207: both upload types were emitted and had interop names, but
+        # no SARIF rule id -- so every upload finding landed on the generic
+        # XSSENTINEL-XSS rule in code-scanning consumers.
+        "upload_xss":           "XSSENTINEL-XSS-UPLOAD-FILENAME",
+        "stored_upload":        "XSSENTINEL-XSS-UPLOAD-STORED",
         "markdown_xss":         "XSSENTINEL-XSS-MARKDOWN",
         "time_based_xss":       "XSSENTINEL-XSS-TIME-BASED",
         "fuzzer_triage":        "XSSENTINEL-XSS-FUZZER-TRIAGE",
@@ -497,7 +508,9 @@ def build_sarif(findings: list, target: str, meta: dict) -> str:
         "second_order":         "Second-Order XSS",
         "dom":                  "DOM-based XSS (static heuristic)",
         "dom_dynamic":          "DOM-based XSS (real-browser confirmed)",
+        "stored_dom":           "Stored DOM-based XSS (browser-confirmed)",
         "blind":                "Blind XSS (OOB-confirmed)",
+        "scenario":             "Scenario XSS (multi-step flow)",
         "mutation_xss":         "Mutation XSS (mXSS)",
         "dom_clobber":          "DOM Clobbering XSS",
         "template_ssti_angularjs": "AngularJS Template SSTI",
@@ -519,6 +532,8 @@ def build_sarif(findings: list, target: str, meta: dict) -> str:
         "error_page_xss":       "Error Page XSS",
         "cors_misconfig":       "CORS Misconfiguration",
         "xs_leak_surface":      "XS-Leaks Surface (no isolation headers)",
+        "upload_xss":           "XSS via Uploaded Filename",
+        "stored_upload":        "Stored XSS (Uploaded File)",
         "markdown_xss":         "Markdown/BBCode XSS",
         "time_based_xss":       "Time-Based XSS (side-channel)",
         "fuzzer_triage":        "Fuzzer Triage (injectable param)",
@@ -871,7 +886,9 @@ _INTEROP_TYPE_NAME = {
     "second_order": "Second-order cross-site scripting",
     "dom": "Cross-site scripting (DOM-based)",
     "dom_dynamic": "Cross-site scripting (DOM-based, browser-confirmed)",
+    "stored_dom": "Stored cross-site scripting (DOM-based, browser-confirmed)",
     "blind": "Blind cross-site scripting (out-of-band)",
+    "scenario": "Multi-step scenario cross-site scripting",
     "mutation_xss": "Mutation cross-site scripting (mXSS)",
     "dom_clobber": "DOM clobbering cross-site scripting",
     "template_ssti_angularjs": "AngularJS template injection (SSTI)",

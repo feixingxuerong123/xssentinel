@@ -142,6 +142,41 @@
   对象),既有逐叶探针把全量 payload 梯子注入每个 String/ID 参数;
   必需的非 String 参数给样本值使 mutation 真正执行,selection set 用
   恒合法的 `{ __typename }`。
+- **修复建议语料补齐 + 报告类型表对齐(Phase 207)**:从"用户唯一直接消费的
+  产品面"往回查,量出三个独立缺口。
+  - **① 8 个真实发射的 finding type 掉进通用兜底建议**。判据是三方交叉:
+    `report.py` 认不认(它有 SARIF rule id 就叫认)+ 代码真的会不会发
+    (`core/*.py` 里的 `"type": "..."` 字典与 `type="..."` 关键字两种形态都算)。
+    结果是 `cors_misconfig` / `xs_leak_surface` / `upload_xss` /
+    `stored_upload` / `stored_dom` / `source_map_exposed` / `bav` / `scenario`
+    —— 八个全部在跑真实扫描时见过(有的直接出现在 `benchmark/results/*.json` 里)。
+    后果不严重也不无害:**报告对一个 CORS 头回显问题、一个源码泄漏问题,
+    给的建议是"对输出做上下文编码"** —— 方向错了,而且没有任何测试会红。
+  - **② 四个类型在 report 的类型表里缺席**。`stored_dom` 由
+    `scanner_stored.py` 发射、带真浏览器证据(`headless.outcome="fired"`),
+    Burp/Nuclei 导出却渲染成 fallback slug `"stored dom (XSS)"`,SARIF 更是
+    塌成通用 `XSSENTINEL-XSS` —— 一个存储型、浏览器确认的 finding 在
+    code-scanning 里的可区分度**与一个反射型完全相同**;`upload_xss` /
+    `stored_upload` 有 interop 名但没有 SARIF rule id;`scenario`
+    (`core/scenarios.py`,`--scenarios` DSL 确认的多步链)**三张表里全都没有**,
+    导出成 `"scenario (XSS)"`。四个类型的三处表已全部补齐。
+  - **③ 新门 `tests/test_fix_advice_coverage.py`(12 例)把三条不变量都钉住**,
+    含两条反证:注入"删掉 `source_map_exposed` 语料"与"合成一张只在 interop
+    表里出现的报告表",门必须各自变红;**另有真实注入验证** —— 把 `scenario`
+    从三张表里移掉,`test_every_finding_construction_is_report_visible`
+    立刻红并指名 `['scenario']`。门自带防空转断言(表提取必须解出 ≥25 键、
+    交集非空、`Finding(...)` 构造点 ≥8),因为"提取器静默返回空集"
+    正是它要防的那种静默失效。
+  - **判据收窄是关键,而且分两层**:`"type": "..."` 也会出现在 JSON schema 里
+    (`"type": "object"`),所以第一层"发射集"刻意取宽,只在**与 report 的
+    两张面向浏览器的表求交**之后才判定 —— 于是 `dom_sink` / `inline_handler`
+    这类会被扫描器折叠成 `type: "dom"` 的子结果名天然出局,**不需要豁免名单**。
+    第二层单独用更严的判据(`Finding(...)` 调用的 `type=` 关键字)抓
+    "**根本不在任何表里**"的类型 —— `scenario` 正是这种,求交式判据看不见它。
+  - 头一版提取器只走字典字面量,`cors_misconfig` 直接隐身(两个引擎都是
+    `Finding(type="cors_misconfig")` 关键字形态)。**门漏掉一个类型就报不出它**,
+    这正是本文件存在的理由,已补上关键字形态并写了注释。
+  - 语料 123 → **131** 条;`_meta.entry_count` 由测试锁死与实际条数一致。
 - **外部效度对照第一次量出来(Phase 196b)**:`benchmark/run_cross_tool.py` 让
   XSSentinel / dalfox / nuclei 在**同一批靶**上跑分。文档 1.0 长期写"第三方对照
   需换机器",本机复核推翻了它:GitHub API 与 raw 可达、Go 代理(goproxy.cn)能
