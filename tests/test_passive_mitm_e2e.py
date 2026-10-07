@@ -17,12 +17,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pytest
 
-from tests.conftest import SOCKETPAIR_OK, loopback_healthy
+from tests.conftest import loopback_healthy
 from tests.test_passive_mitm import _TlsOrigin, _self_signed_cert, _tunneled_get
-
-pytestmark = pytest.mark.skipif(
-    not SOCKETPAIR_OK,
-    reason="Windows loopback socketpair hangs (security software/TCP state)")
 
 
 def test_mitm_to_finding_to_poc(tmp_path):

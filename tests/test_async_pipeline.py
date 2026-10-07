@@ -30,10 +30,6 @@ from xssentinel.core.async_scanner import AsyncScanner
 
 # asyncio.run() needs a working loopback socketpair (see conftest.py);
 # skip instead of hanging when the environment throttles it.
-pytestmark = pytest.mark.skipif(
-    not SOCKETPAIR_OK,
-    reason="Windows loopback socketpair hangs (security software/TCP state)")
-
 
 def b64(s: str) -> str:
     return base64.b64encode(s.encode()).decode().rstrip("=")
@@ -135,28 +131,38 @@ class TestForContextFixed:
 
 
 class TestAsyncL1:
+    @pytest.mark.skipif(not SOCKETPAIR_OK,
+                        reason="needs loopback (moved down from the file-level gate)")
     def test_live_echo_confirms_reflection(self):
         findings, _ = _collect({"q": "probe"})
         assert findings, "async L1 failed to confirm a live reflection"
         assert findings[0].data["type"] == "reflected"
         assert findings[0].data["confidence"] == "high"
 
+    @pytest.mark.skipif(not SOCKETPAIR_OK,
+                        reason="needs loopback (moved down from the file-level gate)")
     def test_escaping_echo_reports_nothing(self):
         findings, _ = _collect({"q": "probe"}, escape=True)
         assert findings == []
 
+    @pytest.mark.skipif(not SOCKETPAIR_OK,
+                        reason="needs loopback (moved down from the file-level gate)")
     def test_pre_encode_path_confirms(self):
         findings, _ = _collect({"q": b64("next=/admin")}, decode=True)
         assert findings, "pre-encoded probe missed on decoding app"
         assert any("pre_encode" in str(f.data.get("transform"))
                    for f in findings)
 
+    @pytest.mark.skipif(not SOCKETPAIR_OK,
+                        reason="needs loopback (moved down from the file-level gate)")
     def test_position_shift_refires_in_body(self):
         findings, session = _collect({"q": "probe"}, escape=True)
         body_calls = [c for c in session.calls if c["data"].get("q")]
         assert body_calls, "position shift did not re-fire into the body"
         assert findings == []
 
+    @pytest.mark.skipif(not SOCKETPAIR_OK,
+                        reason="needs loopback (moved down from the file-level gate)")
     def test_profile_probe_does_not_break_plain_flow(self):
         findings, session = _collect({"q": "probe"})
         # The sandwich probe adds requests; the flow still confirms.
@@ -194,6 +200,8 @@ class TestAsyncCrawlQueryRetention:
 
         return asyncio.run(run())
 
+    @pytest.mark.skipif(not SOCKETPAIR_OK,
+                        reason="needs loopback (moved down from the file-level gate)")
     def test_query_params_forwarded_and_stripped_from_url(self):
         html = ('<html><body><a href="http://t/page?q=hi&debug=1">link'
                 "</a></body></html>")
@@ -205,6 +213,8 @@ class TestAsyncCrawlQueryRetention:
         assert params.get("debug") == "xss", f"debug param dropped: {params}"
         assert "hi" in text  # seed text passed through to the scan layer
 
+    @pytest.mark.skipif(not SOCKETPAIR_OK,
+                        reason="needs loopback (moved down from the file-level gate)")
     def test_bare_link_scanned_without_params(self):
         html = ('<html><body><a href="http://t/other">plain</a>'
                 "</body></html>")
@@ -531,6 +541,8 @@ class TestAsyncConcatRetry:
         finally:
             AsyncScanner._scan_advanced_param_layers = original
 
+    @pytest.mark.skipif(not SOCKETPAIR_OK,
+                        reason="needs loopback (moved down from the file-level gate)")
     def test_keyword_filter_confirms_via_concat_stamp(self):
         findings, session = self._collect_filtered({"q": "probe"})
         assert findings, ("a keyword-filtered but echo-raw target must "

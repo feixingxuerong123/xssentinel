@@ -702,6 +702,19 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
       挪用页面自带脚本需先有另一漏洞 —— 反射面上无可行路径,检出+修复建议
       即终点,不写投机逻辑。
 
+- [x] **204 GraphQL mutation 注入目标(--gql 收尾)**:现代 GraphQL 用
+      variables 对象传参 —— 那是普通 JSON 文档,扫描器的 JSON-carrier 探针
+      (`json_leaf_paths`/`_set_json_leaf`,Phase 46)**原生覆盖**每个叶子。
+      `gql_import.gql_mutation_targets`:每个含 String/ID 参数的 mutation
+      生成一个 spec target(data 为 `{` 开头的 JSON 串,_run_scan 自动走
+      JSON-carrier),query 模板声明全部必需参数(Int/Boolean 给样本值使
+      mutation 真正执行)+ 可选 String 参数(探针目标),selection set 用
+      恒合法的 `{ __typename }`;未知必需标量整条跳过(避免必错查询)。
+      spec_targets 与 urls 对齐(index 对齐是逐目标循环的契约),首个 spec
+      复现原挖矿 pass。测试 11 例(模板/变量/必需参数采样/上限/无
+      mutationType/CLI 对齐)。剩余已知边界:mutation 响应里的回显确认走
+      标准判定链;持久化效果配合 --stored-view 手工指定。
+
 - [x] **203 对等门扩容到 DOM 家族(2.1 收尾)**:`test_engine_parity_gate.py`
       增 DOM 切片 —— manifest 12 端点(6 阳性 DOM + 3 safe 孪生 + 原型污染对),
       dom_engine="auto" 双引擎对跑。三段排错记实:①首轮"空对空"结论是**用错

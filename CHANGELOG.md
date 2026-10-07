@@ -137,6 +137,11 @@
   反射画像,raw=/stripped=/encoded= 元字符分类)加入 MCP 工具面,Agent 可
   按 discover → profile → scan 链式侦察;unsafe-hashes 的"利用"经评估确认
   无反射面可行路径(精确 hash 匹配 = preimage 不可行),检出即终点。
+- **GraphQL mutation 注入目标(Phase 204,--gql 收尾)**:每个含 String
+  参数的 mutation 生成一个 JSON-carrier 扫描目标(query 模板 + variables
+  对象),既有逐叶探针把全量 payload 梯子注入每个 String/ID 参数;
+  必需的非 String 参数给样本值使 mutation 真正执行,selection set 用
+  恒合法的 `{ __typename }`。
 - **外部效度对照第一次量出来(Phase 196b)**:`benchmark/run_cross_tool.py` 让
   XSSentinel / dalfox / nuclei 在**同一批靶**上跑分。文档 1.0 长期写"第三方对照
   需换机器",本机复核推翻了它:GitHub API 与 raw 可达、Go 代理(goproxy.cn)能

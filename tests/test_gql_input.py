@@ -19,6 +19,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from xssentinel.core.gql_import import (  # noqa: E402
     INTROSPECTION_QUERY,
+    gql_mutation_targets,
     gql_param_candidates,
 )
 
@@ -41,8 +42,9 @@ SCHEMA = {
                                                  "ofType": {"name": "String"}}},
                     {"name": "author", "type": {"kind": "SCALAR",
                                                 "name": "String"}},
-                    {"name": "rating", "type": {"kind": "SCALAR",
-                                                "name": "Int"}}]},
+                    {"name": "rating", "type": {"kind": "NON_NULL",
+                                                 "ofType": {"kind": "SCALAR",
+                                                            "name": "Int"}}}]},
             ]},
             {"kind": "INPUT_OBJECT", "name": "CommentInput", "inputFields": [
                 {"name": "body", "type": {"kind": "SCALAR", "name": "String"}},
@@ -148,3 +150,63 @@ def test_cli_flag_exists():
         [sys.executable, "-m", "xssentinel", "--help"],
         capture_output=True, text=True, timeout=60)
     assert "--gql" in (r.stdout + r.stderr)
+
+
+# ---------------------------------------------------------------------------
+# gql_mutation_targets (Phase 204)
+# ---------------------------------------------------------------------------
+
+class TestMutationTargets:
+    def test_template_variables_and_shape(self):
+        from xssentinel.core.gql_import import gql_mutation_targets
+        import json
+        targets = gql_mutation_targets("http://t/graphql", fetch=_fetch_ok)
+        assert targets and targets[0]["gql_mutation"] == "postComment"
+        assert targets[0]["method"] == "POST"
+        body = json.loads(targets[0]["data"])
+        # the query declares the string vars and passes them through; the
+        # selection set is the always-valid __typename
+        assert "mutation PostComment($content: String, $author: String, $rating: Int)" in body["query"]
+        assert "postComment(content: $content, author: $author, rating: $rating)" in body["query"]
+        assert "{ __typename }" in body["query"]
+        # variables carry the probe samples the JSON-carrier prober replaces
+        assert body["variables"]["content"] == "probe"
+        assert body["variables"]["author"] == "probe"
+        # the Int arg is REQUIRED (NON_NULL) -> sample so the mutation runs
+        assert body["variables"]["rating"] == 1
+
+    def test_int_args_are_not_probe_targets(self):
+        from xssentinel.core.gql_import import gql_mutation_targets
+        import json
+        targets = gql_mutation_targets("http://t/graphql", fetch=_fetch_ok)
+        body = json.loads(targets[0]["data"])
+        q = body["query"]
+        assert "$rating: Int" in q            # declared so the query runs
+        assert body["variables"]["rating"] == 1
+
+    def test_cap_and_no_mutation_type(self):
+        import json
+
+        def fetch(url, query):
+            return json.dumps(SCHEMA)
+
+        assert len(gql_mutation_targets("http://t/graphql", fetch=fetch,
+                                        max_mutations=1)) == 1
+
+        empty = {"data": {"__schema": {"queryType": {"name": "Query"},
+                                       "mutationType": None,
+                                       "types": SCHEMA["data"]["__schema"]["types"]}}}
+        assert gql_mutation_targets(
+            "http://t/graphql",
+            fetch=lambda u, q: json.dumps(empty)) == []
+
+    def test_cli_wiring_aligns_specs_with_urls(self):
+        """The per-target loop indexes spec_targets[i] against urls[i] --
+        the --gql branch must keep them the same length."""
+        from xssentinel.core.gql_import import gql_param_candidates,             gql_mutation_targets
+        names = gql_param_candidates("http://t/graphql", fetch=_fetch_ok)
+        specs = [{"url": "http://t/graphql", "method": "GET", "data": "",
+                  "cookies": [], "headers": []}] +             gql_mutation_targets("http://t/graphql", fetch=_fetch_ok)
+        urls = [t["url"] for t in specs]
+        assert len(urls) == len(specs) == 2
+        assert names                                  # mining still armed

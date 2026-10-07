@@ -1038,7 +1038,7 @@ def main(argv=None):
                 return 2
         print(f"[*] Wayback {args.wayback}: {len(urls)} URL(s) imported")
     elif getattr(args, "gql", None):
-        from .core.gql_import import gql_param_candidates
+        from .core.gql_import import gql_param_candidates,             gql_mutation_targets
         try:
             gql_names = gql_param_candidates(args.gql,
                                              timeout=max(args.timeout, 15))
@@ -1052,9 +1052,26 @@ def main(argv=None):
         # The names ride args into the scan setup, where they merge into
         # the param-mining wordlist; the endpoint itself is the target.
         args.gql_params = gql_names
-        urls = [args.gql]
+        # Phase 204: one JSON-carrier target per string-arg mutation --
+        # the variables object is a plain JSON document, so the scanner's
+        # existing leaf probing (json_leaf_paths / _set_json_leaf) injects
+        # the full payload ladder into every String/ID argument.  The
+        # first spec reproduces the plain-GET mining pass.
+        try:
+            mutation_specs = gql_mutation_targets(
+                args.gql, timeout=max(args.timeout, 15))
+        except Exception as e:
+            _log.warning("GraphQL mutation targets failed (continuing "
+                         "with the mining pass): %s", e)
+            mutation_specs = []
+        spec_targets = [
+            {"url": args.gql, "method": "GET", "data": "",
+             "cookies": [], "headers": []}
+        ] + mutation_specs
+        urls = [t["url"] for t in spec_targets]
         print(f"[*] GraphQL {args.gql}: {len(gql_names)} parameter name(s) "
-              f"introspected into the mining wordlist")
+              f"into the mining wordlist + {len(mutation_specs)} mutation "
+              f"target(s) (JSON-carrier probing)")
     if spec_targets:
         urls = [t["url"] for t in spec_targets]
         print(f"[*] {src_label}: {len(spec_targets)} endpoint(s) imported")

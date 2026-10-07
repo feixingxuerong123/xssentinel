@@ -124,9 +124,10 @@ def multictx_server():
     from tests.conftest import loopback_healthy
     if not loopback_healthy():
         pytest.skip("loopback degraded mid-session (security software/TCP state)")
-    server = ThreadingHTTPServer(("127.0.0.1", 18931), _EchoHandler)
+    server = ThreadingHTTPServer(("127.0.0.1", 0), _EchoHandler)
+    port = server.server_address[1]
     threading.Thread(target=server.serve_forever, daemon=True).start()
-    yield "http://127.0.0.1:18931"
+    yield f"http://127.0.0.1:{port}"
     server.shutdown()
 
 

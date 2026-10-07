@@ -27,11 +27,7 @@ from xssentinel.core.mitm_ca import MitmManager, available
 from xssentinel.core.passive_proxy import PassiveProxy
 from xssentinel.core.requester import Requester
 
-from tests.conftest import SOCKETPAIR_OK, loopback_healthy
-
-pytestmark = pytest.mark.skipif(
-    not SOCKETPAIR_OK,
-    reason="Windows loopback socketpair hangs (security software/TCP state)")
+from tests.conftest import loopback_healthy
 
 requires_crypto = pytest.mark.skipif(
     not available(),
@@ -120,17 +116,13 @@ class _TlsOrigin:
             def log_message(self, *a):
                 pass
 
-        for port in range(8962, 8974):
-            try:
-                self.server = _TlsServer(("127.0.0.1", port), _H, ctx)
-                break
-            except OSError:
-                continue
-        if self.server is None:
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                s.bind(("127.0.0.1", 0))
-                free = s.getsockname()[1]
-            self.server = _TlsServer(("127.0.0.1", free), _H, ctx)
+        # Ephemeral port: the OS guarantees it is free, so nothing can squat
+        # it.  The old `for port in range(...)` probe could bind a port an
+        # unrelated process was already listening on -- http.server sets
+        # SO_REUSEADDR, which on Windows makes the second bind succeed --
+        # after which the client talks to the WRONG server and the fixture
+        # never notices.  See tests/test_fixture_port_hygiene.py.
+        self.server = _TlsServer(("127.0.0.1", 0), _H, ctx)
         self.port = self.server.server_address[1]
         threading.Thread(target=self.server.serve_forever, daemon=True).start()
         time.sleep(0.2)

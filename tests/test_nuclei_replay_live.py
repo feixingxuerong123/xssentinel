@@ -24,16 +24,9 @@ import pytest
 
 from xssentinel.core import report
 
-from tests.conftest import SOCKETPAIR_OK, loopback_healthy
+from tests.conftest import loopback_healthy
 
 _HAS_NUCLEI = shutil.which("nuclei") is not None
-
-pytestmark = [
-    pytest.mark.skipif(not SOCKETPAIR_OK,
-                       reason="loopback socketpair degraded"),
-    pytest.mark.skipif(not _HAS_NUCLEI,
-                       reason="nuclei binary not installed"),
-]
 
 
 def _finding(ftype, param, url, payload):
@@ -79,20 +72,13 @@ class _EchoOrigin:
             def log_message(self, *a):
                 pass
 
-        for port in range(9022, 9034):
-            try:
-                self.server = http.server.ThreadingHTTPServer(
-                    ("127.0.0.1", port), _H)
-                break
-            except OSError:
-                continue
-        if self.server is None:
-            import socket
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                s.bind(("127.0.0.1", 0))
-                free = s.getsockname()[1]
-            self.server = http.server.ThreadingHTTPServer(
-                ("127.0.0.1", free), _H)
+        # Ephemeral port: the OS guarantees it is free, so nothing can squat
+        # it.  The old `for port in range(...)` probe could bind a port an
+        # unrelated process was already listening on -- http.server sets
+        # SO_REUSEADDR, which on Windows makes the second bind succeed --
+        # after which the client talks to the WRONG server and the fixture
+        # never notices.  See tests/test_fixture_port_hygiene.py.
+        self.server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), _H)
         self.port = self.server.server_address[1]
         threading.Thread(target=self.server.serve_forever, daemon=True).start()
         time.sleep(0.2)

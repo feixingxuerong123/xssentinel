@@ -29,10 +29,6 @@ from tests.conftest import SOCKETPAIR_OK, loopback_healthy
 
 # asyncio.run() needs a working loopback socketpair (see conftest.py);
 # skip instead of hanging when the environment throttles it.
-pytestmark = pytest.mark.skipif(
-    not SOCKETPAIR_OK,
-    reason="Windows loopback socketpair hangs (security software/TCP state)")
-
 
 def _echo_origin():
     """Start a local HTTP origin that raw-echoes the User-Agent header
@@ -170,6 +166,8 @@ class TestAsyncRequestLayers:
         finally:
             srv.shutdown()
 
+    @pytest.mark.skipif(not SOCKETPAIR_OK,
+                        reason="needs loopback (moved down from the file-level gate)")
     def test_scan_advanced_page_forwards_params(self):
         """Phase 87: run_page_layers receives the endpoint params in
         async mode (import map / CSSI / dangling markup reflection

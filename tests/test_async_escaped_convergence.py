@@ -31,10 +31,6 @@ from xssentinel.core.async_scanner import AsyncScanner
 from xssentinel.core.scanner import Scanner
 from xssentinel.core.scanner_layers import AdvancedLayerMixin
 
-pytestmark = pytest.mark.skipif(
-    not SOCKETPAIR_OK,
-    reason="Windows loopback socketpair hangs (security software/TCP state)")
-
 MARKER = "xssentinel_async_q_ab12"
 
 
@@ -152,11 +148,15 @@ def test_scanner_layers_delegates_to_canonical() -> None:
 # 2. the async engine converges on an escaped reflection
 # --------------------------------------------------------------------------
 
+@pytest.mark.skipif(not SOCKETPAIR_OK,
+                    reason="needs loopback (moved down from the file-level gate)")
 def test_escaped_echo_yields_no_finding() -> None:
     findings, _ = _probe(escape=True)
     assert findings == []
 
 
+@pytest.mark.skipif(not SOCKETPAIR_OK,
+                    reason="needs loopback (moved down from the file-level gate)")
 def test_escaped_echo_request_budget_is_small() -> None:
     """Order of magnitude below the unconverged ~1 + 14 x 13 = 183.
 
@@ -169,6 +169,8 @@ def test_escaped_echo_request_budget_is_small() -> None:
         f"escaped reflection still spent {len(session.calls)} requests")
 
 
+@pytest.mark.skipif(not SOCKETPAIR_OK,
+                    reason="needs loopback (moved down from the file-level gate)")
 def test_escaped_echo_skips_reflection_profile_probe() -> None:
     """The sandwich probe token must never reach the wire when escaped."""
     _, session = _probe(escape=True)
@@ -178,6 +180,8 @@ def test_escaped_echo_skips_reflection_profile_probe() -> None:
                 "reflection-profile sandwich probe still fires when escaped"
 
 
+@pytest.mark.skipif(not SOCKETPAIR_OK,
+                    reason="needs loopback (moved down from the file-level gate)")
 def test_build_variants_honours_cap_override() -> None:
     async def run():
         # AsyncScanner must be built inside the loop: its asyncio.Semaphore
@@ -196,6 +200,8 @@ def test_build_variants_honours_cap_override() -> None:
 # 3. convergence and pacing must not cost detection on a live reflection
 # --------------------------------------------------------------------------
 
+@pytest.mark.skipif(not SOCKETPAIR_OK,
+                    reason="needs loopback (moved down from the file-level gate)")
 def test_live_echo_still_confirms() -> None:
     findings, _ = _probe(escape=False)
     assert findings, "async L1 stopped confirming a live reflection"

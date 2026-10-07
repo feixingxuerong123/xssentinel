@@ -55,9 +55,10 @@ def fuzz_server():
     from http.server import ThreadingHTTPServer
     from benchmark.server import BenchmarkHandler, load_routes
     BenchmarkHandler.routes = load_routes()
-    server = ThreadingHTTPServer(("127.0.0.1", 18879), BenchmarkHandler)
+    server = ThreadingHTTPServer(("127.0.0.1", 0), BenchmarkHandler)
+    port = server.server_address[1]
     threading.Thread(target=server.serve_forever, daemon=True).start()
-    yield "http://127.0.0.1:18879"
+    yield f"http://127.0.0.1:{port}"
     server.shutdown()
 
 

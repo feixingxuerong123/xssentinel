@@ -42,11 +42,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pytest
 
-from tests.conftest import SOCKETPAIR_OK, loopback_healthy
-
-pytestmark = pytest.mark.skipif(
-    not SOCKETPAIR_OK,
-    reason="Windows loopback degraded (security software/TCP state)")
+from tests.conftest import loopback_healthy
 
 BLOCKED = ("<script", "<svg onload=")
 

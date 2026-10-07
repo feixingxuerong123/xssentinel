@@ -44,10 +44,6 @@ from xssentinel.core.budget import BudgetExhausted
 
 # asyncio.run() needs a working loopback socketpair (see conftest.py);
 # skip instead of hanging when the environment throttles it.
-pytestmark = pytest.mark.skipif(
-    not SOCKETPAIR_OK,
-    reason="Windows loopback socketpair hangs (security software/TCP state)")
-
 
 # ---------------------------------------------------------------------------
 # Fakes
@@ -246,6 +242,8 @@ class TestBudgetStopPropagates:
     """The stop must reach scan() instead of being counted as 'one failed
     request' by the per-probe ``except Exception`` handlers."""
 
+    @pytest.mark.skipif(not SOCKETPAIR_OK,
+                        reason="needs loopback (moved down from the file-level gate)")
     def test_probe_param_reraises_budget_exhausted(self):
         """One request allowed: the marker probe spends it, the very next
         probe (the sandwich/profile probe) must raise -- pre-fix it was
@@ -269,6 +267,8 @@ class TestBudgetStopPropagates:
         with pytest.raises(BudgetExhausted):
             asyncio.run(run())
 
+    @pytest.mark.skipif(not SOCKETPAIR_OK,
+                        reason="needs loopback (moved down from the file-level gate)")
     def test_scan_stops_at_request_budget(self):
         """A non-confirming endpoint with a 10-payload budget would fire
         ~15 requests per param (payloads + position shift).  With
@@ -283,6 +283,8 @@ class TestBudgetStopPropagates:
         # Phase 86: the reason is recorded and reported, not left dangling.
         assert scanner.budget_exhausted_reason
 
+    @pytest.mark.skipif(not SOCKETPAIR_OK,
+                        reason="needs loopback (moved down from the file-level gate)")
     def test_scan_survives_without_cap(self):
         """Control: the same non-confirming endpoint with NO budget burns
         far more than 5 requests -- proves the cap above is what stopped it."""
@@ -292,6 +294,8 @@ class TestBudgetStopPropagates:
         assert scanner.requests_made > 5, scanner.requests_made
         assert scanner.budget_exhausted_reason is None
 
+    @pytest.mark.skipif(not SOCKETPAIR_OK,
+                        reason="needs loopback (moved down from the file-level gate)")
     def test_scan_keeps_findings_collected_before_the_stop(self):
         """A finding that cost no requests (bypassable CSP, header-only) must
         still be yielded when the budget cuts the scan short -- pre-fix the
@@ -309,6 +313,8 @@ class TestBudgetStopPropagates:
         assert any(f.data.get("type") == "csp_bypass"
                    for f in scanner.findings)
 
+    @pytest.mark.skipif(not SOCKETPAIR_OK,
+                        reason="needs loopback (moved down from the file-level gate)")
     def test_scan_returns_normally_on_confirming_endpoint(self):
         """A vulnerable endpoint must still yield its reflected finding and
         must NOT be mistaken for a budget stop."""
@@ -318,6 +324,8 @@ class TestBudgetStopPropagates:
         assert any(f.data.get("type") == "reflected" for f in findings)
         assert scanner.budget_exhausted_reason is None
 
+    @pytest.mark.skipif(not SOCKETPAIR_OK,
+                        reason="needs loopback (moved down from the file-level gate)")
     def test_circuit_breaker_stops_the_scan(self):
         """breaker_threshold=2: two 5xx responses trip the breaker and the
         scan must stop instead of hammering a dead target."""
@@ -360,6 +368,8 @@ class TestTransformChainParity:
     """max_transforms was dead config: async fired the bare payload plus one
     polyglot and nothing else, so every filtered target was a false negative."""
 
+    @pytest.mark.skipif(not SOCKETPAIR_OK,
+                        reason="needs loopback (moved down from the file-level gate)")
     def test_transform_chain_detects_filtered_reflection(self):
         """The fixture blocks any value carrying a raw '<' and URL-decodes
         the rest.  Only a transformed (percent-encoded) payload can reflect
@@ -374,6 +384,8 @@ class TestTransformChainParity:
         # Attribution kept: the marker survived the transform chain.
         assert findings[0].data["param"] == "q"
 
+    @pytest.mark.skipif(not SOCKETPAIR_OK,
+                        reason="needs loopback (moved down from the file-level gate)")
     def test_bare_payload_misses_the_same_fixture(self):
         """Control on the SAME fixture: with the ladder capped to the bare
         payload (max_transforms=1 -> only the [] chain) nothing confirms, so
@@ -382,6 +394,8 @@ class TestTransformChainParity:
                                               max_transforms=1)
         assert findings == [], findings
 
+    @pytest.mark.skipif(not SOCKETPAIR_OK,
+                        reason="needs loopback (moved down from the file-level gate)")
     def test_build_variants_respects_max_transforms(self):
         """The ladder is capped at max_transforms and leads with the bare
         payload (cheapest first), like the sync _try_payload."""
@@ -395,6 +409,8 @@ class TestTransformChainParity:
         chains, first = variants[0]
         assert chains == [] and first == "<script>alert('tok123')</script>"
 
+    @pytest.mark.skipif(not SOCKETPAIR_OK,
+                        reason="needs loopback (moved down from the file-level gate)")
     def test_build_variants_keeps_the_marker(self):
         """Attribution: the base variant must still carry the verifier token
         untouched (transforms are applied to the whole marked payload)."""
@@ -407,6 +423,8 @@ class TestTransformChainParity:
         variants = asyncio.run(run())
         assert "xsstok01" in variants[0][1]
 
+    @pytest.mark.skipif(not SOCKETPAIR_OK,
+                        reason="needs loopback (moved down from the file-level gate)")
     def test_drain_agen_does_not_swallow_the_stop(self):
         """_drain_agen isolates per-layer errors -- it must NOT isolate a
         budget stop, or scan() can never see it."""

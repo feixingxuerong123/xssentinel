@@ -28,10 +28,6 @@ import pytest
 
 from tests.conftest import SOCKETPAIR_OK
 
-pytestmark = pytest.mark.skipif(
-    not SOCKETPAIR_OK,
-    reason="Windows loopback socketpair hangs (security software/TCP state)")
-
 NONCE = "k8Fj3x9Qm2Rw7Yp4"
 CSP = (f"default-src 'self'; script-src 'strict-dynamic' "
        f"'nonce-{NONCE}' 'unsafe-inline'")
@@ -57,6 +53,8 @@ class _H(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
 
+@pytest.mark.skipif(not SOCKETPAIR_OK,
+                    reason="needs loopback (moved down from the file-level gate)")
 def test_async_detects_csp_nonce_leak():
     from xssentinel.core.async_scanner import AsyncScanner
 
@@ -89,6 +87,8 @@ def test_async_detects_csp_nonce_leak():
         srv.shutdown()
 
 
+@pytest.mark.skipif(not SOCKETPAIR_OK,
+                    reason="needs loopback (moved down from the file-level gate)")
 def test_host_loop_is_not_hijacked_by_scanner_construction():
     """Regression: AsyncScanner must not bind primitives to a host loop.
 
@@ -126,6 +126,8 @@ def test_host_loop_is_not_hijacked_by_scanner_construction():
         srv.shutdown()
 
 
+@pytest.mark.skipif(not SOCKETPAIR_OK,
+                    reason="needs loopback (moved down from the file-level gate)")
 def test_async_csp_nonce_uses_probe_response_not_last_variant():
     """Regression guard for the overwritten-``text`` trap.
 

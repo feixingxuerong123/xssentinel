@@ -62,18 +62,13 @@ class _Origin:
             def log_message(self, *a):
                 pass
 
-        for port in range(8942, 8954):
-            try:
-                self.server = ThreadingHTTPServer(("127.0.0.1", port), _H)
-                break
-            except OSError:
-                continue
-        if self.server is None:
-            import socket
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                s.bind(("127.0.0.1", 0))
-                free = s.getsockname()[1]
-            self.server = ThreadingHTTPServer(("127.0.0.1", free), _H)
+        # Ephemeral port: the OS guarantees it is free, so nothing can squat
+        # it.  The old `for port in range(...)` probe could bind a port an
+        # unrelated process was already listening on -- http.server sets
+        # SO_REUSEADDR, which on Windows makes the second bind succeed --
+        # after which the client talks to the WRONG server and the fixture
+        # never notices.  See tests/test_fixture_port_hygiene.py.
+        self.server = ThreadingHTTPServer(("127.0.0.1", 0), _H)
         self.port = self.server.server_address[1]
         threading.Thread(target=self.server.serve_forever, daemon=True).start()
         time.sleep(0.2)

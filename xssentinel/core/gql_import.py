@@ -23,7 +23,8 @@ from __future__ import annotations
 
 import json
 
-__all__ = ["gql_param_candidates", "INTROSPECTION_QUERY"]
+__all__ = ["gql_param_candidates", "gql_mutation_targets",
+           "INTROSPECTION_QUERY"]
 
 _MAX_RESPONSE = 8 * 1024 * 1024
 
@@ -71,17 +72,12 @@ def _string_scalar(t: dict) -> bool:
             and name != "")
 
 
-def gql_param_candidates(endpoint: str, timeout: int = 15,
-                         max_names: int = 200, fetch=None) -> list[str]:
-    """Introspect ``endpoint`` -> ordered, deduped parameter-name candidates.
-
-    Order encodes yield: mutation arguments first (they are WRITE
-    injection points), then input-object fields, then query arguments,
-    then plain field names.  Duplicates and GraphQL meta names
-    (``__schema``) are dropped; the result is capped at ``max_names``.
+def _introspect(endpoint: str, timeout: int, fetch=None) -> dict:
+    """One introspection round-trip -> the ``__schema`` dict.
 
     Raises on unreachable endpoints, non-JSON responses, GraphQL-level
-    errors, or a schema without any query type.
+    errors, or a schema without types.  Shared by the wordlist and the
+    mutation-target builders so one request serves both.
     """
     if fetch is not None:                      # injectable for tests
         text = fetch(endpoint, INTROSPECTION_QUERY)
@@ -106,6 +102,24 @@ def gql_param_candidates(endpoint: str, timeout: int = 15,
                          f"{resp['errors'][0].get('message', '?')[:200]}")
     data = resp.get("data") or {}
     schema = data.get("__schema") or {}
+    if not (schema.get("types") or []):
+        raise ValueError("GraphQL response has no __schema.types")
+    return schema
+
+
+def gql_param_candidates(endpoint: str, timeout: int = 15,
+                         max_names: int = 200, fetch=None) -> list[str]:
+    """Introspect ``endpoint`` -> ordered, deduped parameter-name candidates.
+
+    Order encodes yield: mutation arguments first (they are WRITE
+    injection points), then input-object fields, then query arguments,
+    then plain field names.  Duplicates and GraphQL meta names
+    (``__schema``) are dropped; the result is capped at ``max_names``.
+
+    Raises on unreachable endpoints, non-JSON responses, GraphQL-level
+    errors, or a schema without any query type.
+    """
+    schema = _introspect(endpoint, timeout, fetch)
     types = schema.get("types") or []
     if not types:
         raise ValueError("GraphQL response has no __schema.types")
@@ -159,3 +173,118 @@ def gql_param_candidates(endpoint: str, timeout: int = 15,
             _add([str(f.get("name") or "") for f in
                   (t.get("fields") or [])])
     return ordered[:max_names]
+
+
+def _arg_type(t: dict) -> tuple[str, bool]:
+    """Peel wrappers -> (leaf type name, is_non_null)."""
+    non_null = False
+    while isinstance(t, dict):
+        if t.get("kind") == "NON_NULL":
+            non_null = True
+        if t.get("name"):
+            return str(t["name"]), non_null
+        t = t.get("ofType")
+    return "", non_null
+
+
+_SAMPLES = {"Int": 1, "Float": 1.0, "Boolean": True}
+
+
+def gql_mutation_targets(endpoint: str, timeout: int = 15,
+                         max_mutations: int = 25, fetch=None) -> list[dict]:
+    """Introspect ``endpoint`` -> one scan-target spec per string-arg mutation.
+
+    Modern GraphQL carries arguments in a plain ``variables`` JSON object,
+    which is exactly the JSON-carrier mode the scanner already probes
+    leaf-by-leaf (``json_leaf_paths`` / ``_set_json_leaf``): each emitted
+    target's body is ``{"query": <template with $vars>, "variables":
+    {arg: sample}}`` and the L1 loop injects the full payload ladder into
+    every String/ID leaf -- no GraphQL-specific injection machinery
+    needed.
+
+    The query template declares every REQUIRED argument (with a
+    type-appropriate sample, so the mutation actually executes) plus the
+    optional String/ID arguments (the probe targets).  The selection set
+    is ``{ __typename }`` -- valid on every object return type without
+    knowing the schema's shape.
+
+    Returns scan-target dicts aligned with the cli_runner spec format
+    (url/method/data/cookies/headers); ``data`` is the JSON string (the
+    CLI's ``_run_scan`` auto-parses `{`-leading bodies into JSON-carrier
+    mode).  Capped at ``max_mutations``, deduped by field name.
+    """
+    schema = _introspect(endpoint, timeout, fetch)
+    types = schema.get("types") or []
+    by_name = {t.get("name"): t for t in types
+               if isinstance(t, dict) and t.get("name")}
+    mut_name = (schema.get("mutationType") or {}).get("name")
+    if not mut_name:
+        return []
+    mut_type = by_name.get(mut_name) or {}
+
+    targets: list[dict] = []
+    seen: set[str] = set()
+    for field in (mut_type.get("fields") or []):
+        fname = str(field.get("name") or "")
+        if not fname or fname.startswith("__") or fname in seen:
+            continue
+        args = field.get("args") or []
+        string_args = [a for a in args
+                       if _arg_type(a.get("type") or {})[0]
+                       in ("String", "ID", "JSON")]
+        if not string_args:
+            continue                      # nothing probeable to inject
+        seen.add(fname)
+
+        var_defs: list[str] = []
+        passthrough: list[str] = []
+        variables: dict = {}
+        for a in args:
+            aname = str(a.get("name") or "")
+            leaf, non_null = _arg_type(a.get("type") or {})
+            if leaf in ("String", "ID", "JSON"):
+                var_defs.append(f"${aname}: "
+                                f"{'String' if leaf == 'JSON' else leaf}")
+                passthrough.append(f"{aname}: ${aname}")
+                variables[aname] = "probe"
+            elif non_null:
+                # required non-string args get type-appropriate samples so
+                # the mutation executes and the string probes are reached
+                sample = _SAMPLES.get(leaf)
+                if sample is None:
+                    sample = "{}" if leaf not in _BUILTIN_TYPES else ""
+                if sample == "" and non_null:
+                    # an unknown required scalar we cannot fabricate --
+                    # skip the whole mutation rather than ship a query
+                    # that can only error
+                    break
+                var_defs.append(f"${aname}: {leaf}")
+                passthrough.append(f"{aname}: ${aname}")
+                variables[aname] = sample
+        if not variables:
+            continue
+        if any(a[0] not in variables for a in
+               [(str(a.get("name") or ""), ) for a in args
+                if _arg_type(a.get("type") or {})[1]
+                and str(a.get("name") or "") not in variables]):
+            # a required argument we could not sample -- the template would
+            # be rejected server-side before any probe lands
+            continue
+
+        template = (f"mutation {fname[0].upper()}{fname[1:]}("
+                    + ", ".join(var_defs)
+                    + f") {{ {fname}(" + ", ".join(passthrough)
+                    + ") { __typename } }")
+        targets.append({
+            "url": endpoint,
+            "method": "POST",
+            "data": json.dumps({"query": template,
+                                "variables": variables},
+                               ensure_ascii=False),
+            "cookies": [],
+            "headers": [],
+            "gql_mutation": fname,
+        })
+        if len(targets) >= max_mutations:
+            break
+    return targets
