@@ -5,6 +5,20 @@
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-10-09
+
+Unreleased 段自 1.0.0(2026-09-29)起累积了 Phase 185–207 共二十余轮工作,
+本版一次性收口。全部为新增能力与内部重构,**无对外 API 破坏性变更**
+(`--sitemap` / `--skip-param` / `--wayback` / `--gql` / MCP 工具面均为新增;
+语义变化只有一处:JSON 反射的 severity 现与 confidence 一同降级,
+避免 severity-only 的消费者误判 —— 见 Phase 179)。
+
+自编 192 例矩阵双引擎满分的口径不变:sync TP113/FP0/TN79/FN0、async
+TP108/FP0/TN74/FN0,f1 均为 1.000;外部效度首次量出同靶三工具对照
+(XSSentinel f1 0.986 / dalfox 0.825 / nuclei-dast 0.839,60 例分层切片),
+其三条限定(我方唯一 FN 是打分口径而非判定错误、靶仍由我方构造、nuclei 用
+49s 拿 0.839 而我方用 346s 拿 0.986)随该条目一并阅读。
+
 ### Added
 
 - **DOMParser 重建链检测**(Phase 185):`DOMParser.parseFromString` /
