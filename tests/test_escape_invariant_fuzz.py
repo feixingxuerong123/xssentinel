@@ -36,7 +36,6 @@ from benchmark.server import BenchmarkHandler, load_routes  # noqa: E402
 from xssentinel.core.requester import Requester  # noqa: E402
 from xssentinel.core.scanner import Scanner  # noqa: E402
 
-PORT = 18878
 HIGH_MED = ("high", "medium", "critical")
 
 
@@ -47,9 +46,14 @@ def fuzz_server():
         pytest.skip("loopback degraded mid-session (security software/TCP state)")
     from http.server import ThreadingHTTPServer
     BenchmarkHandler.routes = load_routes()
-    server = ThreadingHTTPServer(("127.0.0.1", PORT), BenchmarkHandler)
+    # Ephemeral, not the old fixed PORT = 18878: a fixed port can be bound
+    # twice on Windows (http.server sets SO_REUSEADDR), which silently puts
+    # the client on another process's server.  See
+    # tests/test_fixture_port_hygiene.py.
+    server = ThreadingHTTPServer(("127.0.0.1", 0), BenchmarkHandler)
+    port = server.server_address[1]
     threading.Thread(target=server.serve_forever, daemon=True).start()
-    yield f"http://127.0.0.1:{PORT}"
+    yield f"http://127.0.0.1:{port}"
     server.shutdown()
 
 

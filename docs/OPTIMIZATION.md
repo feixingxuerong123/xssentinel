@@ -446,6 +446,59 @@ JS config line(那本身就是 script-string sink),四例全 confirmed、safe
 但**不经过** async 的 per-host throttle 与 189 的 egress jar —— 一次真实
 不对称,待有需求再对齐。
 
+### 3.9 ✅ 测试套件自身的可信度(Phase 206,两条新门 + 一次真因修复)
+
+本文档此前所有条目都在问"**扫描器**测出来的是不是真的"。Phase 206 记的是同一
+个问题问到**测试自己头上**:一个会静默失去覆盖的门禁,等于没有门禁。
+
+**① 模块级 loopback 门禁(`tests/test_loopback_gate_placement.py`,5 例)**
+
+`pytestmark = skipif(not SOCKETPAIR_OK, ...)` 挂在 Module 节点上,`skipif` 对
+每个继承它的 item 求值,**无法按用例豁免**。主机劣化时整文件一起跳 —— 包括那些
+一个网络请求都不发的用例。实测(`test_verify_carriers_live.py`,
+`XSSENTINEL_FORCE_SOCKETPAIR=bad`):21 skipped 全跳,其中 6 条是守 paramless
+兜底的纯断言,走桩、零网络。丢掉的正是 DOM 家族 finding 依赖的那条分支。
+
+修法是**把门下沉到真正依赖 loopback 的用例**(模块级门根本豁免不了),已下沉
+20 个文件;本条把它固化成门。门自带反证:注入一个模块级门必须让它变红 ——
+一个抓不到已知违规的门,和"会跳过的门禁"是同一个毛病,只是高了一层。
+
+**② loopback 靶场端口卫生(`tests/test_fixture_port_hygiene.py`,4 例)**
+
+起因不是优化,是 `test_xs_leaks.py` 解除模块级门后**立刻转红**。根因不在
+XS-Leaks 判定:源站确实发了 `Cross-Origin-Opener-Policy`,客户端没在跟它说话。
+
+```
+netstat -ano | findstr :9002
+  TCP  127.0.0.1:9002  LISTENING     15668   <- python,2 小时前泄漏
+  TCP  127.0.0.1:9002  ESTABLISHED           <- 我们自己的请求
+```
+
+靶场用 `for port in range(9002, 9014)` 挑端口,而 `http.server` 带
+`allow_reuse_address = 1` —— **Windows 上 SO_REUSEADDR 允许第二个 socket 绑到
+别人正在监听的端口**,所以 bind **成功**、`except OSError: continue` 永不触发、
+`self.port` 报 9002,而连接落到泄漏进程手里。靶场永远不会发现自己连错了。
+
+伤害量级才是重点:同文件的 `test_surface_found_when_opt_in` 本来就期望 1 条
+finding,对着错误服务器**照样绿**——一个被占端口同时产出假绿和假红,两边都没
+提端口。9 个靶场改为 `("127.0.0.1", 0)`:OS 保证独占,"被占"这个状态不存在,
+不需要探测也不需要回退分支。
+
+**没有"看起来安全"的固定端口豁免**。门的第一版给项目约定的 18xxx/19xxx 段
+开了口子,理由是"段内碰撞概率低"—— 这正是 9002-9013 当初留下来时用的同一
+个理由,而失败同样是静默的。最后一个带内 fixture(`test_escape_invariant_fuzz.py`
+的 `PORT = 18878`)已一并改掉,规则现在只剩一句:**端口 0,否则不许绑**。
+例外只有客户端 *connect* 到某个已知端口(如 `test_p27_api.py` 连 vuln_server
+的 8899)—— 那不是 bind,门用"只查 `("127.0.0.1", <int>)` 元组第二项"天然区分。
+
+**一条过期事实**:旧记"Windows 保留段 8810-9109,端口请用 18xxx/19xxx"——
+`netsh` 现在列的是 1101-1200 / 5357 / 21879+ …,那段保留**已经不在了**。
+避让规则仍是对的默认值,但**具体数字从来不是机制,SO_REUSEADDR 才是**;
+ephemeral 绑定把机制本身去掉了。
+
+**顺带收尾**:20 个文件下沉门禁后未删的 `SOCKETPAIR_OK` 导入留下 11 条 F401
+(`ruff check` 红),已清;现全库 `All checks passed!`。
+
 ## 5. 执行顺序建议
 
 ```
@@ -465,6 +518,8 @@ JS config line(那本身就是 script-string sink),四例全 confirmed、safe
 —— 代理 `127.0.0.1:17054` 无监听(netstat 空),直连 `raw.githubusercontent.com`
 curl exit 28。上面"GitHub API 是通的"那条反向实测写于 2026-10-02,已过期。
 结论:1.0 的可执行性**逐日变化**,每次开工前先 `curl -m 10` 复测,不要引用旧条目。
+
+---
 
 ## 6. Phase 207 新增:交付面(修复建议 + 报告类型表)的一致性审计
 

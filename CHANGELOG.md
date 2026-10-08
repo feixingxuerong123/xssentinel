@@ -142,6 +142,27 @@
   对象),既有逐叶探针把全量 payload 梯子注入每个 String/ID 参数;
   必需的非 String 参数给样本值使 mutation 真正执行,selection set 用
   恒合法的 `{ __typename }`。
+- **测试套件自身的两条门禁 + loopback 靶场端口卫生(Phase 206)**:
+  - `tests/test_loopback_gate_placement.py`(5 例)**禁止模块级 loopback 门禁**。
+    `pytestmark = skipif(not SOCKETPAIR_OK, ...)` 活在 Module 节点上、**无法按用例
+    豁免**:主机劣化时整文件连"一个网络请求都不发"的用例一起跳过(实测
+    `test_verify_carriers_live.py` 21 skipped 全跳,其中 6 条正是守 paramless
+    兜底的纯断言)。正确形状是把门下沉到真正依赖 loopback 的用例,本条把该形状
+    固化(含反证:注入违规用例必须变红,否则门本身是空转的)。
+  - `tests/test_fixture_port_hygiene.py`(4 例)**loopback 靶场必须绑
+    `("127.0.0.1", 0)`**。起因是 `test_xs_leaks.py` 解除模块级门后立刻转红,
+    而根因不在 XS-Leaks 判定:源站**确实**发了 `Cross-Origin-Opener-Policy`,
+    客户端却没在跟它说话 —— `netstat` 显示一个 2 小时前泄漏的 python 仍占着
+    9002,`http.server` 的 `allow_reuse_address = 1` 在 Windows 上让**第二次
+    bind 直接成功**(没有 `OSError` 可捕),所以 `for port in range(9002, 9014)`
+    的探测循环自以为拿到了端口,实际连的是别人的服务器。代价是**一绿一红同时
+    产生**:同文件的 `test_surface_found_when_opt_in` 本来就期望 1 条 finding,
+    对着错误服务器也是绿的。**10 个**靶场改为 ephemeral 绑定 —— OS 保证独占,
+    "被占"这个状态根本不存在,不需要探测也不需要回退。规则不给
+    "看起来安全"的固定端口开口子(18xxx 段也不行:碰撞概率低 ≠ 不碰撞,
+    而失败同样静默);唯一例外是客户端 *connect* 到已知端口,那不是 bind。
+  - 顺带收尾了上轮 WIP 遗留:20 个文件下沉门禁后未删的 `SOCKETPAIR_OK` 导入
+    让 `ruff check` 报 11 条 F401,已清(现全库 `All checks passed`)。
 - **修复建议语料补齐 + 报告类型表对齐(Phase 207)**:从"用户唯一直接消费的
   产品面"往回查,量出三个独立缺口。
   - **① 8 个真实发射的 finding type 掉进通用兜底建议**。判据是三方交叉:
@@ -177,6 +198,14 @@
     `Finding(type="cors_misconfig")` 关键字形态)。**门漏掉一个类型就报不出它**,
     这正是本文件存在的理由,已补上关键字形态并写了注释。
   - 语料 123 → **131** 条;`_meta.entry_count` 由测试锁死与实际条数一致。
+- **192 例全矩阵复测(Phase 206,与 9-24 基线同口径 10/6/90)**:sync
+  **TP113 / FP0 / TN79 / FN0 / ERR0,f1=1.000**(742s);async
+  **TP108 / FP0 / TN74 / FN0 / ERR0,f1=1.000**(912s,182 例计分 —— 10 例
+  manifest 声明 `engines:["sync"]` 的存储型/二阶链路记 SKIP,不记通过也不记漏报)。
+  产物 `benchmark/results/p206_full_{sync,async}.json`。**一处如实记账**:async
+  `pos-elem-04` 前两次 attempt 都是 **FN 且 `requests=0`**(第二次直接 180s 超时),
+  第三次 TP(20.33s / 29 请求)—— 按 Phase 97 口径这是环境形 FN,runner 的替换
+  完整留在 `fn_retry` 注记里可审计(`first` + 三次 `attempts`),不是"跑绿就算数"。
 - **外部效度对照第一次量出来(Phase 196b)**:`benchmark/run_cross_tool.py` 让
   XSSentinel / dalfox / nuclei 在**同一批靶**上跑分。文档 1.0 长期写"第三方对照
   需换机器",本机复核推翻了它:GitHub API 与 raw 可达、Go 代理(goproxy.cn)能
