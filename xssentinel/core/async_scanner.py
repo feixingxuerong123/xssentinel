@@ -32,8 +32,7 @@ from typing import AsyncIterator
 from urllib.parse import urljoin, urlparse
 
 from .scanner import Finding, json_leaf_paths, _set_json_leaf
-from .findings import (EVIDENCE_MODEL,
-                       EVIDENCE_NO_BROWSER)
+from .findings import EVIDENCE_MODEL
 from .requester import JsonBody
 from . import payloads as payloads_mod
 from . import context as ctx
@@ -46,8 +45,9 @@ from . import pre_encode as pre_mod
 # Phase 37: reflection-profile + generator parity (sync Phases 31/32).
 from . import reflection_profile as rp_mod
 from . import generator as gen_mod
-from . import csp as csp_mod           # Phase 100: CSP nonce-leak parity
-from . import dom_engine as dom_engine_mod  # Phase 65: DOM-dynamic parity
+# Phase 100 / 187: CSP nonce-leak and gadget-chain exploitation now live in
+# async_scanner_layers (_probe_csp_nonce / _probe_csp_gadget), which is where
+# the Phase 65 dom_engine import also moved to (Phase 211 first cut).
 # Phase 86: budget/circuit stops must be catchable by name at every layer --
 # _throttle() raises them, and the generic ``except Exception`` handlers that
 # surround every probe used to swallow them (see _probe_param).
@@ -1250,17 +1250,9 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
                         )
                         break
 
-        # Phase 100: CSP nonce-leak exploitation (sync _try_csp_nonce
-        # parity).  A nonce CSP blocks plain inline payloads, so the loop
-        # above ends unconfirmed -- but when the nonce itself is echoed
-        # into the page (the classic "nonce in a template/JSON blob" leak)
-        # a script carrying the REAL nonce executes.  The async path had no
-        # equivalent, so --async silently missed every nonce-leak endpoint
-        # that sync reported (pos-csp-01: sync TP, async FN).
-        #
-        # The verifier allowlists the nonce against the response's own CSP
-        # header, so a server that rotates nonces per request still cannot
-        # be falsely confirmed.
+        # Phase 211: the three tail stages below moved to
+        # AsyncDetectionLayersMixin (_probe_csp_nonce / _probe_csp_gadget /
+        # _probe_hpp).  csp_hdr is computed here because two of them read it.
         csp_hdr = ""
         try:
             csp_hdr = probe_headers.get("Content-Security-Policy") or ""
@@ -1270,248 +1262,22 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
         # step (scanner.py:656) carries the same guard, and the block is
         # only reached on an unconfirmed param anyway.
         if not param_confirmed and csp_hdr:
-            try:
-                _nonces = csp_mod.extract_nonces_from_csp(csp_hdr)
-            except Exception:
-                _nonces = []
-            if _nonces:
-                try:
-                    _near = csp_mod.detect_nonce_near_marker(
-                        csp_hdr, probe_text or text or "", marker)
-                except Exception:
-                    _near = {}
-                if _near.get("nonce_exposed_near_marker"):
-                    _n = _near.get("nonce_value") or _nonces[0]
-                    _ntok = "xssv_" + secrets.token_hex(4)
-                    _npay = (f"<script nonce='{_n}'>"
-                             f"alert('{_ntok}')</script>")
-                    _nparams, _ndata = self._probe_kv(
-                        params, data, param, _npay, is_body)
-                    try:
-                        async with self._semaphore:
-                            await self._throttle(url)
-                            async with session.request(
-                                method, url, params=_nparams or None,
-                                headers=self._req_headers(self.headers),
-                                proxy=self._next_proxy(),
-                                **_body_kwargs(_ndata),
-                            ) as nresp:
-                                _ntext = await nresp.text()
-                                _nhdrs = dict(
-                                    getattr(nresp, "headers", None) or {})
-                                self.requests_made += 1
-                                self._record_status(
-                                    getattr(nresp, "status", 200))
-                    except (BudgetExhausted, CircuitOpen):
-                        raise
-                    except Exception:
-                        _ntext = ""
-                        _nhdrs = {}
-                    if _ntext:
-                        _nv = await asyncio.to_thread(
-                            verifier.verify_semantic, _ntext, _ntok,
-                            response_headers=_nhdrs)
-                        if (_nv.get("confirmed") and
-                                verifier.payload_survived(_ntext, _npay)):
-                            _idx = _ntext.find(_ntok)
-                            yield Finding(
-                                url=url, method=method, param=param,
-                                context=_nv.get("context") or context,
-                                payload=_npay,
-                                severity=_non_html_grade(resp_headers)[0],
-                                evidence=_ntext[max(0, _idx - 30):
-                                                _idx + len(_ntok) + 30],
-                        type="reflected",
-                        confidence=_non_html_grade(resp_headers)[1],
-                        transform=["csp_nonce"],
-                        param_in="body" if is_body else "query",
-                        evidence_class=EVIDENCE_MODEL,
-                    )
+            async for _f in self._probe_csp_nonce(
+                    session, url, method, param, params, data, is_body,
+                    marker, context, csp_hdr, probe_text, text,
+                    resp_headers):
+                yield _f
+            async for _f in self._probe_csp_gadget(
+                    session, url, method, param, params, data, is_body,
+                    context, csp_hdr):
+                yield _f
 
-        # Phase 187: CSP gadget chain (sync _try_csp_gadget parity).  A strict
-        # script-src that still allowlists a known gadget host (JSONP endpoint,
-        # Angular CDN, ...) re-opens script execution; inline payloads cannot
-        # confirm it.  Framework-gadget payloads (Angular template expression)
-        # confirm through the SAME static template_angular machinery the
-        # corpus uses; JSONP-shaped ones have no honest static verdict (the
-        # token rides a src attribute) -- sync measures those under headless,
-        # the async emission stays on the static machinery like every other
-        # finding here.  Capped at two gadget payloads per (url, param).
-        if not param_confirmed and csp_hdr:
-            try:
-                _gadgets = csp_mod.gadget_bypass_payloads(csp_hdr)
-            except Exception:
-                _gadgets = []
-            _gtried = getattr(self, "_csp_gadget_tried", None)
-            if _gtried is None:
-                _gtried = set()
-                self._csp_gadget_tried = _gtried
-            if ((url, param) not in _gtried
-                    and csp_mod.gadget_chain_relevant(csp_hdr)):
-                _gtried.add((url, param))
-                for _g in _gadgets[:2]:
-                    _gtok = "xssv_" + secrets.token_hex(4)
-                    _gpay = verifier.mark(_g["payload"], _gtok)
-                    if _gpay == _g["payload"]:
-                        continue  # nothing stampable -> no attributable proof
-                    _gparams, _gdata = self._probe_kv(
-                        params, data, param, _gpay, is_body)
-                    try:
-                        async with self._semaphore:
-                            await self._throttle(url)
-                            async with session.request(
-                                method, url, params=_gparams or None,
-                                headers=self._req_headers(self.headers),
-                                proxy=self._next_proxy(),
-                                **_body_kwargs(_gdata),
-                            ) as gresp:
-                                _gtext = await gresp.text()
-                                _ghdrs = dict(
-                                    getattr(gresp, "headers", None) or {})
-                                self.requests_made += 1
-                                self._record_status(
-                                    getattr(gresp, "status", 200))
-                    except (BudgetExhausted, CircuitOpen):
-                        raise
-                    except Exception:
-                        continue
-                    if not _gtext or _gtok not in _gtext:
-                        continue
-                    _gv = await asyncio.to_thread(
-                        verifier.verify_semantic, _gtext, _gtok,
-                        response_headers=_ghdrs)
-                    if not _gv.get("confirmed"):
-                        # JSONP-shaped gadgets have no honest static verdict
-                        # (the token rides a src attribute).  Sync measures
-                        # those under headless; here the Phase-183 wrapper is
-                        # the browser -- but only when one EXISTS.  Without
-                        # Playwright the emission would be a browserless
-                        # claim sync never makes, so stay silent instead.
-                        if not dom_engine_mod.DynamicDomAnalyzer.available():
-                            continue
-                        _gidx = _gtext.find(_gtok)
-                        yield Finding(
-                            url=url, method=method, param=param,
-                            context=context,
-                            payload=_gpay,
-                            severity="high",
-                            evidence=_gtext[max(0, _gidx - 30):
-                                            _gidx + len(_gtok) + 30],
-                            type="reflected",
-                            confidence="low",
-                            transform=["csp_gadget"],
-                            param_in="body" if is_body else "query",
-                            evidence_class=EVIDENCE_NO_BROWSER,
-                            detail=(
-                                "CSP allowlists "
-                                f"'{_g['host']}' which hosts "
-                                f"{_g['gadget']}; the JSONP gadget payload "
-                                "reflected.  Static verdict is honestly "
-                                "silent (the token rides a src attribute) "
-                                "-- browser confirmation pending."),
-                        )
-                        break
-                    if not verifier.payload_survived(_gtext, _gpay):
-                        continue
-                    _gidx = _gtext.find(_gtok)
-                    yield Finding(
-                        url=url, method=method, param=param,
-                        context=_gv.get("context") or context,
-                        payload=_gpay,
-                        severity=_non_html_grade(_ghdrs)[0],
-                        evidence=_gtext[max(0, _gidx - 30):
-                                        _gidx + len(_gtok) + 30],
-                        type="reflected",
-                        confidence=_non_html_grade(_ghdrs)[1],
-                        transform=["csp_gadget"],
-                        param_in="body" if is_body else "query",
-                        evidence_class=EVIDENCE_MODEL,
-                    )
-                    break
-
-        # Phase 193/196: HPP (HTTP Parameter Pollution, sync _try_hpp
-        # parity).  The parameter is sent twice -- first occurrence benign,
-        # second the payload; a filter inspecting only the first occurrence
-        # passes the request while the backend renders the payload
-        # occurrence.  WAF gate mirrors sync; both positions (query pairs /
-        # raw urlencoded body); capped at two payloads per (url, param).
         if self.waf_name and not param_confirmed:
-            _htried = getattr(self, "_hpp_tried", None)
-            if _htried is None:
-                _htried = set()
-                self._hpp_tried = _htried
-            if (url, param) not in _htried:
-                _htried.add((url, param))
-                for _cand in cands[:2]:
-                    _htok = "xssv_" + secrets.token_hex(4)
-                    _hpay = verifier.mark(_cand, _htok)
-                    if _hpay == _cand:
-                        continue
-                    if is_body:
-                        from urllib.parse import urlencode as _ue
-                        _bpairs = [(k, v) for k, v in (data or {}).items()
-                                   if k != param]
-                        _bpairs.append((param, "xsssafe"))
-                        _bpairs.append((param, _hpay))
-                        _hparams = params
-                        _hdata = _ue(_bpairs)
-                        _hheaders = dict(self._req_headers(self.headers))
-                        _hheaders["Content-Type"] = \
-                            "application/x-www-form-urlencoded"
-                    else:
-                        _hparams = [(k, v) for k, v in (params or {}).items()
-                                    if k != param]
-                        _hparams.append((param, "xsssafe"))
-                        _hparams.append((param, _hpay))
-                        _hdata = data
-                        _hheaders = self._req_headers(self.headers)
-                    try:
-                        async with self._semaphore:
-                            await self._throttle(url)
-                            async with session.request(
-                                method, url, params=_hparams or None,
-                                headers=_hheaders,
-                                proxy=self._next_proxy(),
-                                **_body_kwargs(_hdata),
-                            ) as hresp:
-                                _htext = await hresp.text()
-                                _hhdrs = dict(
-                                    getattr(hresp, "headers", None) or {})
-                                self.requests_made += 1
-                                self._record_status(
-                                    getattr(hresp, "status", 200))
-                    except (BudgetExhausted, CircuitOpen):
-                        raise
-                    except Exception:
-                        continue
-                    if not _htext or _htok not in _htext:
-                        continue
-                    _hv = await asyncio.to_thread(
-                        verifier.verify_semantic, _htext, _htok,
-                        response_headers=_hhdrs)
-                    if not _hv.get("confirmed"):
-                        continue
-                    _hidx = _htext.find(_htok)
-                    yield Finding(
-                        url=url, method=method, param=param,
-                        context=_hv.get("context") or context,
-                        payload=_hpay,
-                        severity="high",
-                        evidence=_htext[max(0, _hidx - 30):
-                                        _hidx + len(_htok) + 30],
-                        type="reflected",
-                        confidence="high",
-                        transform=["hpp"],
-                        param_in="body" if is_body else "query",
-                        evidence_class=EVIDENCE_MODEL,
-                        detail=(
-                            "HPP: the parameter was sent twice (first "
-                            "occurrence benign, second the payload) and "
-                            "the payload-carrying occurrence is what the "
-                            "application rendered -- a filter inspecting "
-                            "only the first occurrence was bypassed"),
-                    )
-                    break
+            async for _f in self._probe_hpp(
+                    session, url, method, param, params, data, is_body,
+                    context, cands):
+                yield _f
+
 
         # Phase 132: L7 parameter layers (mutation / DOM clobber / template
         # / polyglot / markdown).  Sync reaches these at the end of

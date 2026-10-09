@@ -1,10 +1,12 @@
-# Phase 211 预备：`_probe_param` 拆分方案（未动代码）
+# Phase 211：`_probe_param` 拆分
 
-`docs/OPTIMIZATION.md` 1.4 记的是"683 行单方法"。**实测现在是 787 行**
+**第一刀已完成**：787 → **553 行**（搬走 263 行）。下面是实测、切法与验收。
+
+`docs/OPTIMIZATION.md` 1.4 记的是"683 行单方法"。**实测（拆分前）是 787 行**
 （`async_scanner.py:750` 起）——它比文档记的又长了 100 行，是全库最大的单个方法，
 也是项目第一条约定（"新增能力进对应 Mixin，不堆回主文件"）在方法粒度上的唯一例外。
 
-| 度量 | 值 |
+| 度量（拆分前） | 值 |
 |---|---|
 | 行数 | 787 |
 | `if` / `try` / `for` / `async for` / `async with` | 44 / 20 / 13 / 4 / 18 |
@@ -22,7 +24,54 @@
 | E | 1139–1252 | 参数位置变换（37）+ flipped is_body（47）+ 二次 concat |
 | F | 1253–end | CSP nonce 泄漏利用（100），同样 gated on `not param_confirmed`（132） |
 
-## 切法
+## 第一刀（已落地）：搬走三个自包含的尾段
+
+| 方法 | 原位置 | 行数 |
+|---|---|---|
+| `_probe_csp_nonce`（Phase 100） | 1253–1329 | 77 |
+| `_probe_csp_gadget`（Phase 187） | 1331–1430 | 100 |
+| `_probe_hpp`（Phase 193/196） | 1432–1514 | 83 |
+
+选这三段的判据：**只 yield、不改调用方局部变量、都被 `not param_confirmed` 门控**。
+`param_confirmed` 留在调用方 —— 把它传进子方法再返回标志就是行为变更，所以没做。
+落点 `async_scanner_layers.py`（检测层 Mixin），不堆回主文件。
+
+剩余 553 行（A 上下文分类 / B 候选构建 / C 主 variant 循环 / D concat 重试 /
+E 位置变换 / H L7 与时间盲）比这三段纠缠得多 —— 它们共享 `cands` / `prof` /
+`marker_escaped` / `variants` / `resp_headers` 并互相改写，**第二刀要引状态对象，
+属于改逻辑，另开一轮**。
+
+### 搬的时候抓到的一个真 bug（ruff F821）
+
+`_probe_hpp` 的 finding 里用了 `context`，而我给它的签名漏了这个参数 —— 原代码
+里 `context` 是主方法的局部变量，搬出去后就成了未定义名。**它是 ruff 报出来的，
+不是测试**：那几个 CSP/HPP 测试都过不了这条路径（不发 finding 就 return）。
+"移动代码不会引入 bug"这个直觉在跨作用域搬动时是错的。
+
+## 验收（全绿）
+
+| 项 | 结果 |
+|---|---|
+| `test_csp_nonce_async_parity` + `test_async_phase196_hpp_body_parity` | 5 passed |
+| `test_csp_gadget_chain` | 10 passed |
+| parity gate | 4 passed（221s） |
+| `--quick --strict-gate`（async） | FP0/FN0/ERROR0，63 例计分 |
+| **全量 192 例 async 矩阵** | **TP108 FP0 TN74 FN0，f1=1.000**（182 计分 / 10 SKIP） |
+| **逐例比对（`dev/compare_baseline.py`）** | **192/192 例 0 差异**；quick 切片连请求数都 0 差异 |
+
+全量里有 4 例请求数 +1（`neg-cookie-01` / `pos-cookie-01` / `pos-ctoss-01` /
+`pos-multi-02`），**只报告不判失败** —— 同一个 quick 切片的请求数是 0 差异，
+所以这 4 例是本机抖动或随机 token 导致的分支差异，不是拆分引入的。
+
+### 顺带修了比对工具的一个假阳性
+
+第一版把 payload 的"长度 + 是否含 svg/onerror"算进 finding 指纹，于是
+`neg-filter-03` 被报成差异。真因：**polyglot 的 executor 由 token 决定**
+（`idx = sum(ord(c) for c in tok) % len(_EXEC_PRIMITIVES)`），而 token 每次运行
+随机 ⇒ 同一份代码两次跑也会给出 `<svg/onload=...>` 与 `<marquee onstart=...>`。
+payload 含随机性，不可比对，已从指纹中移除。
+
+## 第二刀的前置（未做）
 
 切成 A–F 六个方法，共享状态（`marker` / `context` / `marker_escaped` /
 `param_confirmed` / `cands` / `variants` / `resp_headers` / `profile`）用一个

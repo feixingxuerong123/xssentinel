@@ -20,22 +20,24 @@ FIELDS = ("verdict", "detected", "findings_count", "error")
 
 
 def _finding_shape(fd):
-    """Normalised finding fingerprint: type/severity/confidence/param/payload.
+    """Normalised finding fingerprint: type / severity / confidence / context.
 
-    Payload carries a per-run random marker, so it is compared by SHAPE
-    (length + whether it is a polyglot), not verbatim.
+    The payload is deliberately NOT part of the fingerprint.  It carries a
+    per-run random token, and in the polyglot builder that token also picks
+    the executor -- ``idx = sum(ord(c) for c in tok) % len(_EXEC_PRIMITIVES)``
+    -- so two runs of the SAME code legitimately emit different payload
+    strings (``<svg/onload=...>`` vs ``<marquee onstart=...>``).  Comparing
+    payloads reports a difference on essentially every run that is pure
+    entropy: the first version of this script did exactly that and flagged
+    neg-filter-03 after a verbatim code move that changed nothing.
     """
     out = []
     for f in (fd or []):
-        payload = str(f.get("payload") or "")
         out.append((
             f.get("type"),
             f.get("severity"),
             f.get("confidence"),
-            f.get("param"),
             f.get("context"),
-            len(payload),
-            "<svg" in payload or "onerror" in payload,
         ))
     return sorted(out)
 
