@@ -1487,3 +1487,59 @@ ground truth 取上游 `data/static/challenges.yml`:9 XSS / 69 non-XSS / 38 othe
   `/api/Users` 401。即 stored 系 challenge 在默认配置下不是自动化可达的 sink,
   所以"9 条 challenge 只报了 2 个 sink"不是扫描器漏报,而是靶的其余面要么被
   净化、要么需要人在回路。按 190 纪律不写进 README 当成绩。
+
+## Phase 210:把 SPA 路由交给 Agent 面(`--discover` / `xssentinel_discover`),并在同一轮被真实靶纠正两次
+
+Phase 209 记的边界"`--discover` 只回表单字段名与同源资源,不回路由"本轮补掉。
+改动四处:`harvest()` 从**渲染后的 DOM** 收 `a[href^="#/"]`(浏览器是唯一读得到
+fragment 的东西);`_normalize_harvest` 新增 `routes`(**fragment 必须原样保留**,
+与 `resource_urls` 剥 fragment 的规则相反 —— 剥掉就退回 209 那个错);CLI 的
+`--discover` 与 MCP 的 `xssentinel_discover` 各自接上。
+
+### 被真实靶纠正的两次
+
+1. **"路由优先"是我拍的,错了。** 第一版把 harvest 的路由排在扫描队列最前
+   (理由"API 端点静态挖矿也能拿到,客户端路由只有浏览器能发现"听着很对)。
+   真靶实测:渲染出的 nav 是 `#/login` `#/contact` `#/chatbot` —— **全是无参路由**,
+   而"无参"就等于"注不进去";10 个槽位的窗口被 5 个不可探测的页面吃掉,
+   把同源 API 端点挤了出去。改为 `_discover_scan_order()` 三档:
+   **fragment 带 query 的路由 > 同源端点 > 无参路由(仍返回,只是不占预算)**。
+   变异对照:把顺序改回我原来的"路由一律靠前" → 该组 5 例里 **4 例变红**。
+2. **`--discover` 自己找不到那条真漏洞,因为可探测的路由在 bundle 里。**
+   nav 锚点给不出 `#/search?q=`;能给出参数名的是 bundle 的
+   `navigate([...],{queryParams:{...}})` —— 也就是 209 给爬取路径接的那个矿机。
+   于是让 `--discover` 复用它(同一函数、同一 12 上限、同一同源规则),
+   不再要求操作者"顺手加 -c"。
+
+### 交付实测(真实靶,`--discover --headless`,**不带 -c**)
+
+`xssentinel -u http://127.0.0.1:18900 --discover --headless` →
+**`dom_dynamic` high/high browser-executed @ `#/search?q=xss`**,另有 5 条
+bundle 路由全部进入扫描集(`#/search?q=` `#/login?redirectUrl=`
+`#/address/select?redirectUrl=` `#/track-result?id=` `#/chatbot/conversation?initialMessage=`)。
+即:一条命令、只给 origin,`--discover` 一条路也能出真漏洞。
+
+### 同一次跑量到的、**没有顺手改**的大问题(见 OPTIMIZATION 1.5)
+
+报告里另外 3 条 high 全落在 `main.js`,`evidence_class=browser-unavailable` 且
+**`proof=None`**。逐条对着 bundle 核过去:`addEventListener('message'` 出现 **0 次**
+(它凭"有 message 监听器"就报了 `postmessage_xss`);37 处 `setTimeout(` 传的都是
+函数(`setTimeout(()=>{...},1e3)`、`setTimeout(this.dispose,500)`)却被读成
+"setTimeout(string) from postMessage payload";`location.replace(` 5 处全是
+硬编码常量 `replace(hostServer + '/profile')` 却被报成 "fed by user input"。
+这是判定面(档级/证据要求),需要自己的对照矩阵与全量矩阵复测,
+不在本轮盲改 —— 记为 1.5。同时承认:我把排序修对之后,这个面**暴露得更明显**
+(同一次跑里被扫的 JS chunk 从 1 个变 3 个),所以它不是边角而是必修。
+
+### 门
+
+- `tests/test_phase196.py`:纯函数 5 例(fragment 保留 / 陈旧 fragment 替换 /
+  非 hash href 拒收 / 上限 / 去重)+ 真浏览器 1 例(两个锚点指向同一路由,
+  复跑证明去重发生在实渲染路径上)+ `TestDiscoverScanOrder` 5 例。
+- `tests/test_phase205_mcp_workflow.py`:Agent 链第一步的 payload 里
+  `spa_routes` 必须出现且内容正确(**已确认这条不是空守卫**:单跑 2 passed 0 skipped)。
+- 契约变动的连带面查过:`harvest()` 返回值多了一个 key,全仓只有一处按整个 dict
+  等值断言(`test_nav_recovery.py` 的变异对照),先只扫了 `test_phase196`
+  因此被门抓了一次红,补 `grep resource_urls tests/` 全树扫完后改定。
+- 回归:discover/MCP/nav/dom-engine/CLI 族 `71 passed, 4 skipped`(4 例是
+  `XSS_DOM_LIVE` opt-in 实浏览器)+ CLI 与映射族 `99 passed`。

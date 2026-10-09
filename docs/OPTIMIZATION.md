@@ -168,6 +168,7 @@ findings_count 与拆分前完全一致,请求数 7415 → 7415。
 
 ### 1.3 sandbox.py 拆分 —— 第一刀已完成(2395 → 1320 行)
 
+
 **问题**:纯 Python 浏览器沙箱承担了"HTML 解析 + JS 模拟 + DOM 状态机"
 三个职责,是评分体系的核心依赖(1680-case oracle 的对照臂),单文件
 改动风险高。
@@ -228,6 +229,41 @@ import 仍可用 —— 它靠的是 `sandbox.py` 里带原因的 re-export,而�
 现有 import 路径全部可用(回归测试锁)。
 
 ---
+
+### 1.5 JS bundle 被当成"页面"扫 → 真实靶上 3 条 high 假阳性(2026-10-09 量到,未修)
+
+**实测对象**:OWASP Juice Shop 20.2.0,`--discover --headless`(不带 `-c`)。
+报告给出 4 条 high,其中 3 条落在 `main.js` 上、`evidence_class=browser-unavailable`、
+**`proof` 为 None**(读者无从核对):
+
+| 报告的 claim | bundle 里实际是什么 |
+|---|---|
+| `postmessage_xss`:"vulnerable postMessage listener: `setTimeout(string) from postMessage payload`; no origin check" | `main.js` 里 **`addEventListener('message'` 出现 0 次**;37 处 `setTimeout(` 传的都是函数(`setTimeout(()=>{n.classList.remove(i)},1e3)`、`setTimeout(this.dispose,500)`) |
+| `websocket_xss`:"onmessage handler feeds event.data into a dangerous sink" | 同上 —— 判定形状是 "`setTimeout(` 后面跟了个标识符" 就当字符串实参 |
+| `open_redirect_xss`:"DOM redirect sink fed by user input `location.replace(<user input>)`; params=['to','redirect_uri']" | 5 处 `location.replace(` 全是硬编码常量:`window.location.replace(L$.hostServer + \`/profile\`)` |
+
+**为什么 fixture 永远测不到**:本仓靶场从不把 `.js` 当扫描目标交付
+(benchmark 的 JS 用例是给 `L9_js_miner`/`L8_framework` 的**语义**用的),
+而 `--discover` 的 `resource_urls` 天生包含 `main.js`/`scripts.js`/
+`rolldown-runtime-*.js` —— 真实 SPA 一渲染就是一堆 chunk。
+Phase 210 把"probeable 优先"的排序修好后,这个面**暴露得更充分了**
+(同一次跑里 JS chunk 从 1 个变 3 个),所以这是必修项而不是边角。
+
+**这不是"降级就完事"**:三条里至少 `framework_angular_xss` 一类是真实存在的
+检测面(Juice Shop 确实有 Angular sink),问题在**证据与档级**:
+`browser-unavailable` + `proof=None` + `severity=high` 三者同时出现,
+等于"最弱的证据配最高的音量"。修法必须按本仓老规矩:
+1. 先造对照 —— 同一个 sink 形状在**可控/不可控**两版 bundle 上跑,
+   看层能不能区分"`setTimeout(fn)`"与"`setTimeout(string)`"
+   (Phase 196b 的 CSP 投递通道五形态矩阵是同款方法论);
+2. 判定改动要有门:若定"无浏览器证据 + 无 proof ⇒ 至多 medium/low",
+   就要有测试锁住,并复跑全量矩阵确认没把真阳一起降掉;
+3. 每条静态层都应带可核对的 `proof`(文件 + 偏移 + 片段),
+   `proof=None` 本身该被门拒绝 —— 交付面上"不可核对的高危"是最贵的一类错误。
+
+**关联**:与 1.0(外部效度)、2.1(对等门)同源 —— 都是"实验室指标掩盖了
+真实世界的形状"。Phase 209 的模板 SSTI 假阳性是同一种病的另一个器官
+(把栈行号 `route.js:149:13` 里的 `49` 当成 `{{7*7}}` 的渲染结果)。
 
 ## 2. 中优先级(收益明确,可排期)
 

@@ -23,6 +23,17 @@
   `tests/test_phase209_spa_route_delivery.py`(4,**双引擎** × 阳性/safe 孪生,
   真 Chromium + 变异对照)、`tests/test_phase209_accept_encoding.py`(5,含反向对照)。
 
+- **SPA 路由进入 Agent 面与 `--discover`(Phase 210)**:`harvest()` 从渲染后的 DOM 收
+  `a[href^="#/"]`,`_normalize_harvest` 新增 `routes`(**fragment 原样保留**,与
+  `resource_urls` 相反 —— 剥掉 fragment 就退回 Phase 209 那个"把路由当服务端路径"的错);
+  `xssentinel_discover` 的 payload 多一个 `spa_routes` 字段。扫描集按**可探测性排序**
+  (fragment 带 query 的路由 > 同源端点 > 无参路由;后者仍返回,只是不占 10 槽预算),
+  并让 `--discover` 复用爬取侧的 bundle 矿机,于是
+  `xssentinel -u <origin> --discover --headless`(**不带 `-c`**)在真实靶上给出
+  `dom_dynamic` high/high **browser-executed**(`#/search?q=`)。
+  新增 12 例(纯函数 5 + 真浏览器 1 + 排序 5 + MCP 链 1)+ 排序规则变异对照
+  (退回"路由一律靠前" → 5 例里 4 例红)。
+
 ### Fixed
 
 - **`template_ssti_*` critical 假阳性(Phase 209)**:`detect_rendered()` 原为
@@ -61,6 +72,13 @@
   nuclei v3.9.0 0.8387(25.2s);唯一 FN 仍是打分口径下的 `pos-xs-01`(XS-Leaks)。
 
 ### Known limitations
+
+- **JS bundle 被当成"页面"扫,真实靶上产出 3 条无证据的 high**(见
+  `docs/OPTIMIZATION.md` 1.5):`postmessage_xss` / `websocket_xss` /
+  `open_redirect_xss` 落在 `main.js`,`evidence_class=browser-unavailable` 且
+  `proof=None`。逐条核对 bundle:`addEventListener('message'` 出现 0 次、
+  37 处 `setTimeout(` 传的都是函数、5 处 `location.replace(` 全是硬编码常量。
+  属判定面(档级与证据要求),需要自己的对照矩阵,本轮没有盲改。
 
 - async 爬到的**非** fragment 端点仍只跑反射层(sync 对每个爬到端点跑全套页面层);
   见 `docs/OPTIMIZATION.md` 2.1.1。
