@@ -71,14 +71,36 @@ E 位置变换 / H L7 与时间盲）比这三段纠缠得多 —— 它们共�
 随机 ⇒ 同一份代码两次跑也会给出 `<svg/onload=...>` 与 `<marquee onstart=...>`。
 payload 含随机性，不可比对，已从指纹中移除。
 
-## 第二刀的前置（未做）
+## 第二刀：切点已量化（`dev/probe_param_coupling.py`）
 
-切成 A–F 六个方法，共享状态（`marker` / `context` / `marker_escaped` /
-`param_confirmed` / `cands` / `variants` / `resp_headers` / `profile`）用一个
-模块内 dataclass 承载，显式传递 —— **不用实例属性**：`param_confirmed` 决定了
-后三段跑不跑（Phase 132 的门），放在 `self` 上会让"这次调用"和"下一次调用"串味。
+不再靠印象切。脚本按阶段统计每个名字的写/读，输出跨段状态：
 
-C/D/E/F 是 async generator，委托写法 `async for f in sub(...): yield f`。
+| 名字 | 写于 | 读于 | 结论 |
+|---|---|---|---|
+| `marker` | 前置 | A,B1,C,D,E,F,H | 全程只读 ⇒ 参数传 |
+| `context` | A | B1,B2,B3,C,D,E,F | 全程只读 ⇒ 参数传 |
+| `cands` | B2,B3,B4,B5 | B2..B5,C,E,F | **B 段内部改写，出段后只读** |
+| `marker_escaped` | A,**B3** | B2..B5,C,D | **B3 会改写它（收敛）⇒ 必须回传** |
+| `param_confirmed` | C,D,E | F,H | 决定后两段跑不跑 |
+| `resp_headers` / `text` | C,D,E | F,H | 跨段读 |
+| `variants` / `marked` / `payload` | C | D,E | C→D/E |
+| `t` / `v` / `v2` / `idx` / `sd` / `sp` / `tchain` / `variant` / `send_*` | 单段 | 同段 | **纯局部，随段搬走** |
+
+由此得出难度递增的三刀（建议按序）：
+
+1. **B 段（候选构建，B1–B5 ≈ 137 行）→ `_build_probe_candidates(...)`**
+   边界最干净：入参 `context / marker / marker_escaped / text`，出参
+   `(cands, marker_escaped, prof)`。注意 `marker_escaped` 要回传（B3 的收敛会改它）。
+2. **A 段（L1 探针，62 行）→ `_probe_l1(...)`**
+   有两个提前出口（pre-encode 命中后 `yield`+`return`、marker 未反射时 pre-encode 兜底），
+   需要返回值协议表达"本参数已处理完，调用方直接返回"。
+3. **C+D+E（主循环 + concat 重试 + 位置变换 ≈ 250 行）**
+   最纠缠：`param_confirmed` 在 async generator 里**无法作为返回值交给调用方**，
+   必须塞进一个可变状态对象（小 dataclass 或 dict）传进子生成器。
+   这三段要么整体搬，要么别动。
+
+**`param_confirmed` 不要用实例属性**（`self.xxx`）：它是"本次调用"的状态，
+放 `self` 上会让相邻两次调用串味。
 
 ## 风险（每一条都要单独验证）
 
