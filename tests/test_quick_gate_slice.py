@@ -47,12 +47,21 @@ _BANNED_STALE_CLAIMS = (
     "98-case quick slice",
     "(98 例)",
     "Quick mode (10 cases)",
+    # Present-tense claims about the MATRIX size.  Dated historical rows that
+    # say "98 例" (README's 2026-09-06 / Phase 96 baselines) are legitimate
+    # records -- what must not come back is a sentence asserting the matrix
+    # IS 98 cases today.
+    "同一 98 用例矩阵",
 )
 
-# Files that state how big the push slice is.
+# Files that state how big the push slice is.  A file belongs here only if it
+# really makes that claim: `run_benchmark_batched.py` drives the FULL 192-case
+# matrix and has no reason to mention 64, so adding it made the guard assert
+# something false about a correct file.
 _CLAIMING_FILES = (
     os.path.join(".github", "workflows", "ci.yml"),
     "CONTRIBUTING.md",
+    "README.md",
     os.path.join("docs", "OPTIMIZATION.md"),
     os.path.join("benchmark", "run_benchmark.py"),
     os.path.join("benchmark", "runner.py"),

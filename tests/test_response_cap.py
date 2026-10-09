@@ -82,7 +82,20 @@ def test_a_cap_shortens_the_body_and_says_so(base):
 
 
 def test_an_unbounded_requester_sees_the_whole_page(base):
-    req = Requester(timeout=10)                       # 0 = unlimited
+    """30s, not 10s: this is the only read of the full 5 MB body in this file.
+
+    Measured as a load flake (full batched gate 20261009-184714: attempt 0
+    `socket.timeout: timed out` inside urllib3's read, attempt 1 green; 1
+    failure in 9 standalone runs on a host with another project's 11 python
+    processes competing for loopback).  The assertion is about *integrity* --
+    all 5 MB arrive, nothing silently truncated -- so an incidental bandwidth
+    timeout was measuring the host, not the product.
+
+    This does not disarm a hang: a wedge costs minutes to hours here (the
+    provisional-navigation case on record blocked 763s), so 30s still fails
+    loudly on a target that stops mid-body.
+    """
+    req = Requester(timeout=30)                       # 0 = unlimited
     resp = req.get(base + "/big")
     assert len(resp.text) == BODY
     assert req.truncated_responses == 0

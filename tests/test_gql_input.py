@@ -203,10 +203,12 @@ class TestMutationTargets:
     def test_cli_wiring_aligns_specs_with_urls(self):
         """The per-target loop indexes spec_targets[i] against urls[i] --
         the --gql branch must keep them the same length."""
-        from xssentinel.core.gql_import import gql_param_candidates,             gql_mutation_targets
+        from xssentinel.core.gql_import import (gql_mutation_targets,
+                                                gql_param_candidates)
         names = gql_param_candidates("http://t/graphql", fetch=_fetch_ok)
         specs = [{"url": "http://t/graphql", "method": "GET", "data": "",
-                  "cookies": [], "headers": []}] +             gql_mutation_targets("http://t/graphql", fetch=_fetch_ok)
+                  "cookies": [], "headers": []}] + \
+            gql_mutation_targets("http://t/graphql", fetch=_fetch_ok)
         urls = [t["url"] for t in specs]
         assert len(urls) == len(specs) == 2
         assert names                                  # mining still armed
