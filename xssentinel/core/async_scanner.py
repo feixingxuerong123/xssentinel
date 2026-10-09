@@ -34,7 +34,6 @@ from urllib.parse import urljoin, urlparse
 from .scanner import Finding, json_leaf_paths, _set_json_leaf
 from .findings import EVIDENCE_MODEL
 from .requester import JsonBody
-from . import payloads as payloads_mod
 from . import context as ctx
 from . import verifier
 from . import waf as wafmod
@@ -42,9 +41,8 @@ from . import polyglot as poly_mod
 from . import bypass as bypass_mod
 # Phase 35: pre-encoding pipeline parity with the sync scanner (Phase 34).
 from . import pre_encode as pre_mod
-# Phase 37: reflection-profile + generator parity (sync Phases 31/32).
-from . import reflection_profile as rp_mod
-from . import generator as gen_mod
+# Phase 37/43/96: corpus sampling, reflection profile and generative payloads
+# now live in async_scanner_layers._build_probe_candidates (Phase 211 round 2).
 # Phase 100 / 187: CSP nonce-leak and gadget-chain exploitation now live in
 # async_scanner_layers (_probe_csp_nonce / _probe_csp_gadget), which is where
 # the Phase 65 dom_engine import also moved to (Phase 211 first cut).
@@ -840,129 +838,15 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
                 yield f
             return
 
-        # Build payload candidates (CPU-bound) -- run in thread.
-        # Phase 43: multi-corpus cross-context sampling (sync _scan_param
-        # parity) -- primary corpus stride-sample + sibling corpora +
-        # polyglots.  The old single-corpus slice missed payloads like the
-        # recursive <sscriptcript> strip (neg-filter-01 FN).
-        # Phase 93: on an escaped reflection the sync engine drops the
-        # candidate budget to 2 (``primary_budget``) and only fires 3 of
-        # them -- a small probe set that still catches double-encoding
-        # bugs and attribute-context escapes without burning 168 requests
-        # on a param that is almost certainly safe.
-        cand_budget = 3 if marker_escaped else self.max_payloads
-        try:
-            cands = await asyncio.to_thread(
-                payloads_mod.cross_context_candidates, context,
-                cand_budget)
-        except Exception:
-            cands = payloads_mod.for_context("html_element")[:cand_budget]
-        # Phase 177: multi-reflection parity with sync -- append a small
-        # slice for each additional reflection context after the primary
-        # queue; the payload-loop budget decides whether they ever fire.
-        if _extra_contexts:
-            _seen = set(cands)
-            for _xc in _extra_contexts:
-                for p in payloads_mod.for_context(_xc):
-                    if p not in _seen:
-                        _seen.add(p)
-                        cands.append(p)
+        # Phase 211 round 2: candidate construction (Phase 43 corpus sampling,
+        # Phase 37/95 profile + generative, Phase 96 RCDATA, Phase 29-2 WAF
+        # bypass) moved to _build_probe_candidates.  marker_escaped comes back
+        # because the profile convergence can set it, prof because the RCDATA
+        # stage reads it.
+        cands, marker_escaped, prof = await self._build_probe_candidates(
+            session, url, method, param, params, data, is_body, context,
+            marker, marker_escaped, _extra_contexts)
 
-        # Phase 37: reflection profile + generative payloads (sync parity).
-        # One sandwich probe reveals surviving characters; payloads whose
-        # critical characters are gone move to the back, and payloads built
-        # ONLY from surviving characters lead the queue (dedup'd).
-        # Phase 93: skipped on an escaped reflection, like the sync
-        # `_prioritize_bases` does -- the sandwich probe costs a request and
-        # generative payloads cannot help when the encoder eats them.
-        prof = None
-        if not marker_escaped:
-            try:
-                ptok = "xssap_" + secrets.token_hex(3)
-                pval = rp_mod.build_probe(ptok)
-                sp, sd = self._probe_kv(params, data, param, pval, is_body)
-                async with self._semaphore:
-                    await self._throttle(url)
-                    async with session.request(
-                        method, url, params=sp or None,
-                        headers=self._req_headers(self.headers), proxy=self._next_proxy(),
-                        **_body_kwargs(sd),
-                    ) as resp2:
-                        ptext = await resp2.text()
-                        self.requests_made += 1
-                        self._record_status(getattr(resp2, "status", 200))
-                prof = await asyncio.to_thread(rp_mod.profile_reflection,
-                                               ptext, ptok)
-            except (BudgetExhausted, CircuitOpen):
-                raise  # Phase 86: the sandwich probe was stopped on purpose
-            except Exception:
-                prof = None
-            if prof is not None and not prof.get("full_reflection"):
-                try:
-                    cands = await asyncio.to_thread(rp_mod.prioritize_payloads,
-                                                    prof, cands)
-                except Exception:
-                    pass
-                try:
-                    gen_pls = await asyncio.to_thread(gen_mod.generate, prof,
-                                                      context)
-                    gen_strs = [g["payload"] for g in gen_pls]
-                    known = set(cands)
-                    cands = [g for g in gen_strs if g not in known] + cands
-                except Exception:
-                    pass
-                # Phase 95: profile-backed escape convergence (sync parity).
-                # ``is_marker_escaped`` cannot fire for a plain alphanumeric
-                # marker echoed inside an element body (its neighbours are
-                # the page's own structural characters, never encoded), so
-                # escaped endpoints paid the full budget.  When the sandwich
-                # probe proves every breakout-critical character comes back
-                # encoded, converge to the small probe set.  Must run BEFORE
-                # the WAF-bypass prepend below so the capped path stays clean.
-                try:
-                    converged = await asyncio.to_thread(
-                        rp_mod.profile_says_encoded, prof, context)
-                except Exception:
-                    converged = False
-                if converged:
-                    marker_escaped = True
-                    del cands[3:]
-
-        # Phase 96: RCDATA breakout surfacing (sync parity).  When the
-        # sandwich marker reflected inside <textarea>/<title>/<xmp>,
-        # direct injections are inert while the closing-tag breakout is
-        # the one vector that fires on raw echo.  Deliberately OUTSIDE
-        # the ``not full_reflection`` branch: a raw-echoing RCDATA
-        # endpoint keeps EVERY probed character (full reflection), yet
-        # the breakout is exactly what must be tried there.  Only on the
-        # non-converged path -- an escaping encoder mangles the closing
-        # tag exactly like any other markup, so the breakout is dead
-        # weight there and must not re-widen the converged list.  Runs
-        # BEFORE the WAF-bypass prepend: on a raw-echoing RCDATA endpoint
-        # the breakout outranks everything else.
-        if prof is not None and not marker_escaped:
-            try:
-                cands, _rcd_tag = await asyncio.to_thread(
-                    rp_mod.surface_rcdata_breakout_strs, prof, cands)
-            except Exception:
-                _rcd_tag = None
-            if _rcd_tag:
-                _log.debug(
-                    f"[rcdata] reflection inside <{_rcd_tag}> -> "
-                    "breakout variants lead the queue")
-
-        # If WAF detected, prepend WAF-specific bypass chains.
-        # Phase 93: not on an escaped reflection -- sync bounds these by
-        # the small transform cap instead, and generative bypass bases
-        # cannot help when the encoder eats their special characters.
-        if self.waf_name and not marker_escaped:
-            try:
-                bypass_chains = await asyncio.to_thread(
-                    bypass_mod.chains_for_waf, self.waf_name)
-                bypass_payloads = [base for _, base, _, _ in bypass_chains[:3]]
-                cands = bypass_payloads + cands
-            except Exception:
-                pass
 
         # Phase 132: ``return`` on the first confirmed payload used to end
         # ``_probe_param`` outright, so the position shift, the CSP-nonce

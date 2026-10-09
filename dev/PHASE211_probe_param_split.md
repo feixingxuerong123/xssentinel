@@ -102,6 +102,29 @@ payload 含随机性，不可比对，已从指纹中移除。
 **`param_confirmed` 不要用实例属性**（`self.xxx`）：它是"本次调用"的状态，
 放 `self` 上会让相邻两次调用串味。
 
+### 第二刀（round 2，已落地）：候选构建 → `_build_probe_candidates`
+
+**553 → 439 行**。搬 B2–B5（Phase 43 语料采样 / 37+95 画像与生成式 / 96 RCDATA /
+29-2 WAF bypass，共 124 行），返回 `(cands, marker_escaped, prof)`：
+
+- `marker_escaped` 必须**回传** —— B3 的画像收敛（Phase 95）会把它从 False 改成 True，
+  而 C/D 段都读它；
+- `prof` 必须回传 —— B4（RCDATA）读它；
+- **B1（结构化参数预编码，14 行）没搬**：它有 `yield` + `return`（命中就结束整个
+  `_probe_param`），不是纯计算段。
+
+耦合脚本说得很清楚：B2–B5 是唯一一个"只算、不 yield、不提前退出"的大段，所以它排第一。
+
+**验收**：nonce/HPP/gadget/polyglot **18 passed**（12s）、parity gate **4 passed**（226s）、
+quick **FP0/FN0/ERROR0**（63 例，逐例 0 差异）、全量 192 **TP108 FP0 TN74 FN0**。
+
+全量逐例比对报了 1 处：`pos-dom-05` 从 2×`dom_dynamic` high 变 1×`dom` medium，
+请求数 27→28。**查过了，是偶发不是回归**：同代码重跑三次都是 27 请求 +
+2×`dom_dynamic`（与基线逐位一致），其余 4 个 dom 用例两次运行完全相同；
+静态 `dom` 那条是浏览器没起来时的降级形态（同轮 `sri_missing_script` 也标了
+`browser-unavailable`）。**本机 Chromium 会间歇不可用** —— 这也是为什么请求数
+只报告不判失败。
+
 ## 风险（每一条都要单独验证）
 
 1. **异常传播**：`BudgetExhausted` / `CircuitOpen` 现在是 `raise`（不降级为 continue）。
