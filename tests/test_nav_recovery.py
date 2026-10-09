@@ -253,7 +253,7 @@ def test_harvest_mutation_control(monkeypatch):
     # was left wedged, not an exception.
     out = DynamicDomAnalyzer(timeout=1).harvest("http://127.0.0.1:1/app")
     assert page.recoveries == 0 and page.provisional is True
-    assert out == {"names": [], "resource_urls": []}
+    assert out == {"names": [], "resource_urls": [], "routes": []}
 
 
 # ---------------------------------------------------------------------------

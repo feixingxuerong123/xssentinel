@@ -61,13 +61,82 @@ class TestNormalizeHarvest:
 
     def test_garbage_input_degrades(self):
         assert _normalize_harvest(None, "http://t/") == \
-            {"names": [], "resource_urls": []}
+            {"names": [], "resource_urls": [], "routes": []}
         assert _normalize_harvest([1, 2], "http://t/") == \
-            {"names": [], "resource_urls": []}
+            {"names": [], "resource_urls": [], "routes": []}
 
     def test_cross_host_targets_are_never_kept(self):
         raw = {"names": [], "urls": ["http://evil.t/api"]}
         assert _normalize_harvest(raw, "http://t/")["resource_urls"] == []
+
+    # --- Phase 210: hash routes ------------------------------------------
+    # The fragment is the payload of this feature: stripping it (as
+    # resource_urls do) would hand the scanner a server path the SPA never
+    # routes, which is the exact Phase 209 mistake.
+
+    def test_routes_keep_the_fragment_and_dedupe(self):
+        raw = {"routes": ["#/search", "#/search", "#/detail?id=1"]}
+        assert _normalize_harvest(raw, "http://t/")["routes"] == [
+            "http://t/#/search", "http://t/#/detail?id=1"]
+
+    def test_routes_resolve_against_the_page_not_its_stale_fragment(self):
+        out = _normalize_harvest({"routes": ["#/search"]},
+                                 "http://t/app#/leftovers")
+        assert out["routes"] == ["http://t/app#/search"]
+
+    def test_non_hash_hrefs_are_not_routes(self):
+        raw = {"routes": ["/api/x", "javascript:void(0)", "#anchor",
+                          5, None, "##bogus"]}
+        assert _normalize_harvest(raw, "http://t/")["routes"] == []
+
+    def test_routes_are_capped(self):
+        raw = {"routes": [f"#/r{k}" for k in range(60)]}
+        assert len(_normalize_harvest(raw, "http://t/")["routes"]) == 25
+
+
+class TestDiscoverScanOrder:
+    """Phase 210: which discovered targets are worth scan budget.
+
+    The measured trigger: on OWASP Juice Shop --discover returned five
+    rendered nav routes (`#/login`, `#/contact`, ...) and 23 same-origin
+    resources.  Those routes have no parameter, so nothing can be injected
+    into them -- ranking routes first spent a 10-slot window on inert pages
+    and pushed the API endpoints out.
+    """
+
+    def test_fragment_param_routes_come_first(self):
+        from xssentinel.cli_runner import _discover_scan_order
+        out = _discover_scan_order(
+            ["http://h/#/login", "http://h/#/search?q=xss"],
+            ["http://h/api/feed"])
+        assert out[0] == "http://h/#/search?q=xss", out
+        assert out[-1] == "http://h/#/login", out
+
+    def test_paramless_routes_stay_listed_but_last(self):
+        """Informational, not dropped: an Agent reading the harvest output
+        still wants to know the page exists."""
+        from xssentinel.cli_runner import _discover_scan_order
+        out = _discover_scan_order(["http://h/#/about"], ["http://h/api/x"])
+        assert out == ["http://h/api/x", "http://h/#/about"]
+
+    def test_inert_routes_do_not_crowd_out_endpoints(self):
+        from xssentinel.cli_runner import _discover_scan_order
+        routes = [f"http://h/#/r{k}" for k in range(6)]
+        resources = [f"http://h/api/e{k}" for k in range(6)]
+        window = _discover_scan_order(routes, resources)[:10]
+        assert all(r in window for r in resources), window
+        assert len([r for r in window if "#" in r]) == 4, window
+
+    def test_duplicates_collapse(self):
+        from xssentinel.cli_runner import _discover_scan_order
+        out = _discover_scan_order(["http://h/#/x?a=1", "http://h/#/x?a=1"],
+                                   ["http://h/#/x?a=1"])
+        assert out == ["http://h/#/x?a=1"]
+
+    def test_non_fragment_urls_are_treated_as_resources(self):
+        from xssentinel.cli_runner import _discover_scan_order
+        out = _discover_scan_order(["http://h/plain"], ["http://h/api/x"])
+        assert out == ["http://h/api/x", "http://h/plain"]
 
 
 # ---------------------------------------------------------------------------
@@ -91,6 +160,9 @@ def test_harvest_names_and_resources():
                         b"<form><input name=comment><textarea name=body>"
                         b"</textarea><select name=rating></select>"
                         b"<button name=submit>go</button></form>"
+                        b'<a href="#/search">s</a>'
+                        b'<a href="#/search">dup</a>'
+                        b'<a href="#/detail?id=1">d</a>'
                         b"<script>fetch('/api/comments?limit=5');</script>"
                         b"</body></html>")
             self.send_response(200)
@@ -120,6 +192,13 @@ def test_harvest_names_and_resources():
         base_netloc = base.split("//", 1)[1]
         assert all(urlsplit(u).netloc == base_netloc
                    for u in res["resource_urls"]), res
+        # Phase 210: hash routes come off the RENDERED DOM.  Two anchors point
+        # at #/search, so dedupe is exercised by the live path too, and the
+        # fragment must survive: stripped to "/detail" it becomes a server
+        # path the SPA never routes (the Phase 209 mistake, in a new place).
+        assert f"{base}/#/search" in res["routes"], res
+        assert f"{base}/#/detail?id=1" in res["routes"], res
+        assert sum(1 for r in res["routes"] if r.endswith("#/search")) == 1, res
     finally:
         server.shutdown()
         server.server_close()

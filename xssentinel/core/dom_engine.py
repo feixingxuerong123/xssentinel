@@ -511,8 +511,9 @@ _CLIENT_JS_RE = re.compile(
 
 
 def _normalize_harvest(raw: dict, url: str, max_names: int = 200,
-                       max_urls: int = 50) -> dict:
-    """Phase 196: normalize one harvest -> (names, same-origin resource URLs).
+                       max_urls: int = 50, max_routes: int = 25) -> dict:
+    """Phase 196: normalize one harvest -> (names, same-origin resource URLs,
+    hash routes).
 
     The raw evaluate result is untrusted page output: names are kept
     non-empty strings only; resource URLs must parse as http(s) AND match
@@ -522,7 +523,7 @@ def _normalize_harvest(raw: dict, url: str, max_names: int = 200,
     and are capped.
     """
     from urllib.parse import urlparse
-    out: dict = {"names": [], "resource_urls": []}
+    out: dict = {"names": [], "resource_urls": [], "routes": []}
     if not isinstance(raw, dict):
         return out
     host = urlparse(url).netloc.lower()
@@ -546,6 +547,30 @@ def _normalize_harvest(raw: dict, url: str, max_names: int = 200,
         seen_u.add(clean)
         out["resource_urls"].append(clean)
         if len(out["resource_urls"]) >= max_urls:
+            break
+    # Phase 210: the hash routes the RENDERED page links to.  A SPA on hash
+    # location strategy (Angular `useHash`) renders its nav as href="#/search",
+    # and a fragment never reaches the server -- so an HTTP-only discovery
+    # pass cannot learn these pages exist, while the router does read them and
+    # they are where client-side sinks live.  Measured on OWASP Juice Shop
+    # 20.2.0: the crawl path finds these by mining the bundle, but --discover
+    # and the Agent-facing xssentinel_discover returned nothing route-shaped.
+    #
+    # Same-origin is structural, not filtered: the selector only yields hrefs
+    # that start with "#/", so joining one to the rendered URL cannot leave
+    # that origin.  The fragment is kept INTACT (unlike resource_urls, where
+    # it is stripped): "?q=" inside the fragment is the whole point.
+    seen_r: set = set()
+    root = url.split("#", 1)[0]
+    for r in (raw.get("routes") or []):
+        if not isinstance(r, str) or not r.startswith("#/"):
+            continue
+        target = root + r
+        if target in seen_r:
+            continue
+        seen_r.add(target)
+        out["routes"].append(target)
+        if len(out["routes"]) >= max_routes:
             break
     return out
 
@@ -1038,12 +1063,15 @@ class DynamicDomAnalyzer:
             operator named this host; a third-party analytics call is
             someone else's system), deduped, capped -- SPA API endpoints
             nobody would have guessed.
+          * ``routes`` -- hash routes the rendered page links to
+            (``href="#/..."``).  The fragment is kept, because that is where
+            the router reads its parameters from (Phase 210).
 
         Auth state (headers/cookies/localStorage) applies so authenticated
         pages render exactly as a victim sees them.  Best-effort: every
         failure degrades to an empty dict.
         """
-        empty: dict = {"names": [], "resource_urls": []}
+        empty: dict = {"names": [], "resource_urls": [], "routes": []}
         if not self.available():
             return empty
         try:
@@ -1107,7 +1135,14 @@ class DynamicDomAnalyzer:
       if (r && r.name) urls.push(r.name);
     });
   } catch(e) {}
-  return {names: names, urls: urls};
+  var routes = [];
+  try {
+    document.querySelectorAll('a[href^="#/"]').forEach(function(a){
+      var h = a.getAttribute("href");
+      if (h) routes.push(h);
+    });
+  } catch(e) {}
+  return {names: names, urls: urls, routes: routes};
 })()
 """)
             except Exception:

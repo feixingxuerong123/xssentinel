@@ -33,6 +33,7 @@ _PAGE = (b"<!DOCTYPE html><html><body>"
          b"<form><input name=\"comment\"><textarea name=\"body\">"
          b"</textarea></form>"
          b"<div id=\"feed\"></div>"
+         b"<a href=\"#/settings?tab=1\">prefs</a>"
          b"<script>fetch('/api/feed?limit=5');</script>"
          b"</body></html>")
 
@@ -99,6 +100,11 @@ def test_agent_workflow_discover_then_profile_then_scan(app_base):
     assert "comment" in disc["input_field_names"], disc
     assert any(u.startswith(app_base + "/api/feed")
                for u in disc["same_origin_endpoints"]), disc
+    # Phase 210: the Agent must be told about fragment routes.  An agent that
+    # planned from these two lists alone would scan the API and never learn a
+    # client-side page exists -- and a client-side page is where a DOM sink
+    # lives, which no server-side reflection probe can reach.
+    assert disc.get("spa_routes") == [app_base + "/#/settings?tab=1"], disc
 
     # -- step 2: profile the discovered field ---------------------------
     prof = _payload(mcp_server.run_profile_tool(

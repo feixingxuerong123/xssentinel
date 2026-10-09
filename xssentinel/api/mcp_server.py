@@ -152,10 +152,12 @@ TOOL_DEFINITIONS = [
         "name": "xssentinel_discover",
         "description": (
             "Render a page in a headless browser and harvest the LIVE "
-            "input face: SPA form-field names and the same-origin API "
-            "endpoints the page itself fetched. Use BEFORE xssentinel_scan "
-            "to find what is actually worth scanning (Phase 196 machinery; "
-            "requires playwright)."),
+            "input face: SPA form-field names, the same-origin API "
+            "endpoints the page itself fetched, and the hash routes it links "
+            "to (fragment-only URLs a server-side crawl cannot see). Use "
+            "BEFORE xssentinel_scan to find what is actually worth scanning "
+            "(Phase 196 machinery, routes added in Phase 210; requires "
+            "playwright)."),
         "inputSchema": _TOOL_DISCOVER_SCHEMA,
     },
     {
@@ -308,6 +310,12 @@ def run_discover_tool(args: dict) -> dict:
                              "input_field_names": res.get("names") or [],
                              "same_origin_endpoints":
                                  res.get("resource_urls") or [],
+                             # Phase 210: the fragment routes.  An agent that
+                             # plans "scan these API endpoints" from the two
+                             # lists above would still miss every client-side
+                             # sink on a hash-routing SPA, because those URLs
+                             # are only meaningful to a browser.
+                             "spa_routes": res.get("routes") or [],
                          }, ensure_ascii=False, indent=2)}]}
 
 

@@ -272,6 +272,30 @@ def _base_url_keeping_fragment(parsed) -> str:
     return base
 
 
+def _discover_scan_order(routes: list, resources: list) -> list:
+    """Order discovered targets by whether anything can be *injected* into them.
+
+    Measured on OWASP Juice Shop with --discover: the rendered nav anchors are
+    `#/login`, `#/contact`, `#/chatbot`... -- real routes, but **without a
+    parameter**, so no attacker-controlled string can reach them and the DOM
+    engine's fragment probes have nothing to write.  Ranking all routes first
+    (my first attempt) spent the capped scan window on pages that cannot yield
+    a finding and pushed the same-origin API endpoints out of it.
+
+    A route whose fragment carries a query (`#/search?q=`) IS probeable and
+    outranks everything: that is the shape where the client-side sink lives.
+    Paramless routes are still returned -- they are information for a human or
+    an Agent -- they just do not eat scan budget.
+    """
+    def frag_has_query(u: str) -> bool:
+        frag = u.split("#", 1)[1] if "#" in u else ""
+        return "?" in frag
+
+    live = [r for r in routes if frag_has_query(r)]
+    inert = [r for r in routes if not frag_has_query(r)]
+    return list(dict.fromkeys(live + list(resources) + inert))
+
+
 def _run_scan(args, url: str, requester, oob, progress, checkpoint,
               auth_state=None):
     """Run a single-target scan and return findings.
@@ -403,6 +427,17 @@ def _run_scan(args, url: str, requester, oob, progress, checkpoint,
                     print(f"[*] Discover: {len(_names)} live input field "
                           f"name(s) merged into the mining wordlist")
                 _discovered_urls = _res.get("resource_urls") or []
+                # Phase 210: hash routes the rendered page links to.  Only the
+                # ones carrying a fragment query can be probed, so they go
+                # first; the rest stay informational (see _discover_scan_order
+                # for the measurement that reversed my first ordering).
+                _routes = _res.get("routes") or []
+                if _routes:
+                    _discovered_urls = _discover_scan_order(_routes,
+                                                           _discovered_urls)
+                    print(f"[*] Discover: {len(_routes)} hash route(s) the "
+                          f"rendered page links to; those with a fragment "
+                          f"parameter are scanned first")
                 if _discovered_urls:
                     print(f"[*] Discover: {len(_discovered_urls)} same-origin "
                           f"endpoint(s) the page itself fetched -- they will "
@@ -525,6 +560,25 @@ def _run_scan(args, url: str, requester, oob, progress, checkpoint,
     # Phase 196: the same-origin endpoints the rendered page itself
     # fetched get their own scan (bounded) -- SPA API surfaces the static
     # target list could never name.
+    if getattr(args, "discover", False):
+        # Phase 210: the rendered nav anchors are usually parameterless
+        # (measured: #/login, #/contact, #/chatbot on Juice Shop), and a
+        # route without a parameter cannot receive an injection.  The routes
+        # that CAN are the ones the router declares with query params, and
+        # those live in the bundle -- so reuse the crawler's own miner here
+        # instead of asking the operator to also pass -c.  Same helper, same
+        # cap, same same-origin rule.
+        try:
+            _mined = [u for u, _m, _p, _d in scanner._js_hash_routes(base_url)]
+            if _mined:
+                _discovered_urls = _discover_scan_order(
+                    _mined, _discovered_urls)
+                print(f"[*] Discover: {len(_mined)} bundle-declared route(s) "
+                      f"with parameters added to the scan set")
+        except Exception as e:
+            _log.warning("discover route mining failed (continuing): %s", e,
+                         exc_info=args.verbose)
+
     for _du in _discovered_urls[:10]:
         if args.verbose:
             print(f"[*] Discover: scanning {args.method} {_du}")
