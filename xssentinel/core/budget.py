@@ -44,10 +44,23 @@ class CircuitBreaker:
     overloaded, or already blocking the source IP.
     """
 
-    def __init__(self, threshold: int = 25, window: float = 120.0):
+    def __init__(self, threshold: int = 25, window: float = 120.0,
+                 transport_threshold: int | None = None):
         self.threshold = max(1, int(threshold))
         self.window = float(window)
+        # Phase 208: a 5xx is one endpoint misbehaving; the scan should try
+        # the others.  A request that never got a response is the target as
+        # a whole not answering, and no other endpoint can succeed while it
+        # holds.  Measured on a refused connection here: ~6s per attempt
+        # (the loopback stack on this host makes even a local refusal cost
+        # seconds), so waiting for the 5xx-sized threshold meant ~150s of
+        # re-issuing a request that had already been answered "no".
+        # Lower, and separately counted, because the evidence is stronger.
+        self.transport_threshold = max(
+            1, int(transport_threshold if transport_threshold is not None
+                   else min(self.threshold, 5)))
         self._fail_times: list[float] = []
+        self._transport_fail_times: list[float] = []
         self._lock = threading.Lock()
 
     @staticmethod
@@ -65,16 +78,64 @@ class CircuitBreaker:
                 self._fail_times.append(now)
             else:
                 self._fail_times.clear()  # success resets the streak
+                # Phase 208: a response proves the target is answering, so
+                # the transport streak from before it is over too.  Without
+                # this a target that recovered mid-scan stayed tripped by
+                # refusals that stopped happening minutes ago.
+                self._transport_fail_times.clear()
+
+    def record_transport_failure(self) -> None:
+        """Feed in a request that never received a response.
+
+        Phase 208.  ``record`` takes an HTTP status, so a target that refuses
+        the connection (nothing listening, filtered IP, DNS black hole) never
+        reached it and the streak stayed at zero -- the breaker was blind to
+        precisely the outage it exists for.  A request that raised is not a
+        weaker signal than a 500, it is a stronger one, so it enters its own
+        streak and a success still clears both.
+
+        Tracked apart from the status streak because the two justify
+        different stopping points: one 5xx is a bad endpoint, one refusal is
+        a target that is not there.  ``_fail_times`` counts responses,
+        ``_transport_fail_times`` counts silence.
+        """
+        import time
+        now = time.monotonic()
+        with self._lock:
+            self._transport_fail_times = [
+                t for t in self._transport_fail_times
+                if now - t <= self.window]
+            self._transport_fail_times.append(now)
 
     @property
     def tripped(self) -> bool:
         with self._lock:
-            return len(self._fail_times) >= self.threshold
+            return (len(self._fail_times) >= self.threshold
+                    or len(self._transport_fail_times)
+                    >= self.transport_threshold)
 
     @property
     def failure_streak(self) -> int:
         with self._lock:
-            return len(self._fail_times)
+            return len(self._fail_times) + len(self._transport_fail_times)
+
+    def describe(self) -> str:
+        """Which streak tripped, in the words an operator needs.
+
+        "5xx/429 responses" and "requests that got no response at all" are
+        different problems -- one is the target answering badly, the other is
+        the target not answering -- and a report that conflates them sends
+        the reader looking in the wrong place.
+        """
+        with self._lock:
+            statuses = len(self._fail_times)
+            silent = len(self._transport_fail_times)
+        parts = []
+        if statuses:
+            parts.append(f"{statuses} 5xx/429")
+        if silent:
+            parts.append(f"{silent} with no response")
+        return " + ".join(parts) or "no recorded failure"
 
 
 class Budget:

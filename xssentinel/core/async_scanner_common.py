@@ -26,6 +26,78 @@ if TYPE_CHECKING:  # annotation-only dependency: the shim wraps the engine
     from .async_scanner import AsyncScanner
 
 
+_PROBE = b"xssentinel accept-encoding capability probe"
+
+
+def _aiohttp_can_decode(encoding: str) -> bool:
+    """Ask aiohttp's own decompressor, not its availability flags.
+
+    Phase 209, found on a real application (OWASP Juice Shop): the async
+    engine failed on EVERY request with
+    ``400, message: Can not decode content-encoding: br`` while
+    ``aiohttp.compression_utils.HAS_BROTLI`` read ``True``.  The flag says a
+    brotli module is importable; the decoder then calls
+    ``Decompressor.process(data, max_length)``, which the ``Brotli`` package
+    (as opposed to ``brotlipy``/``brotlicffi``) does not accept -- one
+    positional argument, so the call raises TypeError and aiohttp rewrites it
+    as a 400.  Advertising an encoding we cannot decode is worse than
+    advertising less: the target answers in that encoding and the scan then
+    sees nothing at all, which is exactly how ``--async`` reports zero
+    findings on a healthy site.
+
+    So the question is answered by decompressing, once, through the same code
+    path a real response will take.
+    """
+    if encoding == "br":
+        try:
+            from aiohttp.compression_utils import BrotliDecompressor
+        except Exception:
+            return False
+        try:
+            import brotlicffi as brotli  # type: ignore
+        except Exception:
+            try:
+                import brotli  # type: ignore
+            except Exception:
+                return False
+        try:
+            packed = brotli.compress(_PROBE)
+            out = BrotliDecompressor().decompress_sync(packed, len(_PROBE) + 16)
+            return _PROBE.startswith(bytes(out))
+        except Exception:
+            return False
+    if encoding == "zstd":
+        try:
+            from aiohttp.compression_utils import ZSTDDecompressor
+        except Exception:
+            return False
+        try:
+            import zstandard as zstd  # type: ignore
+            packed = zstd.ZstdCompressor().compress(_PROBE)
+            out = ZSTDDecompressor().decompress_sync(packed, len(_PROBE) + 16)
+            return _PROBE.startswith(bytes(out))
+        except Exception:
+            return False
+    return False
+
+
+_ACCEPT_ENCODING_CACHE: dict[str, str] = {}
+
+
+def safe_accept_encoding() -> str:
+    """Accept-Encoding header the async engine can actually decode."""
+    cached = _ACCEPT_ENCODING_CACHE.get("value")
+    if cached:
+        return cached
+    encodings = ["gzip", "deflate"]
+    for ext in ("br", "zstd"):
+        if _aiohttp_can_decode(ext):
+            encodings.append(ext)
+    value = ", ".join(encodings)
+    _ACCEPT_ENCODING_CACHE["value"] = value
+    return value
+
+
 _EGRESS_JAR: type | None = None
 
 

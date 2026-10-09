@@ -121,7 +121,54 @@ class CrawlMixin:
         # Wire the bump callback so SpaCrawler navigations increment the
         # parent scanner's requests_made counter (keeps reports accurate).
         crawler._bump = self._bump
-        return crawler.crawl(start_url, fallback_crawler=self._crawl)
+        found = crawler.crawl(start_url, fallback_crawler=self._crawl)
+        # Phase 209: the browser crawler renders and follows links -- it does
+        # not read the bundle, so on a hash-routing SPA it registers no route
+        # at all.  Measured on OWASP Juice Shop 20.2.0: 74 crawled endpoints,
+        # zero of them carrying a fragment, while main.js declares 45 router
+        # paths; the app's actual DOM XSS lives behind `#/search?q=`.  The
+        # static `_crawl` path already mines those; do the same here, so the
+        # operator gets the same target set whichever crawl engine ran.
+        # `_merge_endpoints` keys on (url, method, param names), so the
+        # Playwright-missing fallback (which returns _crawl's own list) is
+        # unaffected.
+        return spa_mod._merge_endpoints(
+            found, self._js_hash_routes(start_url))
+
+    def _js_hash_routes(self, url: str) -> list:
+        """Fragment-routed pages reachable from one page's own scripts."""
+        from urllib.parse import urlparse
+        try:
+            resp = self.req.get(url)
+            self._bump()
+        except Exception:
+            return []
+        text = getattr(resp, "text", "") or ""
+        sources = [text]
+        origin = urlparse(url).netloc
+        for src in js_miner.resolve_urls(
+                js_miner.extract_script_srcs(text), url)[:4]:
+            sp = urlparse(src)
+            if sp.netloc and sp.netloc != origin:
+                continue  # never fetch a third-party bundle (授权纪律)
+            try:
+                sj = self.req.get(src)
+                self._bump()
+                sources.append(getattr(sj, "text", "") or "")
+            except Exception:
+                continue
+        out, seen = [], set()
+        for src_text in sources:
+            for h_url in js_miner.hash_route_urls(src_text, url):
+                if h_url in seen:
+                    continue
+                seen.add(h_url)
+                out.append((h_url, "GET", {}, {}))
+        if out:
+            self.coverage.touch_layer(
+                url, "L9_js_miner", "GET",
+                detail=f"hash routes:{len(out)}")
+        return out[:js_miner.MAX_HASH_ROUTES]
 
     def _mine_hidden_params(self, url: str, method: str,
                             existing_params: dict, existing_data: dict,
@@ -339,6 +386,13 @@ class CrawlMixin:
                 js_result = js_miner.mine_html(resp.text, url)
                 js_endpoints: list[tuple[str, str]] = list(
                     js_result.get("inline_endpoints", []))
+                # Phase 209: routes the SPA reaches through the URL fragment.
+                # Routes mined as `route` kind above resolve to SERVER paths
+                # (`/search`), which a hash-routing app never routes at all --
+                # the client reads its route from location.hash.  Inline
+                # script text is part of resp.text, so one pass covers it.
+                hash_urls: list[str] = list(
+                    js_miner.hash_route_urls(resp.text, url))
                 if js_endpoints or js_result.get("external_scripts"):
                     self.coverage.touch_layer(
                         url, "L9_js_miner", "GET",
@@ -353,6 +407,8 @@ class CrawlMixin:
                             self._bump()
                             ext = js_miner.mine_js_file(sj.text or "")
                             js_endpoints.extend(ext.get("endpoints", []))
+                            hash_urls.extend(
+                                js_miner.hash_route_urls(sj.text or "", url))
                             # Phase 189: the bundle's source map, when the
                             # target ships one, is the un-minified source --
                             # mine THAT too, and say so as a disclosure.
@@ -390,6 +446,18 @@ class CrawlMixin:
                         if page_key not in seen_ep:
                             seen_ep.add(page_key)
                             endpoints.append((ep_u, "GET", {}, {}))
+                # Register the fragment-routed pages.  The URL is kept
+                # verbatim (fragment and all): the point of these endpoints is
+                # the part of the URL the server never sees.  Capped on the
+                # UNION, not per source: `hash_urls` accumulates the inline
+                # block and up to 8 external scripts, so without this a page
+                # whose bundles each declare routes would register ~100
+                # endpoints and pay a browser probe pass for every one.
+                for h_url in list(dict.fromkeys(hash_urls))[:js_miner.MAX_HASH_ROUTES]:
+                    page_key = ("PAGE", h_url, "")
+                    if page_key not in seen_ep:
+                        seen_ep.add(page_key)
+                        endpoints.append((h_url, "GET", {}, {}))
             except Exception as e:
                 # JS mining is best-effort; never break the crawl.  Wiring
                 # defects still escalate -- silent layer loss is worse than

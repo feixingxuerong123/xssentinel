@@ -775,6 +775,24 @@ def _run_async_scan(args, url: str, oob, progress, checkpoint,
                    poc_verify=getattr(args, "poc_verify", True))
     shim.findings = list(asc.findings)
     shim.requests_made = asc.requests_made
+    # Phase 208: hand the async engine's egress counters to the shim's tally
+    # so __main__'s completeness gate can read async scans through the same
+    # pair it reads sync ones through (Requester.attempted_requests /
+    # failed_requests).  Without this the gate refused to trust async at all
+    # and printed "completeness check offline" on every --async run: an
+    # async scan that reached nothing looked exactly like a clean one.
+    #
+    # `attempted` counts requests ISSUED.  It must include the ones that
+    # raised, which `requests_made` does not (it is bumped after a
+    # response), so a scan whose every request was refused still reports
+    # that it tried -- otherwise `attempted=0` reads as "nothing was sent",
+    # the one conclusion the tally exists to prevent.
+    try:
+        failed = getattr(asc, "failed_requests", 0) or 0
+        shim.req.tally.attempted = asc.requests_made + failed
+        shim.req.tally.failed = failed
+    except Exception:
+        pass
     shim.waf_name = getattr(asc, "waf_name", None)
     # Phase 98b: bridge the ASYNC session's credentials into the shim's
     # requester.  attach_pocs reads self.req.session.{cookies,headers} --

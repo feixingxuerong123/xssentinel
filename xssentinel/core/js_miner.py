@@ -97,6 +97,89 @@ def extract_endpoints(js_source: str) -> list[tuple[str, str]]:
     return out
 
 
+#: Cap on client-side routes one page may contribute.  Each one is a browser
+#: probe pass, so this is a cost ceiling, not a coverage aspiration.
+MAX_HASH_ROUTES = 12
+
+#: ``router.navigate(['/search'], i)`` -- Angular (and the same shape in
+#: minified Vue Router) targets a route *path*, not a URL the server has.
+#: Whitespace is optional: an un-minified source (plain JS, or the original
+#: recovered from a source map -- Phase 189) writes ``navigate( [ '/x' ], q``
+#: and a minified-only pattern loses every route on that target.
+_NAV_TARGET_RE = re.compile(
+    r'''navigate\(\s*\[\s*['"`](/[A-Za-z0-9_\-./:$%{}]+)['"`]''')
+#: ``i={queryParams:{q:e}}`` -- the keys of the object the app itself puts on
+#: that navigation.  This is where a param NAME comes from without guessing.
+_QUERY_PARAMS_RE = re.compile(r'queryParams:\s*\{([^}]{1,120})\}')
+_QUERY_KEY_RE = re.compile(r'([A-Za-z_][A-Za-z0-9_]{0,24})\s*:')
+
+
+def spa_query_params(js_source: str) -> dict[str, list[str]]:
+    """Map each SPA route target to the query-param names the app uses on it.
+
+    Minified bundles bind the params object to a variable
+    (``let i={queryParams:{q:e}}; ... navigate(['/search'],i)``, so the
+    pairing is recovered from a window around the navigation call rather than
+    from a syntax tree -- there is no parser available for arbitrary
+    minified JS here, and the window is what the app's own code puts the
+    object next to.
+
+    Returns {} for non-SPA sources.  Measured on OWASP Juice Shop 20.2.0
+    (1.2 MB bundle, 45 route paths): 5 routes paired cleanly, including
+    ``search -> ['q']`` -- the route whose component binds
+    ``[innerHTML]="searchValue"``, i.e. its actual DOM XSS.
+    """
+    if not js_source:
+        return {}
+    out: dict[str, list[str]] = {}
+    for m in _NAV_TARGET_RE.finditer(js_source):
+        route = m.group(1).strip("/")
+        if not route or any(c in route for c in ":*{}$%"):
+            continue  # needs a real id / wildcard, not a probeable URL
+        window = js_source[max(0, m.start() - 320):m.end() + 320]
+        names = out.setdefault(route, [])
+        for q in _QUERY_PARAMS_RE.finditer(window):
+            for k in _QUERY_KEY_RE.findall(q.group(1)):
+                if k not in names:
+                    names.append(k)
+    return {r: n for r, n in out.items() if n}
+
+
+def hash_route_urls(js_source: str, base_url: str) -> list[str]:
+    """Absolute ``origin/#/route?param=x`` URLs for client-side routes.
+
+    Why the fragment: an app using hash location strategy reads its route
+    from ``location.hash`` only.  ``urljoin(origin, 'search')`` -- which is
+    what ``extract_endpoints``' ``route`` kind produces -- yields
+    ``origin/search``, a *server* path the SPA never routes.  The server
+    answers it with the same shell it answers everything with, so the
+    scanner ends up firing an HTTP probe ladder at a string the client-side
+    router cannot see, while the real sink (a query param inside the
+    fragment) goes unprobed.
+
+    Measured on OWASP Juice Shop 20.2.0: a root-URL crawl produced 74
+    endpoints, **zero** of them carrying a fragment; handed
+    ``/#/search?q=apple`` directly the same build reports a
+    browser-executed high DOM XSS.  This function is the difference between
+    those two measurements.
+    """
+    if not js_source or not base_url:
+        return []
+    p = urlparse(base_url)
+    if not p.netloc:
+        return []
+    origin = f"{p.scheme}://{p.netloc}"
+    out: list[str] = []
+    for route, names in spa_query_params(js_source).items():
+        if len(out) >= MAX_HASH_ROUTES:
+            break
+        q = "&".join(f"{n}=xss" for n in names[:3])
+        url = f"{origin}/#/{route}?{q}"
+        if url not in out:
+            out.append(url)
+    return out[:MAX_HASH_ROUTES]
+
+
 def find_dangerous_sinks(js_source: str) -> list[tuple[str, str]]:
     """Find dangerous sinks in JS source.
 

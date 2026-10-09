@@ -29,7 +29,7 @@ import copy
 import time
 import secrets
 from typing import AsyncIterator
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 
 from .scanner import Finding, json_leaf_paths, _set_json_leaf
 from .findings import (EVIDENCE_MODEL,
@@ -71,6 +71,7 @@ from .async_scanner_common import (  # noqa: E402  (must follow the block above)
     _JSONP_CALLBACK_NAMES,  # noqa: F401  (engine import surface; used by layers)
     _log,
     _non_html_grade,
+    safe_accept_encoding,
 )
 from .async_scanner_verify import AsyncHeadlessVerifyMixin
 from .async_scanner_layers import AsyncDetectionLayersMixin
@@ -170,7 +171,17 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
         # responses within a 2-minute window trip it; _throttle() then
         # raises CircuitOpen so the scan stops hammering a dead target.
         self.breaker_threshold = max(0, int(breaker_threshold or 0))
+        # Phase 208: silence is a stronger signal than a 5xx, so it stops
+        # the scan sooner -- same rule as CircuitBreaker.transport_threshold.
+        self._transport_threshold = max(
+            1, min(self.breaker_threshold or 1, 5)
+        ) if self.breaker_threshold > 0 else 0
         self._fail_times: list[float] = []
+        # Phase 208: requests that never got a response, kept apart from
+        # 5xx/429 responses.  Same reasoning as CircuitBreaker: one bad
+        # endpoint is worth retrying elsewhere, a target that is not
+        # answering at all is worth stopping for.
+        self._fail_silent: list[float] = []
         self.budget_exhausted_reason: str | None = None
         # Phase 47: JSON-body carrier (async parity with the sync scanner).
         # When set, body params are the LEAF paths of this document
@@ -222,6 +233,14 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
         self.dom_engine = dom_engine
         self.waf_name = waf_name
         self.requests_made = 0
+        # Phase 208: async parity for the completeness gate.  The sync engine
+        # reports both `attempted` and `failed` (Requester.tally), and
+        # __main__'s exit-3 rule needs the pair: "attempted N, M of them never
+        # answered" is the difference between a clean target and one that was
+        # never reached.  Async had `requests_made` only, so the CLI printed
+        # "completeness check offline" and an async scan that found nothing
+        # was indistinguishable from one that never touched the target.
+        self.failed_requests = 0
         self.findings: list[Finding] = []
         self._semaphore: asyncio.Semaphore | None = None
         self._last_request_time: dict[str, float] = {}
@@ -259,7 +278,15 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
         if self.header_rotator is not None:
             merged = self.header_rotator.next_headers()
             merged.update(base)          # caller wins
-            return merged
+            base = merged
+        # Phase 209: advertise only what aiohttp can decode.  A browser-shaped
+        # bundle that promises `br` the decoder cannot handle makes the TARGET
+        # answer in that encoding, and then every response -- baseline included
+        # -- raises `Can not decode content-encoding: br`, which is how --async
+        # reported 0 findings against a healthy real application.  An operator
+        # who set the header by hand wins: they know their own proxy.
+        if not any(k.lower() == "accept-encoding" for k in base):
+            base["Accept-Encoding"] = safe_accept_encoding()
         return base
 
     def _egress(self) -> "EgressPolicy":
@@ -324,6 +351,50 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
             return True
         except ImportError:
             return False
+
+    @staticmethod
+    def _transport_is_real(aiohttp_mod, session) -> bool:
+        """Is this session a genuine aiohttp transport, or a stand-in?
+
+        Phase 208.  ``_sync_layers_online`` gates whether the thread-
+        offloaded sync layers may speak HTTP (``_get_sync_requester``
+        otherwise installs ``_OfflineSession``).  It has to be answered by
+        the transport that will actually carry their requests, because the
+        decision is "may I go to the network", and only the real thing can
+        grant that.
+
+        Checked in the order that costs the least and settles it fastest:
+
+        * ``aiohttp`` must already be in ``sys.modules`` under its real
+          name.  The usual substitution replaces the module object, so
+          this is what catches ``sys.modules["aiohttp"] = fake`` -- and it
+          is checked against the live registry rather than the module's own
+          ``__name__`` attribute, which a fake sets to "aiohttp" for free
+          (``types.ModuleType("aiohttp")`` passes that test; measured, see
+          the test of the same name).
+        * the session must be an instance of the genuine
+          ``ClientSession`` class, so a stub that returns some other object
+          is still refused;
+        * that class must be defined *by* the aiohttp package -- a fake
+          module whose ``ClientSession`` is the real class is still the
+          fake in charge of handing it out.
+
+        An unrecognised answer is treated as NOT real.  That direction is
+        deliberate: a wrongly-offline layer degrades to its own
+        ``except Exception`` (a missed probe), while a wrongly-online layer
+        sends the operator's credentials somewhere a test named.
+        """
+        import sys as _sys
+        if _sys.modules.get("aiohttp") is not aiohttp_mod:
+            return False
+        real_session = getattr(aiohttp_mod, "ClientSession", None)
+        if real_session is None or not isinstance(real_session, type):
+            return False
+        if not isinstance(session, real_session):
+            return False
+        # The class must come from the aiohttp package itself, not from
+        # whatever module merely handed it out.
+        return getattr(real_session, "__module__", "").split(".")[0] == "aiohttp"
 
     async def scan(self, url: str, method: str = "GET",
                    params: dict | None = None,
@@ -410,7 +481,29 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
                 # unresolvable lookup costing seconds of DNS timeout on a
                 # degraded resolver (measured: 6 leaked requests x 7-11s
                 # = the "55s per _probe_param" recorded in 3.8).
-                self._sync_layers_online = True
+                #
+                # Phase 208: this used to be set unconditionally on ENTRY
+                # to the block, which only proves we got inside
+                # ``async with``.  The guard it feeds asks a different
+                # question -- "is there a live TRANSPORT?" -- and a test
+                # that replaces sys.modules["aiohttp"] with a stub enters
+                # this block perfectly happily while speaking no HTTP at
+                # all.  The flag therefore read True over a fake session
+                # and _get_sync_requester handed the sync layers a REAL
+                # requests.Session; _scan_cookie_tossing / _scan_header_xss
+                # then did req.get() against the stub-session's host name
+                # and blocked in getaddrinfo forever.  That is not a test
+                # annoyance: it is the same reachable-by-a-real-scan path
+                # that left range3's /admin/report wedged, and it hung the
+                # whole CI run at 2%.
+                #
+                # Decide from the module that actually built the session, so
+                # a substituted aiohttp keeps the layers offline.  The real
+                # ClientSession is a class from the genuine module; a stub is
+                # a stand-in, and type(session).__module__ names the package
+                # that defined it.
+                self._sync_layers_online = self._transport_is_real(
+                    aiohttp, session)
                 # 1) Baseline: get the page for reflection + DOM + advanced.
                 try:
                     async with self._semaphore:
@@ -438,6 +531,14 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
                 except (BudgetExhausted, CircuitOpen):
                     raise          # Phase 86: stop the scan, never "retry"
                 except Exception as e:
+                    # Phase 208: the baseline is the request that proves the
+                    # target answers at all.  If it never came back, every
+                    # later "0 findings" is an absence of evidence, not
+                    # evidence of absence -- record it for both the counter
+                    # __main__ reads and the breaker that should give up on a
+                    # silent target.
+                    self.failed_requests += 1
+                    self._record_transport_failure()
                     _log.warning("async baseline error: %s", e,
                                  exc_info=self.verbose)
                     return
@@ -451,7 +552,12 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
                 #    override existing names, matching sync's
                 #    ``{**ep_params, **extra_params}`` merge.  It stays ahead
                 #    of the page tasks so the L1 probes see the new names.
-                if self.advanced_layers:
+                if self.advanced_layers and not urlparse(url).fragment:
+                    # Phase 209 (sync parity, scanner.py): a fragment-bearing
+                    # endpoint is a client-side route.  Hidden-parameter mining
+                    # sends server-side query names, and the server never sees
+                    # the fragment -- the DOM engine injects into the fragment
+                    # itself.  Sync skips it for the same reason.
                     _extra = await self._mine_hidden_params_async(url, method,
                                                                   params, data)
                     if _extra:
@@ -1517,6 +1623,10 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
         Called inline right after each response is read; a failure streak
         of ``breaker_threshold`` 5xx/429 responses within 120s trips the
         breaker and _throttle() starts raising CircuitOpen.
+
+        Phase 208: a success clears the transport streak too, so a target
+        that recovers mid-scan does not stay tripped by refusals that have
+        stopped happening.
         """
         if self.breaker_threshold <= 0:
             return
@@ -1527,6 +1637,22 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
             self._fail_times.append(now)
         else:
             self._fail_times.clear()
+            self._fail_silent.clear()
+
+    def _record_transport_failure(self) -> None:
+        """Feed in a request that never received a response (Phase 208).
+
+        Async parity with ``CircuitBreaker.record_transport_failure``.  A
+        5xx means one endpoint misbehaved; silence means the target is not
+        answering and no other endpoint can succeed while it holds, so it
+        gets its own, tighter threshold (``_transport_threshold``).
+        """
+        if self.breaker_threshold <= 0:
+            return
+        now = time.monotonic()
+        self._fail_silent = [t for t in self._fail_silent
+                             if now - t <= 120.0]
+        self._fail_silent.append(now)
 
     def _probe_kv(self, params: dict, data: dict, param: str, value,
                   is_body: bool) -> tuple[dict, dict]:
@@ -1569,11 +1695,12 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
                     f"total request budget exhausted "
                     f"(>={self.max_requests} requests)")
                 raise BudgetExhausted(self.budget_exhausted_reason)
-            if self.breaker_threshold > 0 \
-                    and len(self._fail_times) >= self.breaker_threshold:
+            if self.breaker_threshold > 0 and (
+                    len(self._fail_times) >= self.breaker_threshold
+                    or len(self._fail_silent) >= self._transport_threshold):
                 self.budget_exhausted_reason = (
-                    f"circuit open: {len(self._fail_times)} recent "
-                    f"5xx/429 responses from the target")
+                    f"circuit open: {len(self._fail_times)} 5xx/429 "
+                    f"and {len(self._fail_silent)} unanswered request(s)")
                 raise CircuitOpen(self.budget_exhausted_reason)
             if self.max_requests_per_endpoint is not None:
                 p = urlparse(url)

@@ -14,11 +14,22 @@ Frameworks covered:
   * Underscore (<%= %>)
   * EJS client-side (<%= %>)
 
-The detection is two-stage:
-  1. Inject a marker template expression (e.g. {{7*7}}).
-  2. If the response reflects it verbatim, send a confirmation payload
-     that produces a value ONLY the framework's template compiler would
-     yield (e.g. {{7*7}} -> 49 in the rendered output).
+The detection ``scanner_layers._scan_template`` runs is three requests:
+  1. inject an arithmetic expression (``{{7*7}}``) and look for its RESULT
+     (``49``) in the response -- a verbatim echo means nothing is compiling;
+  2. re-send the same parameter with a digits-free value (``CONTROL_VALUE``).
+     If that response also contains ``49``, the page produced it on its own
+     (line numbers in stack traces, byte counts) and our input is not the
+     cause -- Phase 209 found exactly this emitting a critical false positive
+     on OWASP Juice Shop;
+  3. only then send the framework's XSS payload and require it at the same
+     location.
+
+Note what this can and cannot see: the check reads the *HTTP* response, so it
+confirms a server-side template compilation.  A purely client-side engine
+(Angular/Vue compiling a value the browser received) leaves ``{{7*7}}`` in the
+response and renders it later -- that shape is a DOM/JS question and is
+evidence the browser has to give (``verify_headless``), not this module.
 """
 from __future__ import annotations
 
@@ -114,13 +125,32 @@ def confirm_payload_for(framework: str) -> str | None:
     return None
 
 
-def detect_rendered(response_text: str, expected_value: str) -> bool:
+#: A digits-free, template-free value to inject in the same parameter as a
+#: control (Phase 209).  See ``detect_rendered``.
+CONTROL_VALUE = "xssentinelcontrol"
+
+
+def detect_rendered(response_text: str, expected_value: str,
+                    control_text: str | None = None) -> bool:
     """Check whether the rendered response contains the expected value.
 
     The probe `{{7*7}}` should be reflected VERBATIM if no template engine
     runs, or RENDERED to `49` if the engine runs.  We detect the latter.
+
+    Phase 209: ``control_text`` is the response of the same request carrying
+    ``CONTROL_VALUE`` in the same parameter.  Without it this is a bare
+    substring test, and `49` is one of the most common two-digit strings in
+    an error page -- it is a line number, a byte count, a status code.
+    Measured on OWASP Juice Shop: `/redirect?to={{7*7}}` reflected the probe
+    verbatim (no engine), yet the page's only `49` sat inside
+    `router/route.js:149:13`, and the layer emitted a **critical**
+    `template_ssti_dot` whose evidence line claimed the probe "rendered to
+    49".  A value that is present when our input contains no digits at all
+    was not produced by our input, so it cannot be evidence of rendering.
     """
     if not response_text or not expected_value:
+        return False
+    if control_text is not None and expected_value in control_text:
         return False
     return expected_value in response_text
 
@@ -158,11 +188,17 @@ def analyze(response_text: str) -> dict:
     return out
 
 
-def exploitable_frameworks(response_text: str) -> list[tuple[str, str]]:
+def exploitable_frameworks(response_text: str,
+                           control_text: str | None = None
+                           ) -> list[tuple[str, str]]:
     """Return [(framework, confirm_payload), ...] for engines confirmed
-    to be rendering user input."""
+    to be rendering user input.
+
+    ``control_text`` (Phase 209) is the same request answered with a
+    digits-free value; see ``detect_rendered``.
+    """
     out = []
     for fw, probe, val, confirm in TEMPLATES:
-        if detect_rendered(response_text, val):
+        if detect_rendered(response_text, val, control_text):
             out.append((fw, confirm))
     return out

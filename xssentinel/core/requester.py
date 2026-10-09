@@ -258,13 +258,37 @@ class Requester:
         if self.breaker is not None and self.breaker.tripped:
             raise CircuitOpen(
                 f"circuit open: {self.breaker.failure_streak} recent "
-                f"5xx/429 responses from the target")
+                f"failures from the target "
+                f"({self.breaker.describe()})")
 
     def _post_record(self, resp) -> None:
         """Feed the response status into the circuit breaker (if any)."""
         if self.breaker is not None and resp is not None:
             try:
                 self.breaker.record(resp.status_code)
+            except Exception:
+                pass
+
+    def _post_record_failure(self) -> None:
+        """Feed a request that never got a response into the breaker.
+
+        Phase 208.  ``_post_record`` only ever saw HTTP status codes, so a
+        target that REFUSES the connection -- nothing listening, a filtered
+        IP, a DNS black hole -- produced no status to record and the streak
+        stayed at zero.  The breaker then never tripped and the scan ground
+        through every remaining layer re-issuing the same doomed request.
+        Measured on a closed port: >180s for a scan whose every request was
+        refused, which is also how a range3 case outlived its own runner
+        timeout.
+
+        A refusal is the strongest possible failure signal -- stronger than
+        a 500, which may be the endpoint's own bug -- so it belongs in the
+        same streak.  Success still resets it, so a target that recovers
+        mid-scan does not stay open.
+        """
+        if self.breaker is not None:
+            try:
+                self.breaker.record_transport_failure()
             except Exception:
                 pass
 
@@ -389,6 +413,11 @@ class Requester:
             # failover that succeeds is not a failure, so the tally is taken from
             # the outer scope that only a final raise reaches.
             self.tally.failed += 1
+            # Phase 208: a request that raised is also a breaker failure.
+            # Recorded here, after the failover retry is exhausted, so a
+            # recovered proxy hop does not trip a breaker that has seen no
+            # real outage.
+            self._post_record_failure()
             raise
 
     def get(self, url: str, params: dict | None = None,

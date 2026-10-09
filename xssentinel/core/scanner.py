@@ -339,6 +339,7 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
         # request budget bounded.
         if self._advanced_layers:
             try:
+                from urllib.parse import urlparse
                 merged: list = []
                 enriched = False
                 for ep_url, ep_method, ep_params, ep_data in endpoints:
@@ -346,7 +347,16 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
                     self.coverage.touch_layer(
                         ep_url, "L9_param_miner", ep_method,
                         detail=f"probing {len(ep_params or {})} known + "
-                               f"hidden candidates")
+                               "hidden candidates")
+                    # A fragment-bearing endpoint is a client-side route
+                    # (Phase 209).  Hidden-parameter mining sends server-side
+                    # query names, and the server never sees the fragment --
+                    # the DOM engine injects into the fragment itself.  The
+                    # same server path is still mined as its own endpoint, so
+                    # nothing is lost but the duplicate request ladder.
+                    if urlparse(ep_url).fragment:
+                        merged.append((ep_url, ep_method, ep_params, ep_data))
+                        continue
                     extra_params = self._mine_hidden_params(
                         ep_url, ep_method, ep_params, ep_data,
                         bav=self.bav)
@@ -1584,11 +1594,15 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
     def _dedupe_endpoint_signatures(endpoints):
         """Phase 32: drop endpoints whose scan signature was already seen.
 
-        Signature = (method, host, path, sorted param names, sorted body
-        field names).  Query VALUES are deliberately excluded: /search?q=1
+        Signature = (method, host, path, fragment, sorted param names, sorted
+        body field names).  Query VALUES are deliberately excluded: /search?q=1
         and /search?q=2 exercise the same sink, so only the first crawl
-        result per signature is scanned.  Index 0 (the user entry point)
-        always survives.
+        result per signature is scanned.  The FRAGMENT is deliberately
+        INCLUDED (Phase 209): for a hash-routing SPA the fragment *is* the
+        route -- /#/search and /#/basket are different client-side pages that
+        happen to share one server path, and leaving the fragment out of the
+        signature collapsed every discovered route into the first one.
+        Index 0 (the user entry point) always survives.
         """
         from urllib.parse import urlparse
         seen = set()
@@ -1597,6 +1611,7 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
             try:
                 p = urlparse(url)
                 sig = (method.upper(), p.netloc.lower(), p.path or "/",
+                       p.fragment or "",
                        tuple(sorted(params or {})),
                        tuple(sorted(data or {})))
             except Exception:

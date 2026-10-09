@@ -1402,15 +1402,32 @@ def main(argv=None):
         _req = getattr(scanner, "req", None)
         _att = getattr(_req, "attempted_requests", None)
         # The async shim carries a real `Requester` (used for auth replay and
-        # fast checks) whose counter stays 0, because the scan itself speaks
-        # aiohttp. Reading that 0 as "nothing was attempted" put a false
-        # `exit=3` on every async case -- an instrument that exists but was
-        # never wired to the traffic is worse than a missing one, so the gate
-        # only trusts egress numbers from the engine that made the requests.
-        if _att is not None and not is_async:
+        # fast checks) whose counter used to stay 0, because the scan itself
+        # speaks aiohttp. Reading that 0 as "nothing was attempted" put a
+        # false `exit=3` on every async case -- an instrument that exists but
+        # was never wired to the traffic is worse than a missing one, so the
+        # gate only trusted egress numbers from the engine that made the
+        # requests.
+        #
+        # Phase 208: _run_async_scan now copies the AsyncScanner's own
+        # counters into that tally (cli_runner.py), so async traffic is
+        # measured by the same instrument as sync.  Keep the zero-guard
+        # anyway: a tally no engine filled must stay untrusted rather than
+        # be read as "the target refused everything".
+        #
+        # `attempted_requests` is a property over the tally, so it is only a
+        # count when the tally really holds one.  A caller-supplied scanner
+        # (the batch tests inject a Mock) yields a Mock there, and comparing
+        # that to 0 raised TypeError -- the completeness gate must never be
+        # the thing that crashes a scan it is only supposed to describe.
+        _att_count = _att if isinstance(_att, int) and not isinstance(
+            _att, bool) else None
+        if _att_count is not None and (_att_count > 0 or not is_async):
             egress_reported = True
-            attempted_total += _att
-            failed_total += getattr(_req, "failed_requests", 0) or 0
+            attempted_total += _att_count
+            _failed = getattr(_req, "failed_requests", 0)
+            failed_total += (_failed if isinstance(_failed, int)
+                             and not isinstance(_failed, bool) else 0)
 
         # Write report.
         if out_dir:
@@ -1508,11 +1525,11 @@ def main(argv=None):
         return 3
     if not egress_reported:
         # Say that the completeness gate was offline.  A check that silently
-        # declines to run is how `--async` scans would read as "verified clean"
-        # while nothing examined them.
+        # declines to run is how an empty result reads as "verified clean"
+        # while nothing examined the target.
         print("[*] Completeness check offline: this run's scanner reported no "
-              "egress counters (the async engine does not yet), so an empty "
-              "result was not tested for 'nothing reached the target'.")
+              "egress counters, so an empty result was not tested for "
+              "'nothing reached the target'.")
     if total_findings == 0 and egress_reported and (
             attempted_total == 0 or failed_total >= attempted_total):
         print(f"\n[!] Scan incomplete: {failed_total} of {attempted_total} "

@@ -195,6 +195,11 @@ class AsyncCrawlMixin:
             from . import js_miner
             res = js_miner.mine_html(text, url) or {}
             eps = list(res.get("inline_endpoints") or [])
+            # Phase 209 (sync parity, scanner_crawl.py): routes a hash-routing
+            # SPA reaches only through location.hash.  Inline script text is
+            # part of `text`, so one pass covers it.  Resolved as server paths
+            # they are probed against a route the client never reads.
+            hash_urls: list[str] = list(js_miner.hash_route_urls(text, url))
             if depth == 0:
                 for s_url in (res.get("external_scripts") or [])[:8]:
                     try:
@@ -210,6 +215,8 @@ class AsyncCrawlMixin:
                         eps.extend(
                             (js_miner.mine_js_file(sj.text or "") or {})
                             .get("endpoints", []))
+                        hash_urls.extend(
+                            js_miner.hash_route_urls(sj.text or "", url))
                         # Phase 189: mine the bundle's source map too -- the
                         # un-minified original carries routes the minifier
                         # renamed away (sync: CrawlMixin._mine_source_maps).
@@ -231,6 +238,16 @@ class AsyncCrawlMixin:
                     resolved = urljoin(
                         resolved, urlparse(resolved).path or "/")
                 found.append((resolved, "GET", params, {}))
+            # Register the fragment-routed pages verbatim: the part of the
+            # URL that matters here is the part the server never sees.
+            # Capped on the union (sync parity, scanner_crawl.py) -- this list
+            # accumulates the inline block and up to 8 fetched bundles.
+            _have = {f[0] for f in found}
+            for h_url in list(dict.fromkeys(hash_urls))[
+                    :js_miner.MAX_HASH_ROUTES]:
+                if h_url not in _have:
+                    _have.add(h_url)
+                    found.append((h_url, "GET", {}, {}))
         except Exception as e:
             if layer_guard.is_wiring_error(e):
                 _log.warning("[layer:async_js_miner] %s: %s",
@@ -354,6 +371,25 @@ class AsyncCrawlMixin:
             for m_url, m_method, m_params, m_data in await (
                     self._crawl_mine_endpoints(text, current_url, depth,
                                                mined_observations)):
+                # Phase 209: a fragment-bearing endpoint is a client-side
+                # route.  The ``split("?")`` below would cut the route's own
+                # query away (that "?" sits INSIDE the fragment, which the
+                # server never sees), and reflection-only probing then walks
+                # past a sink that can only be examined in a browser.  Sync
+                # registers these URLs verbatim and runs its DOM layer on
+                # crawled endpoints; measured on OWASP Juice Shop 20.2.0, the
+                # same target gave sync 1 browser-executed high DOM finding
+                # and async 0 findings over 374 requests.
+                if urlparse(m_url).fragment:
+                    frag_key = (m_method, m_url, ())
+                    if frag_key in mined_seen:
+                        continue
+                    mined_seen.add(frag_key)
+                    if self.advanced_layers:
+                        async for finding in self._scan_dom_async(
+                                m_url, text, m_method, m_params):
+                            yield finding
+                    continue
                 m_base = m_url.split("?", 1)[0]
                 key = (m_method, m_base,
                        tuple(sorted(set(m_params) | set(m_data))))

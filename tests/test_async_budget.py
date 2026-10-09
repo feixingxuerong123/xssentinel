@@ -436,3 +436,96 @@ class TestTransformChainParity:
             await asc_mod._drain_agen(agen(), sink)
         with pytest.raises(BudgetExhausted):
             asyncio.run(run())
+
+
+# ===========================================================================
+# Phase 208 -- the hermeticity gate follows the TRANSPORT, not the block
+# ===========================================================================
+
+class TestSyncLayersStayOffline:
+    """The sync layers may only speak HTTP when a real transport exists.
+
+    ``_get_sync_requester`` refuses real traffic unless
+    ``_sync_layers_online`` is set; ``scan()`` sets it on entering
+    ``async with aiohttp.ClientSession(...)``.  Entering the block only
+    proves the block was entered -- with ``sys.modules["aiohttp"]``
+    replaced, nothing speaks HTTP at all, yet the flag read True and the
+    layers kept a real ``requests`` session.
+
+    Consequence, measured (dev/_hang_probe.py): ``_scan_cookie_tossing``
+    and ``_scan_header_xss`` called ``req.get()`` against the stub
+    session's host and parked in ``getaddrinfo`` forever.  That wedged the
+    whole suite at 2% and is the same path that left a range3 case
+    hanging long past its runner timeout.
+    """
+
+    @pytest.mark.skipif(not SOCKETPAIR_OK,
+                        reason="needs loopback (moved down from the file-level gate)")
+    def test_stubbed_aiohttp_keeps_the_sync_requester_offline(self):
+        """Over the fake transport the sync requester must hold the
+        refusing stub -- the observation a leak would change."""
+        from xssentinel.core.async_scanner_crawl import _OfflineSession
+
+        async def run():
+            real = _fake_aiohttp(mode="escape")
+            try:
+                scanner = AsyncScanner(max_concurrent=2, per_host_delay=0,
+                                       jitter=0, timeout=5,
+                                       advanced_layers=False)
+                async for _f in scanner.scan("http://t/x",
+                                             params={"q": "probe"}):
+                    pass
+                return scanner._get_sync_requester()
+            finally:
+                _restore_aiohttp(real)
+
+        req = asyncio.run(run())
+        session = getattr(req, "session", None)
+        assert session is not None, "sync requester has no session at all"
+        assert isinstance(session, _OfflineSession), (
+            "sync layers would reach the real network behind a stub "
+            f"transport: session is {type(session).__name__}")
+
+    @pytest.mark.skipif(not SOCKETPAIR_OK,
+                        reason="needs loopback (moved down from the file-level gate)")
+    def test_stub_transport_is_reported_offline(self):
+        """The decision itself: a stand-in module is not a transport."""
+        import types as _types
+        stub = _types.ModuleType("aiohttp")
+
+        class _AnySession:
+            pass
+
+        stub.ClientSession = _AnySession
+        assert AsyncScanner._transport_is_real(stub, _AnySession()) is False
+
+    @pytest.mark.skipif(not SOCKETPAIR_OK,
+                        reason="needs loopback (moved down from the file-level gate)")
+    def test_genuine_transport_is_reported_online(self):
+        """Control: the real aiohttp session must still unlock the layers,
+        or this fix has silently turned offline-by-default."""
+        aiohttp = pytest.importorskip("aiohttp")
+
+        async def run():
+            # aiohttp's ClientSession binds to the running loop.
+            session = aiohttp.ClientSession()
+            try:
+                return AsyncScanner._transport_is_real(aiohttp, session)
+            finally:
+                await session.close()
+
+        assert asyncio.run(run()) is True
+
+    @pytest.mark.skipif(not SOCKETPAIR_OK,
+                        reason="needs loopback (moved down from the file-level gate)")
+    def test_unknown_transport_is_treated_as_offline(self):
+        """An unrecognised session is not granted the network.
+
+        A wrongly-offline layer degrades to its own ``except Exception``
+        (one missed probe); a wrongly-online layer sends operator
+        credentials to a host a test named.  Only one of those two
+        mistakes is recoverable.
+        """
+        import aiohttp
+        assert AsyncScanner._transport_is_real(
+            aiohttp, object()) is False

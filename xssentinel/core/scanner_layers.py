@@ -607,6 +607,30 @@ class AdvancedLayerMixin:
             return
         probe_text = resp.text or ""
         frameworks = tpl_mod.exploitable_frameworks(probe_text)
+        if frameworks:
+            # Phase 209: attribute the rendered value to our input before
+            # believing it.  Re-send the same parameter with a digits-free
+            # control value; if that response *also* contains the expected
+            # value, the page produced it on its own (line numbers in stack
+            # traces, byte counts, port numbers) and no engine rendered us.
+            # Measured on OWASP Juice Shop, where `{{7*7}}` came back
+            # verbatim and the page's only "49" was `route.js:149:13` -- yet
+            # this layer emitted a critical template_ssti finding.
+            #
+            # A control request that fails is not a passed control: no
+            # attribution, no finding.  This layer claims "critical", so the
+            # burden of proof is on the layer, not on the reader.
+            ctl = self._set_param(params, data, param,
+                                  tpl_mod.CONTROL_VALUE, is_body)
+            try:
+                ctl_resp = req.request(method, url, params=ctl["params"],
+                                       data=ctl["data"])
+                self._bump()
+                self.coverage.record_request(url, method)
+            except Exception:
+                return
+            frameworks = tpl_mod.exploitable_frameworks(
+                probe_text, ctl_resp.text or "")
         if not frameworks:
             return
         for fw, confirm in frameworks:
@@ -631,9 +655,23 @@ class AdvancedLayerMixin:
                         context="template_angular",
                         severity="critical",
                         type=f"template_ssti_{fw.lower()}",
+                        # Phase 209: this branch appends the Finding directly
+                        # instead of going through ``_record``, so an unset
+                        # ``confidence`` reached the report as null (same
+                        # defect class Phase 198 fixed for polyglot).  The
+                        # arithmetic render is deterministic evidence that the
+                        # engine evaluates our input; that it *executes* XSS
+                        # is inferred from the reflected confirm payload, and
+                        # no browser ever saw it.
+                        confidence="medium",
                         evidence_class=EVIDENCE_NO_BROWSER,
-                        evidence=f"{fw} template engine executing user input "
-                                 f"(probe {{{{7*7}}}} rendered to 49)",
+                        evidence=(
+                            f"{fw} template engine executing user input: the "
+                            f"arithmetic probe rendered here, and the same "
+                            f"parameter with a digits-free control value did "
+                            f"not produce that result (so the value came from "
+                            f"our input, not from the page)"
+                        ),
                     ))
                 if self.verbose:
                     _log.debug(f"    [+] {fw} SSTI -> XSS")
