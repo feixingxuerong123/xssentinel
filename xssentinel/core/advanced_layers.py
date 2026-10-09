@@ -70,6 +70,7 @@ def run_page_layers(scanner, req, url: str, response_text: str | None = None,
     # without re-issuing a GET.  When the caller passes the page response
     # (preferred path), we use it directly; otherwise we fetch it here.
     csp_header = ""
+    content_type = ""
     try:
         # Reuse the text we already have if the caller also passed a
         # response object via scanner state -- but advanced_layers only
@@ -86,6 +87,15 @@ def run_page_layers(scanner, req, url: str, response_text: str | None = None,
                  if hasattr(resp2, "headers") else {})
         _enf = csp_mod.policies(_hdrs, text)["enforcing"]
         csp_header = _enf[0] if _enf else ""
+        # Phase 210b: the same header read settles "is this document code or
+        # a page", which decides whether page-policy claims apply at all.
+        # No extra request -- this is the GET the CSP check already does.
+        # Looked up case-insensitively on purpose: `_hdrs` is a plain dict
+        # copy of a CaseInsensitiveDict, and a proxy that rewrites the header
+        # case would otherwise fall through to the URL-suffix rule (which a
+        # path-less JS route does not satisfy).
+        content_type = next((v for k, v in _hdrs.items()
+                             if k.lower() == "content-type"), "")
     except Exception:
         pass
     layer_guard.run_layer(scanner, "postmessage", _scan_postmessage, scanner,
@@ -98,7 +108,7 @@ def run_page_layers(scanner, req, url: str, response_text: str | None = None,
     layer_guard.run_layer(scanner, "redirect", _scan_redirect, scanner,
                           url, text)
     layer_guard.run_layer(scanner, "framework", _scan_framework, scanner,
-                          url, text)
+                          url, text, content_type)
     # Phase 26: new page-level detection layers.
     layer_guard.run_layer(scanner, "graphql", _scan_graphql, scanner, req,
                           url, text)
@@ -106,7 +116,7 @@ def run_page_layers(scanner, req, url: str, response_text: str | None = None,
                           url, text)
     # Phase 27-2: Trusted Types + CSP nonce reuse.
     layer_guard.run_layer(scanner, "trusted_types", _scan_trusted_types,
-                          scanner, url, text, csp_header)
+                          scanner, url, text, csp_header, content_type)
     layer_guard.run_layer(scanner, "csp_nonce", _scan_csp_nonce,
                           scanner, url, text, csp_header)
     # Phase 27-3: Cookie tossing XSS + SRI bypass.

@@ -11,6 +11,7 @@ from .. import sw_xss as sw_mod
 from .. import worker_xss as worker_mod
 from .. import redirect_xss as redirect_mod
 from .. import framework_xss as fw_mod
+from .. import document_kind
 from .. import graphql_xss as gql_mod
 from .. import websocket_xss as ws_xss_mod
 
@@ -202,11 +203,13 @@ def _scan_redirect(scanner, url: str, html: str) -> None:
             print(f"    [!] redirect layer error: {e}")
 
 
-def _scan_framework(scanner, url: str, html: str) -> None:
+def _scan_framework(scanner, url: str, html: str,
+                    content_type: str = "") -> None:
     """Framework-specific DOM XSS (React/Vue/Angular/Svelte/Lit)."""
     # Phase 20-3: record L8 framework layer.
     scanner.coverage.touch_layer(url, "L8_framework", "GET",
                                  detail="static page analysis")
+    _script_doc = document_kind.is_script_document(url, content_type)
     try:
         result = fw_mod.analyze_page(html)
         if not result["vulnerable_count"]:
@@ -222,15 +225,30 @@ def _scan_framework(scanner, url: str, html: str) -> None:
                 continue
             fw = finding.get("framework", frameworks[0] if frameworks else "unknown")
             payload = finding.get("snippet", "")[:200]
+            severity = finding.get("severity", "medium")
+            confidence = "high"
+            prefix = ""
+            if _script_doc:
+                # Phase 210b: the pattern is real -- Juice Shop's
+                # ``chunk-eYAgyLdn.js`` genuinely calls
+                # ``bypassSecurityTrustHtml()`` -- but reading a bundle tells
+                # nothing about which page binds it, to what, or whether that
+                # branch ever runs here.  That is a lead, and a lead shipped
+                # at high is how this target's report grew a false "Angular
+                # XSS" next to the one finding a browser actually confirmed.
+                severity = "low"
+                confidence = "low"
+                prefix = "JavaScript resource (no page context): "
             poc = fw_mod.build_poc_html(url, fw, payload)
             scanner._add(_make_finding(
                 url=url, method="GET", param=None,
                 payload=payload,
                 context=f"framework_{fw.lower()}",
-                severity=finding.get("severity", "medium"),
+                severity=severity,
+                confidence=confidence,
                 ftype=f"framework_{fw.lower()}_xss",
                 evidence=(
-                    f"{fw} dangerous pattern: "
+                    prefix + f"{fw} dangerous pattern: "
                     f"{finding.get('description', '')}"
                 ),
                 poc_html=poc,

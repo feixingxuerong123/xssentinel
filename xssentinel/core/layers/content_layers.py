@@ -14,6 +14,7 @@ from .. import import_map_xss as imap_mod
 from .. import sanitizer_bypass as san_mod
 from .. import css_injection as cssi_mod
 from .. import dangling_markup as dml_mod
+from .. import document_kind
 from .. import svg_xss as svg_mod
 
 from .common import _make_finding
@@ -78,7 +79,8 @@ def _scan_markdown(scanner, req, url, method, params, data, param, is_body,
 # Phase 27-2: Trusted Types + CSP nonce reuse layers
 # =============================================================================
 
-def _scan_trusted_types(scanner, url: str, html: str, csp_header: str = "") -> None:
+def _scan_trusted_types(scanner, url: str, html: str, csp_header: str = "",
+                        content_type: str = "") -> None:
     """Trusted Types violation detection.
 
     Reports four classes of finding:
@@ -91,15 +93,28 @@ def _scan_trusted_types(scanner, url: str, html: str, csp_header: str = "") -> N
         no TT policy is registered (medium -- defense-in-depth gap).
       * ``trusted_types_policy_unused`` -- a TT policy is registered but
         never called via ``policy.createHTML(...)`` (low -- dead code).
+
+    Phase 210b: the ``no_policy`` class is a claim about **the page's**
+    enforced policy, and a JavaScript response has no such header to read --
+    measured on Juice Shop, where ``/scripts.js``, ``/main.js`` and two
+    chunks each produced a medium ``trusted_types_no_policy``.  The other
+    three classes read code, and a bundle is code, so they stay.
     """
     # Phase 27-2: record L8 Trusted Types layer.
     scanner.coverage.touch_layer(url, "L8_trusted_types", "GET",
                                  detail="static page analysis + CSP check")
+    _script_doc = document_kind.is_script_document(url, content_type)
     try:
         result = tt_mod.analyze_page(html, csp_header)
         if not result["violations"]:
             return
-        for v in result["violations"][:2]:
+        # Cap AFTER the script-document filter, not before: a bundle whose
+        # first two violations are the unanswerable `no_policy` claim must
+        # still report a real taint flow sitting behind them.
+        candidates = [v for v in result["violations"]
+                      if not (_script_doc
+                              and v.get("type") == "tt_no_policy")]
+        for v in candidates[:2]:
             vtype = v.get("type", "tt_violation")
             ftype_map = {
                 "tt_taint_flow": "trusted_types_taint_flow",

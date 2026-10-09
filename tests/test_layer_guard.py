@@ -124,7 +124,11 @@ def test_page_layers_continue_after_soft_failure(scanner, caplog,
     def broken(scanner, url, text):
         raise KeyError("x")
 
-    def healthy(scanner, url, text):
+    # Phase 210b contract: run_page_layers now hands the response's media
+    # type to the framework layer, so a stand-in for that layer has to take
+    # the argument -- a TypeError here would be swallowed at DEBUG and the
+    # test would read as "the loop continued" while nothing ran.
+    def healthy(scanner, url, text, content_type=""):
         scanner._record("healthy")
 
     monkeypatch.setattr(advanced_layers, "_scan_redirect", broken)
