@@ -44,6 +44,8 @@ handlers that feed ``event.data`` into dangerous sinks.
 from __future__ import annotations
 import re
 
+from . import string_eval_sinks
+
 
 # ---------------------------------------------------------------------------
 # WebSocket construction / connection detection
@@ -106,10 +108,10 @@ DANGER_SINKS: list[tuple[str, str, str]] = [
      "document.writeln from WebSocket message payload"),
     (r'\beval\s*\(', "high",
      "eval() of WebSocket message payload"),
-    (r'setTimeout\s*\(\s*[^,)]*[a-zA-Z]', "high",
-     "setTimeout(string) from WebSocket message payload"),
-    (r'setInterval\s*\(\s*[^,)]*[a-zA-Z]', "high",
-     "setInterval(string) from WebSocket message payload"),
+    # setTimeout/setInterval go through string_eval_sinks now (shared with the
+    # postMessage layer).  The removed patterns matched any call passing a
+    # function, which is the ordinary shape -- and the layer described the hit
+    # as "setTimeout(string", a thing the regexp never verified.
     (r'new\s+Function\s*\(', "high",
      "new Function() of WebSocket message payload"),
     (r'\.src\s*[\+\-\*\/]?=', "high",
@@ -191,11 +193,14 @@ def find_websocket_handlers(html_or_js: str) -> list[dict]:
             start = max(0, lm.start() - 40)
             end = min(len(script), lm.end() + 600)
             snippet = script[start:end]
-            has_sink = bool(SINK_RE.search(snippet))
+            timer_sinks = string_eval_sinks.timer_string_eval_sites(
+                snippet, "WebSocket message")
+            has_sink = bool(SINK_RE.search(snippet) or timer_sinks)
             has_data_ref = bool(DATA_REF_RE.search(snippet))
             has_origin_check = bool(ORIGIN_CHECK_RE.search(snippet))
             sinks_found = [desc for pat, _, desc in DANGER_SINKS
                            if re.search(pat, snippet, re.IGNORECASE)]
+            sinks_found.extend(timer_sinks)
             exploitable = (has_sink and has_data_ref and not has_origin_check)
 
             # Pick the closest preceding ws_url.

@@ -27,6 +27,8 @@ message listeners and reports:
 from __future__ import annotations
 import re
 
+from . import string_eval_sinks
+
 # Match `window.addEventListener('message', ...)` and `window.onmessage = ...`
 MESSAGE_LISTENER_RE = re.compile(
     r'(?:addEventListener\s*\(\s*["\']message["\']'
@@ -56,10 +58,13 @@ DANGER_SINKS: list[tuple[str, str, str]] = [
      "document.writeln from postMessage payload"),
     (r'\beval\s*\(', "high",
      "eval() of postMessage payload"),
-    (r'setTimeout\s*\(\s*[^,)]*[a-zA-Z]', "high",
-     "setTimeout(string) from postMessage payload"),
-    (r'setInterval\s*\(\s*[^,)]*[a-zA-Z]', "high",
-     "setInterval(string) from postMessage payload"),
+    # setTimeout/setInterval are handled by string_eval_sinks, NOT by a pattern
+    # here.  The previous entry, r'setTimeout\s*\(\s*[^,)]*[a-zA-Z]', matched
+    # every call that passes a function -- which is the normal shape, and the
+    # shape the real bundle is full of (measured: 37 calls, all functions, zero
+    # message listeners, yet this layer reported postmessage_xss at high with
+    # the text "setTimeout(string)").  See that module for what the argument
+    # shape can and cannot prove.
     (r'new\s+Function\s*\(', "high",
      "new Function() of postMessage payload"),
     (r'\.src\s*[\+\-\*\/]?=', "high",
@@ -125,11 +130,17 @@ def find_message_listeners(html_or_js: str) -> list[dict]:
             start = max(0, lm.start() - 40)
             end = min(len(script), lm.end() + 600)
             snippet = script[start:end]
-            has_sink = bool(SINK_RE.search(snippet))
+            # Phase 210: the implicit-eval timers need an argument the text can
+            # actually show to be a string; see string_eval_sinks. Shared with
+            # the WebSocket layer so the two cannot drift apart again.
+            timer_sinks = string_eval_sinks.timer_string_eval_sites(
+                snippet, "postMessage")
+            has_sink = bool(SINK_RE.search(snippet) or timer_sinks)
             has_data_ref = bool(DATA_REF_RE.search(snippet))
             has_origin_check = bool(ORIGIN_CHECK_RE.search(snippet))
             sinks_found = [desc for pat, _, desc in DANGER_SINKS
                            if re.search(pat, snippet, re.IGNORECASE)]
+            sinks_found.extend(timer_sinks)
             exploitable = (has_sink and has_data_ref and not has_origin_check)
             findings.append({
                 "snippet": snippet.strip()[:400],
