@@ -45,12 +45,25 @@ model-only 默认值。
 async 侧只有 polyglot **探针**（`async_scanner.py:991` 附近构建变体），命中后落进
 通用 reflected 路径 ⇒ 拿到 high/high。**在证据等价的前提下 async 偏乐观。**
 
-### 修复方向（未做，留给下一轮）
+### 已修复（commit `6c311df`，Phase 208b）
 
-1. async 的 polyglot 变体命中应归类为 `polyglot_reflection`，severity/confidence
-   取 medium/medium，并复用 sync 的 `_poly_non_html()` 降级（非 HTML 响应 → low）。
-2. 用测试锁住"polyglot 载荷命中的 finding 不得落到 reflected"。
-3. **改判定语义 ⇒ 必须配全量 192 例矩阵验收**，不与其它改动混在同一轮。
+1. async 的 polyglot 变体命中现在归类为 `polyglot_reflection`，severity/confidence
+   取 medium/medium，非 HTML 响应降为 low —— 由新增的 `_polyglot_grade()`
+   （`async_scanner_common.py`）统一给，用的 content-type 白名单与 async 既有的
+   `_non_html_grade()`、sync 的 `_poly_non_html()` **逐字相同**。
+   两处发射点都改了：主 variant 循环 + Phase 166 的 concat 重试（它可能骑在
+   polyglot 基变体上）。
+2. 新测试 `tests/test_async_polyglot_classification.py`（3 例，2.9s）锁住三件事：
+   评级函数、`/r/url03` 双引擎一致、以及**普通 reflected 必须仍是 high/high**
+   —— 没有第三条，这个"修复"可能悄悄把所有 async finding 都降了级。
+   一致性那条做了**反证**：把 `_is_poly` 强改成 `False`，测试立刻红。
+3. 验收（改判定语义的代价）：
+   - parity gate 7 passed（225s）
+   - `benchmark --quick --strict-gate`：sync FP0/FN0/ERROR0（64 例）、
+     async FP0/FN0/ERROR0（63 例 + 1 SKIP）
+   - **全量 192 例 async 矩阵：TP108 FP0 TN74 FN0，f1=1.000（182 计分 / 10 SKIP）**
+     —— 与 Phase 206 基线**逐位相同**，即重分类在检出上零代价。
+     产物 `benchmark/results/p208_full_async.json`。
 
 ## 三条方法层面的发现（比数字更值钱）
 
