@@ -71,6 +71,7 @@ from .async_scanner_common import (  # noqa: E402  (must follow the block above)
     _JSONP_CALLBACK_NAMES,  # noqa: F401  (engine import surface; used by layers)
     _log,
     _non_html_grade,
+    _polyglot_grade,
     safe_accept_encoding,
 )
 from .async_scanner_verify import AsyncHeadlessVerifyMixin
@@ -1026,15 +1027,26 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
                 # Phase 165 (sync parity, scanner._try_payload): the token
                 # survived -- did the PAYLOAD?  Keep looking otherwise.
                 if v["confirmed"] and verifier.payload_survived(text, variant):
+                    # Phase 208: a polyglot variant is a BROADER claim than
+                    # a context-specific hit (it tries several breakouts at
+                    # once), so it is graded like the sync polyglot layer
+                    # (medium/medium, low on a non-HTML response) instead of
+                    # as a plain reflected hit.  Previously identical
+                    # evidence came out high/high here and medium/medium in
+                    # sync -- measured on /r/url03.
+                    _is_poly = "polyglot" in (tchain or [])
+                    _sev, _conf = (_polyglot_grade(resp_headers) if _is_poly
+                                   else _non_html_grade(resp_headers))
                     yield Finding(
                         url=url, method=method, param=param,
                         context=v.get("context") or context,
                         payload=variant,
-                        severity=_non_html_grade(resp_headers)[0],
+                        severity=_sev,
                         evidence=text[max(0, text.find(marker)-30):
                                       text.find(marker)+len(marker)+30],
-                        type="reflected",
-                        confidence=_non_html_grade(resp_headers)[1],
+                        type=("polyglot_reflection" if _is_poly
+                              else "reflected"),
+                        confidence=_conf,
                         transform=tchain,
                         # Phase 164 (sync parity, scanner._record): record
                         # WHERE the payload rode so the PoC replays the same
@@ -1101,15 +1113,23 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
                                 and verifier.payload_survived(text, variant)):
                             idx = text.find(marker)
                             param_confirmed = True
+                            # Phase 208: same polyglot grading as the main
+                            # variant loop (the concat retry can ride on a
+                            # polyglot base variant).
+                            _is_poly = "polyglot" in (tchain or [])
+                            _sev, _conf = (
+                                _polyglot_grade(resp_headers) if _is_poly
+                                else _non_html_grade(resp_headers))
                             yield Finding(
                                 url=url, method=method, param=param,
                                 context=v.get("context") or context,
                                 payload=variant,
-                                severity=_non_html_grade(resp_headers)[0],
+                                severity=_sev,
                                 evidence=text[max(0, idx - 30):
                                               idx + len(marker) + 30],
-                                type="reflected",
-                                confidence=_non_html_grade(resp_headers)[1],
+                                type=("polyglot_reflection" if _is_poly
+                                      else "reflected"),
+                                confidence=_conf,
                                 transform=tchain,
                                 param_in="body" if is_body else "query",
                                 evidence_class=EVIDENCE_MODEL,

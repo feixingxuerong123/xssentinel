@@ -143,6 +143,27 @@ def _non_html_grade(resp_headers) -> tuple[str, str]:
             "text/html", "application/xhtml", "image/svg")):
         return "low", "low"
     return "high", "high"
+
+
+def _polyglot_grade(resp_headers) -> tuple[str, str]:
+    """Phase 208 parity with the sync polyglot layer
+    (``scanner_layers.py``, ``type="polyglot_reflection"``).
+
+    A polyglot hit is a BROADER claim than a context-specific reflected
+    hit: the payload tries several breakouts at once, so it says "this
+    endpoint is executable somewhere", not "this exact sink fires".  Sync
+    has graded it medium/medium since Phase 198 for exactly that reason
+    (and low on a non-HTML response).
+
+    Before Phase 208 the async polyglot variant fell through to the
+    generic ``reflected`` branch and came out high/high -- identical
+    evidence, harsher verdict.  Measured on /r/url03 (meta_refresh):
+    both engines model-only, both ``event_handler``, both polyglot.
+    """
+    sev, _conf = _non_html_grade(resp_headers)
+    return ("low", "medium") if sev == "low" else ("medium", "medium")
+
+
 _log = get_logger("async_scanner")
 # JSONP callback parameter names probed by the async JSONP layer.  Kept
 # at module level so it is created once instead of per-scan.
