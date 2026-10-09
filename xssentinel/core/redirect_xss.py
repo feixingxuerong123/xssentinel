@@ -115,6 +115,74 @@ LINK_HREF_RE = re.compile(
 )
 
 
+#: How far past a sink we look for its taint source (unchanged since 113b).
+_JUDGMENT_WINDOW = 200
+#: How far before it -- a variable assigned from the query string lives here.
+_LOOKBEHIND = 60
+
+#: A qualifier glued in front of a sink: ``window.location.replace(``,
+#: ``self.location =``.  USER_INPUT_RE's ``window.location`` alternative
+#: matches this text, so it has to be masked along with the sink itself.
+_QUALIFIER_RE = re.compile(r'(?:window|self|globalThis)\s*\.\s*$')
+
+
+def _mask_span(block: str, m: "re.Match") -> tuple:
+    """The part of a sink match that must never count as its own source.
+
+    * assignment form: through the ``=`` (113b masked exactly the left-hand
+      side so the right-hand side stays judgeable -- a pattern like
+      ``location.href =\\s*[^;\\n]`` already ate one RHS character, and that
+      character is frequently the ``l`` of ``location.hash``, which is the
+      real source);
+    * call form: the whole ``...location.replace(``.
+
+    A qualifier glued in front of either is included.
+    """
+    matched = m.group(0)
+    eq = matched.find("=")
+    end = m.start() + (eq + 1 if eq != -1 else len(matched))
+    start = m.start()
+    # Searched in a short window, not `block[:start]`: a bundle is ~1 MB and
+    # the regex is end-anchored, so slicing the whole prefix would copy
+    # megabytes per sink for a match that can only live in the last ~12 chars.
+    # The window's own offset has to be added back -- `pre.start()` is
+    # relative to the slice, and getting that wrong silently un-masks every
+    # qualifier (the bundle tests go red immediately).
+    window = max(0, start - 24)
+    pre = _QUALIFIER_RE.search(block[window:start])
+    if pre:
+        start = window + pre.start()
+    return start, end
+
+
+def _statement_end(block: str, m: "re.Match") -> int:
+    """Index just past the sink's own statement, capped at ``_JUDGMENT_WINDOW``.
+
+    Reading a fixed 200 characters past the sink reached into the NEXT
+    statement.  In a minified bundle the next statement is routinely another
+    redirect sink, which then quoted itself as this sink's taint source --
+    measured on OWASP Juice Shop's main.js, where two hardcoded
+    ``window.location.replace(L$.hostServer + `/profile`)`` calls stayed
+    "exploitable" only because a sibling sink sat inside the window.
+    """
+    limit = min(len(block), m.end() + _JUDGMENT_WINDOW)
+    if m.group(0).rstrip().endswith("("):
+        depth = 1
+        i = m.end()
+        while i < limit:
+            ch = block[i]
+            if ch == "(":
+                depth += 1
+            elif ch == ")":
+                depth -= 1
+                if depth == 0:
+                    return i + 1
+            i += 1
+        return limit
+    nxt = re.search(r"[;\n]", block[m.end():limit])
+    return m.end() + (nxt.end() if nxt else limit - m.end())
+
+
 def redirect_params() -> list[str]:
     """Return the list of common open-redirect parameter names."""
     return list(REDIRECT_PARAMS)
@@ -126,10 +194,11 @@ def find_redirect_sinks(html_or_js: str) -> list[dict]:
     Returns a list of dicts::
 
         {
-            "snippet":         str,        # ~400 char context
+            "snippet":         str,        # the sink's own statement, plus
+                                           # a 60-char look-behind
             "sink":            str,        # human-readable sink description
-            "user_controlled": bool,       # snippet references user input
-            "exploitable":     bool,       # sink fed by user input
+            "user_controlled": bool,       # a real source feeds this sink
+            "exploitable":     bool,       # == user_controlled
         }
     """
     if not html_or_js:
@@ -142,30 +211,31 @@ def find_redirect_sinks(html_or_js: str) -> list[dict]:
     if not blocks:
         blocks = [html_or_js]
     for block in blocks:
-        for m in SINK_RE.finditer(block):
-            start = max(0, m.start() - 60)
-            end = min(len(block), m.end() + 200)
+        matches = list(SINK_RE.finditer(block))
+        spans = [_mask_span(block, m) for m in matches]
+        for m in matches:
+            start = max(0, m.start() - _LOOKBEHIND)
+            end = _statement_end(block, m)
             snippet = block[start:end]
-            # Phase 113b: a literal destination is never attacker
-            # controlled.  Without this, the USER_INPUT_RE alternative
-            # "location.href" matched the sink's own left-hand side, so
-            # every "location.href = '/fixed'" was reported as an open
-            # redirect fed by user input.
             matched = m.group(0)
-            # Look at the assignment's parts separately.
-            #   * a literal destination cannot carry attacker input, and
-            #   * the LEFT-hand side must not be counted as an input
-            #     source -- it is the sink itself, and USER_INPUT_RE's
-            #     ``location.href`` alternative otherwise matches it.
+            # Phase 113b: a literal destination is never attacker
+            # controlled, and the LEFT-hand side must not be counted as an
+            # input source -- it is the sink itself, and USER_INPUT_RE's
+            # ``location.href`` / ``window.location`` alternatives match it.
             # The right-hand side is kept: a real source frequently lives
             # there (``location.href = location.hash.slice(1)``).
-            eq = matched.find("=")
-            lhs = matched[:eq] if eq != -1 else ""
             rhs_m = re.search(r"=\s*([^=].*)$", matched)
             literal_rhs = bool(
                 rhs_m and re.match(r"""^['"`]""", rhs_m.group(1).strip()))
-            context = snippet.replace(matched, matched.replace(lhs, " "), 1) \
-                if lhs else snippet
+            # Phase 210b: mask EVERY sink span inside the window, not just
+            # this one.  A neighbouring sink statement used to serve as this
+            # sink's "proof of user input".
+            chars = list(snippet)
+            for s, e in spans:
+                for i in range(max(s, start) - start, min(e, end) - start):
+                    if 0 <= i < len(chars):
+                        chars[i] = " "
+            context = "".join(chars)
             user_controlled = (bool(USER_INPUT_RE.search(context))
                                and not literal_rhs)
             sinks_found = [desc for pat, _, desc in DANGER_SINKS
