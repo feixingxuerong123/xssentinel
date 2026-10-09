@@ -230,7 +230,16 @@ import 仍可用 —— 它靠的是 `sandbox.py` 里带原因的 re-export,而�
 
 ---
 
-### 1.5 JS bundle 被当成"页面"扫 → 真实靶上 3 条 high 假阳性(2026-10-09 量到,未修)
+### 1.5 JS bundle 被当成"页面"扫 → 真实靶上 3 条 high 假阳性(2026-10-09 量到,**三类病因已各自改掉**,Phase 210b)
+
+> **原判读需要更正两处**(写完才实测的代价,按本项目 1.1/3.5 的同一课回头核对):
+> ① 不是"3 条"而是 **5 类 8 条**:`discoveronly2` 那次跑还给了 4 条
+> `trusted_types_no_policy`(medium)与 1 条 `framework_angular_xss`(high),
+> 全部落在 `.js` URL 上;原文只数了 high,把音量当数量读了。
+> ② `open_redirect_xss` 的病因不是"层太宽松",而是**判定窗口自引用**:
+> Phase 113b 遮了赋值式的左手边,但调用式(`window.location.replace(`)没有左手边,
+> 且固定 200 字符尾窗**伸进下一条语句** —— 压缩包里下一条通常又是同一个 sink。
+> 所以它是 113b 的**没修完**,不是一个新类别。
 
 **实测对象**:OWASP Juice Shop 20.2.0,`--discover --headless`(不带 `-c`)。
 报告给出 4 条 high,其中 3 条落在 `main.js` 上、`evidence_class=browser-unavailable`、
@@ -260,6 +269,43 @@ Phase 210 把"probeable 优先"的排序修好后,这个面**暴露得更充分�
    就要有测试锁住,并复跑全量矩阵确认没把真阳一起降掉;
 3. 每条静态层都应带可核对的 `proof`(文件 + 偏移 + 片段),
    `proof=None` 本身该被门拒绝 —— 交付面上"不可核对的高危"是最贵的一类错误。
+
+**已落地(2026-10-09,Phase 210b)—— 按三类病因各改各的那一处,不是一个通用降级**:
+
+| 病因 | 改法 | 对照与门 |
+|---|---|---|
+| 判定谓词**声称了它没测的性质**(`setTimeout(` 后跟标识符 ⇒ "string") | 共享谓词 `core/string_eval_sinks.py`:先认回调形状(`=>`/`function`/`}`),再认字符串/拼接/`data`;裸标识符**故意不判**,并把这条权衡钉成测试(`test_bare_identifier_is_deliberately_not_claimed`) | `tests/test_phase210_string_eval_sinks.py` 9 例;两条旧宽松模式从 `DANGER_SINKS` 删掉并留注释,**AST 常量级**门防"修一个忘一个" |
+| 判定窗口**自引用**(sink 自己给自己作证) | ①遮罩含黏在前面的 `window./self./globalThis.` 限定符;②遮罩窗口内**所有** sink 跨度;③判定区收窄为**该 sink 自己的语句**(调用式到配对右括号;赋值式到 `;`)。RHS 全留:模式里的 `[^;\n]` 会吃掉 `location.hash` 的那个 `l`,整段遮罩会误杀真阳 | `tests/test_phase210_redirect_selfsource.py` 9 例(含样本表 ↔ `DANGER_SINKS` **双向**覆盖);bundle 级取证 `dev/redirect_selfsource_probe.py` 用 `git show HEAD:` 取旧模块当对照组,同一批 28 个真实 JS 文档双臂跑:**HEAD 6 条 exploitable → 现 0 条**,真阳 fixture 两臂都报,且**逐条打印被删项供归因**(数量不是结论,读得通才是) |
+| **文档种类从来不是判定输入** | 新增 `core/document_kind.py`(媒体类型优先、URL 后缀兜底;`.js` 答 `text/html` 判为页面)。`tt_no_policy` 在脚本上**不发**(它读的是页面的 CSP,脚本响应没有);`taint_flow`/`policy_bypass` 读代码 → 保留。框架模式在脚本上**降 low/low + "no page context"**(线索留着,音量撤掉) | `tests/test_phase210b_script_documents.py` 9 例,含**反向对照**(同一文本作为页面必须照旧报)与 dispatch 契约门:AST 读出 `run_page_layers` 每条 `run_layer(...)` 的实参数,`inspect.signature().bind()` 逐个核对 —— 防"层签名漂移 + TypeError 被 per-layer guard 吞成 DEBUG"(Phase 63/84/198 三次同一形状) |
+
+接线只有一处:`run_page_layers()` 是双引擎唯一的页面层入口(sync `scanner.py:556` /
+async `async_scanner_layers.py:245` 经 shim),而它本来就要为 CSP 判定再取一次响应头,
+`content_type` 就在那儿读 —— **零额外请求,且两个引擎不可能不同步**。
+
+**变异对照头两次跑都报 `guard_is_load_bearing=False`**(`dev/phase210b_mutation_control.py`):
+M1 的锚点选在 `_statement_end()` 的**赋值式分支**,而真实靶走**调用式分支**
+(与 `dev/_MUTATION_CONTROL_LESSON.md` 同课,只是这次错在分支不是缩进);
+M2 更值钱 —— 遮掉"邻居也算"的循环后我的样本**仍然全绿**,因为语句边界已挡住那对兄弟;
+缺口是"邻居落进 60 字符**前瞻**窗口"这个形状没被样本覆盖。补
+`switch(r){case 1:location.href="/a";break;case 2:window.location.replace(h+\`/b\`)}`
+之后 M1/M2 双双变红。
+**M5 是同一个形状的第二遍**:把 dispatch 里 `content_type` 的读取打回大小写敏感的
+`_hdrs.get("Content-Type")`,五项**全部仍绿** —— 因为测试用的是 `http://h/main.js`,
+大小写一丢就落进 **URL 后缀兜底规则**,两条路径给出同一个答案。改成无扩展名的脚本路径
+(`/assets/dynamic-bundle`,只有响应头能说明它是脚本)之后 M5 才变红,并据此发现
+**兜底规则确实掩盖了一个真缺陷**:`_hdrs` 是从 CaseInsensitiveDict 复制来的**普通 dict**,
+大小写敏感取法在代理重写头之后就失效(现按 `k.lower()=="content-type"` 取)。
+五项最终全部 `mutated_red=True / restored_green=True` + 逐字节还原自校验。
+
+**"守卫声称防 A,实际测 B"本项目已记到第五、六次,来源都是同一个**:
+测试的输入没能把"实现对"和"实现错"分开。**先问什么输入能区分两者,再写断言** ——
+而不是写完断言看它绿了就收工。
+
+**仍然待做(原文第 2、3 条的一般形式,本轮没动)**:
+① 静态层一律 `proof=None` —— "不可核对的高危"该被门拒绝,这需要跨**全部**静态层的
+证据形状门;② "无浏览器证据 + 无 proof ⇒ 至多 medium" 的**通用**降档规则,需要自己的
+对照矩阵与全量矩阵复测。现在只是按每种错各自的证据改了各自那一处 ——
+**把它们合并成一条通用规则听着更省事,但那正是本项目反复记账的"用信念代替推导"**。
 
 **关联**:与 1.0(外部效度)、2.1(对等门)同源 —— 都是"实验室指标掩盖了
 真实世界的形状"。Phase 209 的模板 SSTI 假阳性是同一种病的另一个器官

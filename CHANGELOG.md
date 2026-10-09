@@ -54,8 +54,73 @@
   以 `process(data, max_length)` 调用只实现 `process(data)` 的 `Brotli` 包 →
   每个响应 `400 Can not decode content-encoding: br`(实测 374 请求 / 0 结果)。
 
+- **文档种类进入判定(Phase 210b)**:新增 `xssentinel/core/document_kind.py` ——
+  媒体类型优先、URL 后缀兜底(`.js` 答 `text/html` 判为页面而不是脚本)。
+  两条页面形态判定按**证据能支撑到哪一档**各改各的:
+  `trusted_types_no_policy` 在脚本资源上不再发出(它读的是**页面**的 CSP 头,
+  脚本响应没有 → 对地球上每个 `.js` 恒真);`framework_*_xss` 在脚本上降为
+  low/low 并在 evidence 里写明 "JavaScript resource (no page context)"
+  (模式是真的:Juice Shop 的 chunk 确实调 `bypassSecurityTrustHtml()` ——
+  留线索、撤音量)。接线在双引擎唯一的页面层入口 `run_page_layers()`,
+  复用 CSP 判定已经要发的那次请求,**零额外请求、两引擎不可能不同步**。
+
+- **静态层"自己给自己作证"(Phase 210b,`docs/OPTIMIZATION.md` 1.5 结案三类病因)**:
+  ① `postmessage_xss` / `websocket_xss` 的判定谓词用
+  `setTimeout\(\s*[^,)]*[a-zA-Z]` 声称"字符串实参",而该模式**同样命中传函数的正常形状**
+  (真实靶 `main.js`:37 处 `setTimeout(` 全是函数,`addEventListener('message'` 出现 0 次,
+  仍报两条 high)。改为共享谓词 `core/string_eval_sinks.py`(先认回调形状,再认字符串/拼接/`data`;
+  裸标识符**故意不判**并钉成测试)。
+  ② `open_redirect_xss` 是 Phase 113b 的**没修完**:113b 只遮了赋值式的左手边,
+  调用式 `window.location.replace(` 没有左手边,而 `USER_INPUT_RE` 含 `window.location`
+  → sink 自己算作用户输入;且固定 200 字符尾窗**伸进下一条语句**,压缩包里下一条通常又是
+  同一个 sink → 邻居替它作证。现遮罩含 `window./self./globalThis.` 限定符、遮罩窗口内
+  **全部** sink 跨度,并把判定区收窄为该 sink 自己的语句(调用式到配对右括号,赋值式到 `;`);
+  RHS 完整保留 —— 模式里的 `[^;\n]` 会吃掉 `location.hash` 的首字母,整段遮罩会误杀真阳。
+  **bundle 级取证**:同一批 28 个真实 JS 文档双臂(HEAD 模块 vs 现模块)对照,
+  HEAD 6 条 exploitable → 现 0 条,真阳 fixture 两臂都报,且逐条打印被删项供归因。
+  ③ 上面那条页面形态判定(文档种类)。
+- 新门 **29 例**(`29 passed in 0.41s`)+ dispatch 契约门:
+  `tests/test_phase210_string_eval_sinks.py`(9)、
+  `tests/test_phase210_redirect_selfsource.py`(10,含样本表 ↔ `DANGER_SINKS` 双向覆盖,
+  与 `_mask_span` 切片偏移断言)、
+  `tests/test_phase210b_script_documents.py`(10,含用 AST 读 `run_page_layers` 的每条
+  `run_layer(...)` 实参并 `inspect.signature().bind()` 核对 —— 防"层签名漂移被
+  per-layer guard 吞成 DEBUG",本仓在 Phase 63/84/198 三次同一形状;
+  以及**穿过 dispatch** 的一例)。
+  变异对照 `dev/phase210b_mutation_control.py` **两次跑都报过 `guard_is_load_bearing=False`**:
+  M1 锚点落在 `_statement_end()` 的赋值式分支(真实靶走调用式分支),M2 揭示
+  "邻居落进 60 字符前瞻窗口"这个形状没被样本覆盖;M5(把 `content_type` 的读取打回
+  大小写敏感)揭示**测试自己用了带 `.js` 后缀的 URL**,兜底规则替 bug 说话 →
+  换成无扩展名路径后才有区分力。顺带据此修了一个真缺陷:`_hdrs` 是从
+  CaseInsensitiveDict 复制来的普通 dict,现按 `k.lower()=="content-type"` 取。
+  五项最终全部 `mutated_red=True / restored_green=True` + 逐字节还原自校验。
+
 ### Verified
 
+- **真实靶复测(OWASP Juice Shop 20.2.0,同一目标版本、同一命令)**:
+  `dev/_js_out/findings_p210b_discover.json` —— `-u <origin> -c --discover --headless`
+  给出 **1 条** finding:`dom_dynamic` high/high **browser-executed**(`#/track-result?id=xss`),
+  而 coverage 里 **4 个 JS 文档在扫描集内**(`main.js` `scripts.js` `polyfills.js`
+  `rolldown-runtime-*.js`)却**一条不发** —— 对照改前同一 arm 的
+  `findings_discoveronly3.json`(3 条 high + 2 条 medium 全落在 `.js` 上)。
+  **两条引擎各自打同一个 bundle**:`p210b_mainjs.json` sync 52 请求 / **0 findings**、
+  `p210b_mainjs_async.json` async 27 请求 / **0 findings**(改前该 URL 给 3 条 high)。
+  靶的 `Content-Type` 实测为 `application/javascript; charset=UTF-8` ——
+  即起作用的规则是**媒体类型**那一条,不是 URL 后缀兜底。
+  注:该轮 `scan_status=partial`(14898 attempted / 8 failed),成因是靶进程
+  **JS heap OOM 崩溃**(node 死在扫描中途,日志 `dev/_js_out/juiceshop.log`),
+  属目标侧资源不足而非扫描器缺陷 —— 复测的单 URL 两臂均在健康靶上跑完。
+- **精度门全复跑(降档改的是 severity,而打分器按 severity 过滤 —— `runner.py:329`
+  只把 high/medium/critical 算作"检出",所以必须复跑全量而不是切片)**:
+  64 例 strict 切片双引擎 sync **TP36/FP0/TN28/FN0/ERR0**、async
+  **TP36/FP0/TN27/FN0/ERR0(1 SKIP)**,f1 均 1.000;全量 192 例 **sync
+  TP113/FP0/TN79/FN0/ERR0 f1=1.000(902.9s)**、**async TP108/FP0/TN74/FN0/ERR0
+  (10 SKIP)f1=1.000(786.7s)**,逐项等于既有基线。
+  **诚实归因**:async 全量臂跑在同一 worktree 的并发会话正改 async polyglot 降档的期间
+  (`async_scanner*.py`,属 Phase 208 那条 /r/url03 分歧的修复,不是本轮),
+  该读数证的是"两件事叠加后仍零退化",不是"只有本轮改动为零退化";
+  本轮改动的单独凭证是 sync 全量臂、双引擎切片与真实靶两臂
+  (`benchmark/results/phase210b_{quick_sync,quick_async,full_sync,full_async}.json`)。
 - 全量 192 例矩阵**双引擎**复测零退化(切片绿灯不等于全量没变):
   sync TP113/FP0/TN79/FN0/ERR0、async TP108/FP0/TN74/FN0/ERR0(10 例 SKIP 为
   manifest 声明 sync-only 的 stored/二阶),两引擎 f1 均 1.000;
@@ -73,12 +138,16 @@
 
 ### Known limitations
 
-- **JS bundle 被当成"页面"扫,真实靶上产出 3 条无证据的 high**(见
-  `docs/OPTIMIZATION.md` 1.5):`postmessage_xss` / `websocket_xss` /
-  `open_redirect_xss` 落在 `main.js`,`evidence_class=browser-unavailable` 且
-  `proof=None`。逐条核对 bundle:`addEventListener('message'` 出现 0 次、
-  37 处 `setTimeout(` 传的都是函数、5 处 `location.replace(` 全是硬编码常量。
-  属判定面(档级与证据要求),需要自己的对照矩阵,本轮没有盲改。
+- **`docs/OPTIMIZATION.md` 1.5 的三类病因已各自改掉,但两条一般规则没立**(Phase 210b):
+  ① 静态层一律 `proof=None` —— "不可核对的高危"应当被门拒绝,这需要跨**全部**静态层的
+  证据形状门;② "无浏览器证据 + 无 proof ⇒ 至多 medium" 的**通用**降档规则,需要自己的
+  对照矩阵与全量矩阵复测。本轮按每种错各自的证据改了各自那一处,没有合并成一条通用规则。
+
+- **DOM finding 不带参数名(本轮量到,未修)**:真实靶上 browser-executed 的
+  `dom_dynamic` 是 `param=None`,报告参数列因此为空,`verify_fix` 的重放只能走
+  `params["_"]` 兜底载体,修的人看不出该改哪个键。
+  **注意这不是"缺一条 curl"**:fragment 投递服务端永远收不到,`curl` 反而是误导,
+  PoC 里自动导航的 HTML 才是正确且可执行的重放(它已在)。缺的是**键名**。
 
 - async 爬到的**非** fragment 端点仍只跑反射层(sync 对每个爬到端点跑全套页面层);
   见 `docs/OPTIMIZATION.md` 2.1.1。

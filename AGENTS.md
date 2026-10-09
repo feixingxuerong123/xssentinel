@@ -1543,3 +1543,161 @@ bundle 路由全部进入扫描集(`#/search?q=` `#/login?redirectUrl=`
   因此被门抓了一次红,补 `grep resource_urls tests/` 全树扫完后改定。
 - 回归:discover/MCP/nav/dom-engine/CLI 族 `71 passed, 4 skipped`(4 例是
   `XSS_DOM_LIVE` opt-in 实浏览器)+ CLI 与映射族 `99 passed`。
+
+## Phase 210b:把 1.5 那三条"bundle 假阳性"逐条改掉,并第一次让文档写下"文档种类"
+
+Phase 210 结尾记下的 1.5 不是"降级就完事",也不是一个整体 —— 它是**三种不同的错**,
+每种都要各自实测、各自判决(与 Phase 201 的"同族问题每条各自测量"同一条纪律):
+
+| 报告说 | bundle 里实际是 | 病因 | 改法 |
+|---|---|---|---|
+| `postmessage_xss` / `websocket_xss` high:"setTimeout(string) from … payload" | `addEventListener('message'` **0 次**;37 处 `setTimeout(` 全传函数 | 判定谓词 `setTimeout\(\s*[^,)]*[a-zA-Z]` **声称了它没测的性质** | 共享谓词 `string_eval_sinks._arg_is_string_eval()`:先看回调形状再判字符串;裸标识符**故意不判**(浏览器层负责),并把这条权衡写成一条测试 |
+| `open_redirect_xss` high:"fed by user input" | `window.location.replace(L$.hostServer+\`/profile\`)` 等 5 处硬编码 | Phase 113b 只遮了**赋值式**的左手边;调用式没有左手边,而 `USER_INPUT_RE` 含 `window.location` → **sink 自己给自己作证**;并且窗口尾部固定 200 字符**伸进下一条语句**,在压缩包里下一条通常又是一个 sink → **邻居替它作证** | 遮罩改为:①含黏在前面的 `window./self./globalThis.` 限定符;②遮罩窗口内**所有** sink 跨度;③判定区改为**该 sink 自己的语句**(调用式到配对右括号,赋值式到 `;`)。RHS 完整保留(模式 `[^;\n]` 会吃掉源码里 `location.hash` 的那个 `l`) |
+| `trusted_types_no_policy` medium ×4 + `framework_angular_xss` high ×1(全在 `.js` 上) | 模式确实存在(`bypassSecurityTrustHtml` 真的在 chunk 里) | **文档种类从来不是判定输入**:`.js` 响应没有 CSP 头,"这页没注册 TT 策略"对地球上每个脚本都恒真;而 bundle 读不出"哪个页面绑定它、传什么值、这条分支是否走到" | 新增 `core/document_kind.py`(媒体类型优先、路径兜底),两条判定各按**证据能支撑到哪一档**处理:`tt_no_policy` 在脚本上**不发**(`taint_flow`/`policy_bypass` 读代码,保留);框架模式在脚本上**降为 low/low + "no page context"**(线索保留,音量撤掉) |
+
+### 接线只有一处,所以对两个引擎同时生效
+
+`run_page_layers()` 是双引擎唯一的页面层入口(sync `scanner.py:556`,async
+`async_scanner_layers.py:245` 经 shim),而它**本来就要**为 CSP 判定再取一次响应头 ——
+`content_type` 就在那里读,零额外请求。因此新增的门是**dispatch 契约**而不是层内约定:
+`tests/test_phase210b_script_documents.py` 用 AST 读出 `run_page_layers` 里每一条
+`run_layer(...)` 调用的实参个数/关键字,再用 `inspect.signature().bind()` 逐个核对 ——
+本仓被"层签名与调用点漂移、TypeError 被 per-layer guard 吞成 DEBUG"咬过三次
+(Phase 63/84/198),而这条路上**整层消失而扫描照样报结果**。同一处改动也当场把
+既有面 `tests/test_layer_guard.py` 打红了一次:它的替身
+`_scan_framework(scanner, url, text)` 少了新形参,于是"循环继续"的断言读起来像通过,
+实际一层都没跑 —— 新门防的就是这个形状。
+
+### 变异对照第一次跑:两条守卫当时**没有**吃劲
+
+`dev/phase210b_mutation_control.py` 第一次跑 `guard_is_load_bearing=False(['M1','M2'])`:
+- **M1 是我脚本自己的错**:锚点选的是 `_statement_end()` 的**赋值式分支**,
+  而真实靶的形状走**调用式分支** —— 所谓"变异后运行"跑的仍然带着语句边界。
+  与 `dev/_MUTATION_CONTROL_LESSON.md` 同一课,只是这次错在**分支**而不是缩进。
+- **M2 是真缺口**:遮掉"邻居 sink 也算"的那条循环,单靠语句边界就能挡住
+  `main.js` 那对兄弟调用 → 我的样本只覆盖了"邻居在后面",**没有覆盖
+  邻居在 60 字符前瞻窗口里**的形状。补一条实测形状
+  (`switch(r){case 1:location.href="/a";break;case 2:window.location.replace(h+\`/b\`)}`
+  —— 邻居的左手边 `location.href` 落进本 sink 的前瞻窗口),M2 才变红。
+
+第二次跑加进 **M5**(把 dispatch 里 `content_type` 的读取打回大小写敏感的
+`_hdrs.get("Content-Type")`),**仍然 5 项全绿 → 又一个"声称防 A 实际测 B"**:
+测试用的是 `http://h/main.js`,大小写一丢就落进 URL 后缀兜底规则,结果一样。
+改成**无扩展名的 bundle 路径**(`/assets/dynamic-bundle`,只有响应头能说明它是脚本)
+之后 M5 才变红。**这条同时暴露了一个真实缺陷**:`_hdrs` 是从 CaseInsensitiveDict
+复制来的**普通 dict**,大小写敏感的取法在代理重写头之后就会失效 ——
+现按 `k.lower()=="content-type"` 取,并把"没有头也没有扩展名 ⇒ 不猜脚本"这个
+**取舍方向**钉成测试注释(保守地按页面判定,而不是放宽谓词)。
+
+五项最终 `mutated_red=True / restored_green=True`,并且**逐字节自校验还原**
+(Windows 上 `shutil.move` 还原失败过一次,见 Phase 201 续三)。
+
+**同一轮里还有一次"自己制造的变异"**:收尾时顺手做了一个效率改动
+(限定符查找从 `block[:start]` 收成 24 字符窗口 —— 1 MB 的 bundle 里每个 sink
+都复制一遍前缀毫无必要),把遮罩**弄坏了**:`pre.start()` 是**切片相对**偏移,
+我按绝对偏移加了回去。两条 bundle 测试立刻变红、靶级探针报 `current=5`。
+这不是"运气好发现 bug",而是门本来就该做的事 —— 也说明**"顺手收尾"和"改逻辑"
+一样要走验证**,不存在因为改动"只是性能"就可以跳过。补了一条直接钉住偏移算术的
+断言(`test_mask_span_includes_a_glued_qualifier_at_any_offset`),
+因为原来那两条只有端到端形状能发现问题,报错信息会指向"层判错了"而不是"索引错了"。
+
+### 降档会不会传到交付面:查了映射,不是假设
+
+`framework_*_xss` 在脚本上落 low 之后,**SARIF 的 `level` 由 severity 映射**
+(`report.py:454-455`:`critical/high→error`、`medium→warning`、`low/info→note`),
+所以 Code Scanning 里它真的从 error 变成 note —— 不是只在 JSON 里降了档。
+报告侧没有低严重度过滤器(`grep min_severity` 在 report.py/cli_runner.py 零命中),
+线索仍然可见;这正是"留线索、撤音量"要的形状。
+
+### bundle 级取证(不是样本级)
+
+`dev/redirect_selfsource_probe.py` 把 HEAD 版模块从 `git show` 取出来当**对照组**,
+同一批字节(真实靶的 28 个 JS 文档 + 一条真阳 fixture)双臂跑:
+**HEAD 6 条 exploitable → 现在 0 条**,fixture 真阳 `location.replace(p.get('next'))`
+两臂都报。被删掉的 5 条逐条打印出来供归因,读得通:两条是
+`replace(L$.hostServer+\`/profile\`)`/`replace(L$.hostServer+\`/dataerasure\`)`
+这对兄弟,三条同族;最后一条是 `nativeWindow.location.replace(\`${Ow}?client_id=…\`)`
+的 OAuth URL —— 参数来自 `this.clientId`/`this.redirectUri`,没有一个读 query/hash/message。
+**"数量下降"不是结论,"每条删掉的都能读出为什么是假的"才是结论。**
+
+### 真实靶复测:同一个 arm、同一目标版本、两个引擎
+
+| 跑法 | 改前 | 改后 |
+|---|---|---|
+| `-u <origin> -c --discover --headless` | 3 high + 2 medium,**全部落在 `.js`**(`main.js`/`scripts.js`/两个 chunk) | **1 条**:`dom_dynamic` high/high **browser-executed**(`#/track-result?id=xss`) |
+| 单打 `/main.js`(sync) | 3 条 high | **0 条**(52 请求) |
+| 单打 `/main.js`(async) | 同引擎同缺陷 | **0 条**(27 请求) |
+
+控制条件不是"结果变少了"就算数:同一份报告里 coverage **含 4 个 JS 文档**
+(`main.js` `scripts.js` `polyfills.js` `rolldown-runtime-*.js`) —— 也就是
+**bundle 仍然被扫**,只是不再被当成页面来判定。真阳一条留在报告里,证据级是
+最强的那一档。靶的 `Content-Type` 实测 `application/javascript; charset=UTF-8`,
+所以起作用的是媒体类型规则而非后缀兜底。
+
+诚实记账:这一 arm 的 `scan_status=partial`(14898 attempted / 8 failed),
+成因是**靶进程 JS heap OOM 崩溃**(`dev/_js_out/juiceshop.log`:
+`Ineffective mark-compacts near heap limit`),node 死在扫描中途 —— 目标侧资源不足,
+不是扫描器缺陷;单 URL 的两臂是在重启后的健康靶上跑的。同机另有
+`D:\qoder\vuln-agent` 的 lab matrix 与本仓另一会话的 `_p208_measure.py` 在跑,
+所以本轮所有墙钟数字(158s → 23 min)只能当**内容**证据,不能当性能证据。
+
+### 改档级之前,先查"打分器看得见什么"
+
+**打分器按档级过滤** —— `benchmark/runner.py:329` 只把 `severity in (high, medium,
+critical)` 算作"检出",所以把 bundle 上的 `framework_*_xss` 降到 low **结构上就可能
+把 TP 变成 FN**。因此这一轮不是"跑个切片看看",而是先把受影响的面查干净:
+
+- 全 192 例里只有 **2 例**以 `trusted_types_*` 为 credited type(`pos-tt-01`/`neg-tt-01`,
+  路径 `/r/tt01` `/s/tt01`),而**没有任何一例**以 `framework_*` 为 credited type;
+  `pos-tt-01` 要的是 `trusted_types_policy_bypass` —— **本轮明确保留的那一类**。
+- 靶场里以 `application/javascript` 应答的端点只有 **2 个**(JSONP 的
+  `m_jsonp_whitelist` / `m_jsonp_wrapped`,`benchmark/server.py:431,438`),body 是
+  `cb({"status": "ok"});` —— 既无框架标记也无 TT sink,降档在那两格上根本不触发。
+- 结论:"bundle 降档"这一面在 192 例矩阵里**结构上不可达**;仍然复跑全量,是为了让
+  这句话是一次数码,而不是一段推理。
+
+**64 例 strict 切片双引擎复测(本机实测,产物入库)**:`--quick --strict-gate`
+sync **TP36/FP0/TN28/FN0/ERR0,f1=1.000,360.2s**(`benchmark/results/phase210b_quick_sync.json`)、
+async **TP36/FP0/TN27/FN0/ERR0(1 SKIP = stored-dom 属 sync-only),f1=1.000,408.5s**
+(`phase210b_quick_async.json`)—— 与 Phase 190/209 记下的基线**逐项相同**,零退化。
+
+**全量 192 例矩阵 sync 臂(产物 `phase210b_full_sync.json`)**:
+**TP113/FP0/TN79/FN0/ERR0,recall=precision=f1=1.000,902.9s** —— 与 Phase 189 以来
+的 sync 基线**逐项相同**。这一条是本轮的关键复测:降档改的是 severity,而"检出"的定义
+是 `severity in (high, medium, critical)`,所以"没退化"必须是**全量**读数,不能只看切片。
+
+**全量 192 例矩阵 async 臂(产物 `phase210b_full_async.json`)**:
+**TP108/FP0/TN74/FN0/ERR0(10 SKIP = manifest 声明 sync-only),f1=1.000,786.7s** ——
+与既有 async 基线逐项相同。**但这条读数跑在混合树上**:同一 worktree 的并发会话在
+async 臂运行期间改了 polyglot 降档(`async_scanner.py` / `async_scanner_common.py`,
+Phase 208 那条 /r/url03 分歧的修复,**不属于本轮**)。它把 polyglot 命中从 high/high
+降为 medium/medium,而 medium 仍计入"检出",所以两条改动**叠加**后的净效果仍是零退化 ——
+这句话能证的是"合取为真",**不能**证"只有我的改动为真"。按本项目"绿≠跑过"的同一纪律,
+该读数按"混合归因"记账;本轮改动的单独凭证是 sync 全量臂 + 双引擎切片 + 真实靶两臂。
+
+### 门与遗留
+
+- 新门 **29 例**(实测 `29 passed in 0.41s`):`tests/test_phase210_string_eval_sinks.py`(9)+
+  `tests/test_phase210_redirect_selfsource.py`(10,含"样本表覆盖 DANGER_SINKS 每一行"
+  的双向断言,与 `_mask_span` 的**切片偏移**断言)+
+  `tests/test_phase210b_script_documents.py`(10,含穿过
+  `run_page_layers` 的 dispatch 级一例)。
+- 既有面回归:`test_redirect_fp`/`test_dom_source_fp`/`test_client_layers` **26 例**、
+  `test_layer_guard`/`test_trusted_types_identity`/`test_p30_framework` **64 例**全绿。
+- **1.5 仍未结的两条**(本轮没动,因为它们是判定档级的一般规则,不是一处 bug):
+  ① 静态层一律 `proof=None` —— "不可核对的高危"应当被门拒绝,这需要跨全部静态层的
+  证据形状门;② "无浏览器证据 + 无 proof ⇒ 至多 medium" 的**通用**降档规则,
+  需要自己的对照矩阵与全量矩阵复测。现在只按每种错各自的证据改了各自的那一处。
+- **本轮量到的一条交付面缺口(先纠正我自己写下的判断,再记)**:那条
+  browser-executed 的 `dom_dynamic` 是 `param=None`(`dev/_js_out/findings_p210b_discover.json`),
+  我第一版把它写成"最强的证据配最弱的可操作性"。**这句不对,已纠正**:
+  fragment 投递的 finding 本来就不该有 curl —— 服务端永远收不到 `#` 之后的东西,
+  `curl` 反而是误导;PoC 里那个自动导航的 HTML(`window.location.href="…#/track-result?id=…"`)
+  才是正确且可执行的重放,而它在。
+  **真正的缺口比那个小,但仍然实在**:finding 没记下**载荷实际落在哪个键上**
+  (`id`),于是报告的参数列是空的,`verify_fix` 的重放只能走 `params["_"]` 兜底载体
+  (Phase 210 续十四已锁的那条),修的人看不出该改哪个键。
+  下一轮:DOM 探针知道投递位置(`_probes()` 造的 URL),把那个键名带回 finding 的
+  `param`;并钉一条"fragment 类 finding 的 `param` 必须非空或显式说明为何为空"的门。
+  **记下这次纠正本身**:我原本把"没有 curl"当成缺陷,那是**拿工具的默认形状当标准** ——
+  DOM 面的正确产物是 HTML PoC,先把"这条主张能造成什么行动"问清楚再写判断。
