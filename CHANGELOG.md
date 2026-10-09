@@ -5,6 +5,69 @@
 
 ## [Unreleased]
 
+### Added
+
+- **SPA hash 路由发现(Phase 209)**:`js_miner.spa_query_params()` /
+  `hash_route_urls()` 从应用自己的 bundle 里配对
+  `navigate([/route], {queryParams:{…}})` → 产出 `origin/#/route?param=x` 端点
+  (上限 12),接线到三条发现路径(sync 静态爬虫、sync SPA 爬虫、async 爬虫);
+  端点签名去重把 **fragment 纳入**(否则同 host+path 的 45 条路由塌成 1 条)。
+  动因是真实靶场实测:OWASP Juice Shop 20.2.0 上 `-u <origin> -c` 得到 74 端点、
+  **0 个带 fragment**,而手工给 `/#/search?q=apple --headless` 11.4s 即拿到
+  browser-executed high —— 缺的是可发现性,不是检测能力。
+- **真实应用外部效度驱动 `dev/juiceshop_external.py`**:起服 / 表面探针 /
+  写面探针 / 扫描矩阵;ground truth 取上游 `challenges.yml`(9 XSS / 69 non-XSS)。
+  Phase 200 记的"外部效度需要一个本仓不具备的驱动器"至此结案。
+- 新门 35 例(逐文件 `--collect-only` 实测):`tests/test_phase209_template_control.py`(9)、
+  `tests/test_phase209_spa_hash_routes.py`(17)、
+  `tests/test_phase209_spa_route_delivery.py`(4,**双引擎** × 阳性/safe 孪生,
+  真 Chromium + 变异对照)、`tests/test_phase209_accept_encoding.py`(5,含反向对照)。
+
+### Fixed
+
+- **`template_ssti_*` critical 假阳性(Phase 209)**:`detect_rendered()` 原为
+  `"49" in response_text`。靶场把 `{{7*7}}` **原样回显**(无模板引擎),而 406
+  错误页唯一的 `49` 是栈行号 `route.js:149:13`,于是发出 critical 发现且 evidence
+  声称"rendered to 49"。现加**差分对照请求**(同参数发无数字值),并对该层
+  直接 `append(Finding(...))` 缺失的 `confidence` 键补上(与 Phase 198 的
+  polyglot 同类元数据缺陷),evidence 改为描述实测。
+- **async 爬到即检查(Phase 209)**:`_crawl_and_scan` 对带 fragment 的端点改跑
+  `_scan_dom_async` 并纳入去重(此前只跑反射层,而 fragment 参数只有浏览器读得到;
+  `split("?")` 还会切掉 fragment 内的 query)。复测:`--async -u <origin> -c
+  --headless` 在真实靶上给出 high/high browser-executed(`#/track-result?id=`,
+  与 sync 的 `#/search?q=` 是两个不同 sink,均经独立 Playwright 复核为 parsed)。
+
+- **async 只声明可解码的压缩(Phase 209)**:`safe_accept_encoding()` 实测
+  aiohttp 自己的解码路径能否往返,再决定 `Accept-Encoding`;操作者显式设置不覆盖。
+  修的是 `--async` 对整个真实靶场失效:`HAS_BROTLI=True` 于是声明 `br`,而解码器
+  以 `process(data, max_length)` 调用只实现 `process(data)` 的 `Brotli` 包 →
+  每个响应 `400 Can not decode content-encoding: br`(实测 374 请求 / 0 结果)。
+
+### Verified
+
+- 全量 192 例矩阵**双引擎**复测零退化(切片绿灯不等于全量没变):
+  sync TP113/FP0/TN79/FN0/ERR0、async TP108/FP0/TN74/FN0/ERR0(10 例 SKIP 为
+  manifest 声明 sync-only 的 stored/二阶),两引擎 f1 均 1.000;
+  64 例 strict 切片亦 FP0/FN0/ERROR0。
+- `--self-test` **ALL CHECKS PASSED**(93 PASS/0 FAIL),其中
+  `L7 Template SSTI -> XSS fired (1)` 证明新加的差分对照杀掉假阳性但没杀掉真阳性。
+- 真实靶场:range2 26/26(TP20/FN0/TN6/FP0)、range3 sync TP20/FP0/TN6/FN0 +
+  async TP18/FP0/TN6/FN0/SKIP2、range4 双引擎 TP2/FP0/TN2/FN0 且 gate exit 0。
+- 全量分批门禁 182/182 文件绿(2644s,failures: none);跳过口径按"绿≠跑过"一并给出:
+  14 例 / 7 文件,其中 5 例是声明式跳过(`XSS_DOM_LIVE` opt-in 4 + POSIX 权限位 1),
+  其余 9 例为负载诱发(抽跑 3 个文件即 `22 passed, 0 skipped`)。
+- 同类竞品同靶对照在**冻结树**上重跑(`engine_stable=True`):60 例切片我方
+  **f1 0.9859 / FP0**(复跑去掉一次性 ERR 后),dalfox v2.13.0 0.8254(FP1),
+  nuclei v3.9.0 0.8387(25.2s);唯一 FN 仍是打分口径下的 `pos-xs-01`(XS-Leaks)。
+
+### Known limitations
+
+- async 爬到的**非** fragment 端点仍只跑反射层(sync 对每个爬到端点跑全套页面层);
+  见 `docs/OPTIMIZATION.md` 2.1.1。
+- 真实靶场上浏览器爬取宽度不稳定(实测同命令 18 / 22 / 70 / 70 / 70 / 74 端点),
+  以及 WAF 误检(Juice Shop 被判 `Generic/Unknown WAF` / `Cisco ACE`)未动 ——
+  后者属判定面,需单独测量。
+
 ## [1.1.0] - 2026-10-09
 
 Unreleased 段自 1.0.0(2026-09-29)起累积了 Phase 185–207 共二十余轮工作,

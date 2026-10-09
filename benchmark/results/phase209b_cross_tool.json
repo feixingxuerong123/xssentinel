@@ -1,0 +1,738 @@
+{
+  "generated": "2026-10-09 20:00:27",
+  "base_url": "http://127.0.0.1:18896",
+  "tools": [
+    "XSSentinel",
+    "dalfox",
+    "nuclei-dast-xss"
+  ],
+  "tool_versions": {
+    "XSSentinel": "builtin",
+    "dalfox": "v2.13.0",
+    "nuclei-dast-xss": "v3.9.0"
+  },
+  "engine_fingerprint_start": "8a409f26d026babf",
+  "engine_fingerprint_end": "8a409f26d026babf",
+  "engine_stable": true,
+  "slice": {
+    "requested_sample": 60,
+    "all": false,
+    "ids": [
+      "pos-dangle-01",
+      "pos-blind-01",
+      "pos-cdata-01",
+      "pos-attr-08",
+      "pos-proto-01",
+      "pos-dom-01",
+      "pos-attr-07",
+      "pos-graphql-01",
+      "pos-ctoss-01",
+      "pos-hdr-01",
+      "pos-markdown-01",
+      "pos-attr-01",
+      "pos-attr-03",
+      "pos-attr-02",
+      "pos-comment-01",
+      "pos-elem-01",
+      "pos-importmap-01",
+      "pos-math-01",
+      "pos-url-03",
+      "pos-redirect-01",
+      "pos-xs-01",
+      "pos-sanitizer-01",
+      "pos-script-03",
+      "pos-script-01",
+      "pos-script-02",
+      "pos-script-04",
+      "pos-sw-01",
+      "pos-sri-01",
+      "pos-svg-01",
+      "pos-tpl-01",
+      "pos-tb-01",
+      "pos-tt-01",
+      "pos-attr-04",
+      "pos-url-01",
+      "pos-worker-01",
+      "pos-ws-01",
+      "neg-dangle-01",
+      "neg-blind-01",
+      "neg-cssi-01",
+      "neg-proto-01",
+      "neg-dom-07",
+      "neg-graphql-01",
+      "neg-ctoss-01",
+      "neg-header-01",
+      "neg-markdown-01",
+      "neg-escape-02",
+      "neg-escape-06",
+      "neg-escape-03",
+      "neg-comment-01",
+      "neg-stored-02",
+      "neg-importmap-01",
+      "neg-url-03",
+      "neg-redirect-01",
+      "neg-xs-01",
+      "neg-sanitizer-01",
+      "neg-jsonp-01",
+      "neg-escape-04",
+      "neg-sw-01",
+      "neg-sri-01",
+      "neg-tb-01"
+    ]
+  },
+  "cases": 60,
+  "per_tool": {
+    "XSSentinel": {
+      "tp": 34,
+      "fp": 0,
+      "tn": 24,
+      "fn": 1,
+      "errors": 1,
+      "completed": 59,
+      "precision": 1.0,
+      "recall": 0.9714,
+      "f1": 0.9855,
+      "total_time_s": 537.8
+    },
+    "dalfox": {
+      "tp": 26,
+      "fp": 1,
+      "tn": 22,
+      "fn": 10,
+      "errors": 1,
+      "completed": 59,
+      "precision": 0.963,
+      "recall": 0.7222,
+      "f1": 0.8254,
+      "total_time_s": 982.0
+    },
+    "nuclei-dast-xss": {
+      "tp": 26,
+      "fp": 0,
+      "tn": 23,
+      "fn": 10,
+      "errors": 1,
+      "completed": 59,
+      "precision": 1.0,
+      "recall": 0.7222,
+      "f1": 0.8387,
+      "total_time_s": 25.2
+    }
+  },
+  "matrix": {
+    "pos-dangle-01": {
+      "ground_truth": "vulnerable",
+      "mode": "dangling_vuln",
+      "context": "attribute",
+      "XSSentinel": true,
+      "dalfox": true,
+      "nuclei-dast-xss": true
+    },
+    "pos-blind-01": {
+      "ground_truth": "vulnerable",
+      "mode": "blind_vuln",
+      "context": "blind_oob",
+      "XSSentinel": true,
+      "dalfox": true,
+      "nuclei-dast-xss": true
+    },
+    "pos-cdata-01": {
+      "ground_truth": "vulnerable",
+      "mode": "raw_cdata",
+      "context": "cdata",
+      "XSSentinel": true,
+      "dalfox": true,
+      "nuclei-dast-xss": true
+    },
+    "pos-attr-08": {
+      "ground_truth": "vulnerable",
+      "mode": "raw_attr_dq_style",
+      "context": "css_context",
+      "XSSentinel": true,
+      "dalfox": true,
+      "nuclei-dast-xss": true
+    },
+    "pos-proto-01": {
+      "ground_truth": "vulnerable",
+      "mode": "prototype_vuln",
+      "context": "dom_prototype",
+      "XSSentinel": true,
+      "dalfox": false,
+      "nuclei-dast-xss": false
+    },
+    "pos-dom-01": {
+      "ground_truth": "vulnerable",
+      "mode": "dom_hash_innerhtml",
+      "context": "dom_xss",
+      "XSSentinel": null,
+      "dalfox": false,
+      "nuclei-dast-xss": false
+    },
+    "pos-attr-07": {
+      "ground_truth": "vulnerable",
+      "mode": "raw_attr_dq_event",
+      "context": "event_handler",
+      "XSSentinel": true,
+      "dalfox": true,
+      "nuclei-dast-xss": true
+    },
+    "pos-graphql-01": {
+      "ground_truth": "vulnerable",
+      "mode": "graphql_vuln",
+      "context": "graphql",
+      "XSSentinel": true,
+      "dalfox": false,
+      "nuclei-dast-xss": false
+    },
+    "pos-ctoss-01": {
+      "ground_truth": "vulnerable",
+      "mode": "cookie_toss_parent",
+      "context": "header",
+      "XSSentinel": true,
+      "dalfox": false,
+      "nuclei-dast-xss": false
+    },
+    "pos-hdr-01": {
+      "ground_truth": "vulnerable",
+      "mode": "late_header_reflect",
+      "context": "header_reflection",
+      "XSSentinel": true,
+      "dalfox": false,
+      "nuclei-dast-xss": false
+    },
+    "pos-markdown-01": {
+      "ground_truth": "vulnerable",
+      "mode": "markdown_raw",
+      "context": "html_attribute",
+      "XSSentinel": true,
+      "dalfox": true,
+      "nuclei-dast-xss": true
+    },
+    "pos-attr-01": {
+      "ground_truth": "vulnerable",
+      "mode": "raw_attr_dq",
+      "context": "html_attribute_dq",
+      "XSSentinel": true,
+      "dalfox": true,
+      "nuclei-dast-xss": true
+    },
+    "pos-attr-03": {
+      "ground_truth": "vulnerable",
+      "mode": "raw_attr_nq",
+      "context": "html_attribute_noquote",
+      "XSSentinel": true,
+      "dalfox": true,
+      "nuclei-dast-xss": true
+    },
+    "pos-attr-02": {
+      "ground_truth": "vulnerable",
+      "mode": "raw_attr_sq",
+      "context": "html_attribute_sq",
+      "XSSentinel": true,
+      "dalfox": true,
+      "nuclei-dast-xss": true
+    },
+    "pos-comment-01": {
+      "ground_truth": "vulnerable",
+      "mode": "raw_comment",
+      "context": "html_comment",
+      "XSSentinel": true,
+      "dalfox": true,
+      "nuclei-dast-xss": true
+    },
+    "pos-elem-01": {
+      "ground_truth": "vulnerable",
+      "mode": "raw_element",
+      "context": "html_element",
+      "XSSentinel": true,
+      "dalfox": true,
+      "nuclei-dast-xss": true
+    },
+    "pos-importmap-01": {
+      "ground_truth": "vulnerable",
+      "mode": "importmap_vuln",
+      "context": "import_map",
+      "XSSentinel": true,
+      "dalfox": true,
+      "nuclei-dast-xss": true
+    },
+    "pos-math-01": {
+      "ground_truth": "vulnerable",
+      "mode": "raw_math",
+      "context": "math_context",
+      "XSSentinel": true,
+      "dalfox": true,
+      "nuclei-dast-xss": true
+    },
+    "pos-url-03": {
+      "ground_truth": "vulnerable",
+      "mode": "raw_meta_refresh",
+      "context": "meta_refresh",
+      "XSSentinel": true,
+      "dalfox": true,
+      "nuclei-dast-xss": true
+    },
+    "pos-redirect-01": {
+      "ground_truth": "vulnerable",
+      "mode": "redirect_vuln",
+      "context": "redirect",
+      "XSSentinel": true,
+      "dalfox": false,
+      "nuclei-dast-xss": false
+    },
+    "pos-xs-01": {
+      "ground_truth": "vulnerable",
+      "mode": "xs_vuln",
+      "context": "response_headers",
+      "XSSentinel": false,
+      "dalfox": false,
+      "nuclei-dast-xss": false
+    },
+    "pos-sanitizer-01": {
+      "ground_truth": "vulnerable",
+      "mode": "sanitizer_vuln",
+      "context": "sanitizer",
+      "XSSentinel": true,
+      "dalfox": true,
+      "nuclei-dast-xss": true
+    },
+    "pos-script-03": {
+      "ground_truth": "vulnerable",
+      "mode": "raw_script_block",
+      "context": "script_block",
+      "XSSentinel": true,
+      "dalfox": true,
+      "nuclei-dast-xss": true
+    },
+    "pos-script-01": {
+      "ground_truth": "vulnerable",
+      "mode": "raw_script_string_dq",
+      "context": "script_string_dq",
+      "XSSentinel": true,
+      "dalfox": true,
+      "nuclei-dast-xss": true
+    },
+    "pos-script-02": {
+      "ground_truth": "vulnerable",
+      "mode": "raw_script_string_sq",
+      "context": "script_string_sq",
+      "XSSentinel": true,
+      "dalfox": true,
+      "nuclei-dast-xss": true
+    },
+    "pos-script-04": {
+      "ground_truth": "vulnerable",
+      "mode": "raw_script_template",
+      "context": "script_template",
+      "XSSentinel": true,
+      "dalfox": true,
+      "nuclei-dast-xss": true
+    },
+    "pos-sw-01": {
+      "ground_truth": "vulnerable",
+      "mode": "sw_vuln",
+      "context": "service_worker",
+      "XSSentinel": true,
+      "dalfox": false,
+      "nuclei-dast-xss": false
+    },
+    "pos-sri-01": {
+      "ground_truth": "vulnerable",
+      "mode": "sri_vuln",
+      "context": "sri",
+      "XSSentinel": true,
+      "dalfox": true,
+      "nuclei-dast-xss": true
+    },
+    "pos-svg-01": {
+      "ground_truth": "vulnerable",
+      "mode": "raw_svg",
+      "context": "svg_context",
+      "XSSentinel": true,
+      "dalfox": true,
+      "nuclei-dast-xss": true
+    },
+    "pos-tpl-01": {
+      "ground_truth": "vulnerable",
+      "mode": "raw_template",
+      "context": "template_angular",
+      "XSSentinel": true,
+      "dalfox": true,
+      "nuclei-dast-xss": true
+    },
+    "pos-tb-01": {
+      "ground_truth": "vulnerable",
+      "mode": "tb_vuln",
+      "context": "time_based_css_import",
+      "XSSentinel": true,
+      "dalfox": true,
+      "nuclei-dast-xss": true
+    },
+    "pos-tt-01": {
+      "ground_truth": "vulnerable",
+      "mode": "tt_vuln",
+      "context": "trusted_types",
+      "XSSentinel": true,
+      "dalfox": true,
+      "nuclei-dast-xss": true
+    },
+    "pos-attr-04": {
+      "ground_truth": "vulnerable",
+      "mode": "raw_attr_dq_href",
+      "context": "url_href",
+      "XSSentinel": true,
+      "dalfox": true,
+      "nuclei-dast-xss": true
+    },
+    "pos-url-01": {
+      "ground_truth": "vulnerable",
+      "mode": "raw_href_js",
+      "context": "url_javascript",
+      "XSSentinel": true,
+      "dalfox": true,
+      "nuclei-dast-xss": true
+    },
+    "pos-worker-01": {
+      "ground_truth": "vulnerable",
+      "mode": "worker_vuln",
+      "context": "web_worker",
+      "XSSentinel": true,
+      "dalfox": false,
+      "nuclei-dast-xss": false
+    },
+    "pos-ws-01": {
+      "ground_truth": "vulnerable",
+      "mode": "ws_vuln",
+      "context": "websocket",
+      "XSSentinel": true,
+      "dalfox": false,
+      "nuclei-dast-xss": false
+    },
+    "neg-dangle-01": {
+      "ground_truth": "safe",
+      "mode": "dangling_safe",
+      "context": "attribute",
+      "XSSentinel": false,
+      "dalfox": false,
+      "nuclei-dast-xss": false
+    },
+    "neg-blind-01": {
+      "ground_truth": "safe",
+      "mode": "blind_safe",
+      "context": "blind_oob",
+      "XSSentinel": false,
+      "dalfox": false,
+      "nuclei-dast-xss": false
+    },
+    "neg-cssi-01": {
+      "ground_truth": "safe",
+      "mode": "cssi_safe",
+      "context": "css_context",
+      "XSSentinel": false,
+      "dalfox": false,
+      "nuclei-dast-xss": false
+    },
+    "neg-proto-01": {
+      "ground_truth": "safe",
+      "mode": "prototype_safe",
+      "context": "dom_prototype",
+      "XSSentinel": false,
+      "dalfox": false,
+      "nuclei-dast-xss": false
+    },
+    "neg-dom-07": {
+      "ground_truth": "safe",
+      "mode": "dom_hash_route_safe",
+      "context": "dom_xss",
+      "XSSentinel": false,
+      "dalfox": false,
+      "nuclei-dast-xss": false
+    },
+    "neg-graphql-01": {
+      "ground_truth": "safe",
+      "mode": "graphql_safe",
+      "context": "graphql",
+      "XSSentinel": false,
+      "dalfox": false,
+      "nuclei-dast-xss": false
+    },
+    "neg-ctoss-01": {
+      "ground_truth": "safe",
+      "mode": "cookie_toss_self",
+      "context": "header",
+      "XSSentinel": false,
+      "dalfox": false,
+      "nuclei-dast-xss": false
+    },
+    "neg-header-01": {
+      "ground_truth": "safe",
+      "mode": "header_only",
+      "context": "header_reflection",
+      "XSSentinel": false,
+      "dalfox": false,
+      "nuclei-dast-xss": false
+    },
+    "neg-markdown-01": {
+      "ground_truth": "safe",
+      "mode": "markdown_filtered",
+      "context": "html_attribute",
+      "XSSentinel": false,
+      "dalfox": false,
+      "nuclei-dast-xss": false
+    },
+    "neg-escape-02": {
+      "ground_truth": "safe",
+      "mode": "escape_attr_dq",
+      "context": "html_attribute_dq",
+      "XSSentinel": false,
+      "dalfox": false,
+      "nuclei-dast-xss": false
+    },
+    "neg-escape-06": {
+      "ground_truth": "safe",
+      "mode": "escape_attr_nq",
+      "context": "html_attribute_noquote",
+      "XSSentinel": false,
+      "dalfox": false,
+      "nuclei-dast-xss": false
+    },
+    "neg-escape-03": {
+      "ground_truth": "safe",
+      "mode": "escape_attr_sq",
+      "context": "html_attribute_sq",
+      "XSSentinel": false,
+      "dalfox": false,
+      "nuclei-dast-xss": false
+    },
+    "neg-comment-01": {
+      "ground_truth": "safe",
+      "mode": "comment_stripped",
+      "context": "html_comment",
+      "XSSentinel": false,
+      "dalfox": false,
+      "nuclei-dast-xss": false
+    },
+    "neg-stored-02": {
+      "ground_truth": "safe",
+      "mode": "stored_api_write_escaped",
+      "context": "html_element",
+      "XSSentinel": false,
+      "dalfox": null,
+      "nuclei-dast-xss": null
+    },
+    "neg-importmap-01": {
+      "ground_truth": "safe",
+      "mode": "importmap_safe",
+      "context": "import_map",
+      "XSSentinel": false,
+      "dalfox": false,
+      "nuclei-dast-xss": false
+    },
+    "neg-url-03": {
+      "ground_truth": "safe",
+      "mode": "escape_meta_refresh_js",
+      "context": "meta_refresh",
+      "XSSentinel": false,
+      "dalfox": false,
+      "nuclei-dast-xss": false
+    },
+    "neg-redirect-01": {
+      "ground_truth": "safe",
+      "mode": "redirect_safe",
+      "context": "redirect",
+      "XSSentinel": false,
+      "dalfox": false,
+      "nuclei-dast-xss": false
+    },
+    "neg-xs-01": {
+      "ground_truth": "safe",
+      "mode": "xs_safe",
+      "context": "response_headers",
+      "XSSentinel": false,
+      "dalfox": false,
+      "nuclei-dast-xss": false
+    },
+    "neg-sanitizer-01": {
+      "ground_truth": "safe",
+      "mode": "sanitizer_safe",
+      "context": "sanitizer",
+      "XSSentinel": false,
+      "dalfox": false,
+      "nuclei-dast-xss": false
+    },
+    "neg-jsonp-01": {
+      "ground_truth": "safe",
+      "mode": "jsonp_whitelist",
+      "context": "script_block",
+      "XSSentinel": false,
+      "dalfox": false,
+      "nuclei-dast-xss": false
+    },
+    "neg-escape-04": {
+      "ground_truth": "safe",
+      "mode": "escape_script_string",
+      "context": "script_string_dq",
+      "XSSentinel": false,
+      "dalfox": true,
+      "nuclei-dast-xss": false
+    },
+    "neg-sw-01": {
+      "ground_truth": "safe",
+      "mode": "sw_safe",
+      "context": "service_worker",
+      "XSSentinel": false,
+      "dalfox": false,
+      "nuclei-dast-xss": false
+    },
+    "neg-sri-01": {
+      "ground_truth": "safe",
+      "mode": "sri_safe",
+      "context": "sri",
+      "XSSentinel": false,
+      "dalfox": false,
+      "nuclei-dast-xss": false
+    },
+    "neg-tb-01": {
+      "ground_truth": "safe",
+      "mode": "tb_safe",
+      "context": "time_based_css_import",
+      "XSSentinel": false,
+      "dalfox": false,
+      "nuclei-dast-xss": false
+    }
+  },
+  "disagreements": [
+    {
+      "case": "pos-proto-01",
+      "context": "dom_prototype",
+      "tool": "dalfox",
+      "kind": "missed-a-real-XSS"
+    },
+    {
+      "case": "pos-proto-01",
+      "context": "dom_prototype",
+      "tool": "nuclei-dast-xss",
+      "kind": "missed-a-real-XSS"
+    },
+    {
+      "case": "pos-dom-01",
+      "context": "dom_xss",
+      "tool": "dalfox",
+      "kind": "missed-a-real-XSS"
+    },
+    {
+      "case": "pos-dom-01",
+      "context": "dom_xss",
+      "tool": "nuclei-dast-xss",
+      "kind": "missed-a-real-XSS"
+    },
+    {
+      "case": "pos-graphql-01",
+      "context": "graphql",
+      "tool": "dalfox",
+      "kind": "missed-a-real-XSS"
+    },
+    {
+      "case": "pos-graphql-01",
+      "context": "graphql",
+      "tool": "nuclei-dast-xss",
+      "kind": "missed-a-real-XSS"
+    },
+    {
+      "case": "pos-ctoss-01",
+      "context": "header",
+      "tool": "dalfox",
+      "kind": "missed-a-real-XSS"
+    },
+    {
+      "case": "pos-ctoss-01",
+      "context": "header",
+      "tool": "nuclei-dast-xss",
+      "kind": "missed-a-real-XSS"
+    },
+    {
+      "case": "pos-hdr-01",
+      "context": "header_reflection",
+      "tool": "dalfox",
+      "kind": "missed-a-real-XSS"
+    },
+    {
+      "case": "pos-hdr-01",
+      "context": "header_reflection",
+      "tool": "nuclei-dast-xss",
+      "kind": "missed-a-real-XSS"
+    },
+    {
+      "case": "pos-redirect-01",
+      "context": "redirect",
+      "tool": "dalfox",
+      "kind": "missed-a-real-XSS"
+    },
+    {
+      "case": "pos-redirect-01",
+      "context": "redirect",
+      "tool": "nuclei-dast-xss",
+      "kind": "missed-a-real-XSS"
+    },
+    {
+      "case": "pos-xs-01",
+      "context": "response_headers",
+      "tool": "XSSentinel",
+      "kind": "missed-a-real-XSS"
+    },
+    {
+      "case": "pos-xs-01",
+      "context": "response_headers",
+      "tool": "dalfox",
+      "kind": "missed-a-real-XSS"
+    },
+    {
+      "case": "pos-xs-01",
+      "context": "response_headers",
+      "tool": "nuclei-dast-xss",
+      "kind": "missed-a-real-XSS"
+    },
+    {
+      "case": "pos-sw-01",
+      "context": "service_worker",
+      "tool": "dalfox",
+      "kind": "missed-a-real-XSS"
+    },
+    {
+      "case": "pos-sw-01",
+      "context": "service_worker",
+      "tool": "nuclei-dast-xss",
+      "kind": "missed-a-real-XSS"
+    },
+    {
+      "case": "pos-worker-01",
+      "context": "web_worker",
+      "tool": "dalfox",
+      "kind": "missed-a-real-XSS"
+    },
+    {
+      "case": "pos-worker-01",
+      "context": "web_worker",
+      "tool": "nuclei-dast-xss",
+      "kind": "missed-a-real-XSS"
+    },
+    {
+      "case": "pos-ws-01",
+      "context": "websocket",
+      "tool": "dalfox",
+      "kind": "missed-a-real-XSS"
+    },
+    {
+      "case": "pos-ws-01",
+      "context": "websocket",
+      "tool": "nuclei-dast-xss",
+      "kind": "missed-a-real-XSS"
+    },
+    {
+      "case": "neg-escape-04",
+      "context": "script_string_dq",
+      "tool": "dalfox",
+      "kind": "false-positive"
+    }
+  ]
+}

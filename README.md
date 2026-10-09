@@ -39,7 +39,18 @@ XSSentinel 的目标是**在开源/自研工具中做到检测维度最全、架
 - **深度爬虫**：`-c` 自动发现同域 `<a>` 链接与 `<form>` 端点（BFS，`--crawl-depth` 控深度，`--scope` 限域），连"无参数纯 DOM 页面"也纳入扫描——多数单脚本工具跑完一个 URL 就停了。
 - **发现去重**：`dedup()` 按 `(type, URL, param, context)` 合并经不同爬取路径/变形变体发现的同一漏洞，避免重复告警刷屏（DOM 类忽略 query 差异）。
 - **隐藏参数挖掘（Phase 43）**：内置 313 个高产出候选词（分页/token/回跳/模板等 14 类），`--param-wordlist` 可追加自定义词表（操作符提示前置）；fuzzer 差分 triage 从大词表挑 top-N 深测，请求量可控。
-- **双引擎精度对齐（Phase 43）**：`benchmark/runner.py --engine {sync,async}` 用同一 98 用例矩阵分别标定两条流水线——async 经 CSP 响应头门、转义实体窗口、mXSS payload 自带结构守卫三层修复后已达 **recall 100% / precision 100% / FPR 0**，与 sync 完全对齐（Phase 69 重新标定：sync 98 用例 TP=64/FP=0/FN=0，recall/precision 100%，FPR 0——此前本机退化 loopback 曾出现 1 例环境性假 FN，单跑该用例 0.2s 即检出；runner 现对出错用例自动重试，且**漏洞用例若最终无法完成计入 FN**，不再让跑不完的用例悄悄缩小 recall 分母。Phase 176n 补上这句话当时做不到的部分：旧闸门是 `verdict != "FN"`，**只有出错的漏洞用例被重试**，出错的安全用例首试即被接受、直接从分母消失；现由 `_evaluate_with_retries()` 两类一并重测（并发路径此前一次都不重试），产物并记录 `engine` / `retried_cases` / 每例 `retries`）。**注意该标定已被 Phase 91/92 刷新**：当时 async 基线里 3 个 safe 用例存在从未暴露的误报（Phase 84 引入），最新数字见文末「当前基线」表——precision 仍是 1.000，但 recall 分母口径下的 FN 需先单跑复现再判定。
+- **双引擎精度对齐（Phase 43）**：`benchmark/runner.py --engine {sync,async}` 用同一 192 用例矩阵分别标定两条流水线——async 经 CSP 响应头门、转义实体窗口、mXSS payload 自带结构守卫三层修复后已达 **recall 100% / precision 100% / FPR 0**，与 sync 完全对齐（Phase 69 重新标定：sync 98 用例 TP=64/FP=0/FN=0，recall/precision 100%，FPR 0——此前本机退化 loopback 曾出现 1 例环境性假 FN，单跑该用例 0.2s 即检出；runner 现对出错用例自动重试，且**漏洞用例若最终无法完成计入 FN**，不再让跑不完的用例悄悄缩小 recall 分母。Phase 176n 补上这句话当时做不到的部分：旧闸门是 `verdict != "FN"`，**只有出错的漏洞用例被重试**，出错的安全用例首试即被接受、直接从分母消失；现由 `_evaluate_with_retries()` 两类一并重测（并发路径此前一次都不重试），产物并记录 `engine` / `retried_cases` / 每例 `retries`）。**注意该标定已被 Phase 91/92 刷新**：当时 async 基线里 3 个 safe 用例存在从未暴露的误报（Phase 84 引入），最新数字见文末「当前基线」表——precision 仍是 1.000，但 recall 分母口径下的 FN 需先单跑复现再判定。
+- **SPA hash 路由自动发现（Phase 209）**：Angular/Vue 的 hash location strategy 只在
+  `location.hash` 里读路由，HTTP 探针打服务端路径（`/search`）永远碰不到客户端 sink。
+  现在从应用**自己的 bundle** 里配对 `navigate([/route], {queryParams:{…}})` → 得到
+  路由与参数名 → 注册成 `origin/#/route?param=` 端点（上限 12），sync 静态爬取、
+  sync SPA 爬取、async 爬取三条路径都接线。**外部效度实测**：OWASP Juice Shop 20.2.0
+  （第三方真实应用，非本仓 fixture）上 `xssentinel -u <origin> -c --headless` 一条命令
+  即报出 `dom_dynamic` **high/high browser-executed**（`location.hash` →
+  `Element.innerHTML`，对应上游 `challenges.yml` 的 `localXssChallenge`）；双引擎各命中
+  一个**不同**的真实 sink，且都经独立 Playwright 复核（注入 `<em class=…>` 后被解析成
+  元素而非文本）。同一轮还量出并修掉一个 **critical 级假阳性**（模板 SSTI 把错误页栈
+  行号里的 `49` 当成 `{{7*7}}` 的渲染结果），现为差分对照判定。
 - **可复现 PoC**：每个确认漏洞自动产出 **curl 命令 + 含 payload 的 URL + 自包含 HTML PoC 页面**（iframe / 自动提交表单 / `location.hash` 触发 DOM），HTML/JSON/CSV/SARIF 四报告均携带，直接交差或进缺陷单。
 - **被动代理扫描（Phase 44）**：`--passive` 起本地 HTTP 代理（对标 xray / w13scan 的被动模式），浏览器/工具挂代理即可把流量捕获进扫描流水线——按 `方法+主机+路径+参数名集合` 签名去重（分页/翻 token 不重扫），GET/POST 表单与 JSON body 全解析，HTTPS 默认走 CONNECT 隧道透传；加 `--mitm-ca ca.pem`（Phase 50）则自动生成本地 CA 并对 scope 内主机做 HTTPS 拦截——每主机证书由该 CA 签发，把 CA 证书 `ca-cert.pem` 装进浏览器/系统信任库后 HTTPS 参数/body 也能被捕获扫描（越 scope 主机保持盲透传）；后台 worker 把捕获端点直接喂给 L1 流水线，`--sqli-check` / `--check-outdated-js` 快检可联动（见下）。写端点（POST/PUT/PATCH）扫描后自动进入 **stored 二阶观察**：对 body 参数注入唯一 token 探针，之后浏览到的任意页面若原样渲染该 token（可执行上下文）即确认 high `second_order` finding——存储型 XSS 无需手动指定注入/查看端点（Phase 67）。
 - **目标级 CORS / XS-Leaks 审计（Phase 51/53）**：每 origin 探测 Origin 反射（GET+OPTIONS 兜底）——反射任意 Origin+Allow-Credentials → high `cors_misconfig`；`--audit-xs-leaks` 对无任何跨源隔离头（COOP/CORP/COEP/帧守卫）的页面记 low `xs_leak_surface`；`xs_leaks.py` 另附 img/frame-timing/window.name/history 四信道载荷库与免服务器演示 PoC（证明已确认 XSS 的跨站窃取半径）。sync/async 双引擎对齐（Phase 54）。
@@ -346,7 +357,10 @@ python -m xssentinel --mcp
 
 **浏览器渲染输入发现（`--discover`，Phase 196）**——渲染目标一次：SPA 表单
 字段名并入挖矿词表，页面自己 fetch 的同源 API 端点在主目标后扫描（上限 10）；
-需要 playwright，sync 引擎专属：
+需要 playwright，sync 引擎专属。**已知边界（Phase 209 记录）**：`--discover` 目前
+只回表单字段名与同源资源 URL，**不回 hash 路由表**——SPA 的 `/#/route?param=` 由
+爬取路径（`-c`）发现并投递 DOM 探测，不走 `--discover`；把路由也暴露给
+`xssentinel_discover`（供 Agent 编排）是排后的下一步。
 
 ```bash
 python -m xssentinel -u "https://target.com/app" --discover -o reports/

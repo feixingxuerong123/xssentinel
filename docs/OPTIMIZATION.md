@@ -276,6 +276,45 @@ import 仍可用 —— 它靠的是 `sandbox.py` 里带原因的 re-export,而�
 > async 的 L7 层 shim findings 视图缺主循环裁定,polyglot fallback 只在 async
 > 误发(/r/jsonct01 多一条)—— 已修(shim seed + param_confirmed 哨兵),顺带
 > 修复两个引擎 polyglot finding 缺 confidence 键的报告元数据缺陷。
+
+#### 2.1.1 实测新分歧(Phase 209,2026-10-09):async **发现端点但不检查它们**
+
+真实靶场(OWASP Juice Shop 20.2.0)第一次把这条暴露出来 —— 本仓 192 例矩阵与
+range3/4 都是**逐端点显式给 URL**,爬取到的端点从未成为 DOM 判定的对照对象,
+所以这一类"一边整个分支不存在"的门是空的:
+
+| 跑法 | 结果 |
+|---|---|
+| `sync -u <origin> -c --headless` | 1 条 `dom_dynamic` high/high **browser-executed**(`location.hash` → `Element.innerHTML`),即上游 `localXssChallenge` |
+| `async -u <origin> -c --headless` | **0 findings**,374 请求,0 失败 —— 端点确实被发现(`_crawl_mine_endpoints` 直调返回 `/#/home?v=xss`),但没有被检查 |
+| `async -u <origin>/#/search?q=apple --headless` | 1 条 high/high browser-executed,12 请求 |
+
+**代码依据**:`async_scanner_crawl.py:344,378` 对爬到的端点只调
+`self._scan_reflected(...)`;而主循环 `_scan_raw`(`async_scanner.py:578-612`)
+为端点建 L1 + `L3_dom`(`_scan_dom_async`)+ `L5_advanced_page` + `L8_request`
+全套 page_tasks。sync 侧 `scan_target` 对爬到的每个端点都走完整流程 —— 所以
+**async 的爬取等于"只跑反射层"**。三条 parity 门都测不到它,因为它们喂的是显式
+端点,不是爬取产物。
+
+**当日已修(fragment 路由这一支)**:`_crawl_and_scan` 对带 fragment 的端点改跑
+`_scan_dom_async`(并纳入 `mined_seen` 去重,否则同一路由从内联与外链 JS 各发现一次
+会付两次浏览器),`m_base` 的 `split("?")` 不再截掉 fragment 内的 query。
+复测:`--async -u <origin> -c --headless` 在真实靶上给出 1 条 `dom_dynamic`
+high/high **browser-executed**(`#/track-result?id=`,与 sync 命中的 `#/search?q=`
+是**两个不同**真实 sink);两路由均经独立 Playwright 复核:注入
+`<em class="xssprobe9k">` 后 `querySelectorAll('em.xssprobe9k').length == 1` 且
+页面不把它显示成文本 —— parsed,不是 escaped,sink 为真。
+门:`tests/test_phase209_spa_route_delivery.py` 现按 **双引擎** 参数化
+(阳性 + safe 孪生 × sync/async),变异对照(摘掉 `_crawl_spa` 的 merge)必红。
+
+**仍然开放的更大一支(未做)**:async 爬到的**非** fragment 端点仍只跑反射层
+(`async_scanner_crawl.py` 的 link 循环与 mined 循环都只调 `_scan_reflected`),
+而 sync 对每个爬到的端点跑全套 page tasks(L3/L6 DOM + 高级页面层 + 请求层)。
+本轮不一起改的理由仍然成立:那会把 async 爬取扫描的请求量按"端点数 × 页面层"
+放大,预算/超时/192 例 async 基线都要重测。**改法形状**:让 `_crawl_and_scan`
+复用 `_scan_raw` 的 page_tasks 组装(或抽出"对一个端点跑全套"的共享入口),
+并给 parity 门加一条**爬取切片** —— 同一目标 `-c` 双引擎比对 finding 集合。
+验收沿用 2.1 的规矩:门必须能复现本条事故(把 async 爬取里的 DOM 调用摘掉,门要红)。
 ### 2.2 报告层性能
 
 [report.py](file:///d:/qoder/xssentinel/xssentinel/core/report.py) **1428 行**,

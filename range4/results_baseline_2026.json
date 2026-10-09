@@ -1,0 +1,331 @@
+{
+  "meta": {
+    "range": "range4",
+    "generated": "2026-10-09 12:20:28",
+    "engines": [
+      "sync",
+      "async"
+    ],
+    "max_payloads": 8,
+    "max_transforms": 4,
+    "per_case_timeout": 240,
+    "construct_probe": "dev/_r4_construct_probe.py (server_reflect must be False for -safe cases)"
+  },
+  "counts": {
+    "sync": {
+      "TP": 2,
+      "FP": 0,
+      "TN": 2,
+      "FN": 0,
+      "ERROR": 0
+    },
+    "async": {
+      "TP": 1,
+      "FP": 0,
+      "TN": 1,
+      "FN": 0,
+      "ERROR": 2
+    }
+  },
+  "rows": [
+    {
+      "engine": "sync",
+      "case_id": "r4-pos-react-dsi",
+      "verdict": "TP",
+      "findings": 12,
+      "confirmed": 12,
+      "elapsed_s": 16.9,
+      "findings_detail": [
+        {
+          "type": "reflected",
+          "severity": "high",
+          "context": "script_string_sq",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "reflected",
+          "severity": "high",
+          "context": "script_string_sq",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "reflected",
+          "severity": "high",
+          "context": "script_string_sq",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "reflected",
+          "severity": "high",
+          "context": "script_string_sq",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "reflected",
+          "severity": "high",
+          "context": "script_string_sq",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "reflected",
+          "severity": "high",
+          "context": "script_string_sq",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "reflected",
+          "severity": "high",
+          "context": "script_string_sq",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "reflected",
+          "severity": "high",
+          "context": "script_string_sq",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "reflected",
+          "severity": "high",
+          "context": "script_string_sq",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "reflected",
+          "severity": "high",
+          "context": "script_string_sq",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "reflected",
+          "severity": "high",
+          "context": "script_string_sq",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "dom_dynamic",
+          "severity": "high",
+          "context": "Element.innerHTML",
+          "headless_outcome": "fired"
+        }
+      ],
+      "error": ""
+    },
+    {
+      "engine": "sync",
+      "case_id": "r4-neg-react-text",
+      "verdict": "TN",
+      "findings": 0,
+      "confirmed": 0,
+      "elapsed_s": 22.8,
+      "findings_detail": [],
+      "error": ""
+    },
+    {
+      "engine": "sync",
+      "case_id": "r4-pos-vue-vhtml",
+      "verdict": "TP",
+      "findings": 12,
+      "confirmed": 12,
+      "elapsed_s": 26.9,
+      "findings_detail": [
+        {
+          "type": "reflected",
+          "severity": "high",
+          "context": "script_string_sq",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "reflected",
+          "severity": "high",
+          "context": "script_string_sq",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "reflected",
+          "severity": "high",
+          "context": "script_string_sq",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "reflected",
+          "severity": "high",
+          "context": "script_string_sq",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "reflected",
+          "severity": "high",
+          "context": "script_string_sq",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "reflected",
+          "severity": "high",
+          "context": "script_string_sq",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "reflected",
+          "severity": "high",
+          "context": "script_string_sq",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "reflected",
+          "severity": "high",
+          "context": "script_string_sq",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "reflected",
+          "severity": "high",
+          "context": "script_string_sq",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "reflected",
+          "severity": "high",
+          "context": "script_string_sq",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "reflected",
+          "severity": "high",
+          "context": "script_string_sq",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "dom_dynamic",
+          "severity": "high",
+          "context": "Element.innerHTML",
+          "headless_outcome": "fired"
+        }
+      ],
+      "error": ""
+    },
+    {
+      "engine": "sync",
+      "case_id": "r4-neg-vue-vtext",
+      "verdict": "TN",
+      "findings": 0,
+      "confirmed": 0,
+      "elapsed_s": 10.9,
+      "findings_detail": [],
+      "error": ""
+    },
+    {
+      "engine": "async",
+      "case_id": "r4-pos-react-dsi",
+      "verdict": "TP",
+      "findings": 12,
+      "confirmed": 12,
+      "elapsed_s": 19.3,
+      "findings_detail": [
+        {
+          "type": "reflected",
+          "severity": "high",
+          "context": "script_block",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "reflected",
+          "severity": "high",
+          "context": "script_block",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "reflected",
+          "severity": "high",
+          "context": "script_block",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "reflected",
+          "severity": "high",
+          "context": "script_block",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "reflected",
+          "severity": "high",
+          "context": "script_block",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "reflected",
+          "severity": "high",
+          "context": "script_block",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "reflected",
+          "severity": "high",
+          "context": "script_block",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "reflected",
+          "severity": "high",
+          "context": "script_block",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "reflected",
+          "severity": "high",
+          "context": "script_block",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "reflected",
+          "severity": "high",
+          "context": "script_block",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "reflected",
+          "severity": "high",
+          "context": "script_block",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "dom_dynamic",
+          "severity": "high",
+          "context": "Element.innerHTML",
+          "headless_outcome": "fired"
+        }
+      ],
+      "error": ""
+    },
+    {
+      "engine": "async",
+      "case_id": "r4-neg-react-text",
+      "verdict": "TN",
+      "findings": 0,
+      "confirmed": 0,
+      "elapsed_s": 11.1,
+      "findings_detail": [],
+      "error": ""
+    },
+    {
+      "engine": "async",
+      "case_id": "r4-pos-vue-vhtml",
+      "verdict": "ERROR",
+      "findings": 0,
+      "confirmed": 0,
+      "elapsed_s": 240.0,
+      "findings_detail": [],
+      "error": "timeout after 240s"
+    },
+    {
+      "engine": "async",
+      "case_id": "r4-neg-vue-vtext",
+      "verdict": "ERROR",
+      "findings": 0,
+      "confirmed": 0,
+      "elapsed_s": 241.1,
+      "findings_detail": [],
+      "error": "timeout after 240s"
+    }
+  ]
+}

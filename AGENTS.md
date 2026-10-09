@@ -1198,6 +1198,88 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
       文件级 `pytestmark` 会覆盖同文件里不需要该依赖的测试,而它覆盖的往往正是
       最关键的那部分覆盖。
 
+## Phase 201 续十六:探针报告"全绿"却一个测试都没跑
+
+**新形态:装置坏了,输出看起来像通过。**
+
+`dev/_ungate_safety_probe.py` 第一版输出:
+
+```
+15 candidate files, 121 candidate tests
+  test_async_deep.py   20  0  0  0  ok
+  ... (15 files all 0/0/0/ok)
+RESULT misclassified=0 safe_to_ungate=15
+```
+
+**它一个测试都没执行。** 15 个文件全部 `pass=0 FAIL=0 skip=0`,
+而判定逻辑是 `failed == 0 -> ok`。
+
+### 三个独立缺陷叠加
+
+1. **路径拼错** — `os.path.join(dirpath, fname)` 少了 `tests/`,
+   pytest 找不到文件,**不打印摘要行**。
+2. **沉默被当成结果** — `tail` 为空 -> `passed=0 failed=0` ->
+   `failed == 0` -> **ok**。**零工作量与全部通过产生同一个数字。**
+3. **补丁方向搞反** — `skipif(COND)` 在 COND 为真时**跳过**,
+   解除门禁是 `skipif(False)`。我连续四次写成 `True`。
+
+### 四个错误方向,每一个都产出了整齐的数字
+
+| 补丁 | 实际发生 | 探针报告 |
+|---|---|---|
+| 替换 conftest 导入行 | 静默 no-op | (路径错,双重失效) |
+| `True  # 注释 or not ...` | **注释吞掉后续参数 -> SyntaxError** | 收集为空 -> `0 failed` = **ok** |
+| `True`,删 `reason=` | `skipif(True)` 需要 reason | `21 errors` |
+| `True`,留 reason | **True 就是跳过** | `21 skipped` |
+| `False`(正确) | 测试真的跑了 | 真实数据 |
+
+**没有一个方向报错。** 决定性的一步不是读代码,是**读 pytest 尾行**:
+`tail='21 skipped'` / `tail='21 errors'` 一行区分全部四种错误。
+
+### 真实答案(补丁修好后)
+
+15 个文件里 **10 个可安全解除门禁,5 个不能**:
+`test_async_budget.py` / `test_poc_replay_headers.py` **HUNG**
+(asyncio selector 挂住,真的需要 loopback);
+`test_dom_eval_sink.py` 2 failed;
+`test_passive_mitm.py` 1 failed。
+**"结构上像离线" 与 "运行时确实离线" 只有一半重合。**
+纯函数测试(`test_is_available_bool` 实测只需一行断言)确实不需要网络,
+但同一文件里的其他测试需要 —— **文件级解除不可行,只能逐测试。**
+
+**如果我采信第一版的 `safe_to_ungate=15`,就会去改 15 个测试文件,
+把真的网络测试暴露在降级主机上 —— 用一份根本没运行过的证据去改动
+170 个文件里的一批。** 实际答案是 10 个文件 5 个有问题。
+
+详见 `dev/_SILENT_ZERO.md`。
+
+### 五条新规则
+
+1. **零永远不是通过。** `passed==0 and failed==0` 必须单列成
+   独立 verdict,不能落进 `failed == 0` 的分支。
+2. **没有摘要行 != 没有失败。** 收集错误、超时、import 失败都不产生
+   摘要行。缺摘要行应当是 **UNKNOWN**,不是 0。
+3. **计数表达式不能把"没匹配到"折叠成 0。**
+   `(re.search(...) or [0,0])[1]` 在两种完全不同的情况下给出同一个 0。
+4. **用正则改代码时,替换文本里不能出现注释** —— 它会吞掉后续参数,
+   产出语法错误,而语法错误又表现为"没有结果"。
+5. **解除门禁的补丁必须断言测试真的跑了**,而不是只看没有失败。
+   `skipif(False)` 才是放行。
+
+### Phase 204 已落地并实测
+
+工作期间 Phase 204 (commit `ddaafdc`) 正好实施了这个改法:
+把 15 个文件的模块级 `pytestmark` 全部下沉为逐测试 `skipif`
+(7 个文件)或内联 `loopback_healthy()` 保护(8 个文件)。
+`dev/_phase204_coverage.py` 实测 **15/15 全部 per-test gated 或
+inline guarded,0 个残留文件级门禁**。
+
+**降级主机实测**(`XSSENTINEL_FORCE_SOCKETPAIR=bad`,这 15 个文件):
+**`69 passed, 102 skipped`** —— 这 69 个测试在模块级门禁下会被整片跳过。
+`test_async_deep.py` 单文件从 `21 skipped` 变成 `4 passed, 24 skipped`。
+
+**这是本轮唯一的仓库级改动收益,而它是被测量驱动的,不是被猜的。**
+
 ## Phase 207:交付面的一致性审计(修复建议 + 报告类型表)
 
 前 200 多个 Phase 都在问"**检测**对不对"。Phase 207 把同一问题问到**交付面**:
@@ -1247,3 +1329,161 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
    第一版反证自己手写了一个 `only_half = {...}` 断言 —— 那只证明"集合会做减法",
    不证明门接线到了这个函数。改成给 `report_type_map_offenders` 注入合成表,
    才是真的在测门。
+
+## Phase 209:真实靶场把"一个目标 → 一份漏洞报告"跑通,并量出四个 fixture 测不到的缺陷
+
+前 208 轮全部精度结论都建立在我方自写的 fixture 上(range2/3/4 + 192 例矩阵)。
+本轮按用户要求把同一套判定拿去打**真实应用**:OWASP Juice Shop 20.2.0
+(官方 release 包,MD5 与上游逐字节匹配;`node build/app.js`,PORT 18900;
+ground truth 取上游 `data/static/challenges.yml`:9 XSS / 69 non-XSS / 38 other)。
+
+**交付结论(实测)**:`python -m xssentinel -u http://127.0.0.1:18900 -c --headless`
+一条命令 → `dev/_js_out/REALAPP_juiceshop_report.html`(71.6 KB),内含 1 条
+`dom_dynamic` high/high **browser-executed**,`location.hash` → `Element.innerHTML`,
+落在 `#/search?q=` —— 即上游 `localXssChallenge`。async 引擎同一目标同一命令
+给出 `#/track-result?id=` 的 high/high browser-executed。
+**两个 sink 都独立复核为真**:注入 `<em class="xssprobe9k">` 后
+`querySelectorAll('em.xssprobe9k').length == 1` 且页面不显示成文本 —— parsed
+而非 escaped,sink 成立;两条路由不是同一个,所以下游报告里的 sink 计数是真的多。
+
+### 四个缺陷,每一个都只有真实应用能暴露
+
+1. **critical 级假阳性(template SSTI)**。`detect_rendered()` 是一句
+   `"49" in response_text`。靶场 `/redirect?to={{7*7}}` 把探针**原样回显**
+   (没有模板引擎),而 406 错误页里唯一的 `49` 是栈行号
+   `router/route.js:1**49**:13` —— 于是发出一条 `template_ssti_dot` critical,
+   evidence 还写着"probe {{7*7}} rendered to 49"(**这句话本身在说谎**)。
+   改法:**差分对照** —— 同参数再发一个不含数字的值,若对照响应里也有该值,
+   那值不是我们造成的,不构成引擎在渲染的证据。顺带补上这条分支缺失的
+   `confidence` 键(该层直接 `findings.append(Finding(...))` 不走 `_record`,
+   与 198 修过的 polyglot 同一类元数据缺陷),并把 evidence 改成描述实测内容。
+   变异对照:`baseline 9 passed → mutated(摘掉对照) 1 failed → restored 9 passed`,
+   文件逐字节还原 → 守卫吃劲。
+2. **SPA 路由发现不了**。`js_miner.EXTRACTORS` 早就有 `path:'x'` 的 route 提取
+   (真 bundle 里挖出 45 条),但爬取侧用 `urljoin` 把它们解析成**服务端路径**
+   `/search`,而 hash-routing 的客户端只读 `location.hash` —— HTTP 探针打进去
+   的东西路由器永远看不见。更糟的是默认 `crawl_engine=auto` 走 **SpaCrawler**,
+   而 SpaCrawler 完全不挖 JS:`-u <origin> -c` 实测 74 端点、**0 个带 fragment**;
+   手工给 `/#/search?q=apple --headless` 却 11.4s 拿到 browser-executed high。
+   **能力没问题,可发现性有问题**。改法:`js_miner.spa_query_params()` 从
+   `navigate([...], {queryParams:{...}})` 的**窗口内**配对路由→参数名
+   ( Juice Shop 5 条命中,含 `search -> ['q']`;窗口外不配,防止把全 bundle
+   的 key 随机挂到路由上),`hash_route_urls()` 产出 `origin/#/route?param=x`
+   并封顶 `MAX_HASH_ROUTES=12`;三条路径都接线(sync 静态、sync SPA、async),
+   `_dedupe_endpoint_signatures` 把 **fragment 纳入签名**(否则 45 条路由同 host+path
+   塌成 1 条),并对 fragment 端点跳过隐藏参数挖矿(服务端看不见 fragment,
+   挖矿只会白烧预算)。正则**同时容许空格**:未压缩源码 / source map 原文写
+   `navigate( [ '/x' ], { queryParams: { v: e } })` —— 第一版只匹配压缩形状,
+   是我自己的门先红了一次才发现的。
+3. **`--async` 对整台真实靶场失效**。aiohttp 的 `HAS_BROTLI=True`(`Brotli` 包
+   可导入)于是**主动声明 `br`**,但它自己的解码器调
+   `Decompressor.process(data, max_length)`,而该包只实现 `process(data)` →
+   `TypeError` → aiohttp 包成 `400 Can not decode content-encoding: br`,
+   于是**每一个**响应都失败:374 请求 / 0 结果 / 0 端点。stdlib 靶场从不压缩,
+   所以这条在本仓任何 fixture 上都不可见。改法:`safe_accept_encoding()`
+   **实测** aiohttp 自己的解码路径能不能往返,只声明能解码的编码;
+   操作者显式设置的 `accept-encoding` 不被覆盖。测试成对:
+   `test_async_request_gets_the_body_back` + 反向对照
+   `test_control_advertising_br_really_does_break`(没有后者,前一句"我们不声明 br"
+   不可证伪)。
+4. **async 发现端点但不检查它们**(2.1.1 记的门类缺口)。`_crawl_and_scan` 对
+   爬到的端点只调 `_scan_reflected`,而 fragment 路由的参数**只能在浏览器里读**;
+   更细的是 `m_base = m_url.split("?")[0]` 把 fragment 内部的 query 也切掉了。
+   本轮修 fragment 这一支:`urlparse(m_url).fragment` 的端点改跑
+   `_scan_dom_async`,并入 `mined_seen` 去重(同一路由从内联与外链 JS 各挖到一次
+   会付两次浏览器)。复测即上文 async 命中 `#/track-result?id=`。
+   **非 fragment 的爬到端点仍只跑反射层** —— 更大一支留在 2.1.1。
+
+### 门禁与门
+
+- 精度门(改动前后各跑一次):64 例 strict 切片**双引擎** FP0/FN0/ERROR0
+  (sync 64 例 0 SKIP,async 63 例 1 SKIP),`benchmark_20261009_164114/164801.json`。
+- **全量 192 例矩阵双引擎复测(切片绿灯不等于全量没变)**:
+  sync **TP113 FP0 TN79 FN0 ERR0** f1=1.000(903.43s,
+  `benchmark_20261009_181110.json`)、async **TP108 FP0 TN74 FN0 ERR0**
+  f1=1.000(944.81s,`benchmark_20261009_182655.json`,10 例 SKIP 是 manifest
+  声明 `engines:["sync"]` 的 stored/二阶)——与 Phase 189 基线**逐项相同**,
+  即这轮四处判定/爬取改动在满矩阵上零退化。
+  先确认过没有任何测试断言模板层的请求条数(那 +1 条对照请求是最可能踩到的),
+  实测也没踩到。
+- **全量分批门禁 `tests/run_all_batched.py --quiet`:182/182 文件绿(2644s),failures: none**
+  —— 本轮零回归。按本项目"绿≠跑过"的规矩同时给出跳过口径:**14 例跳过 / 7 个文件**,
+  且逐个查了成因:`test_dom_engine_probe_urls.py` 4 例是 opt-in 实浏览器
+  (`XSS_DOM_LIVE=1` 未设)、`test_passive_mitm.py` 1 例是 POSIX 权限位在 Windows 上不适用
+  —— 这 5 例是**声明式**沉默。剩下 **9 例**(`test_benchmark_fp` 5 /
+  `test_mcp_server` 1 / `test_multi_reflection_context` 1 / `test_nuclei_replay_live` 1 /
+  `test_scan_orchestration` 1)**在门禁里跳、单独复跑却不跳**:我刚把其中 3 个文件
+  拎出来跑,`22 passed, 0 skipped` —— 所以那 9 例是负载/环境诱发,不是能力门;
+  剩下 2 个慢文件(228s / 340s)的复跑还没做,**记为未归因**。
+- 同一次门禁里 `test_response_cap.py` 是 **attempt 0 rc=1 → attempt 1 rc=0**:
+  文件最终计绿,但**重试通过不等于无事**。失败的是
+  `test_an_unbounded_requester_sees_the_whole_page`(urllib3 `_error_catcher` 栈),
+  我这轮改动不碰响应读取与 `requester.py`,同期 `D:\qoder\vuln-agent` 有 11 个
+  python 进程在抢主机 —— 待定点复跑定性。
+- 真实靶场复跑:range2 TP20/FN0/TN6/FP0(26/26)、range3 sync
+  TP20/FP0/TN6/FN0/ERR0 + async TP18/FP0/TN6/FN0/SKIP2、range4 双引擎
+  TP2/FP0/TN2/FN0/ERR0 且 gate exit 0(用 `--out` 写新文件,不覆写入库产物)。
+- 新增门(逐文件 `--collect-only` 实测计数,不手数):
+  `test_phase209_template_control.py` 9 例、
+  `test_phase209_spa_hash_routes.py` 17 例(纯函数配对/上限/跳过规则 +
+  sync 静态与 SPA 两条接线的**行为**测试 + 去重**两个方向**都断言 +
+  双引擎接线的 AST 守卫 + 一条"每条爬取入口函数体内必须有接线"的按名守卫 ——
+  后者就是防我自己这一轮"只补了静态爬取、默认 SPA 路径没补"那个错的)、
+  `test_phase209_spa_route_delivery.py` 4 例(**双引擎** × 阳性/safe 孪生,
+  真 Chromium,变异对照证明摘掉接线即红)、`test_phase209_accept_encoding.py` 5 例
+  —— 共 35 例。
+- 驱动入库:`dev/juiceshop_external.py`(起服 / 面探针 / 扫描矩阵 / 写面探针),
+  Phase 200 那次"外部效度需要一个不具备的驱动器"的说法至此**结案**。
+- **同类竞品同靶对照(冻结树上重跑,`engine_stable=True`,fp `8a409f26d026babf`)**:
+  **作废在先**:`phase209_cross_tool.*` 那次我边跑边改源码,`engine_stable=False`
+  (该字段存在的全部意义),按本仓规矩这轮逐例数字不能归因 —— 已删除,不留误导性产物。
+  另一次作废:长跑链首次把 `--progress` 传给 `benchmark.runner`(它没有这个参数)
+  → 两个 arm 秒退 RC=2,且 cross-tool 不带 `--sample` 时只跑 18 例而非入库基线的
+  60 例 —— 核实 CLI 口径之后才重发。
+  60 例分层切片,XSSentinel vs **dalfox v2.13.0** vs **nuclei v3.9.0**(同一批目标、
+  同一 `_build_target_url`,ground truth 取 manifest 独立撰写):
+  我方 **TP34 FP0 TN24 FN1 ERR1 f1=0.9855**(537.8s)、dalfox
+  TP26 FP1 TN22 FN10 ERR1 f1=0.8254(982s)、nuclei TP26 FP0 TN23 FN10 ERR1
+  f1=0.8387(**25.2s**)。产物 `benchmark/results/phase209b_cross_tool.{json,md}`。
+  **开工前先登记预期**(f1≈0.986 / FP0 / 唯一 miss=`pos-xs-01`),实测三项全中;
+  **唯一偏差是那条 ERR**,所以没有直接下"与基线相同"的结论,而是复跑定位:
+  ERR 落在 `pos-dom-01`(dom_xss)—— 单例复跑 **TP**,再把整条我方 arm 全 60 例
+  复跑(`phase209c_ours60.json`,仍 `engine_stable=True`)得
+  **TP35 FP0 TN24 FN1 ERR0 f1=0.9859**,与 Phase 196b 入库基线 0.986 逐项相同,
+  且两次复跑里 `null` 集合为空 → 定性为**一次性瞬时错误,不复现**。
+  唯一 FN 仍是 `pos-xs-01`:XS-Leaks 审计层按设计给 low/firm,而"检出"口径要求
+  high/medium/critical —— 这是**打分口径**,不是判定错误,不改判定去凑数字。
+  另一处自证:`test_quick_gate_slice.py` 的文档数字门扩容后,我把陈旧说法塞回 README
+  验证门会红(`1 failed`),还原逐字节一致后 `6 passed`。
+- **门禁里那条重试定性为存量负载 flake,并按 Phase 183 先例修掉**:
+  `test_response_cap.py::test_an_unbounded_requester_sees_the_whole_page` 在门禁
+  attempt 0 抛 `socket.timeout`(栈在 urllib3 读体里),attempt 1 绿;独立复跑
+  **9 次里失败 1 次**。成因是该文件**唯一**读满 5 MB body 的用例(capture 其他
+  用例都有 cap 上限、只读前几 KB),10s socket 超时在同期 11 个 python 进程抢
+  loopback 时量的是**主机带宽**而不是产品。改法只把这一个请求 10s→30s,
+  断言一字未动;变异对照证明断言仍然吃劲(强行塞 `max_response_bytes=1024`
+  → `1 failed`,还原 → `8 passed`,文件逐字节一致)。挂 763s 级的真 wedge 仍会红。
+
+### 本轮量到但没做的
+
+- **爬取宽度不稳定**:同一命令同一条码,端点数实测 18 / 22 / 70 / 70 / 70 / 74。
+  SPA 浏览器爬虫的点击与渲染受主机负载影响(同期 `D:\qoder\vuln-agent` 在跑),
+  所以"一次跑出来的端点数"不是可引用数字 —— 只有 fragment 路由那 5 条稳定。
+- **WAF 误检**:真实靶场两次分别被判成 `Generic/Unknown WAF` 与 `Cisco ACE`
+  (错误页栈信息 + 406/500 形状)。本轮未动判定 —— 它改变载荷选择,属于判定面,
+  需要单独测量。
+- **DOM 发现的 `param` 为空 → PoC 只给 HTML 不给 curl**:真实靶上
+  `#/search?q=xss` 的 `dom_dynamic` finding 里 `param=None`,于是
+  `poc.curl` 写成"No injectable parameter"。这条本身**诚实**(fragment 不进 HTTP
+  请求,curl 本来表达不了),但路由的参数名我们是**知道的**(就在 fragment 里)——
+  把它记进 `param`(命名成 `q@hash` 之类的来源限定形式,而不是假装是 query 参数)
+  能让报告读者一眼看出"注入点在 fragment",属于交付面可读性,不是判定。
+- **驱动自身的探针在负载下会超时**:`dev/juiceshop_external.py writes/surfaces`
+  现把失败请求记成 `error` + `None`(UNKNOWN),不再写成一片 `False` —— 后者读起来
+  正好是"这个靶不回显",而那是连接错误说的。空载时需复跑一次取干净产物。
+
+- **写面打不穿**:`POST /api/Feedbacks` 需 captcha(`/rest/captcha` 直接把答案
+  回在 JSON 里,这是靶场自己的弱点),解开后 sanitize-html **把载荷清成空串**;
+  `/api/Users` 401。即 stored 系 challenge 在默认配置下不是自动化可达的 sink,
+  所以"9 条 challenge 只报了 2 个 sink"不是扫描器漏报,而是靶的其余面要么被
+  净化、要么需要人在回路。按 190 纪律不写进 README 当成绩。
