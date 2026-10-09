@@ -1677,6 +1677,22 @@ Phase 208 那条 /r/url03 分歧的修复,**不属于本轮**)。它把 polyglot
 
 ### 门与遗留
 
+- **全量分批门禁(`tests/run_all_batched.py`)本轮未跑,按"未验证"记账,不是已验证。**
+  `--self-test` 同样未跑(同一原因:它要 Chromium + loopback,在这种争用下只会产出需要
+  再归因一次的超时)。
+  跑前检查过进程表:`D:\qoder\vuln-agent` 的 `_tmp/lab_matrix.py` + dvwa 靶 +
+  `vuln_cli.py scan` 仍在运行,且同一 worktree 的另一会话此刻正在跑
+  `benchmark/runner.py --quick`。这正是 Phase 187/200/201 三次记录过的同一形态
+  (201 那次 687 分钟只落盘 2 个文件),所以不再重蹈"硬跑到超时"。
+  **下一轮的前置**:先确认无并发(`Get-CimInstance Win32_Process -Filter "Name='python.exe'"`
+  读命令行),再跑 `python tests/run_all_batched.py --quiet`,并给出 `env_gated_tests`
+  跳过口径("绿"不等于"跑过")。
+- 替代它跑的**定点面**(全部本机实测,非引用):新门 29 例;redirect/DOM 源 FP/客户端层
+  26 例;layer-guard + TT 身份 + 框架族 64 例;async 接线 + 层注册 + coverage 矩阵奇偶
+  16 例;**所有引用 `run_page_layers` 的测试文件**(async_pipeline / async_request_layers /
+  async_wiring / layer_guard / p26 / 新门)共 **118 passed in 14.11s** —— 这条是本轮
+  dispatch 签名变更最直接的证据面。
+
 - 新门 **29 例**(实测 `29 passed in 0.41s`):`tests/test_phase210_string_eval_sinks.py`(9)+
   `tests/test_phase210_redirect_selfsource.py`(10,含"样本表覆盖 DANGER_SINKS 每一行"
   的双向断言,与 `_mask_span` 的**切片偏移**断言)+

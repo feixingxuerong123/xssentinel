@@ -136,6 +136,13 @@
   **f1 0.9859 / FP0**(复跑去掉一次性 ERR 后),dalfox v2.13.0 0.8254(FP1),
   nuclei v3.9.0 0.8387(25.2s);唯一 FN 仍是打分口径下的 `pos-xs-01`(XS-Leaks)。
 
+- **全量分批门禁(`tests/run_all_batched.py`)本轮未跑 —— 按"未验证"记账。**
+  跑前读进程表:同机 `D:\qoder\vuln-agent` 的 lab matrix/dvwa/scan 与本 worktree 另一会话的
+  `benchmark/runner.py` 都在运行,即 Phase 187/200/201 三次记录过的同一形态。
+  替代面(实测):新门 29 例 + redirect/DOM-源/客户端层 26 例 + layer-guard/TT/框架族 64 例
+  + async 接线/层注册/coverage 奇偶 16 例 + **全部引用 `run_page_layers` 的测试文件
+  118 passed in 14.11s**。
+
 ### Known limitations
 
 - **`docs/OPTIMIZATION.md` 1.5 的三类病因已各自改掉,但两条一般规则没立**(Phase 210b):
