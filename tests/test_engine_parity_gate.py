@@ -225,8 +225,30 @@ class TestGateCatchesKnownIncidents:
     def test_missing_content_type_downgrade_is_red(self, bench_base,
                                                    monkeypatch):
         from xssentinel.core import async_scanner as asm
-        monkeypatch.setattr(asm, "_non_html_grade",
-                            lambda hdrs: ("high", "high"))
+        from xssentinel.core import async_scanner_common as asc
+        from xssentinel.core import async_scanner_layers as asl
+
+        # Phase 211: the grading call sites moved from async_scanner into the
+        # layers mixin, and patching only async_scanner left the live call
+        # sites untouched -- this gate went BLIND while still reporting
+        # green on its other cases.  Three namespaces hold the name:
+        #   - async_scanner_common: where it is DEFINED, and what
+        #     _polyglot_grade calls internally;
+        #   - async_scanner / async_scanner_layers: the importing modules
+        #     whose call sites bind it directly.
+        # Patch all three so the gate cannot be blinded by the next move.
+        def _always_high(resp_headers):
+            return ("high", "high")
+
+        # raising=False on the core module: after Phase 211 it no longer
+        # imports the name at all (the call sites moved to the layers mixin),
+        # and setattr would raise AttributeError instead of patching.  Keeping
+        # the attempt means the gate still works if the call sites ever move
+        # back.
+        monkeypatch.setattr(asm, "_non_html_grade", _always_high,
+                            raising=False)
+        monkeypatch.setattr(asl, "_non_html_grade", _always_high)
+        monkeypatch.setattr(asc, "_non_html_grade", _always_high)
         case = [("/r/jsonct01", "q")]
         diffs = _diff(_run_sync(bench_base, case),
                       _run_async(bench_base, case))
@@ -234,6 +256,7 @@ class TestGateCatchesKnownIncidents:
 
     def test_missing_concat_retry_is_red(self, bench_base, monkeypatch):
         from xssentinel.core import async_scanner as asm
+        from xssentinel.core import async_scanner_layers as asl
         from xssentinel.core import verifier as real_v
 
         shim = types.SimpleNamespace(
@@ -241,7 +264,10 @@ class TestGateCatchesKnownIncidents:
                 p if style == "concat" else real_v.mark(p, t, style=style)),
             verify_semantic=real_v.verify_semantic,
             payload_survived=real_v.payload_survived)
+        # Same reason as above: the concat retry now lives in the layers
+        # mixin, so both modules carry a `verifier` binding.
         monkeypatch.setattr(asm, "verifier", shim)
+        monkeypatch.setattr(asl, "verifier", shim)
         case = [("/s/flt05", "q")]
         diffs = _diff(_run_sync(bench_base, case),
                       _run_async(bench_base, case))

@@ -125,6 +125,35 @@ quick **FP0/FN0/ERROR0**（63 例，逐例 0 差异）、全量 192 **TP108 FP0 
 `browser-unavailable`）。**本机 Chromium 会间歇不可用** —— 这也是为什么请求数
 只报告不判失败。
 
+## 第三刀（round 3，已落地）：C+D+E → `_fire_probe_variants`，**439 → 171**
+
+搬走主 variant 循环 + concat 重试 + 位置变换（286 行）。这三段互相纠缠，只能整体搬。
+`param_confirmed` / `resp_headers` / `text` 由 `_ProbeFireState` 承载回传 ——
+**async generator 不能用 `return` 交回值**，而这三样后面全要用（`param_confirmed` 门控
+CSP/HPP/L7/时间盲，`resp_headers` 给 CSP nonce，`text` 给 nonce 与 L7）。
+状态对象**刻意不放在 `self`** 上：那是每次调用的，放实例上会串到下一个参数。
+
+### 这一刀抓到的最值钱的东西：门瞎了，但它自己不会说
+
+parity gate 的两个反证测试（`TestGateCatchesKnownIncidents`）这样注入已知违规：
+
+```python
+monkeypatch.setattr(asm, "_non_html_grade", lambda hdrs: ("high", "high"))
+```
+
+而 `_non_html_grade` 的调用点已随代码搬进 layers mixin ⇒ **补丁打在空处**，门于是
+"没看见"它本该看见的违规 —— 而同文件其它用例照样绿。这正是 Phase 206 那条
+"抓不到已知违规的门等于没有门"，只是这次是**搬家把它搬瞎的**。
+
+修了两点：
+
+1. **三个命名空间都打补丁** —— `async_scanner_common`（定义处，`_polyglot_grade` 内部
+   调的是这个）+ `async_scanner` / `async_scanner_layers`（两个导入者，调用点各自绑定）。
+   少一处就瞎一处：先只补了后两个，`test_missing_content_type_downgrade_is_red` 仍红。
+2. **`raising=False`** —— 核心模块搬空后**根本不再持有** `_non_html_grade`，
+   `setattr` 直接抛 `AttributeError`，表现为"测试失败"而不是"门没抓到"。
+   留着这次 setattr，代码将来搬回去门也还活得成。
+
 ## 风险（每一条都要单独验证）
 
 1. **异常传播**：`BudgetExhausted` / `CircuitOpen` 现在是 `raise`（不降级为 continue）。

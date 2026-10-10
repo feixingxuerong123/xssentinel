@@ -32,13 +32,13 @@ from typing import AsyncIterator
 from urllib.parse import urljoin, urlparse
 
 from .scanner import Finding, json_leaf_paths, _set_json_leaf
-from .findings import EVIDENCE_MODEL
 from .requester import JsonBody
 from . import context as ctx
 from . import verifier
 from . import waf as wafmod
-from . import polyglot as poly_mod
 from . import bypass as bypass_mod
+# Phase 91/208: the polyglot probe and its grading live with the variant
+# loop now (async_scanner_layers._fire_probe_variants, Phase 211 round 3).
 # Phase 35: pre-encoding pipeline parity with the sync scanner (Phase 34).
 from . import pre_encode as pre_mod
 # Phase 37/43/96: corpus sampling, reflection profile and generative payloads
@@ -68,8 +68,9 @@ from .async_scanner_common import (  # noqa: E402  (must follow the block above)
     _FakeResp,
     _JSONP_CALLBACK_NAMES,  # noqa: F401  (engine import surface; used by layers)
     _log,
-    _non_html_grade,
-    _polyglot_grade,
+    # Phase 211 round 3: grading and the fire-state now belong to the
+    # variant loop in async_scanner_layers.
+    _ProbeFireState,
     safe_accept_encoding,
 )
 from .async_scanner_verify import AsyncHeadlessVerifyMixin
@@ -721,6 +722,11 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
         if _skip:
             param_items = [(p, b) for p, b in param_items
                            if str(p).lower() not in _skip]
+            # Phase 185: the names must also leave the request itself, not
+            # just the iteration list.  Bound once so every async side layer
+            # below (DOM, JSONP, CSP, CORS, XS-Leaks, upload, scenarios,
+            # request layers) sees the filtered pair.
+            params, data = self._drop_skip_params(params, data)
         # Phase 43 fix: _probe_param returns async GENERATORS, which
         # asyncio.as_completed() rejects (not awaitables) -- the whole L1
         # layer silently produced nothing under scan().  Drain via tasks.
@@ -754,6 +760,10 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
         marker = f"{stem}{param}_{secrets.token_hex(2)}"
         probe_params, probe_data = self._probe_kv(
             params, data, param, marker, is_body)
+        # Phase 185: never transmit names the operator asked to withhold.
+        # Phase 184 excluded them from the iteration list only.
+        probe_params, probe_data = self._drop_skip_params(
+            probe_params, probe_data)
         try:
             async with self._semaphore:
                 await self._throttle(url)
@@ -848,291 +858,19 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
             marker, marker_escaped, _extra_contexts)
 
 
-        # Phase 132: ``return`` on the first confirmed payload used to end
-        # ``_probe_param`` outright, so the position shift, the CSP-nonce
-        # exploit AND the L7 parameter layers were all skipped on exactly
-        # the endpoints that were easiest to confirm -- async reported the
-        # reflected hit and nothing else (13 requests vs sync's 45 on
-        # pos-clobber-01, where sync also reports dom_clobber).  Sync breaks
-        # out of its loop and keeps going (scanner.py:667 gates the loop on
-        # ``not confirmed`` and reaches _run_advanced_layers unconditionally),
-        # so this mirrors that: flag + break, later stages gated on the flag.
-        param_confirmed = False
-        for payload in cands:
-            if param_confirmed:
-                break
-            marked = verifier.mark(payload, marker)
-            # Phase 86: WAF/filter evasion parity with the sync _try_payload.
-            # Until now the async path fired only the bare marked payload plus
-            # one polyglot, so every evasion variant the sync engine tries
-            # (mixed case, entity/percent encoding, comment breaks, ...) was
-            # never sent -- self.max_transforms was stored but unused, which
-            # left async with a large false-negative gap on filtered targets.
-            variants = await asyncio.to_thread(
-                self._build_variants, marked, context, marker,
-                2 if marker_escaped else None)
-            try:
-                # Polyglot probe for unknown contexts.
-                poly = poly_mod.build_polyglot(marker)
-                if not any(v == poly for _, v in variants):
-                    variants.append((["polyglot"], poly))
-            except Exception:
-                pass
+        # Phase 211 round 3: the variant loop, the concat-stamp retry and the
+        # parameter position shift moved to _fire_probe_variants.  The three
+        # values the tail stages read come back on the state object -- an
+        # async generator cannot return them.
+        _fire = _ProbeFireState(text)
+        async for _f in self._fire_probe_variants(
+                session, url, method, param, params, data, is_body,
+                context, marker, cands, marker_escaped, _fire):
+            yield _f
+        param_confirmed = _fire.param_confirmed
+        resp_headers = _fire.resp_headers
+        text = _fire.text
 
-            for tchain, variant in variants:
-                send_params, send_data = self._probe_kv(
-                    params, data, param, variant, is_body)
-                try:
-                    async with self._semaphore:
-                        await self._throttle(url)
-                        async with session.request(
-                            method, url, params=send_params or None,
-                            headers=self._req_headers(self.headers), proxy=self._next_proxy(),
-                            **_body_kwargs(send_data),
-                        ) as resp:
-                            text = await resp.text()
-                            # Phase 43: capture headers for the verifier's
-                            # CSP gate (sync parity) -- without them the
-                            # CSP-blocks-inline check is skipped and strict
-                            # CSP endpoints false-positive.  Defensive
-                            # getattr: fake sessions in tests may omit
-                            # headers entirely.
-                            resp_headers = dict(getattr(resp, "headers", None) or {})
-                            self.requests_made += 1
-                            self._record_status(getattr(resp, "status", 200))
-                except (BudgetExhausted, CircuitOpen):
-                    raise        # Phase 86: stop instead of "next variant"
-                except Exception:
-                    continue
-                # Verify execution (CPU-bound) -- run in thread.
-                v = await asyncio.to_thread(verifier.verify_semantic,
-                                            text, marker,
-                                            response_headers=resp_headers)
-                # Phase 165 (sync parity, scanner._try_payload): the token
-                # survived -- did the PAYLOAD?  Keep looking otherwise.
-                if v["confirmed"] and verifier.payload_survived(text, variant):
-                    # Phase 208: a polyglot variant is a BROADER claim than
-                    # a context-specific hit (it tries several breakouts at
-                    # once), so it is graded like the sync polyglot layer
-                    # (medium/medium, low on a non-HTML response) instead of
-                    # as a plain reflected hit.  Previously identical
-                    # evidence came out high/high here and medium/medium in
-                    # sync -- measured on /r/url03.
-                    _is_poly = "polyglot" in (tchain or [])
-                    _sev, _conf = (_polyglot_grade(resp_headers) if _is_poly
-                                   else _non_html_grade(resp_headers))
-                    yield Finding(
-                        url=url, method=method, param=param,
-                        context=v.get("context") or context,
-                        payload=variant,
-                        severity=_sev,
-                        evidence=text[max(0, text.find(marker)-30):
-                                      text.find(marker)+len(marker)+30],
-                        type=("polyglot_reflection" if _is_poly
-                              else "reflected"),
-                        confidence=_conf,
-                        transform=tchain,
-                        # Phase 164 (sync parity, scanner._record): record
-                        # WHERE the payload rode so the PoC replays the same
-                        # carrier instead of guessing it from the method.
-                        param_in="body" if is_body else "query",
-                        evidence_class=EVIDENCE_MODEL,
-                    )
-                    param_confirmed = True
-                    break  # leave the variant loop; outer loop re-checks
-
-            # Phase 166 (sync parity, scanner._try_payload:1112): the plain
-            # stamp confirmed nothing for THIS payload.  A keyword filter
-            # rewrites a LITERAL callable (``alert(`` -> ``blocked(``) while
-            # letting the concatenated form through, so retry with the CONCAT
-            # stamp -- bounded to two requests, exactly like sync pays them
-            # per base payload.  This used to exist only inside the
-            # position-shift block below, which requires a WAF *fingerprint*;
-            # a WAF-less keyword filter never gets there (neg-filter-05:
-            # sync confirms via the concat stamp, async paid 106 requests
-            # and reported nothing).
-            # Skipped when the marker came back HTML-escaped: the encoder
-            # eats the concat variant just as dead as the plain one, and the
-            # Phase 27-1 convergence budget must not grow by 2/payload
-            # (test_async_escaped_convergence pins that ceiling).
-            if not param_confirmed and not marker_escaped:
-                concat_marked = verifier.mark(payload, marker, style="concat")
-                if concat_marked != marked:
-                    concat_retry: list = [([], concat_marked)]
-                    for tchain, _v in variants[:1]:
-                        v2 = concat_marked
-                        for t in tchain:
-                            v2 = await asyncio.to_thread(transform_mod.apply,
-                                                         t, v2)
-                        concat_retry.append(
-                            (list(tchain) + ["concat_stamp"], v2))
-                    for tchain, variant in concat_retry:
-                        if marker not in variant:
-                            continue
-                        send_params, send_data = self._probe_kv(
-                            params, data, param, variant, is_body)
-                        try:
-                            async with self._semaphore:
-                                await self._throttle(url)
-                                async with session.request(
-                                    method, url, params=send_params or None,
-                                    headers=self._req_headers(self.headers),
-                                    proxy=self._next_proxy(),
-                                    **_body_kwargs(send_data),
-                                ) as resp:
-                                    text = await resp.text()
-                                    resp_headers = dict(getattr(
-                                        resp, "headers", None) or {})
-                                    self.requests_made += 1
-                                    self._record_status(
-                                        getattr(resp, "status", 200))
-                        except (BudgetExhausted, CircuitOpen):
-                            raise
-                        except Exception:
-                            continue
-                        v = await asyncio.to_thread(
-                            verifier.verify_semantic, text, marker,
-                            response_headers=resp_headers)
-                        if (v["confirmed"]
-                                and verifier.payload_survived(text, variant)):
-                            idx = text.find(marker)
-                            param_confirmed = True
-                            # Phase 208: same polyglot grading as the main
-                            # variant loop (the concat retry can ride on a
-                            # polyglot base variant).
-                            _is_poly = "polyglot" in (tchain or [])
-                            _sev, _conf = (
-                                _polyglot_grade(resp_headers) if _is_poly
-                                else _non_html_grade(resp_headers))
-                            yield Finding(
-                                url=url, method=method, param=param,
-                                context=v.get("context") or context,
-                                payload=variant,
-                                severity=_sev,
-                                evidence=text[max(0, idx - 30):
-                                              idx + len(marker) + 30],
-                                type=("polyglot_reflection" if _is_poly
-                                      else "reflected"),
-                                confidence=_conf,
-                                transform=tchain,
-                                param_in="body" if is_body else "query",
-                                evidence_class=EVIDENCE_MODEL,
-                            )
-                            break
-
-        # Phase 37: parameter position shift (sync parity).  WAFs often
-        # guard only the ORIGINAL parameter location -- re-fire the top
-        # payloads with the param cloned into the OTHER location.
-        # Phase 132: gated on ``not param_confirmed`` -- sync's call site
-        # (scanner.py:693) has the same guard, and re-firing after a
-        # confirmed hit would only add requests.
-        if not param_confirmed:
-            for payload in cands[:3]:
-                marked = verifier.mark(payload, marker)
-                # Phase 47: flipped is_body routes through _probe_kv so a
-                # JSON-mode query->body shift lands in the JSON document
-                # instead of a form body the server ignores.
-                sp, sd = self._probe_kv(params, data, param, marked,
-                                        not is_body)
-                try:
-                    async with self._semaphore:
-                        await self._throttle(url)
-                        async with session.request(
-                            method, url, params=sp or None,
-                            headers=self._req_headers(self.headers), proxy=self._next_proxy(),
-                            **_body_kwargs(sd),
-                        ) as resp:
-                            text = await resp.text()
-                            resp_headers = dict(getattr(resp, "headers", None) or {})  # CSP gate parity
-                            self.requests_made += 1
-                        self._record_status(getattr(resp, "status", 200))
-                except (BudgetExhausted, CircuitOpen):
-                    raise            # Phase 86: stop instead of "next param"
-                except Exception:
-                    continue
-                v = await asyncio.to_thread(verifier.verify_semantic,
-                                            text, marker,
-                                            response_headers=resp_headers)
-                if (v["confirmed"]
-                        and verifier.payload_survived(text, marked)):
-                    idx = text.find(marker)
-                    yield Finding(
-                        url=url, method=method, param=param,
-                        context=v.get("context") or context,
-                        payload=marked,
-                        severity=_non_html_grade(resp_headers)[0],
-                        evidence=text[max(0, idx - 30):idx + len(marker) + 30],
-                        type="reflected",
-                        confidence=_non_html_grade(resp_headers)[1],
-                        transform=["position_shift"],
-                        # Phase 164: the shift re-fires the parameter into the
-                        # OTHER location, so the carrier here is the FLIPPED
-                        # one -- exactly the value the PoC needs.
-                        param_in="query" if is_body else "body",
-                        evidence_class=EVIDENCE_MODEL,
-                    )
-                    param_confirmed = True
-                    break
-
-            # Phase 166 (sync parity, scanner._try_payload): the plain stamp
-            # confirmed nothing.  A keyword filter rewrites a LITERAL callable
-            # while letting the concatenated form through, so retry with the
-            # CONCAT stamp -- the only form that survives such a filter AND can
-            # carry the marker.  Bounded to two requests, reached only when
-            # everything above failed.
-            if not param_confirmed:
-                concat_marked = verifier.mark(payload, marker, style="concat")
-                retry: list = [([], concat_marked)]
-                for tchain, _v in variants[:1]:
-                    v2 = concat_marked
-                    for t in tchain:
-                        v2 = await asyncio.to_thread(transform_mod.apply, t, v2)
-                    retry.append((list(tchain) + ["concat_stamp"], v2))
-                for tchain, variant in retry:
-                    if marker not in variant:
-                        continue
-                    send_params, send_data = self._probe_kv(
-                        params, data, param, variant, is_body)
-                    try:
-                        async with self._semaphore:
-                            await self._throttle(url)
-                            async with session.request(
-                                method, url, params=send_params or None,
-                                headers=self._req_headers(self.headers),
-                                proxy=self._next_proxy(),
-                                **_body_kwargs(send_data),
-                            ) as resp:
-                                text = await resp.text()
-                                resp_headers = dict(
-                                    getattr(resp, "headers", None) or {})
-                                self.requests_made += 1
-                                self._record_status(
-                                    getattr(resp, "status", 200))
-                    except (BudgetExhausted, CircuitOpen):
-                        raise
-                    except Exception:
-                        continue
-                    v = await asyncio.to_thread(verifier.verify_semantic,
-                                                text, marker,
-                                                response_headers=resp_headers)
-                    if (v["confirmed"]
-                            and verifier.payload_survived(text, variant)):
-                        idx = text.find(marker)
-                        param_confirmed = True
-                        yield Finding(
-                            url=url, method=method, param=param,
-                            context=v.get("context") or context,
-                            payload=variant,
-                            severity=_non_html_grade(resp_headers)[0],
-                            evidence=text[max(0, idx - 30):
-                                          idx + len(marker) + 30],
-                            type="reflected",
-                            confidence=_non_html_grade(resp_headers)[1],
-                            transform=tchain,
-                            param_in="body" if is_body else "query",
-                            evidence_class=EVIDENCE_MODEL,
-                        )
-                        break
 
         # Phase 211: the three tail stages below moved to
         # AsyncDetectionLayersMixin (_probe_csp_nonce / _probe_csp_gadget /

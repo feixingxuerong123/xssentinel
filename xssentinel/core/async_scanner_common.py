@@ -164,6 +164,27 @@ def _polyglot_grade(resp_headers) -> tuple[str, str]:
     return ("low", "medium") if sev == "low" else ("medium", "medium")
 
 
+class _ProbeFireState:
+    """Phase 211 round 3: out-params for ``_fire_probe_variants``.
+
+    That stage is an async generator, so it cannot hand values back with
+    ``return`` -- the caller would need StopAsyncIteration plumbing.  Three
+    values have to survive into the later stages: ``param_confirmed`` gates
+    the CSP/HPP/L7/time-based stages, ``resp_headers`` is read by the CSP
+    nonce stage, and ``text`` is read by both the nonce stage and L7.
+
+    Deliberately NOT attributes on the scanner instance: this is
+    per-parameter state and would otherwise leak into the next parameter's
+    probe (the same reason ``param_confirmed`` stayed a local).
+    """
+    __slots__ = ("text", "resp_headers", "param_confirmed")
+
+    def __init__(self, text: str = ""):
+        self.text = text
+        self.resp_headers: dict = {}
+        self.param_confirmed = False
+
+
 _log = get_logger("async_scanner")
 # JSONP callback parameter names probed by the async JSONP layer.  Kept
 # at module level so it is created once instead of per-scan.
