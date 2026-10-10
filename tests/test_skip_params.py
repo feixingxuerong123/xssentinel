@@ -61,16 +61,40 @@ def test_noise_params_never_hide_declared_page_params():
     assert NOISE_PARAMS  # the default list is non-empty
 
 
-def test_sync_probe_loop_honours_skip_params(monkeypatch):
+def test_sync_probe_loop_honours_skip_params():
+    """Phase 184 probed only the non-skipped names.  Phase 185 went further:
+    the skip set must leave the WIRE, not just the iteration list.
+
+    Before Phase 185 every request the scanner sent -- the L1 dither request
+    AND every page-level layer (DOM, JSONP, CSP, CORS, XS-Leaks) -- still
+    carried the full original query string, so a name the operator asked to
+    withhold (a session token that must not reach the target's logs) was
+    still transmitted.  Measured on a closed port: 41 requests, all of them
+    carrying the skipped param.
+
+    This test drives the real scan_endpoint against a static responder, so
+    it runs in milliseconds with no network, and it fails if any skipped
+    name appears in any request the scanner actually built.
+    """
     s = Scanner(skip_params={"Track", "csrf"})
+    req = _FakeReq()
     probed = []
-    monkeypatch.setattr(s, "_scan_param",
-                        lambda req, url, method, params, data, p, b:
-                        probed.append((p, b)))
-    s.scan_endpoint("http://t/", params={"q": "1", "Track": "2"},
-                    data={"bio": "x", "CSRF": "t"})
+
+    def spy(req_, url, method, params, data, p, b):
+        # Keep the probe inert: this test is about the wire, not detection.
+        probed.append((p, b))
+
+    s._scan_param = spy
+    s.scan_endpoint("http://target.invalid/", params={"q": "1", "Track": "2"},
+                    data={"bio": "x", "CSRF": "t"}, req=req)
+    # Phase 184 contracts (unchanged):
     assert ("q", False) in probed and ("bio", True) in probed
     assert all(str(p).lower() not in ("track", "csrf") for p, _ in probed)
+    # Phase 185 contract: nothing on the wire carries a skipped name.
+    assert req.params_seen, "expected the scanner to issue requests"
+    for name in req.params_seen:
+        assert str(name).lower() not in ("track", "csrf"), (
+            f"skipped param {name!r} still transmitted on the wire")
 
 
 def test_async_probe_loop_honours_skip_params():

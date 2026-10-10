@@ -46,9 +46,46 @@ if TYPE_CHECKING:  # only ever referenced inside annotations
 _log = get_logger("scanner.mixins")
 
 
+def _drop_skip_params(params, data, skip):
+    """Phase 185: strip operator ``--skip-param`` names from a request pair.
+
+    Phase 184 only filtered the *parameter-iteration* list (which parameter
+    gets probed).  Every request that actually left the machine still carried
+    the full query string/body -- so a value the operator asked to withhold
+    (a session token that must not reach the target's logs, a field excluded
+    for compliance) was still transmitted, by L1's dither request and by
+    every page-level layer (JSONP/CSP/CORS/advanced).
+
+    The filter runs on the **raw dict**, before any encoding.  Filtering an
+    already-encoded URL instead is not an option: round-tripping ``?q=<script>``
+    through ``parse_qsl``/``urlencode`` rewrites ``<`` as ``%3C`` and would
+    silently neuter every payload the scanner sends.
+
+    Never mutates the caller's dicts.  A missing skip set returns the same
+    objects, so the no-flag path is allocation-identical to Phase 184.
+    """
+    if not skip:
+        return params, data
+    if params:
+        params = {k: v for k, v in params.items()
+                  if str(k).lower() not in skip}
+    if data:
+        data = {k: v for k, v in data.items()
+                if str(k).lower() not in skip}
+    return params, data
+
 
 class AdvancedLayerMixin:
     """L3 DOM + L7 advanced detection methods."""
+
+    def _skip_filtered(self, params, data):
+        """``_drop_skip_params`` bound to this scanner's skip set.
+
+        Case-insensitive, matching Phase 184's normalisation in
+        ``Scanner.__init__`` (``{"track"}``, not ``{"Track"}``).
+        """
+        return _drop_skip_params(
+            params, data, getattr(self, "skip_params", None) or set())
 
     def _scan_dom(self, req, url) -> tuple[str, "requests.Response | None"]:
         """DOM-XSS layer.

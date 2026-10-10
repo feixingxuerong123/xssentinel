@@ -190,7 +190,7 @@ PASS=172  FAIL=5  SLOW=0  UNKNOWN=0   files=177
 | `test_api_ai_report.py` | FAIL | **26 passed** (23s) | 负载相关:120s 期限在压力下不够 |
 | `test_p27_api.py` | FAIL | **87 passed** (48s) | 负载相关 |
 | `test_vuln_server_concurrency.py` | FAIL | **6 passed** (5.7s) | 负载相关 |
-| `test_skip_params.py` | FAIL(97s,需人工 kill) | — | 本机 loopback 退化,见下 |
+| `test_skip_params.py` | FAIL(97s,需人工 kill) | **5 passed** (0.33s) | 本机 loopback 退化 + 扫描器合规缺陷,均已修复,见下 |
 
 新增测试文件:
 - `tests/test_circuit_breaker_transport.py` — 9 passed
@@ -209,7 +209,50 @@ connect 到已关闭的回环端口   2.05s / 2.05s / 2.05s   <-- 异常
 
 **回环端口被拒要花 2.05 秒才报出来**（正常应瞬时）。这解释了为什么
 碰死端口的用例在本机格外慢,以及 `tests/conftest.py` 为什么要用 `SOCKETPAIR_OK` 门控 53 个文件。
-`test_skip_params.py` 卡住时的线程栈同样落在 `socket.socketpair → accept`。
+
+### `test_skip_params.py` 的真实病因与修复（Phase 184/185）
+
+此前把本文件的 97s 卡死归因为 `socket.socketpair → accept`,**错**。
+用 `dev/_count_real_requests.py` 实测(替换 `HTTPAdapter.send` 计数):
+
+```
+probed: [('q', False), ('bio', True)]
+real requests: 41 in 252.70s
+first URL: http://127.0.0.1:1/?q=1          <- L1 已过滤(Phase 184)
+jsonp URL: http://127.0.0.1:1/?q=1&callback=...  <- 干净
+无 Track=2 / CSRF=t
+```
+
+**真相:41 次真实网络请求全打在已关闭的回环端口上,每次约 2.05s
+(Phase 184 之前的版本)**,合计逾 250s,与线程栈无关。
+
+真正发现的是**产品合规缺陷**,不是测试问题:
+Phase 184 只过滤了迭代列表,`_scan_jsonp`、CSP、CORS、XS-Leaks 等旁路层
+与 `_scan_param` 的探针请求仍在**线上**重放原始查询串,
+把操作员用 `--skip-param` 明确要求不外泄的名字(sessionid 之类)
+重新送了出去 —— 这正是该开关存在的意义。
+
+Phase 185 的修法(同步 / 异步各一处):
+
+- `xssentinel/core/scanner_layers.py` — `_drop_skip_params()` +
+  `AdvancedLayerMixin._skip_filtered()`,按**原始 params 字典**丢键,
+  不做 URL 字符串级剥离。`dev/_url_roundtrip_probe.py` 实测:
+  18 条 payload URL 里 13 条会被 `parse_qsl`+`urlencode` 往返改写,
+  所以字符串级方案会静默损坏 payload,已否决。
+- `xssentinel/core/scanner.py` — L1 迭代与 `_scan_param` 探针同时过滤。
+- `xssentinel/core/async_scanner_layers.py` — `_drop_skip_params()`,
+  `_scan_reflected` 绑定过滤后的参数对,供下游所有 async 旁路层使用。
+
+测试本身随后改为**完全不碰网络**(`_FakeReq` 记录实际发出的键),
+0.33s 且结果稳定。
+
+双向变异验证(证明守卫是承重的,不是装饰):
+
+| 注入变异 | 结果 |
+|---|---|
+| 同步 `_skip_filtered` 改为直接返回 | `test_sync_probe_loop_honours_skip_params` **FAIL**:`skipped param 'Track' still transmitted on the wire` |
+| 异步 `_scan_reflected` 去掉 `_drop_skip_params` 绑定 | `dev/_async_skip_leak_probe.py` **LEAKED**(157 个请求全部带 `Track`) |
+| 恢复原状 | 5 passed / clean(exit 0) |
 
 我一度以为这是浏览器进程泄漏,用 `dev/_browser_leak_probe.py` 实测排除:
 DOM sink matrix 17 例跑完 142.71s,**残留浏览器进程 0 个**。

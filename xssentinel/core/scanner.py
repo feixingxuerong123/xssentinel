@@ -449,6 +449,13 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
         if _skip:
             param_items = [(p, b) for p, b in param_items
                            if str(p).lower() not in _skip]
+            # Phase 185: the same names must leave the request itself, not
+            # just the iteration list.  Bound once here so every side layer
+            # below (upload probes, scenarios, DOM, JSONP/CSP/CORS, request
+            # layers) sees the filtered pair without editing each of them.
+            # _scan_param re-filters per request, which is the path that
+            # actually protects the dither request.
+            params, data = self._skip_filtered(params, data)
         # L1/L2/L5 over each reflected parameter (parallel when threads>1).
         if self.threads > 1 and len(param_items) > 1:
             with ThreadPoolExecutor(max_workers=self.threads) as ex:
@@ -586,9 +593,15 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
         self.coverage.record_param(url, param, in_body=is_body, method=method)
         marker = _stem_marker("xssm_") + secrets.token_hex(4)
         probe = self._set_param(params, data, param, marker, is_body)
+        # Phase 185: the probe request must not carry names the operator
+        # listed in --skip-param.  Phase 184 kept them out of the iteration
+        # list only; they still rode along in every request this scanner
+        # sent, including the dither request here and every page-level layer.
+        send_params, send_data = self._skip_filtered(
+            probe["params"], probe["data"])
         try:
-            resp = req.request(method, url, params=probe["params"],
-                               data=probe["data"])
+            resp = req.request(method, url, params=send_params,
+                               data=send_data)
             self._bump()
             self.coverage.record_request(url, method)
         except Exception as e:
