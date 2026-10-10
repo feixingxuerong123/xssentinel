@@ -1717,3 +1717,101 @@ Phase 208 那条 /r/url03 分歧的修复,**不属于本轮**)。它把 polyglot
   `param`;并钉一条"fragment 类 finding 的 `param` 必须非空或显式说明为何为空"的门。
   **记下这次纠正本身**:我原本把"没有 curl"当成缺陷,那是**拿工具的默认形状当标准** ——
   DOM 面的正确产物是 HTML PoC,先把"这条主张能造成什么行动"问清楚再写判断。
+
+## Phase 211:`_probe_param` 787 → 171(三刀)+ CLI main 728 → 627
+
+`docs/OPTIMIZATION.md` 1.4 记的是"683 行单方法",实测(拆分前)已是 **787 行**
+(`async_scanner.py:750` 起)——全库最大的单个方法,也是"新增能力进对应 Mixin"
+这条约定在方法粒度上的唯一例外。拆法不凭印象:先落**逐用例基线差分**
+(`dev/compare_baseline.py`,比对 verdict/detected/findings_count/error 与 finding
+的 type·severity·confidence·context,请求数只报告不判失败——本机墙钟与请求数会因
+安全软件抖动 8 倍),再用 `dev/probe_param_coupling.py` 按阶段统计每个名字的
+写/读,把切点量化后才动刀。
+
+| 刀 | 搬什么 | 行数 | 关键约束 |
+|---|---|---|---|
+| 1 | 自包含尾段 `_probe_csp_nonce` / `_probe_csp_gadget` / `_probe_hpp`(全被 `not param_confirmed` 门控) | 787→553 | 只 yield、不改调用方局部变量;`param_confirmed` 留在调用方 |
+| 2 | B2–B5 候选构建 → `_build_probe_candidates` | 553→439 | `marker_escaped` 被 Phase 95 画像收敛改写、`prof` 被 RCDATA 段读,都必须**回传**;B1(结构化预编码)有 yield+return 提前出口,刻意不搬 |
+| 3 | C+D+E 主 variant 循环 + concat 重试 + 位置变换 → `_fire_probe_variants` | 439→171 | 三段互相纠缠只能整体搬;`param_confirmed`/`resp_headers`/`text` 由 `_ProbeFireState` 承载回传(async generator 不能用 return 交值);状态**刻意不上 `self`**——那是每次调用的,上实例会串到下一个参数 |
+
+**round 1 搬动时抓到一个真 bug(ruff F821)**:`_probe_hpp` 的 finding 用了
+`context`,拆出去后签名漏了这个参数 → 未定义名。它是 ruff 报的,不是测试——
+那几个 CSP/HPP 测试都过不了这条路径(不发 finding 就 return)。
+**"移动代码不会引入 bug"的直觉在跨作用域搬动时是错的。**
+
+**round 3 抓到的最值钱的东西:门瞎了,但它自己不会说。** parity gate 的两个
+反证测试用 `monkeypatch.setattr(asm, "_non_html_grade", ...)` 注入已知违规,
+而 `_non_html_grade` 的调用点已随代码搬进 layers mixin ⇒ 补丁打在空处,门
+"没看见"它本该看见的违规,同文件其它用例照样绿(Phase 206"抓不到已知违规的
+门等于没有门"的搬家版)。修两点:三个命名空间都打补丁(定义处
+`async_scanner_common` + 两个导入者,少一处瞎一处);`raising=False` 让核心
+模块搬空后 setattr 不再抛 AttributeError、将来搬回去门也活得成。
+
+验收:每刀后 parity gate + quick 逐例 0 差异;round 2 全量 192
+**TP108/FP0/TN74/FN0**;round 3 验收产物 `benchmark/results/p211r3_full_async.json`
+(同数字,随提交入库)。已知非回归差异:全量 4 例请求数 ±1(本机抖动/随机
+token 分支);`pos-dom-05` 一次静态 `dom` 降级形态 = 本机 Chromium 间歇不可用
+(同代码复跑三次与基线逐位一致)。
+
+顺带:CLI `main` 728 → 627(输入面块 HAR/OpenAPI/sitemap/wayback/GraphQL →
+`_build_spec_targets`,它是 main() 里唯一真正的计算块)。
+
+**流程瑕疵记账**:Phase 185 的 async 半(`AsyncDetectionLayersMixin.
+_drop_skip_params`,实测 3 处 diff 确随 b2a8a49 进库)混进了 round 3 的提交
+——"搬代码与改逻辑绝不混在同一轮"被这一刀自己违反了;sync 半在 Phase 212
+单独提交(2c2f613),内含变异验证与离线化后的测试。
+
+## Phase 212:一次"假回归"的全套取证 —— p212 红块是测量事故,树是健康的
+
+接手时工作区留着两份未跟踪产物 `p212_full_{sync,async}.json`(10-10 18:23 后台
+启动,`run_benchmark_batched.py … 8899 sync 0 0 90`):sync **TP92/FN21**、
+async **TP33/FN75**(基线均 FN0),且**所有 FN 都是阳性、阴性全过**。上一会话为
+此建了单例重放工具 `dev/_replay_case.py`,查到 10-11 03:37 未留结论。本轮接手,
+归因三次反转,每一步都有读数:
+
+1. **第一反转:我自己最初的复现读数全部作废。** 用 `_replay_case.py` 在当前树与
+   干净 HEAD(git worktree)上都"复现"了 FN——随后发现该工具起服务器时**不装载
+   路由表**(`load_routes()` 在 `serve_until_shutdown()` 内部,裸起
+   `ThreadingHTTPServer(BenchmarkHandler)` 对所有用例 404),阳性必然全 FN、
+   阴性全 TN,形状与 p212 一模一样。它 docstring 里"the payload/reflection path
+   is dead"的结论是装置空转的假象。已修(工具内注释记录)。**探针的输出和被测
+   代码一样需要被怀疑——这次死在复现装置自己身上,同族失效的新变体。**
+2. **修正后实测:树是健康的。** 装载路由后重放:主树 sync pos-script-02 **TP
+   (59 请求,与基线逐位)**、async pos-attr-01 **TP(34 请求)**;干净 HEAD
+   worktree 同样全 TP(async 复跑 2/2)。期间一次 async 瞬时挂死(90s/0 请求)
+   复跑即愈——与 Phase 187/200/201 记录的 loopback 间歇劣化同形,按环境形态记账。
+3. **预算假说也被实测否定。** p212 的调用传了 `max_payloads 0 / max_transforms 0`
+   (非标定值;meta 块有记录,但没人读)——而 (0,0) 预算下 pos-script-02 /
+   pos-blind-01 照样 **TP**:0 预算不产生 FN 形状,预算不是成因。
+
+**p212 红块的最终归因**:该跑的调用方式非常规(端口 8899 落在 Phase 179 记录的
+Windows 保留段、预算 0/0、后台启动无 exit 留痕、无笔记无提交),红块本身在现在
+无法取证(8899 已无监听)——最大嫌疑是**当时 8899 上的服务器状态**(陈旧/外来
+实例或 Windows 双绑,流量部分打到 impostor)或当机环境抖动。**无论哪种,"代码
+回归"与"预算配置"两个假说都被实测否定,不再有需要修的代码。**
+
+**收口(本轮,标定入口实测)**:`python benchmark/runner.py`(默认端口 18777、
+并发 1、预算 14/12/90,vuln-agent 同机负载下墙钟不作数)全量 192 例:
+- sync **TP113 / FP0 / TN79 / FN0 / ERR0,f1=1.000**(691.65s,
+  `benchmark/results/p212_full_sync.json`)
+- async **TP108 / FP0 / TN74 / FN0 / ERR0,f1=1.000**(925.7s,
+  `benchmark/results/p212_full_async.json`;10 SKIP = manifest 声明 sync-only,
+  与既有基线逐项相同;`neg-escape-01` 经 1 次未应答重试后按 TN 正常计分,
+  重试机制如实记账)
+与 Phase 189 以来双引擎基线**逐项相同**。无效产物归档
+`dev/_p212_invalid_{sync,async}.json`(meta 块记录着坏配置,留作取证)。
+
+**三条新教训**:
+1. **装置缺一件小事(routes),输出与真回归不可区分** —— "全阳性 FN、阴性全过"
+   这个形状,route-less 服务器、死靶、部分 impostor 都能造出来;判定前先让装置
+   自证(本例:同一工具装上 routes 立刻 TP)。与 201 续十六"零工作量与全部通过
+   产生同一个数字"同族:**这次是"零反射与检测全灭产生同一组数字"。**
+2. **meta/预算块是读数的一部分** —— `run_benchmark_batched.py` 的 docstring 写明
+   "budget is recorded so two runs are never silently compared at different
+   budgets":契约在、没人读。**读任何跑分产物先读 meta,不是先看 verdict。**
+3. **后台跑必须有留痕** —— `_bg_sync.log` 只有 start/cmd/空 exit:跑没跑完、
+   谁启动的、什么配置全靠猜;30 分钟排障有一半花在重建现场。
+
+顺带收尾:Phase 185 WIP 随本轮提交(2c2f613,受影响测试 5 passed 0.33s +
+ruff 过);`dev/_replay_case.py` 路由装载已修;10-10 00:25 的绿色 quick 切片
+产物(`benchmark_20261010_002510.json`,async 64 例 FP0/FN0/ERROR0)补入库。
