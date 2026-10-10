@@ -811,6 +811,139 @@ def _run_ai_reset(args) -> int:
     return 0
 
 
+def _build_spec_targets(args, urls):
+    """Phase 211: turn the operator's input surface into scan targets.
+
+    HAR / OpenAPI produce SPEC targets (per-URL method, body, cookies,
+    headers -- used as per-target overrides later); sitemap / wayback
+    produce a plain URL list; GraphQL produces both a mining wordlist
+    (args.gql_params) and JSON-carrier mutation targets.
+
+    Returns a dict with ``spec_targets``, ``src_label``, ``urls`` and
+    ``err``.  ``err`` is the exit code (2) when an import failed and the
+    caller must return immediately, else None.  A dict rather than a
+    tuple because the block grew four out-values and positional returns
+    were how the original `return 2` got lost.
+    """
+    spec_targets: list = []
+    src_label = None
+
+    if getattr(args, "har", None):
+        from .core.har_import import har_to_scan_targets
+        try:
+            spec_targets = har_to_scan_targets(args.har)
+        except Exception as e:
+            _log.error("HAR import failed: %s", e)
+            return {"spec_targets": spec_targets, "src_label": src_label, "urls": urls, "err": 2}
+        src_label = f"HAR {args.har}"
+    elif getattr(args, "openapi", None):
+        from .core.openapi_import import openapi_to_scan_targets
+        try:
+            spec_targets = openapi_to_scan_targets(args.openapi)
+        except Exception as e:
+            _log.error("OpenAPI import failed: %s", e)
+            return {"spec_targets": spec_targets, "src_label": src_label, "urls": urls, "err": 2}
+        src_label = f"OpenAPI {args.openapi}"
+    elif getattr(args, "sitemap", None):
+        from .core.sitemap_import import sitemap_to_urls
+        try:
+            urls = sitemap_to_urls(args.sitemap, timeout=args.timeout)
+        except Exception as e:
+            _log.error("Sitemap import failed: %s", e)
+            return {"spec_targets": spec_targets, "src_label": src_label, "urls": urls, "err": 2}
+        if not urls:
+            _log.error("Sitemap %s expanded to zero URLs.", args.sitemap)
+            return {"spec_targets": spec_targets, "src_label": src_label, "urls": urls, "err": 2}
+        # Phase 176l parity: <loc> hosts the operator did not name are not
+        # authorizations.  Reuse the HAR/OpenAPI partition so --allow-host /
+        # --allow-any-host behave identically across imports.
+        from .core import scoping as _scoping
+        patterns = _scoping.baseline_hosts([args.sitemap],
+                                           getattr(args, "allow_host", []))
+        if not getattr(args, "allow_any_host", False):
+            wrapped, dropped = _scoping.partition_by_scope(
+                [{"url": u} for u in urls], patterns)
+            if dropped:
+                hosts = sorted({d.get("host") or "?" for d in dropped})
+                print("\n[!] %d sitemap URL(s) are OUTSIDE the sitemap's "
+                      "host and were not imported. Hosts: " % len(dropped)
+                      + ", ".join(hosts[:12]), file=sys.stderr)
+            urls = [t["url"] for t in wrapped]
+            if not urls:
+                _log.error("Every sitemap URL was out of scope; nothing to"
+                           " scan. Re-run with --allow-host.")
+                return {"spec_targets": spec_targets, "src_label": src_label, "urls": urls, "err": 2}
+        print(f"[*] Sitemap {args.sitemap}: {len(urls)} URL(s) imported")
+    elif getattr(args, "wayback", None):
+        from .core.wayback_import import wayback_to_urls, normalize_target
+        try:
+            urls = wayback_to_urls(args.wayback, timeout=max(args.timeout, 30))
+        except Exception as e:
+            _log.error("Wayback import failed: %s", e)
+            return {"spec_targets": spec_targets, "src_label": src_label, "urls": urls, "err": 2}
+        if not urls:
+            _log.error("Wayback %s expanded to zero URLs.", args.wayback)
+            return {"spec_targets": spec_targets, "src_label": src_label, "urls": urls, "err": 2}
+        # The archive covers the whole web; the operator named ONE host.
+        # Same partition as the sitemap import -- --allow-host /
+        # --allow-any-host behave identically across all imports.
+        from .core import scoping as _scoping
+        patterns = _scoping.baseline_hosts([normalize_target(args.wayback)],
+                                           getattr(args, "allow_host", []))
+        if not getattr(args, "allow_any_host", False):
+            wrapped, dropped = _scoping.partition_by_scope(
+                [{"url": u} for u in urls], patterns)
+            if dropped:
+                hosts = sorted({d.get("host") or "?" for d in dropped})
+                print("\n[!] %d wayback URL(s) are OUTSIDE the named host"
+                      " and were not imported. Hosts: " % len(dropped)
+                      + ", ".join(hosts[:12]), file=sys.stderr)
+            urls = [t["url"] for t in wrapped]
+            if not urls:
+                _log.error("Every wayback URL was out of scope; nothing to"
+                           " scan. Re-run with --allow-host.")
+                return {"spec_targets": spec_targets, "src_label": src_label, "urls": urls, "err": 2}
+        print(f"[*] Wayback {args.wayback}: {len(urls)} URL(s) imported")
+    elif getattr(args, "gql", None):
+        from .core.gql_import import gql_param_candidates,             gql_mutation_targets
+        try:
+            gql_names = gql_param_candidates(args.gql,
+                                             timeout=max(args.timeout, 15))
+        except Exception as e:
+            _log.error("GraphQL introspection failed: %s", e)
+            return {"spec_targets": spec_targets, "src_label": src_label, "urls": urls, "err": 2}
+        if not gql_names:
+            _log.error("GraphQL %s exposed zero usable parameter names.",
+                       args.gql)
+            return {"spec_targets": spec_targets, "src_label": src_label, "urls": urls, "err": 2}
+        # The names ride args into the scan setup, where they merge into
+        # the param-mining wordlist; the endpoint itself is the target.
+        args.gql_params = gql_names
+        # Phase 204: one JSON-carrier target per string-arg mutation --
+        # the variables object is a plain JSON document, so the scanner's
+        # existing leaf probing (json_leaf_paths / _set_json_leaf) injects
+        # the full payload ladder into every String/ID argument.  The
+        # first spec reproduces the plain-GET mining pass.
+        try:
+            mutation_specs = gql_mutation_targets(
+                args.gql, timeout=max(args.timeout, 15))
+        except Exception as e:
+            _log.warning("GraphQL mutation targets failed (continuing "
+                         "with the mining pass): %s", e)
+            mutation_specs = []
+        spec_targets = [
+            {"url": args.gql, "method": "GET", "data": "",
+             "cookies": [], "headers": []}
+        ] + mutation_specs
+        urls = [t["url"] for t in spec_targets]
+        print(f"[*] GraphQL {args.gql}: {len(gql_names)} parameter name(s) "
+              f"into the mining wordlist + {len(mutation_specs)} mutation "
+              f"target(s) (JSON-carrier probing)")
+
+    return {"spec_targets": spec_targets, "src_label": src_label,
+            "urls": urls, "err": None}
+
+
 def main(argv=None):
     ap = build_parser()
     args = ap.parse_args(argv)
@@ -961,117 +1094,16 @@ def main(argv=None):
     # method/data/cookie per URL, so they are kept separate from the
     # plain-URL list.
     spec_targets: list[dict] = []
-    if getattr(args, "har", None):
-        from .core.har_import import har_to_scan_targets
-        try:
-            spec_targets = har_to_scan_targets(args.har)
-        except Exception as e:
-            _log.error("HAR import failed: %s", e)
-            return 2
-        src_label = f"HAR {args.har}"
-    elif getattr(args, "openapi", None):
-        from .core.openapi_import import openapi_to_scan_targets
-        try:
-            spec_targets = openapi_to_scan_targets(args.openapi)
-        except Exception as e:
-            _log.error("OpenAPI import failed: %s", e)
-            return 2
-        src_label = f"OpenAPI {args.openapi}"
-    elif getattr(args, "sitemap", None):
-        from .core.sitemap_import import sitemap_to_urls
-        try:
-            urls = sitemap_to_urls(args.sitemap, timeout=args.timeout)
-        except Exception as e:
-            _log.error("Sitemap import failed: %s", e)
-            return 2
-        if not urls:
-            _log.error("Sitemap %s expanded to zero URLs.", args.sitemap)
-            return 2
-        # Phase 176l parity: <loc> hosts the operator did not name are not
-        # authorizations.  Reuse the HAR/OpenAPI partition so --allow-host /
-        # --allow-any-host behave identically across imports.
-        from .core import scoping as _scoping
-        patterns = _scoping.baseline_hosts([args.sitemap],
-                                           getattr(args, "allow_host", []))
-        if not getattr(args, "allow_any_host", False):
-            wrapped, dropped = _scoping.partition_by_scope(
-                [{"url": u} for u in urls], patterns)
-            if dropped:
-                hosts = sorted({d.get("host") or "?" for d in dropped})
-                print("\n[!] %d sitemap URL(s) are OUTSIDE the sitemap's "
-                      "host and were not imported. Hosts: " % len(dropped)
-                      + ", ".join(hosts[:12]), file=sys.stderr)
-            urls = [t["url"] for t in wrapped]
-            if not urls:
-                _log.error("Every sitemap URL was out of scope; nothing to"
-                           " scan. Re-run with --allow-host.")
-                return 2
-        print(f"[*] Sitemap {args.sitemap}: {len(urls)} URL(s) imported")
-    elif getattr(args, "wayback", None):
-        from .core.wayback_import import wayback_to_urls, normalize_target
-        try:
-            urls = wayback_to_urls(args.wayback, timeout=max(args.timeout, 30))
-        except Exception as e:
-            _log.error("Wayback import failed: %s", e)
-            return 2
-        if not urls:
-            _log.error("Wayback %s expanded to zero URLs.", args.wayback)
-            return 2
-        # The archive covers the whole web; the operator named ONE host.
-        # Same partition as the sitemap import -- --allow-host /
-        # --allow-any-host behave identically across all imports.
-        from .core import scoping as _scoping
-        patterns = _scoping.baseline_hosts([normalize_target(args.wayback)],
-                                           getattr(args, "allow_host", []))
-        if not getattr(args, "allow_any_host", False):
-            wrapped, dropped = _scoping.partition_by_scope(
-                [{"url": u} for u in urls], patterns)
-            if dropped:
-                hosts = sorted({d.get("host") or "?" for d in dropped})
-                print("\n[!] %d wayback URL(s) are OUTSIDE the named host"
-                      " and were not imported. Hosts: " % len(dropped)
-                      + ", ".join(hosts[:12]), file=sys.stderr)
-            urls = [t["url"] for t in wrapped]
-            if not urls:
-                _log.error("Every wayback URL was out of scope; nothing to"
-                           " scan. Re-run with --allow-host.")
-                return 2
-        print(f"[*] Wayback {args.wayback}: {len(urls)} URL(s) imported")
-    elif getattr(args, "gql", None):
-        from .core.gql_import import gql_param_candidates,             gql_mutation_targets
-        try:
-            gql_names = gql_param_candidates(args.gql,
-                                             timeout=max(args.timeout, 15))
-        except Exception as e:
-            _log.error("GraphQL introspection failed: %s", e)
-            return 2
-        if not gql_names:
-            _log.error("GraphQL %s exposed zero usable parameter names.",
-                       args.gql)
-            return 2
-        # The names ride args into the scan setup, where they merge into
-        # the param-mining wordlist; the endpoint itself is the target.
-        args.gql_params = gql_names
-        # Phase 204: one JSON-carrier target per string-arg mutation --
-        # the variables object is a plain JSON document, so the scanner's
-        # existing leaf probing (json_leaf_paths / _set_json_leaf) injects
-        # the full payload ladder into every String/ID argument.  The
-        # first spec reproduces the plain-GET mining pass.
-        try:
-            mutation_specs = gql_mutation_targets(
-                args.gql, timeout=max(args.timeout, 15))
-        except Exception as e:
-            _log.warning("GraphQL mutation targets failed (continuing "
-                         "with the mining pass): %s", e)
-            mutation_specs = []
-        spec_targets = [
-            {"url": args.gql, "method": "GET", "data": "",
-             "cookies": [], "headers": []}
-        ] + mutation_specs
-        urls = [t["url"] for t in spec_targets]
-        print(f"[*] GraphQL {args.gql}: {len(gql_names)} parameter name(s) "
-              f"into the mining wordlist + {len(mutation_specs)} mutation "
-              f"target(s) (JSON-carrier probing)")
+    # Phase 211: the import surface (HAR / OpenAPI / sitemap / wayback /
+    # GraphQL) moved to _build_spec_targets.  err is an exit code the caller
+    # must return as-is.
+    built = _build_spec_targets(args, urls)
+    if built["err"]:
+        return built["err"]
+    spec_targets = built["spec_targets"]
+    src_label = built["src_label"]
+    urls = built["urls"]
+
     if spec_targets:
         urls = [t["url"] for t in spec_targets]
         print(f"[*] {src_label}: {len(spec_targets)} endpoint(s) imported")
