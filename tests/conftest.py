@@ -225,3 +225,61 @@ def _isolate_event_loop(request):
     if leaked_before:
         pytest.skip(
             "a previous test left a running event loop in this thread")
+
+
+# ---------------------------------------------------------------------------
+# Logging isolation  (Phase 221c)
+# ---------------------------------------------------------------------------
+#
+# Same failure SHAPE as the loop leak above, different mechanism, and it is
+# the one that survived two full-suite runs because it reproduces only in
+# a long session.
+#
+# `xssentinel.core.logger.configure_logging()` sets the level on the NAMED
+# `xssentinel` logger and installs a StreamHandler on it, and nothing ever
+# puts it back.  Any test that drives `__main__.main()` in-process with
+# `--log-level error` therefore leaves `xssentinel` at ERROR for the rest
+# of the session.  pytest's caplog installs its handler on the ROOT logger
+# and at_level() sets the ROOT level -- but a named logger's OWN level wins
+# over root's -- so every later caplog assertion collects nothing and fails
+# with a message that reads like a product bug:
+#
+#   tests/test_layer_guard.py:65  "wiring error was not escalated to WARNING"
+#
+# Reproduced in 6 seconds (vs 40-66 minutes to notice it in a full run):
+#
+#   pytest tests/test_completeness_gate_robust.py tests/test_layer_guard.py
+#   -> 3 failed, 12 passed
+#
+# The 73-file alphabetical bisect missed it because the poisoning file is
+# `test_completeness_gate_robust.py`, whose own name sorts BEFORE the guard
+# file but whose *content* is what matters.
+#
+# Fix: snapshot the logger's level + handlers around every test and restore
+# them, so a test that configures logging cannot decide the outcome of one
+# that asserts on it.
+
+@pytest.fixture(autouse=True)
+def _isolate_logging():
+    """Undo any logging configuration a test performs.
+
+    Scope note: only the ``xssentinel`` logger is restored, not the root.
+    pytest itself owns root handlers (caplog lives there), and rewriting
+    root mid-session is how you break the framework's own reporting.
+    """
+    import logging
+    from xssentinel.core import logger as _logger_mod
+
+    xs = logging.getLogger("xssentinel")
+    saved_level = xs.level
+    saved_handlers = list(xs.handlers)
+    saved_configured = _logger_mod._configured
+    yield
+    for h in list(xs.handlers):
+        if h not in saved_handlers:
+            xs.removeHandler(h)
+    for h in saved_handlers:
+        if h not in xs.handlers:
+            xs.addHandler(h)
+    xs.setLevel(saved_level)
+    _logger_mod._configured = saved_configured
