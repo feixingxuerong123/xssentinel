@@ -2330,10 +2330,10 @@ query 那条**只因为 `_record` 附了 proof 才逃过帽** —— 帽按设�
 不变量**:"声称 high 就必须带可核对凭据"。这条**比原来更严**,且由 218
 自己的门(`test_phase218_evidence_cap.py`)独立守着。
 
-### 记账:剩下的 8 个是全树同跑才现的顺序/负载依赖,未修
+### 记账:8 个里的 3 个 —— 日志状态污染(Phase 221c,已定因已修)
 
 收尾跑全量两次,失败数 11 → 8(修掉的正是上面 4 个根因)。剩下的 8 个
-**每个文件单独跑全绿**,是 40–66 分钟长跑里才现的:
+**每个文件单独跑全绿**,只在 40–66 分钟长跑里现。其中 3 个已定因:
 
 | 文件 | 单独跑 | 全量里 |
 |---|---|---|
@@ -2342,24 +2342,44 @@ query 那条**只因为 `_record` 附了 proof 才逃过帽** —— 帽按设�
 | `test_scenarios.py` | 7 passed / 22.76s | 2 failed |
 | `test_vuln_server_concurrency.py` | 6 passed / 5.28s | 1 failed |
 
-已排除的假设与量到的证据:
+**复现只要 6 秒**(而全量里要 40–66 分钟才认出来):
 
-* **不是跨文件污染**:`dev/_bisect_poison.py` 按字母序逐个加前缀复跑
-  73 个文件(guard 单独绿才开走),**全程没有一个前缀能把它点红**;
-* **不是日志状态**:grep 全树无任何测试动 `setLevel`/`addHandler`/
-  `basicConfig`;`dev/_logging_state_probe.py` 量到 root=WARNING、
-  无 handler、`xssentinel` logger propagate=True/level=NOTSET —— 干净;
-* **不是 loop 泄漏**:`conftest._isolate_event_loop` 会把"进来时已有
-  loop"判成 **skip 而非 fail**,而我们看到的是 FAILED ⇒ 泄漏发生在
-  这些用例**自己内部**,不是被上一个用例连累;
-* **不是我方改动**:`git stash -u` 清干净树后同组合复跑绿(见上)。
+```
+pytest tests/test_completeness_gate_robust.py tests/test_layer_guard.py
+-> 3 failed, 12 passed
+```
 
-**未定性的一手观测**:连跑 6 遍 `test_layer_guard.py`,前两遍 0.23s 绿,
-第三遍**挂住**(pytest 不退出,已强杀)。这与"长跑后期资源/时序退化"
-一致,但**不足以定因** —— 本轮不猜。留给下一轮的抓手是
-`_isolate_event_loop` 的 `[loop-leak]` stderr 行:下一次全量跑请**保留
-stderr**(本轮的 `Out-File` 把它吞了,这是本轮最大的取证失误),它会
-点名是哪个用例漏了 loop。
+根因:`xssentinel.core.logger.configure_logging()` 把 level 设到**具名**
+的 `xssentinel` logger 上(`logger.py:59` 取的是
+`logging.getLogger(_ROOT_NAME)`),还给它挂一个 StreamHandler,而
+`_configured` 这个模块级全局**没有任何东西复位**。
+`test_completeness_gate_robust.py` 用 `--log-level error` **进程内**驱动
+`__main__.main()`,于是整场会话的 `xssentinel` 都被留在 ERROR。
+
+pytest 的 `caplog` 把手挂在 **root** 上、`at_level()` 设的也是 **root**
+的 level —— 但**具名 logger 自己的 level 优先于 root**。于是后面每一个
+caplog 断言都收到 0 条记录,失败信息看起来像产品 bug:
+
+```
+test_layer_guard.py:65  "wiring error was not escalated to WARNING"
+```
+
+**与已有的 loop 泄漏同形不同因**,也正因如此 `conftest` 那个 fixture 救不了:
+漏 loop 会变成 **skip**,这个变成 **fail**。
+
+**为什么前面的 bisect 漏了它**:`dev/_bisect_poison.py` 按字母序走了 73 个
+前缀全没点红 —— 下毒文件是 `test_completeness_gate_robust.py`,字母序确实
+在 `test_layer_guard.py` 之前,但**按文件名排序不等于按行为排序**。
+(同轮记的两条自我更正:①"不是日志状态"这条结论是错的 —— grep 只搜了
+`tests/`,漏了 `xssentinel/core/logger.py` 这个真正的动手方;②第一次写
+`_suite_keep_stderr.py` 用 `subprocess.PIPE` 缓冲到退出,结果一个跑了
+2 小时不得不杀的会话把 stderr 全丢了 —— 改成直接落盘。)
+
+**修法**:conftest 加 autouse `_isolate_logging`,每个用例前后快照并还原
+`xssentinel` logger 的 level / handlers 与 `logger._configured`;
+**只碰 `xssentinel`,绝不碰 root**(root 的 handler 归 pytest,caplog 就
+住在那里)。变异验证:关掉还原 → 精确复现 3 个失败;打开 → 15 passed /
+0.31s。
 
 ### 本轮保留的取证工具(`dev/`,gitignore 内)
 
@@ -2369,6 +2389,9 @@ stderr**(本轮的 `Out-File` 把它吞了,这是本轮最大的取证失误),�
 | `_severity_shape_probe.py` | 打印真实端点上 finding 的 evidence 形状(证帽按设计工作) |
 | `_polyglot_shape_probe.py` | 同上,走 scripted session(证 198 的 medium 默认值) |
 | `_logging_state_probe.py` | 打印 root/包 logger 的 level/handler/propagate |
+| `_caplog_state_probe.py` | 证明两条能让 caplog 收不到记录的机制(`disable()` / 具名 level) |
+| `_p23_poison_probe.py` | 无 pytest 复现 `configure_logging` 如何废掉 caplog |
+| `_suite_keep_stderr.py` | 全量跑,**stdout/stderr 直落盘**(被杀也不丢证据) |
 | `_replay_case.py` | 单例复现(走 benchmark 自己的 server,**含 load_routes**) |
 
 最后一条是本轮最贵的一课:**它第一版漏了
