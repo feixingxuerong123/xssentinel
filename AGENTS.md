@@ -2281,3 +2281,57 @@ kill 的 benchmark 跑分留下的 `vuln_server.py` 进程仍占着 **8899**:
 FAIL。另三个测试覆盖目录缺失与 listdir/unlink 的 TOCTOU 竞态。
 
 `benchmark/results/` :252 → 0 个 tmp,12.15 MB → 10.65 MB。
+
+## Phase 221b:全量套件跑出的四个真问题 —— 一个搬漏的再导出 + 三份过期契约
+
+跑完全量(177 文件 → **3135 passed / 11 failed / 39min**)。11 个失败里
+8 个是**全树同跑才现**的,3 个单独跑就红。四类根因,没有一类是"环境"。
+
+### 1. `async_scanner.dom_engine_mod` 搬漏了(唯一的真产品缺陷)
+
+Phase 211 把 Phase 65 的 dom_engine 导入搬进 `async_scanner_layers`,
+**名字一起删掉了**。两个测试按路径 patch 它
+(`test_async_deep.py:377`、`test_async_wiring.py:353`),于是分别以
+`ModuleNotFoundError` 与 `AttributeError` 死掉。**搬代码漏掉再导出,
+症状就是这个样子** —— 与 Phase 191 记的 `_EGRESS_JAR` 同形,那条注记
+已经在文件里,这次漏的是另一条。
+
+补回别名时只补**名字**:层代码继续用 `async_scanner_layers` 自己的
+绑定,否则 patch 这个别名会"改到一份没人读的副本"(同一坑)。
+变异:别名改回原名 → 精确复现 ModuleNotFoundError。
+
+### 2-4. 三份写在 Phase 198/208b/218 之前、之后再没跑过的契约
+
+**关键在于每一条都先量了形状再改断言**(否则就是把红改绿):
+
+| 断言 | 真相 | 量法 |
+|---|---|---|
+| `type == "reflected"` | 208b 起双引擎都发 `polyglot_reflection` | 读 `scanner_layers.py:774` |
+| `confidence == "high"` | **198 起**每个 polyglot 就是 medium | `scanner_layers.py:781` |
+| `header_xss` severity high | 218 帽:无浏览器证据无 proof ⇒ medium | `dev/_severity_shape_probe.py` |
+
+第二个尤其值得记:`confidence="medium"` 是 198 给 polyglot 定的**默认
+值**,两台引擎一致,所以这条断言从落成起就没为真过 —— 不是被谁改坏的,
+是**从写下那天起就在断言一个不存在的行为**。
+
+帽那三条(sync 的 header/cookie/path + async 的 header)的量法相同,形状
+完全一致:
+
+```
+/api/search?term=probe  reflected   proof=True   severity=high
+/api/reflect            header_xss   proof=False  severity=medium
+/api/cookie             cookie_xss   proof=False  severity=medium
+                        三者 evidence_class=browser-unavailable
+```
+
+query 那条**只因为 `_record` 附了 proof 才逃过帽** —— 帽按设计工作。
+
+改法不是把 severity 断言删掉(那是把门放松),而是**把它换成 1.5-① 的
+不变量**:"声称 high 就必须带可核对凭据"。这条**比原来更严**,且由 218
+自己的门(`test_phase218_evidence_cap.py`)独立守着。
+
+### 记账:不是我们的锅的一个
+
+`test_range5` 的真实浏览器用例是 flake:单独跑 6/6,与别的文件同跑就红。
+`git stash -u` 清干净树后同组合复跑 **17 passed / 93s** —— 排除我方改动,
+未修,记为浏览器时序 flake。
