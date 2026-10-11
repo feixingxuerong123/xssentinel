@@ -26,6 +26,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
 from xssentinel.core import async_scanner as ASYNC  # noqa: E402
+from xssentinel.core import dom_engine  # noqa: E402  (definition site, see below)
 # Phase 191: the async engine is no longer one file.  A guard that kept reading
 # only async_scanner.py would silently lose every layer call site that moved --
 # the very failure mode this file exists to close -- so the engine's files are
@@ -350,9 +351,17 @@ def test_dom_browser_is_pointed_at_a_url_that_carries_the_params(monkeypatch):
 
     sc = _bare_scanner()
     sc._resolve_dom_engine = lambda: _FakeEngine()
-    monkeypatch.setattr(ASYNC.dom_engine_mod, "page_has_client_js",
+    # Patch the DEFINITION site, not an importer: the Phase 211 split moved
+    # the `dom_engine_mod` binding out of async_scanner into
+    # async_scanner_layers, and this test kept patching the old holder --
+    # AttributeError ever since (a blind window from 2026-10-10 01:48 to
+    # 2026-10-11: the name stopped existing where the patch pointed, which
+    # is the round-3 parity-gate lesson wearing a different hat).  The call
+    # site reads the attribute off the module OBJECT at call time, so the
+    # definition site covers every importer.
+    monkeypatch.setattr(dom_engine, "page_has_client_js",
                         lambda t: True, raising=False)
-    monkeypatch.setattr(ASYNC.dom_engine_mod, "page_can_run_sink",
+    monkeypatch.setattr(dom_engine, "page_can_run_sink",
                         lambda t: True, raising=False)
 
     asyncio.run(_drain(sc._scan_dom_async("http://h/p", "<html><script>x"

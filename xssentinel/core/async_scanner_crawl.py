@@ -315,10 +315,22 @@ class AsyncCrawlMixin:
         # because the same URL reached with different fields is a different
         # target -- and the bare form action is already in `visited`.
         mined_seen: set[tuple] = set()
-        queue: deque[tuple[str, int]] = deque([(start_url, 0)])
+        # Phase 214: queue entries carry the delivery params and WHERE the
+        # entry came from.  The seed must not be page-layered again at pop
+        # time (the main loop already ran the full pipeline on it -- sync
+        # parity: scanner_crawl registers the start URL as endpoints[0]
+        # precisely so it is not scanned twice).
+        queue: deque[tuple[str, int, dict, str]] = deque(
+            [(start_url, 0, {}, "seed")])
         while queue:
-            current_url, depth = queue.popleft()
-            if depth >= self.crawl_depth:
+            current_url, depth, pop_params, origin = queue.popleft()
+            # Phase 214: only the SEED keeps the old depth short-circuit (the
+            # main loop already ran the full pipeline on it; with
+            # crawl_depth=0 the crawl adds nothing).  LINK entries at max
+            # depth are now fetched and page-layered -- before this phase
+            # they were never fetched at all and only ever got the
+            # discovery-time reflection probe.
+            if origin == "seed" and depth >= self.crawl_depth:
                 continue
             # Fetch the page (or reuse start_text for the seed).
             if current_url == start_url:
@@ -339,29 +351,70 @@ class AsyncCrawlMixin:
                 except Exception as e:
                     _log.debug("crawl fetch failed for %s: %s", current_url, e)
                     continue
+            # Phase 214: page-level layers for LINK-discovered endpoints, at
+            # the point where the page's OWN text is in hand.  At discovery
+            # time only the parent's text exists -- analyzing that would be
+            # static analysis of the wrong page -- but at pop time the
+            # endpoint has just been fetched for link extraction anyway, so
+            # the layers cost zero extra fetches (sync parity: every
+            # registered endpoint gets the full scan_endpoint stack,
+            # including the browser DOM layer).  The 2.1.1 record: before
+            # this, a linked page with a DOM sink was invisible to --async,
+            # whatever the marker reached through.  Fragment-bearing links
+            # stay reflected-only here: fragment ROUTES get the DOM layer at
+            # mining time (Phase 209), and a fragment ANCHOR's route page is
+            # the same render.
+            if (origin == "link" and self.advanced_layers
+                    and not urlparse(current_url).fragment):
+                # De-parameterised URL + params dict, the shape scanner_crawl
+                # registers for sync.  This is a WIRE-SHAPE contract, not a
+                # delivery one (measured, mutation M2, 2026-10-11): handing
+                # the browser ``/sink?v=1`` plus ``params={"v": ...}`` does
+                # NOT lose the marker -- the engine's own named probes
+                # re-mark EVERY matching key (``_with_param_value`` assigns
+                # each ``k == name`` in the pair list), so even the merged
+                # ``?v=1&v=xss`` fires the sink.  What the bare URL buys is
+                # that the navigation carries one clean copy of the query
+                # instead of a doubled one.
+                bare_url = current_url.split("?", 1)[0]
+                async for finding in self._scan_dom_async(
+                        bare_url, text, "GET", pop_params):
+                    yield finding
+                async for finding in self._scan_advanced_page(
+                        bare_url, text, pop_params):
+                    yield finding
+            # Phase 214: extraction and mining stay depth-bounded exactly as
+            # before -- a max-depth LINK entry was fetched for its OWN page
+            # layers above, but contributes no child frontier.
+            if depth >= self.crawl_depth:
+                continue
             # Extract links (CPU-bound) -- run in thread.
             links = await asyncio.to_thread(_extract_links, text, current_url)
             for link in links:
                 if link in visited:
                     continue
                 visited.add(link)
-                queue.append((link, depth + 1))
                 # Scan the discovered endpoint for reflected XSS.  Phase 46:
                 # a link carrying query params (?q=hi&debug=1) is scanned as
                 # a GET endpoint with those params in the params dict and the
                 # URL de-parameterised -- the old call passed ({}, {}) so the
                 # query never reached the reflection probe and every crawled
                 # query-param endpoint was silently skipped (sync crawler
-                # parity: scanner_crawl.py).
+                # parity: scanner_crawl.py).  Phase 214: the same params ride
+                # the queue so the pop-time page layers (below) see the
+                # delivery shape too; the queue keeps the FULL link, exactly
+                # as before.
                 cparams: dict = {}
+                scan_url = link
                 if "?" in link:
                     fu = urlparse(link)
                     q = link.split("?", 1)[1]
                     cparams = {k.split("=")[0]: "xss"
                                for k in q.split("&") if k}
-                    link = urljoin(link, fu.path or "/")
+                    scan_url = urljoin(link, fu.path or "/")
+                queue.append((link, depth + 1, cparams, "link"))
                 async for finding in self._scan_reflected(
-                        session, link, "GET", cparams, {}, text):
+                        session, scan_url, "GET", cparams, {}, text):
                     yield finding
 
             # Phase 176s: form + JS mining, in addition to <a href> links.

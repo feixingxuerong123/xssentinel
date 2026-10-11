@@ -1874,3 +1874,71 @@ ruff 零告警。**未跑**:全量 192 例矩阵与 parity DOM 切片 —— 判
 命中 —— 若页面"任意参数都进 sink",通用 `__xss__` 探针(排在命名 swap 之前)
 先命中,finding 的 param 就是 `__xss__` 而非具体键。这是诚实形状("证明了
 任意键可行"),命名优先排序是另一处行为变更,本轮不做。
+
+### Phase 213 续:全量矩阵复测(切片之外的确认)
+
+全量 192 例双引擎(标定入口):sync **TP113/FP0/TN79/FN0/ERR0**(882.2s)、
+async **TP108/FP0/FN0/ERR0**(1135.4s,10 SKIP;`aux-s-formecho01` 三次尝试
+均 90s 超时计 ERROR —— 同机 vuln-agent 负载形态,**单例复跑 TN/1.06s/49 请求,
+不复现**,按既有惯例归因环境)。dom 用例 findings_count 逐位不变(去重
+param 盲性的全量实证)。切片绿灯至此升级为全量绿灯,Phase 213 记账里的
+"未跑"清零。
+
+## Phase 214:async 爬到的非 fragment 链接端点补页层(2.1.1 的主体落地)
+
+Phase 209 记的 2.1.1:async `_crawl_and_scan` 对爬到的端点只跑反射探针 ——
+fragment 路由那支已在 209 接了 DOM 层,但**普通链接页**上有 DOM sink 时,
+async 全程不可见,而 sync 对每个注册端点跑完整 `scan_endpoint`(含浏览器
+DOM 层)。本轮把链接端点的页层接上,**接线点是出队后**:发现时只有父页的
+text(对它做静态分析是分析错页),出队时端点刚为自己的子链接提取被抓取过,
+层调用零额外抓取(sync 对等:sync 爬虫在 `depth <= crawl_depth` 抓取并注册
+每个页面)。
+
+四处改动,全部在 `_crawl_and_scan`:
+1. 队列元素带 `(url, depth, params, origin)` —— origin 区分 seed/link;
+2. **出队层块**(origin=link、`advanced_layers`、非 fragment):接
+   `_scan_dom_async` + `_scan_advanced_page`;
+3. **种子不重扫**:主循环已对起始 URL 跑过全管线(sync 对等:scanner_crawl
+   把种子登记为 endpoints[0] 正是为了不扫两次);行为门断言种子页恰好
+   1 条 dom_dynamic;
+4. 深度语义重排:最大深度的**链接条目现在会被抓取并分层**(此前它们从不
+   被抓取,只吃过发现时的一次反射探针),子链接提取与挖矿保持
+   `depth < crawl_depth` 原边界 —— 抓取集与 sync 对齐,前沿不扩。
+
+**被变异对照纠正的一次错误论证(M2,记全过程)**:层 URL 我刻意去参
+(`bare_url = current_url.split("?", 1)[0]`),第一版注释声称不这样做
+"marker 永远到不了"(引 scanner_crawl 对反射探针的 merged-query 教训)。
+**变异 M2(去掉去参)没变红** —— 读数推翻理由:DOM 引擎自己的命名 swap
+探针会把**每个**同名键都重打成 marker(`_with_param_value` 对 pairs 里每个
+`k == name` 赋值),`?v=1&v=xss` 被修成 `?v=MK&v=MK`,sink 照样点火。
+bare_url 的真实理由是**线上只发一份干净的 query + 与 sync 注册形状对齐**
+—— 是 wire 形状契约,不是投递契约,由 AST 静态守卫钉住;注释已按实测
+重写。"守卫声称防 A 实际测 B"这一族的新变体:**这次是理由错了、守卫没
+错 —— 变异对照的职责是暴露前者,而不是逼后者存在。**
+
+**门(`tests/test_phase214_crawl_page_layers.py`,5 例)**:AST 接线守卫
+(`_crawl_and_scan` 体内必须有 `_scan_dom_async`/`_scan_advanced_page`/
+`_scan_reflected` 调用 + seed/link 常量 + 去参形状);真 Chromium 双引擎
+行为门 —— `/` 链到 `/sink?v=1`(读 `?v=` 进 innerHTML):async 现在**必须**
+在 /sink 上给出 browser-executed 的 dom_dynamic(214 之前为 0),种子页
+**恰好 1 条**(出队层块不得重扫种子);textContent 安全孪生双引擎沉默。
+**变异 M1(层块禁用)/M2(种子并入层块)全承重**,逐字节还原。
+
+**顺带结清一笔 211 的瞎窗账**:`test_async_wiring` 的
+"DOM 浏览器必须看到注入参数"守卫自 Phase 211 round 1(7f45aed,10-10
+01:48)起就 AttributeError —— 它往 `async_scanner.dom_engine_mod` 上打
+补丁,而该名字随拆分搬去了 `async_scanner_layers`(HEAD 零处引用,实测
+归属)。211 的四件套验收不含它,红了两轮没人看见 —— round 3"搬家把
+parity 门搬瞎"的同族,换了顶帽子。修法按 round 3 的正解:补丁打**定义
+处**(`dom_engine.page_has_client_js`/`page_can_run_sink`,调用点经模块
+对象取属性,定义处覆盖所有导入者)。**教训入册:移动名字的提交,验收面
+必须包含所有 patch 该名字的测试 —— grep 名字,不是 grep 文件。**
+
+**回归**:phase209 全家(splice/AST/真浏览器)+ async wiring + 层记账 +
+证据覆盖 **36 passed**;214 门 5 例 + 变异对照;ruff 零告警。benchmark
+矩阵不受影响(manifest 用例不开 crawl,变更代码路径结构性不可达 —— 按
+"改动面>切片"纪律如实记,不跑 slices)。**仍留记账(2.1.1 的剩余)**:
+mined 非 fragment 端点(form action / JS 挖出)仍只跑反射层 —— 给它们
+接层需要自己的抓取预算决策;爬到端点的 CSP/JSONP/CORS/L8 层未接(需要
+把爬取 fetch 的 resp_headers 管道化);fragment 锚点链接(`a#frag`)出队
+仍不分层(209 的挖矿分支已覆盖路由页)。
