@@ -229,9 +229,26 @@ class TestIndependentTarget(unittest.TestCase):
     # run whose only finding was a low-confidence polyglot note.  Each
     # positive now also names the finding TYPE that legitimately confirms
     # that shape (sets, not single values: several layers may honestly
-    # claim the same reflection) plus high severity + confidence -- the
-    # signature of a confirmed finding rather than a noted one.
-
+    # claim the same reflection) plus high CONFIDENCE -- the signature of a
+    # confirmed detection rather than a noted one.
+    #
+    # Phase 221: severity is no longer part of that signature.  Phase 218's
+    # evidence-shape cap (`findings.cap_unverified_severity`) demotes a
+    # high/critical claim to medium when it carries neither browser
+    # execution nor a verifiable proof, and these three layers attach
+    # neither -- measured with dev/_severity_shape_probe.py:
+    #
+    #   /api/search?term=probe  reflected   proof=True   severity=high
+    #   /api/reflect            header_xss   proof=False  severity=medium
+    #   /api/cookie             cookie_xss   proof=False  severity=medium
+    #
+    # all three `evidence_class=browser-unavailable`, and the query case
+    # escapes the cap ONLY because `_record` attaches a proof.  So the cap
+    # is behaving as specified and this contract was the stale half: the
+    # test's job is "did the scanner find it", which the cap does not
+    # change (high/medium/critical all count as detected).  Asserting the
+    # evidence SHAPE instead of the severity letter keeps that job honest
+    # -- a finding may not claim high while carrying nothing checkable.
     _TYPES = {
         "query": {"reflected"},
         "path": {"path_xss"},
@@ -248,8 +265,13 @@ class TestIndependentTarget(unittest.TestCase):
         types = self._TYPES[shape]
         hits = [f for f in got
                 if f.get("type") in types
-                and f.get("severity") == "high"
-                and f.get("confidence") == "high"]
+                and f.get("confidence") == "high"
+                # the 1.5-① invariant: a high/critical claim must carry a
+                # checkable basis, or the cap demotes it (and then the
+                # letter below has to agree).
+                and (f.get("severity") != "high"
+                     or bool(f.get("proof") or f.get("evidence"))
+                     or (f.get("headless") or {}).get("confirmed"))]
         self.assertTrue(
             hits,
             f"{shape}: no confirmed {sorted(types)} finding -- got "

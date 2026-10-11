@@ -46,6 +46,17 @@ from . import pre_encode as pre_mod
 # Phase 100 / 187: CSP nonce-leak and gadget-chain exploitation now live in
 # async_scanner_layers (_probe_csp_nonce / _probe_csp_gadget), which is where
 # the Phase 65 dom_engine import also moved to (Phase 211 first cut).
+#
+# Phase 221: that move silently deleted a NAME other code patched.  Both
+# tests/test_async_deep.py and tests/test_async_wiring.py reach the DOM
+# engine through `patch("xssentinel.core.async_scanner.dom_engine_mod....")`
+# and `monkeypatch.setattr(ASYNC.dom_engine_mod, ...)`; with the alias gone
+# they died with ModuleNotFoundError / AttributeError, which is exactly the
+# signature of a move that forgot a re-export.  The binding is re-asserted
+# here for that reason ONLY -- the LAYER code must keep using
+# async_scanner_layers' own binding, or patching this alias would stop
+# steering anything (same trap the _EGRESS_JAR note below describes).
+from . import dom_engine as dom_engine_mod  # noqa: F401  (re-export)
 # Phase 86: budget/circuit stops must be catchable by name at every layer --
 # _throttle() raises them, and the generic ``except Exception`` handlers that
 # surround every probe used to swallow them (see _probe_param).

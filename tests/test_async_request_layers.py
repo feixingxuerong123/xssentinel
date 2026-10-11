@@ -100,7 +100,20 @@ class TestAsyncRequestLayers:
                        if f.data.get("type") == "header_xss")
             assert hdr.data.get("param", "").startswith("(header:"), \
                 f"unexpected header finding param: {hdr.data.get('param')}"
-            assert hdr.data.get("severity") == "high"
+            # Phase 221: Phase 218's evidence-shape cap demotes a high claim
+            # to medium when nothing checkable backs it, and the header/path
+            # layers attach no proof and no evidence excerpt (measured:
+            # evidence_class=browser-unavailable, proof/evidence both absent --
+            # the same shape dev/_severity_shape_probe.py measured on sync).
+            # So the invariant to assert is the 1.5-① one -- a high letter
+            # must carry a basis -- not the letter itself.  The sync
+            # counterpart of this test never asserted a severity at all,
+            # which is why only the async side went stale.
+            assert hdr.data.get("severity") in ("high", "medium")
+            if hdr.data.get("severity") == "high":
+                assert (bool(hdr.data.get("proof") or hdr.data.get("evidence"))
+                        or (hdr.data.get("headless") or {}).get("confirmed")), \
+                    "a high claim must carry a checkable basis"
         finally:
             srv.shutdown()
 
