@@ -2146,3 +2146,34 @@ TP108/TN74/SKIP10/FP0/FN0/ERR0 885s)—— **帽在全量矩阵零触发**(矩�
 **1.5 至此全部收口**(三类 bundle 病因 210b + 通用帽与不变量门本轮)。
 过程记两笔:验收跑用旧谓词跑了两分钟即被纸面预检叫停(预检发生在启动
 之后 —— 下一步先对账再开跑);1.3 被发现早已测量结项,不再当待办。
+
+## Phase 219:Juice Shop 官方靶复跑 —— 环境阻塞解除,214-218 树在真实靶上验证通过
+
+**环境阻塞的解除路径本身就是一课**:上一轮记"node ≥18 不可达"时,我搜的
+是**自己以为的靶**(`D:\qoder\js-official`)并三次尝试起它(node v16 →
+`eventsource-parser` 要 TransformStream → SQLITE_READONLY/CANTOPEN)——
+而本仓的驱动 `dev/juiceshop_external.py` **早就自带答案**:`NODE_CANDIDATES`
+里躺着 `C:\NodeJS22\node-v22.20.0-win-x64\node.exe`(便携 v22,209 时代的
+遗产,我的 find 深度不够漏了它),且驱动用的是**自己的靶包副本**
+`dev/_juiceshop/app/juice-shop_20.2.0`。"路径决定你量的是哪棵树"本仓记过
+四次,这次连**靶是哪棵树**都搞错了三轮才去读驱动。教训:**用现成驱动,
+先读它的常量,不要凭记忆重建环境。**
+
+**复跑结果(oneshot 行:`-u BASE -c --crawl-depth 2 --headless`,两臂各重试
+一次后完成 —— 两臂首跑都是同形楔死:进程活着、0 连接、0 Chromium,重试即
+绿,187/200/209 记过的负载形态)**:
+
+| 臂 | 结果 | 对照基线 |
+|---|---|---|
+| sync | **1 finding:`dom_dynamic` high/high browser-executed @ `#/track-result?id=xss`**(826 请求,completed) | = 210b sync 臂逐位一致 |
+| async | **1 finding:`dom_dynamic` high/high browser-executed @ `#/search?q=xss`**(1552 请求,completed) | 209 记录的两个已证实 sink 之一(路由命中随爬取时序在 `#/search` 与 `#/track-result` 间摆动,两个 sink 都在 209 独立复核过) |
+
+**214-218 的五项改动在官方靶上全部按声明行事**:① 210 修掉的 3 条 bundle
+high 假阳性**没有回潮**(报告里只有那 1 条真 finding);② 214-216 的新层
+(L8/JSONP/CSP 爬取接线)零误报;③ 218 的帽未误触任何真 finding;④
+WAF 误检维持 209 已记账的两态形状(sync=Generic/Unknown、async=Cisco ACE
+—— 记账不追);⑤ 产物 `dev/_js_out/findings_p219_oneshot_{sync,async}.json`。
+**1.0 外部效度的"待 node ≥18 补跑"记账清零。**
+
+顺带:我误用 `js-official` 树时的环境动作已全部还原(挪走的 sqlite 归位、
+误建的空库删除),该树属于上一轮的探索残骸,不是本仓靶。
