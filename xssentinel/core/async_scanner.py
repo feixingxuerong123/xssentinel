@@ -82,7 +82,7 @@ from .async_scanner_crawl import AsyncCrawlMixin
 
 
 
-from .findings import _DEFAULT_TRANSFORMS  # noqa: E402
+from .findings import _DEFAULT_TRANSFORMS, cap_unverified_severity  # noqa: E402
 from . import transform as transform_mod  # noqa: E402
 from .stealth import (marker as _stem_marker, HeaderRotator as _HeaderRotator, ProxyPool as _ProxyPool,  # noqa: E402
                       jitter_interval, load_proxies as _load_proxies)
@@ -419,12 +419,18 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
         """
         if not getattr(self, "use_headless", False):
             async for f in self._scan_raw(url, method, params, data):
+                # Phase 218: the evidence-shape severity cap at the engine's
+                # FINAL yield -- after any in-place evidence mutation, so a
+                # finding is capped on its last word, not its first.
+                cap_unverified_severity(f.data)
                 yield f
             return
         try:
             seen: set = set()
             async for f in self._scan_raw(url, method, params, data):
-                yield await self._headless_verify_finding(f, seen)
+                f = await self._headless_verify_finding(f, seen)
+                cap_unverified_severity(f.data)
+                yield f
         finally:
             # The pool outlives individual findings; release the worker
             # threads (and with them, their thread-bound Chromiums) once

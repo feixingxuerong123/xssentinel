@@ -135,6 +135,50 @@ def extract_replay_token(payload: str) -> str | None:
     return m.group(0) if m else None
 
 
+def cap_unverified_severity(data: dict) -> bool:
+    """Phase 218 (1.5-②): a HIGH/CRITICAL claim with neither browser
+    evidence nor a verifiable proof is capped to MEDIUM.
+
+    The rule the 210b record asked for, in its measured shape.  "Browser
+    evidence" = evidence_class browser-executed, an OOB callback (a real
+    victim browser executed the payload), or a confirmed headless replay.
+    "Verifiable proof" = a non-empty ``proof`` payload the report can show
+    (sync ``_record`` attaches one to every reflected confirmation, so the
+    standard reflection path is unaffected).  What remains on the high
+    shelf after the cap is exactly the population that can back its claim
+    -- measured on the lab and the matrix, the residues are the static
+    analysis hints (trusted_types taint_flow / policy_bypass family),
+    symmetric between the engines since Phase 217.
+
+    Severity only: the detection's own confidence is untouched, and the
+    scoring denominator (high/medium/critical counts as detected) does not
+    move -- a capped finding is still a finding, just not one allowed to
+    shout.  Idempotent; returns True when the cap fired.
+    """
+    if data.get("severity") not in ("high", "critical"):
+        return False
+    if data.get("evidence_class") in (EVIDENCE_BROWSER_EXECUTED, EVIDENCE_OOB):
+        return False
+    if (data.get("headless") or {}).get("confirmed"):
+        return False
+    # A verifiable basis: a proof payload the report can show, OR a judged
+    # reflection's own response excerpt (``evidence``).  The second half is
+    # what keeps the engines symmetric: sync attaches ``proof`` to every
+    # reflected confirmation (``_record``), async encodes the same excerpt
+    # in ``evidence`` with NO proof field -- a proof-only check would cap
+    # async's entire reflected family while sync's stayed high (measured
+    # before the first matrix run of this phase: 69 vs 63 highs would have
+    # split by engine).  The static hints this rule targets carry NEITHER
+    # (measured on trusted_types_taint_flow: no proof, no evidence key).
+    if data.get("proof") or data.get("evidence"):
+        return False
+    data["severity"] = "medium"
+    data["detail"] = (data.get("detail") or "") + (
+        " | severity capped to medium: high claim with neither browser "
+        "evidence nor a verifiable proof (evidence-shape rule)")
+    return True
+
+
 _DEFAULT_TRANSFORMS = [
     [],  # base
     ["mixed_case"],

@@ -2109,3 +2109,40 @@ ruff 零告警。**剩余人群现在对称**:lab 上唯一的 no-proof high 是
 —— **1.5-② 的帽在两侧将命中同一人群,Phase 218 可以安全落地**(落地时
 仍需全量矩阵复测:帽只动 severity,检出口径 high/medium/critical 不变,
 TP/FN 结构上不动,但"结构上不动"要跑成读数)。
+
+## Phase 218:1.5-② 证据形状帽落地 + 1.5-① 不变量门 —— 1.5 全部收口
+
+**帽(`findings.cap_unverified_severity`)**:high/critical + 非浏览器证据
+(非 browser-executed、非 OOB、headless 未确认)+ 无可核对凭据 ⇒ **medium**,
+detail 附注;幂等。只动 severity —— 检出口径(high/medium/critical 算检出)
+不动,confidence 不动(179 的"连降"是 content-type 规则自己的形状,这条
+规则的依据是"主张不可核对",不是"检出不确定")。**接线在两台引擎的
+"证据终态"处**:sync `_add`(在 217 镜像**之后** —— 刚被确认的 finding
+保住 high);async `scan()` 的**两个最终 yield 分支**(headless 关 = 直通;
+开 = `_headless_verify_finding` 就地升级之后)—— 若帽在 `_add_finding`
+(验证**前**)落,async 高危被确认后仍 medium 而 sync 是 high,反造
+parity 分歧,这是接线点被实测论证而不是拍脑袋的地方。
+
+**谓词修过一次,修在对等门红之前**:第一版只认 `proof` 豁免 —— 纸面预检
+发现 **async 的主反射 finding(63 条 high)是 EVIDENCE_MODEL 且无 proof
+字段**(sync 的 `_record` 每条都附 proof)—— 全量一跑,最大族群会按引擎
+劈成 sync-high/async-medium,parity 门必红。改为 **proof 或 evidence
+任一在场即豁免**(async 的反射摘录在 `evidence` 里,报告可见 = 可核对;
+实测静态提示 `trusted_types_taint_flow` 两者皆无,豁免不吞帽的目标族群)。
+验收跑终止重启了一次,旧谓词的产物不留。
+
+**验收(全部本机实测)**:strict 64 例切片双引擎 **f1=1.000 基线形状逐项
+相同**(sync TP36/TN28 567s;async TP36/TN27 302s);全量 192 例双引擎
+**verdict 逐位不动**(sync TP113/TN79/FP0/FN0/ERR0 687s;async
+TP108/TN74/SKIP10/FP0/FN0/ERR0 885s)—— **帽在全量矩阵零触发**(矩阵用例
+不产静态提示型 high;该族群在真实页面上);真 lab(不开 headless)双引擎:
+`trusted_types_taint_flow` **high → medium 双侧同步**带帽注记,已是 medium
+的 `no_policy` 未被触碰 —— 引擎对称的最终实证。门 14 例(帽行为矩阵/
+幂等/六类豁免/sync 汇聚点行为/**双分支 AST 守卫**);**变异 M1(sync 汇聚
+点)/M2(async off 分支)/M3(async on 分支)全承重**,逐字节还原。
+**1.5-① 不变量门即此结构**:帽在汇聚点 + AST 钉双分支 —— "静态高危必须
+带凭据"从此不可能在任一引擎的输出里违反,而不需要逐层清单。
+
+**1.5 至此全部收口**(三类 bundle 病因 210b + 通用帽与不变量门本轮)。
+过程记两笔:验收跑用旧谓词跑了两分钟即被纸面预检叫停(预检发生在启动
+之后 —— 下一步先对账再开跑);1.3 被发现早已测量结项,不再当待办。

@@ -80,7 +80,8 @@ _log = get_logger("scanner")
 
 from .findings import (Finding, EVIDENCE_OOB, _DEFAULT_TRANSFORMS,  # noqa: E402,F401  (Mixin 运行时引用:scanner 由 Mixin 组合,静态分析看不见)
                        _grade_evidence, _norm, _proof,
-                       _safe_snippet, extract_replay_token)
+                       _safe_snippet, cap_unverified_severity,
+                       extract_replay_token)
 from .scanner_stored import StoredBlindMixin  # noqa: E402
 from .scanner_layers import AdvancedLayerMixin  # noqa: E402
 from .scanner_crawl import CrawlMixin  # noqa: E402
@@ -1817,6 +1818,9 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
         # engine would have confirmed.
         if getattr(self, "use_headless", False):
             self._maybe_headless_verify(finding)
+        # Phase 218: the evidence-shape severity cap (1.5-②) -- after the
+        # mirror so a just-confirmed finding keeps its high shelf.
+        cap_unverified_severity(finding.data)
         with self._lock:
             self.findings.append(finding)
         if self._progress:
