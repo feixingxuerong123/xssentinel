@@ -2025,3 +2025,26 @@ Content-Type —— 实测不认,才有了上面的边界记录。
 覆盖全绿;ruff 零告警;benchmark 矩阵结构性不可达(manifest 不开 crawl)。
 **2.1.1 至此全部收口**:sync 对 async 的爬取对等 = 反射探针(46)+ 页层
 五件套(214/215/216)+ mined 带参探针(176s/209),无一层缺席。
+
+### Phase 216 续:真实多页服务器验证 + Juice Shop 真靶的环境阻塞
+
+**真靶验证(仓内 lab 实测,`tests/vuln_server.py` 起在 18899)**:
+`python -m xssentinel -u http://127.0.0.1:18899/links -c --headless --async`
+→ **19 findings / 583 请求 / scan_status=completed**,全链路逐项命中:
+`/echo` `/script` 反射确认(browser-executed);**`/dom` 的 `dom_dynamic`
+browser-executed —— 214 的头号缺口在真实多页服务器上闭合**(改动前 async
+对爬取页的 DOM sink 完全不可见);L8 载体在爬取页上确认(`path_xss` × 7、
+`error_page_xss` × 7,全是 browser-executed —— 216 的接线生效);215 的
+高级页层在爬取页上首次产出(`trusted_types_taint_flow` high +
+`trusted_types_no_policy` medium @ /dom,browser-unavailable 诚实评级,
+与 sync 同层同页行为);**`/safe`(注释写明"must stay clean")在新层全开
+下零 finding —— 无误报**;离站链接未被爬(范围纪律);产物
+`dev/_p216_vulnsvr_async.json`。
+
+**Juice Shop 真靶本轮不可达,按"未验证"记账**:`D:\qoder\js-official` 的
+依赖(`eventsource-parser` 的 `TransformStream`)要求 node ≥18,本机
+`C:\NodeJS\node.exe` 是 v16.15.0(209/210 当年能跑,此后该树被同机其它
+项目升级过依赖);vuln-agent 用的 node v22 未在常规路径找到,其"复制
+Juice"是自建靴场(五层同源),不宜跨项目当验证靶。214-216 的验证权重由
+四个 fixture 门(真 Chromium)+ 本次仓内 lab 真服务器扫描承担;官方靶
+复跑待环境具备 node ≥18 时补。
