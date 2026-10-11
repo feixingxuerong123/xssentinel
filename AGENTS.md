@@ -2330,8 +2330,48 @@ query 那条**只因为 `_record` 附了 proof 才逃过帽** —— 帽按设�
 不变量**:"声称 high 就必须带可核对凭据"。这条**比原来更严**,且由 218
 自己的门(`test_phase218_evidence_cap.py`)独立守着。
 
-### 记账:不是我们的锅的一个
+### 记账:剩下的 8 个是全树同跑才现的顺序/负载依赖,未修
 
-`test_range5` 的真实浏览器用例是 flake:单独跑 6/6,与别的文件同跑就红。
-`git stash -u` 清干净树后同组合复跑 **17 passed / 93s** —— 排除我方改动,
-未修,记为浏览器时序 flake。
+收尾跑全量两次,失败数 11 → 8(修掉的正是上面 4 个根因)。剩下的 8 个
+**每个文件单独跑全绿**,是 40–66 分钟长跑里才现的:
+
+| 文件 | 单独跑 | 全量里 |
+|---|---|---|
+| `test_layer_guard.py` | 11 passed / 0.24s | 3 failed |
+| `test_range5.py` | 6 passed / 21.40s | 2 failed |
+| `test_scenarios.py` | 7 passed / 22.76s | 2 failed |
+| `test_vuln_server_concurrency.py` | 6 passed / 5.28s | 1 failed |
+
+已排除的假设与量到的证据:
+
+* **不是跨文件污染**:`dev/_bisect_poison.py` 按字母序逐个加前缀复跑
+  73 个文件(guard 单独绿才开走),**全程没有一个前缀能把它点红**;
+* **不是日志状态**:grep 全树无任何测试动 `setLevel`/`addHandler`/
+  `basicConfig`;`dev/_logging_state_probe.py` 量到 root=WARNING、
+  无 handler、`xssentinel` logger propagate=True/level=NOTSET —— 干净;
+* **不是 loop 泄漏**:`conftest._isolate_event_loop` 会把"进来时已有
+  loop"判成 **skip 而非 fail**,而我们看到的是 FAILED ⇒ 泄漏发生在
+  这些用例**自己内部**,不是被上一个用例连累;
+* **不是我方改动**:`git stash -u` 清干净树后同组合复跑绿(见上)。
+
+**未定性的一手观测**:连跑 6 遍 `test_layer_guard.py`,前两遍 0.23s 绿,
+第三遍**挂住**(pytest 不退出,已强杀)。这与"长跑后期资源/时序退化"
+一致,但**不足以定因** —— 本轮不猜。留给下一轮的抓手是
+`_isolate_event_loop` 的 `[loop-leak]` stderr 行:下一次全量跑请**保留
+stderr**(本轮的 `Out-File` 把它吞了,这是本轮最大的取证失误),它会
+点名是哪个用例漏了 loop。
+
+### 本轮保留的取证工具(`dev/`,gitignore 内)
+
+| 工具 | 用途 |
+|---|---|
+| `_bisect_poison.py` | 按字母序逐个加前缀,定位第一个能点红目标文件的用例 |
+| `_severity_shape_probe.py` | 打印真实端点上 finding 的 evidence 形状(证帽按设计工作) |
+| `_polyglot_shape_probe.py` | 同上,走 scripted session(证 198 的 medium 默认值) |
+| `_logging_state_probe.py` | 打印 root/包 logger 的 level/handler/propagate |
+| `_replay_case.py` | 单例复现(走 benchmark 自己的 server,**含 load_routes**) |
+
+最后一条是本轮最贵的一课:**它第一版漏了
+`BenchmarkHandler.routes = load_routes()`(batched runner 在 84 行做),
+于是每个 case 都在对着 404 评分,而 404 页的形状恰好就是 FN 的形状**
+(请求正常、快速、无 error、零发现)。与既有 "VOID probe" 清单同源。
