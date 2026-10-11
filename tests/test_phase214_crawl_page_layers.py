@@ -147,6 +147,7 @@ def _collect(engine: str, base: str) -> list:
         return [f.data or {} for f in sc.findings]
 
     import asyncio
+    import threading
     from xssentinel.core.async_scanner import AsyncScanner
 
     async def go():
@@ -157,7 +158,23 @@ def _collect(engine: str, base: str) -> list:
             out.append(f.data if hasattr(f, "data") else f)
         return out
 
-    return asyncio.run(go())
+    # Phase 203's lesson, hit again cross-file (2026-10-11): a sync-Playwright
+    # test earlier in the same pytest process binds the browser loop to the
+    # main test thread, and ``asyncio.run`` on that thread then wedges
+    # flat-CPU.  Individually every arm passes; run the async half on a
+    # fresh thread so it cannot inherit the binding.
+    out: dict = {}
+
+    def _runner():
+        out["result"] = asyncio.run(go())
+
+    t = threading.Thread(target=_runner, daemon=True)
+    t.start()
+    t.join(timeout=600)
+    if "result" not in out:
+        raise AssertionError("async scan did not finish within 600s -- "
+                             "loop/browser cross-thread wedge (see 203)")
+    return out["result"]
 
 
 # ---------------------------------------------------------------------------
@@ -173,8 +190,11 @@ def test_crawl_function_wires_the_page_layers():
     calls = {n.func.attr for n in ast.walk(fn)
              if isinstance(n, ast.Call)
              and isinstance(n.func, ast.Attribute)}
-    assert {"_scan_dom_async", "_scan_advanced_page",
-            "_scan_reflected"} <= calls, sorted(calls)
+    # Phase 215 moved the pop-time layer trio into _crawl_page_layers --
+    # the wiring assert follows the call, it does not pin the file the
+    # call lives in (that would re-create the 211 blind-window shape).
+    assert {"_crawl_page_layers", "_scan_reflected",
+            "_scan_dom_async"} <= calls, sorted(calls)
     # The layer URL must be de-parameterised (assertion 2's static half).
     assert 'bare_url = current_url.split("?", 1)[0]' in src
     # Seed/origin discrimination exists (assertion 3's static half).

@@ -1942,3 +1942,49 @@ mined 非 fragment 端点(form action / JS 挖出)仍只跑反射层 —— 给�
 接层需要自己的抓取预算决策;爬到端点的 CSP/JSONP/CORS/L8 层未接(需要
 把爬取 fetch 的 resp_headers 管道化);fragment 锚点链接(`a#frag`)出队
 仍不分层(209 的挖矿分支已覆盖路由页)。
+
+## Phase 215:2.1.1 收尾 —— mined 端点页层、爬取页 CSP、fragment 锚点
+
+214 记的三条剩余,各自实测后落地(全部在 `async_scanner_crawl.py`):
+1. **mined 非 fragment 端点接页层**:页层三元组(`_scan_dom_async` +
+   `_scan_advanced_page` + `_scan_csp_async`)收进新 helper
+   `_crawl_page_layers`;mined 分支在内联 **GET** 抓取后调它 —— 这些端点
+   不被行走,没人替它们抓页面,sync 在 scan_endpoint 里付同样的 GET。
+   浏览器成本由 DOM 层自己的静态门(`page_has_client_js` /
+   `page_can_run_sink`)把关,API 形的 form action 只付一个 GET。预算类
+   异常(BudgetExhausted/CircuitOpen)照 Phase 86 上抛不吞。
+2. **爬取页 CSP**:出队 fetch 原先把 `resp.headers` 扔掉,CSP 层对爬取页
+   结构性失明。现在 fetch 捕获 headers 进 helper。**async 引擎没有真
+   coverage(P191 的 `_NullCoverage` 门面,"the async scanner has none"),
+   coverage 行断言结构性不可用** —— 可观察面改用 finding:链接页 `/csp`
+   发 `default-src 'unsafe-inline'`(enforcing 且经典可绕),断言爬取页上
+   出现 `csp_bypass`。这比 coverage 行更强:层不但跑了,还读对了页自己的头。
+3. **fragment 锚点出队分层 + 去重**:214 曾把带 fragment 的链接排除在层外
+   (fragment 只在浏览器里可见,恰是 DOM 层的输入)。现在纳入,按
+   **fragment 剥离后的 URL** 去重(`findings._norm` 丢 fragment,sync 把
+   `/dup#one` 与 `/dup#two` 注册为同一个端点);**async 没有 finding 去重
+   (`_add_finding` 直接 append),不去重就是两条一模一样的 finding 入报**。
+   mined 分支共享同一 `layered_seen` —— 同一页面被发现两次(form action 既
+   是链接又被挖矿)只层一次,且先到者优先(mined 带字段参数,排在前)。
+
+**门(`tests/test_phase215_crawl_mined_layers.py`,5 例)**:静态守卫
+(helper 三元组 + **两个**接线点);真 Chromium —— `/fa`(表单挖矿,sink 读
+`?v=`,**字段名只有挖矿路径知道**,链接路径的 action URL 无 query 永远点不
+着它)必须出 `param="v"` 的 browser-executed finding;`/csp` 的
+`csp_bypass`;`/dup` 双锚点**恰好一条** finding;textContent 安全孪生沉默。
+**变异对照 M1/M2/M3 全承重**(挖矿层块禁用 / CSP 摘除 / 去重摘除),逐字节
+还原。
+
+**回归**:214 门(层调用下移后其 AST 守卫跟着接线名走 —— "守卫跟随调用,
+不钉文件名,否则重造 211 瞎窗")+ 215 门 + phase209 家族 + async wiring +
+层记账 + 证据覆盖全绿;ruff 零告警。benchmark 矩阵结构性不可达(manifest
+不开 crawl)。**2.1.1 至此收口,仍留一条**:爬到端点的 L8/JSONP/CORS/
+XS-Leaks(各自开自己的请求预算,需要独立的测量轮)。**过程一则(两次实测,
+确诊+修复)**:215 门整文件首跑 19 分钟无输出(python 进程 CPU 平坦、
+9 个 Chromium 挂着);终止后逐个隔离,每个 40-80s 全过。合跑 214+215 又楔
+(20 分钟平坦 CPU、三个 idle python 进程)——**确诊:214 的 sync 臂把
+sync Playwright 浏览器(及其 loop)绑到主测试线程,同一进程里 215 的
+`asyncio.run` 即死**,与 214 单独全绿、215 单独全绿不矛盾。修法 =
+Phase 203 的既定形状:两个文件的 async 半场各跑**独立线程**(600s 上限,
+超时报"跨线程 loop 楔死"而非静默挂)。修后合跑 **46 passed / 240s**。
+同机 vuln-agent 负载只放大墙钟,不是成因。

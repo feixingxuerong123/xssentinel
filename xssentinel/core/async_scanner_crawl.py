@@ -293,6 +293,26 @@ class AsyncCrawlMixin:
                 findings.append(Finding(**fields))
         return extra
 
+    async def _crawl_page_layers(self, url: str, text: str,
+                                 resp_headers: dict, params: dict):
+        """Phase 214/215: the page-level layers a CRAWLED endpoint gets.
+
+        The parity target is ``scan_endpoint``'s stack; this helper carries
+        the subset that needs only the page itself (``_scan_reflected``
+        already ran at discovery with the endpoint's own parameters).  CSP
+        rides the endpoint's OWN response headers (Phase 215 plumbing) --
+        the seed gets the same layer from the main loop with the seed's
+        headers.  L8 / JSONP / CORS / XS-Leaks stay recorded-off for crawled
+        endpoints: each opens its own request budget, which is its own
+        measured round (OPTIMIZATION 2.1.1 keeps that line visible).
+        """
+        async for finding in self._scan_dom_async(url, text, "GET", params):
+            yield finding
+        async for finding in self._scan_advanced_page(url, text, params):
+            yield finding
+        async for finding in self._scan_csp_async(url, resp_headers, text):
+            yield finding
+
     async def _crawl_and_scan(self, session, start_url: str,
                               start_text: str) -> AsyncIterator[Finding]:
         """L7 crawl: discover linked endpoints and scan them.
@@ -322,6 +342,10 @@ class AsyncCrawlMixin:
         # precisely so it is not scanned twice).
         queue: deque[tuple[str, int, dict, str]] = deque(
             [(start_url, 0, {}, "seed")])
+        # Phase 215: a page is page-layered ONCE, keyed on the
+        # fragment-stripped URL (sync registers /x#a and /x#b as one
+        # endpoint; see the pop-time block below).
+        layered_seen: set[str] = set()
         while queue:
             current_url, depth, pop_params, origin = queue.popleft()
             # Phase 214: only the SEED keeps the old depth short-circuit (the
@@ -335,6 +359,7 @@ class AsyncCrawlMixin:
             # Fetch the page (or reuse start_text for the seed).
             if current_url == start_url:
                 text = start_text
+                resp_headers: dict = {}
             else:
                 try:
                     async with self._semaphore:
@@ -344,6 +369,7 @@ class AsyncCrawlMixin:
                             proxy=self._next_proxy(),
                         ) as resp:
                             text = await resp.text()
+                            resp_headers = dict(resp.headers)
                             self.requests_made += 1
                             self._record_status(getattr(resp, "status", 200))
                 except (BudgetExhausted, CircuitOpen):
@@ -351,8 +377,8 @@ class AsyncCrawlMixin:
                 except Exception as e:
                     _log.debug("crawl fetch failed for %s: %s", current_url, e)
                     continue
-            # Phase 214: page-level layers for LINK-discovered endpoints, at
-            # the point where the page's OWN text is in hand.  At discovery
+            # Phase 214/215: page-level layers for LINK-discovered endpoints,
+            # at the point where the page's OWN text is in hand.  At discovery
             # time only the parent's text exists -- analyzing that would be
             # static analysis of the wrong page -- but at pop time the
             # endpoint has just been fetched for link extraction anyway, so
@@ -360,29 +386,31 @@ class AsyncCrawlMixin:
             # registered endpoint gets the full scan_endpoint stack,
             # including the browser DOM layer).  The 2.1.1 record: before
             # this, a linked page with a DOM sink was invisible to --async,
-            # whatever the marker reached through.  Fragment-bearing links
-            # stay reflected-only here: fragment ROUTES get the DOM layer at
-            # mining time (Phase 209), and a fragment ANCHOR's route page is
-            # the same render.
-            if (origin == "link" and self.advanced_layers
-                    and not urlparse(current_url).fragment):
-                # De-parameterised URL + params dict, the shape scanner_crawl
-                # registers for sync.  This is a WIRE-SHAPE contract, not a
-                # delivery one (measured, mutation M2, 2026-10-11): handing
-                # the browser ``/sink?v=1`` plus ``params={"v": ...}`` does
-                # NOT lose the marker -- the engine's own named probes
-                # re-mark EVERY matching key (``_with_param_value`` assigns
-                # each ``k == name`` in the pair list), so even the merged
-                # ``?v=1&v=xss`` fires the sink.  What the bare URL buys is
-                # that the navigation carries one clean copy of the query
-                # instead of a doubled one.
-                bare_url = current_url.split("?", 1)[0]
-                async for finding in self._scan_dom_async(
-                        bare_url, text, "GET", pop_params):
-                    yield finding
-                async for finding in self._scan_advanced_page(
-                        bare_url, text, pop_params):
-                    yield finding
+            # whatever the marker reached through.  Phase 215: fragment-
+            # bearing anchors layer too (the fragment is a taint source only
+            # the browser reads), deduped on the fragment-stripped URL --
+            # findings._norm drops fragments, so sync registers /x#a and
+            # /x#b as ONE endpoint; two browser passes would be cost without
+            # information.
+            if origin == "link" and self.advanced_layers:
+                layer_key = current_url.split("#", 1)[0]
+                if layer_key not in layered_seen:
+                    layered_seen.add(layer_key)
+                    # De-parameterised URL + params dict, the shape
+                    # scanner_crawl registers for sync.  This is a WIRE-SHAPE
+                    # contract, not a delivery one (measured, mutation M2,
+                    # 2026-10-11): handing the browser ``/sink?v=1`` plus
+                    # ``params={"v": ...}`` does NOT lose the marker -- the
+                    # engine's own named probes re-mark EVERY matching key
+                    # (``_with_param_value`` assigns each ``k == name`` in
+                    # the pair list), so even the merged ``?v=1&v=xss`` fires
+                    # the sink.  What the bare URL buys is that the
+                    # navigation carries one clean copy of the query instead
+                    # of a doubled one.
+                    bare_url = current_url.split("?", 1)[0]
+                    async for finding in self._crawl_page_layers(
+                            bare_url, text, resp_headers, pop_params):
+                        yield finding
             # Phase 214: extraction and mining stay depth-bounded exactly as
             # before -- a max-depth LINK entry was fetched for its OWN page
             # layers above, but contributes no child frontier.
@@ -452,5 +480,36 @@ class AsyncCrawlMixin:
                 async for finding in self._scan_reflected(
                         session, m_base, m_method, m_params, m_data, text):
                     yield finding
+                if self.advanced_layers and not urlparse(m_url).fragment:
+                    # Phase 215: mined NON-fragment endpoints get the page
+                    # layers too.  Nothing else ever fetches them (they are
+                    # not walked), so this GET is the page-text source --
+                    # sync pays the same GET inside scan_endpoint.  The DOM
+                    # layer's own static gates (page_has_client_js /
+                    # page_can_run_sink) keep the browser off non-HTML
+                    # endpoints, so an API form action costs a GET, not a
+                    # browser pass.
+                    try:
+                        async with self._semaphore:
+                            await self._throttle(m_base)
+                            async with session.get(
+                                    m_base,
+                                    headers=self._req_headers(self.headers),
+                                    proxy=self._next_proxy()) as m_resp:
+                                m_text = await m_resp.text()
+                                m_headers = dict(m_resp.headers)
+                                self.requests_made += 1
+                                self._record_status(
+                                    getattr(m_resp, "status", 200))
+                    except (BudgetExhausted, CircuitOpen):
+                        raise        # Phase 86: stop instead of skipping
+                    except Exception as e:
+                        _log.debug("crawl page-layer fetch failed for %s: %s",
+                                   m_base, e)
+                        m_text, m_headers = "", {}
+                    if m_text:
+                        async for finding in self._crawl_page_layers(
+                                m_base, m_text, m_headers, m_params):
+                            yield finding
             for f in mined_observations:
                 yield f
