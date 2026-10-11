@@ -54,28 +54,11 @@ class AsyncHeadlessVerifyMixin:
 
     @staticmethod
     def _probe_token(payload: str) -> str | None:
-        """The unique marker a fired dialog must carry for confirmation.
-
-        ``verifier.mark`` rewrites the payload's alert() argument to the
-        marker, so when the payload executes, the dialog message IS that
-        argument -- extract it from the (possibly transformed) payload
-        instead of threading a token through every yield site.  Order
-        mirrors mark()'s stamp shapes: plain alert('..'), the paren-free
-        alert`..`, and the concat stamp window['ale'+'rt']('..').  No match
-        means the replay cannot be ATTRIBUTED to this probe -- return None
-        so the caller skips verification rather than risk a false
-        browser-refuted grade on an unattributable dialog.
-        """
-        import re as _re
-        m = (_re.search(r"alert\(\s*['\"]([^'\"]{2,})['\"]\s*\)", payload)
-             or _re.search(r"alert`\s*([^`]{2,})\s*`", payload)
-             or _re.search(r"rt\]\(\s*['\"]([^'\"]{2,})['\"]\s*\)", payload))
-        if m:
-            return m.group(1)
-        # Fallback: a marker-token run anywhere in the payload (hex-suffixed
-        # stems like xssp_q_2813 / xssentinel_async_q_2813 / xssup_field_...).
-        m = _re.search(r"[A-Za-z_]*xss[A-Za-z0-9_]*?[0-9a-f]{4,}", payload)
-        return m.group(0) if m else None
+        """Phase 217: delegates to the shared ``findings.
+        extract_replay_token`` -- one copy of the carrier contract for both
+        engines (the docstring and stamp order live there now)."""
+        from .findings import extract_replay_token
+        return extract_replay_token(payload)
 
     async def _headless_verify_finding(self, f: Finding, seen: set):
         """Browser-confirm one finding, or return it untouched when a dialog

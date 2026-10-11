@@ -237,16 +237,26 @@ def _scan_error_xss(scanner, req, url: str) -> None:
     try:
         # One error-page finding per host is enough -- the error page is
         # the same regardless of which endpoint triggered the 404 probe.
+        # Phase 217: ATOMIC host claim, not a scan of scanner.findings.
+        # The old check-then-emit raced on the append happening after the
+        # check: an instant _add kept the window microscopic, but the
+        # Phase 217 headless-confirmation mirror runs a ~1-2s browser
+        # replay INSIDE _add -- measured, same tree, same target: the
+        # widened window let concurrent endpoint scans emit 3 per-host
+        # findings where the pre-mirror tree stably emitted 1.  The claim
+        # also makes the contract monotone: one attempt per host, no
+        # retry-via-another-endpoint after a failed probe (the 404 handler
+        # is host-global, so a retry could only repeat the same answer).
         from urllib.parse import urlparse
         host_key = urlparse(url).netloc
+        claimed = getattr(scanner, "_error_page_hosts", None)
+        if claimed is None:
+            claimed = set()
+            scanner._error_page_hosts = claimed
         with scanner._lock:
-            already = any(
-                f.data.get("type") == "error_page_xss"
-                and urlparse(f.data.get("url", "")).netloc == host_key
-                for f in scanner.findings
-            )
-        if already:
-            return
+            if host_key in claimed:
+                return
+            claimed.add(host_key)
 
         token = _stem_marker("xserr_") + secrets.token_hex(3)
         payload = f"<svg/onload=alert('{token}')>"

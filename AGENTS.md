@@ -2048,3 +2048,64 @@ browser-executed —— 214 的头号缺口在真实多页服务器上闭合**(�
 Juice"是自建靴场(五层同源),不宜跨项目当验证靶。214-216 的验证权重由
 四个 fixture 门(真 Chromium)+ 本次仓内 lab 真服务器扫描承担;官方靶
 复跑待环境具备 node ≥18 时补。
+
+## Phase 217:sync 补齐非 record finding 的无头确认 —— 1.5-② 的测量前置
+
+**起点是一次清单纠错**:接手 OPTIMIZATION 1.3(sandbox 第二刀)后发现它
+**2026-10-04 已测量结项**("下一刀量过了,不做"—— js_vm/dom_state 双向
+耦合、常量表只值 113 行),按文档自己的警告不再重开。转向 1.5 真正未结的
+②("无浏览器证据 + 无 proof ⇒ 至多 medium")——按 210b 的要求**测量先行**,
+lab 双引擎对照立刻量出**规则的前置缺陷**:
+
+| 同一 lab、同开 `--headless` | path/error 载体 |
+|---|---|
+| sync | browser-unavailable / **no-proof** |
+| async | browser-executed / proof |
+
+原因:async 的 Phase 183 包装器在 `scan()` 层确认**每一个** finding;sync 只
+确认 `_record` 路径的 finding —— L8 载体(header/path/cookie/error)直接
+`_add`,从不过无头确认。今天两侧严重度碰巧同高;规则 ② 一旦落地,"无证据
+无 proof"的帽会把不对称放大成**严重度分歧**(sync medium vs async high)
+—— 正是 198 契约(severity 是被消费的契约)的红线。**前置:先补 sync 侧。**
+
+**镜像(`Scanner._maybe_headless_verify`,经 `_add` 在 `use_headless` 时
+触发)**:守卫链与 async 包装器逐字对应 —— 已带 headless 判定跳过(record
+路径的确认与显式 skip 形状都不重验)/ OOB 回调跳过 / 占位审计载荷跳过 /
+**token 不可归因跳过**(这条天然把静态提示挡在外面:提示的 payload 是代码
+片段,不是可重放载荷)/ (url,param,payload) 重放去重;确认失败降级
+`errored` 不抛;重分级走同一 `_grade_evidence`。token 提取收进共享
+`findings.extract_replay_token`,async 的 `_probe_token` 委托 —— 载体契约
+两份拷贝是 Phase 207 的漂移形状。
+
+**实测(token 契约的一次自我纠正)**:测试初版用了我拼的
+`window['ale'+'rt']('tok1234')` 并断言可提取 —— **错**;对
+`verifier.mark` 自己的输出实测:真 concat 印记的 token 走 fallback
+(要求 payload 里有 `xss` token 串),**外来 token 的 concat 印记不可归因
+是文档化行为**(跳过重放,而非冒险给一个假的 browser-refuted)。测试改为
+用 mark 的真实输出,边界写成断言。
+
+**镜像牵出并修掉一个既有 TOCTOU**:error 层的"每 host 一条"去重是
+**扫描 `scanner.findings` 的 check-then-emit** —— 镜像把 `_add` 从微秒级
+拉宽到 1-2 秒(浏览器重放),窗口放大千倍,同一棵树稳定从 1 条/_host 变
+3 条/_host(干净 HEAD worktree 复跑复现 16/1,镜像树三轮稳定 18/3)。
+修为**原子 per-host 认领集**(锁下查+占;该层注释自证"错误页与触发端点
+无关",每 host 一次尝试本就是其语义;失败不重试 —— 同一 404 处理器只会
+给出同一答案)。**async 零行为变化**:其 L8 经 per-call shim 跑 sync 层,
+新旧去重在 shim 上都结构性按调用隔离(lab 7 条 error 的既有形状不变)。
+lab 复扫:sync error_page 回到 1 条且 browser-executed/proof;path 10→8
+为 lab 既有的逐运行涨落(不同函数,认领集结构性不可达)。
+
+**门(`tests/test_phase217_sync_headless_verify.py`,8 例)**:镜像点火
+(确认 → browser-executed)、refuted → browser-refuted/low(与 async 同
+词表)、record finding 不重验(显式 skip 形状也不碰)、OOB/占位/不可归因
+三跳过、重放去重、headless 关闭时永不验证、token 契约双引擎逐形状对等、
+**TOCTOU 守卫(认领不随 finding 离开列表而重装填)**。**变异 M1(钩子
+禁用)/M2(守卫摘除)全承重**,逐字节还原。
+
+**回归**:transport/headless 族 54 passed(async headless 验证、async
+request layers、熔断传输、header 切片、layer guard);214-216 门复跑绿;
+ruff 零告警。**剩余人群现在对称**:lab 上唯一的 no-proof high 是
+`trusted_types_taint_flow`(browser-unavailable 静态提示,双引擎同形状)
+—— **1.5-② 的帽在两侧将命中同一人群,Phase 218 可以安全落地**(落地时
+仍需全量矩阵复测:帽只动 severity,检出口径 high/medium/critical 不变,
+TP/FN 结构上不动,但"结构上不动"要跑成读数)。

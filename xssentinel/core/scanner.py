@@ -78,9 +78,9 @@ _log = get_logger("scanner")
 # Combinations are ordered by realistic bypass payoff; the engine stops at
 # `max_transforms` entries (default 12) so coverage scales with the flag.
 
-from .findings import (Finding, _DEFAULT_TRANSFORMS,  # noqa: E402,F401  (Mixin 运行时引用:scanner 由 Mixin 组合,静态分析看不见)
+from .findings import (Finding, EVIDENCE_OOB, _DEFAULT_TRANSFORMS,  # noqa: E402,F401  (Mixin 运行时引用:scanner 由 Mixin 组合,静态分析看不见)
                        _grade_evidence, _norm, _proof,
-                       _safe_snippet)
+                       _safe_snippet, extract_replay_token)
 from .scanner_stored import StoredBlindMixin  # noqa: E402
 from .scanner_layers import AdvancedLayerMixin  # noqa: E402
 from .scanner_crawl import CrawlMixin  # noqa: E402
@@ -1736,6 +1736,73 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
             finding.data["reflected_meta"] = _meta
         self._add(finding)
 
+    def _maybe_headless_verify(self, finding: Finding) -> None:
+        """Phase 217: headless-confirm findings that bypassed ``_record``.
+
+        The async engine confirms EVERY finding through its scan()-level
+        wrapper (Phase 183); sync only confirmed ``_record`` findings, so
+        the L8 request carriers (header / path / cookie / error) -- which
+        are ``_add``ed directly -- never got browser evidence even under
+        ``--headless`` (measured 2026-10-11, same target both engines:
+        sync path_xss = browser-unavailable/no-proof while async's =
+        browser-executed).  That asymmetry is also the prerequisite the
+        1.5-② severity cap is waiting on: capping "no browser evidence +
+        no proof" highs while the confirmation paths differed would have
+        broken engine severity parity.
+
+        Guards mirror the async wrapper (``_headless_verify_finding``)
+        verbatim: already-carries-browser-evidence / OOB callback /
+        placeholder payload / unattributable token / replay dedup.  The
+        token-unattributable guard is what keeps the STATIC hints out --
+        their payload is a code snippet, not a runnable replay.  Re-grades
+        through the SAME ``_grade_evidence``.  Never raises: a failed
+        verification degrades to ``errored`` like ``_record``'s does.
+        """
+        d = finding.data
+        if d.get("headless") is not None:
+            return
+        if d.get("evidence_class") == EVIDENCE_OOB:
+            return
+        url = d.get("url")
+        if not url:
+            return
+        payload = d.get("payload") or ""
+        if payload.startswith("(") and payload.endswith(")"):
+            return
+        token = extract_replay_token(payload)
+        if not token:
+            return
+        is_body = d.get("param_in") == "body"
+        if is_body and getattr(self, "json_body", None) is not None:
+            return
+        seen = getattr(self, "_hverify_seen", None)
+        if seen is None:
+            seen = set()
+            self._hverify_seen = seen
+        key = (url, d.get("param"), payload)
+        if key in seen:
+            return
+        seen.add(key)
+        try:
+            result = verifier.verify_headless(
+                url, d.get("method") or "GET",
+                params=None if is_body else {d.get("param") or "": payload},
+                data={d.get("param") or "": payload} if is_body else None,
+                headers=dict(self.req.session.headers),
+                token=token)
+        except Exception as e:
+            _log.warning("headless verification failed for %s: %s",
+                         url, e, exc_info=self.verbose)
+            result = {"available": False, "confirmed": False,
+                      "outcome": "errored",
+                      "detail": f"sync headless verify error: {e}"}
+        _cls, _conf, _det = _grade_evidence(
+            result, d.get("confidence"), d.get("detail") or "")
+        d["headless"] = result
+        d["evidence_class"] = _cls
+        d["confidence"] = _conf
+        d["detail"] = _det
+
     def _add(self, finding: Finding):
         # Phase 48: see findings.attach_replay_ctx -- carries the CSRF /
         # hidden fields of the original request onto confirmed findings.
@@ -1744,6 +1811,12 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
             attach_replay_ctx(finding, getattr(self, "_tl", None))
         except Exception:
             pass
+        # Phase 217: browser-confirm bypass findings when --headless is on
+        # (see _maybe_headless_verify).  Runs BEFORE the append so the
+        # progress consumer never sees an unconfirmed shape the async
+        # engine would have confirmed.
+        if getattr(self, "use_headless", False):
+            self._maybe_headless_verify(finding)
         with self._lock:
             self.findings.append(finding)
         if self._progress:
