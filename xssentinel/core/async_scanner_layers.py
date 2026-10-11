@@ -219,7 +219,10 @@ class AsyncDetectionLayersMixin:
                 )
             for d in dyn_findings:
                 yield Finding(
-                    url=url, method="GET", param=None,
+                    url=url, method="GET",
+                    # Phase 213: delivered key (``q`` / ``q@hash`` /
+                    # ``__xss__``), None when the probe had no key position.
+                    param=d.get("param"),
                     context=d.get("sink"),
                     payload=d.get("snippet", ""),
                     severity="high",

@@ -199,7 +199,12 @@ class AdvancedLayerMixin:
             _cls, _conf, _det = _grade_evidence(_h, d.get("confidence", "high"),
                                                 d.get("detail", ""))
             self._add(Finding(**{
-                "url": url, "method": "GET", "param": None,
+                "url": url, "method": "GET",
+                # Phase 213: the delivered key (``q`` / ``q@hash`` /
+                # ``__xss__``) or None when the probe had no key position.
+                # ``@hash`` marks a FRAGMENT-carried key: no HTTP request
+                # ever sees it, so poc/verify_fix must not replay it as one.
+                "param": d.get("param"),
                 "type": "dom_dynamic", "context": d.get("sink"),
                 "payload": d.get("snippet", ""), "transform": [],
                 "severity": "high", "confidence": _conf,

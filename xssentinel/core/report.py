@@ -1160,6 +1160,12 @@ def _nuclei_template(f: dict, target: str) -> dict:
     d = _finding_dict(f)
     ftype = d.get("type", "reflected")
     param = d.get("param") or ""
+    # Phase 213: fragment-carried keys (``q@hash`` from the DOM engine) never
+    # ride an HTTP request -- a template asking for ``?q@hash=`` would replay
+    # against a server that cannot read the fragment.  Keyless, exactly like
+    # the pre-Phase-213 dom templates.
+    if param.endswith("@hash"):
+        param = ""
     payload = d.get("payload") or ""
     method = (d.get("method") or "GET").upper()
     url = d.get("url") or target

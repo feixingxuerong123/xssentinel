@@ -1188,7 +1188,7 @@ class DynamicDomAnalyzer:
         # this probe on every URL a real scan visits.
         sep = "&" if "?" in base else "?"
         probes.append({"kind": "goto", "url": base + sep + "__xss__=" + marker,
-                       "source": "location.search"})
+                       "source": "location.search", "param": "__xss__"})
         # A page reads a *specific* parameter (``?q=``), so the generic
         # ``__xss__`` probe above only helps pages that read any parameter.
         # Replay the original query with each real parameter's value swapped
@@ -1198,7 +1198,8 @@ class DynamicDomAnalyzer:
                 continue
             probes.append({"kind": "goto",
                            "url": _with_param_value(url, name, marker),
-                           "source": "location.search"})
+                           "source": "location.search",
+                           "param": name})
         # SPA hash routing: the parameters live inside the fragment
         # (``#/search?q=``).  Nothing above reaches them -- ``base`` has the
         # fragment stripped, ``urlparse().query`` is empty, and an HTTP
@@ -1206,10 +1207,16 @@ class DynamicDomAnalyzer:
         # is the only thing that ever sees these values, which is precisely
         # the DOM-XSS case.  Verified against OWASP Juice Shop, where both
         # hash-routed XSS went undetected without this probe.
+        # Phase 213: the delivered KEY rides back on the finding
+        # (``q@hash`` -- source-qualified, NOT a query parameter: no HTTP
+        # request ever sees it, so report/poc/verify_fix must not treat it
+        # as one).  Without it the report's param column was empty and the
+        # fixer could not tell which key to escape.
         for name in _hash_param_names(url)[:_MAX_SEARCH_PARAM_PROBES]:
             probes.append({"kind": "goto",
                            "url": _with_hash_param_value(url, name, marker),
-                           "source": "location.hash"})
+                           "source": "location.hash",
+                           "param": name + "@hash"})
         # location.href (full URL reflected as-is)
         href_url = base + sep + "__xss__=" + quote(marker) + "#" + marker
         probes.append({"kind": "goto", "url": href_url,
@@ -1530,6 +1537,10 @@ class DynamicDomAnalyzer:
                             "type": "dom_dynamic",
                             "sink": sink,
                             "source": probe["source"],
+                            # Phase 213: the delivered key (``q`` / ``q@hash``
+                            # / ``__xss__``), or None when the probe had no
+                            # key position (raw fragment, pathname, cookie...).
+                            "param": probe.get("param"),
                             "snippet": h.get("snippet", ""),
                             "confidence": "high",
                             "detail": (f"DOM XSS CONFIRMED in real browser: "

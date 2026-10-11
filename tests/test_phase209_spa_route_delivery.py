@@ -182,6 +182,16 @@ def test_root_url_reaches_the_fragment_sink(spa_server, engine):
         f"routes reached: {routes}, all types: "
         f"{[f.get('type') for f in found]}")
     assert routes, f"[{engine}] the finding must sit on the fragment-routed page"
+    # Phase 213: the delivered KEY rides on the finding, source-qualified.
+    # The router reads `?v=` out of the fragment; no HTTP request ever sees
+    # it, so the report must say `v@hash` -- not `v` (that would pretend the
+    # query carried it) and not nothing (that was the pre-213 report gap:
+    # the fixer could not tell which key to escape).  The raw-fragment probe
+    # cannot outrun this assertion: on this page a bare `#<marker>` renders
+    # an empty string, so only the named-key probe can fire the sink.
+    assert all(f.get("param") == "v@hash" for f in hits), (
+        f"[{engine}] fragment-delivered finding lost its delivered key: "
+        f"{[f.get('param') for f in hits]}")
 
 
 @needs_browser

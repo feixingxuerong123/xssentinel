@@ -200,6 +200,16 @@ def _replay_request(requester, finding: dict, payload: str) -> dict:
             and param and not param.startswith("("):
         ck_name = param                     # legacy bare-name cookie
 
+    # Phase 213: a fragment-carried key (``q@hash`` from the DOM engine) is
+    # never on the wire -- a query param literally named ``q@hash`` would
+    # ship a request the page's router never reads, and the replay could
+    # then conclude "fixed" from a delivery that reproduced nothing.
+    # Treat it as keyless: the payload goes into the probe query slot
+    # (``params["_"]``), the delivery path this HTTP replay has for the DOM
+    # family (Phase 201 carrier audit).
+    if param and param.endswith("@hash"):
+        param = None
+
     # Snapshot any pre-existing cookie value BEFORE the probe overwrites
     # it, so the restore below puts the session back exactly as found.
     saved_cookie = None

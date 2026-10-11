@@ -1783,6 +1783,12 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
         url = _norm(d.get("url") or "")
         if d.get("type") in ("dom", "dom_dynamic"):
             url = url.split("?", 1)[0]
+            # Phase 213: the delivered key (``q`` / ``q@hash``) does not split
+            # groups either -- the same sink on the same page is one issue no
+            # matter which taint source carried the marker, and the remediation
+            # is the sink.  Keying on param would turn "search AND hash both
+            # reach innerHTML" into two findings where there was one.
+            return (d.get("type"), url, None, d.get("context"))
         return (d.get("type"), url, d.get("param"), d.get("context"))
 
     def dedup(self):

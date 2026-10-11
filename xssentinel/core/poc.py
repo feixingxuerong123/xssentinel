@@ -153,7 +153,20 @@ def build_poc(finding, csrf_fields: dict | None = None,
     # pos-pshift-01: the PoC replayed into "Sorry, you have been blocked",
     # while `-X POST '<url>?q=<payload>'` returns 200 and reflects.
     param_in = str(d.get("param_in") or "").lower()
-    if param:
+    # Phase 213: a fragment-carried key (``q@hash`` from the DOM engine) is
+    # NOT an HTTP carrier -- no request ever sees it, so the query branch
+    # below would ship a curl replaying ``?q@hash=...`` at a server that can
+    # never read it (dom findings ride method=GET, which is exactly the
+    # branch's query-shape trigger).  The PoC is the HTML page navigating the
+    # fragment; the curl states where the key actually lives.
+    _frag = _re.fullmatch(r"([^@\s]+)@hash", param or "") \
+        if ftype in _MARKER_TYPES and param else None
+    if _frag:
+        poc["curl"] = (f"# Payload rides the URL FRAGMENT key "
+                       f"'{_frag.group(1)}' (never sent to the server); "
+                       f"open the HTML PoC below "
+                       f"(source: {d.get('context') or 'unknown'})")
+    elif param:
         if param_in == "query" or method == "GET":
             p = urlparse(url)
             q = dict(parse_qsl(p.query, keep_blank_values=True))
@@ -222,9 +235,21 @@ def _html_poc(d, url, method, param, payload, ftype,
     esc = _html_escape
     csrf_fields = dict(csrf_fields or {})
     if ftype in _MARKER_TYPES:
-        # DOM XSS: source is typically location.hash or location.search.
-        ctx = (d.get("context") or "").lower()
-        if "search" in ctx:
+        # DOM XSS: navigate the page with the payload in the taint source
+        # the scanner actually delivered through.  Phase 213: the finding's
+        # param names that position -- ``q@hash`` = fragment-carried key
+        # (only the page's router ever sees it, and the route path must
+        # survive or the SPA renders a different view), a plain name = query
+        # key.  With no param keep the legacy raw-source shapes.
+        import re as _re
+        _fm = _re.fullmatch(r"([^@\s]+)@hash", param) if param else None
+        if _fm:
+            from .dom_engine import _with_hash_param_value
+            target = _with_hash_param_value(url, _fm.group(1), payload)
+        elif param:
+            from .dom_engine import _with_param_value
+            target = _with_param_value(url, param, payload)
+        elif "search" in (d.get("context") or "").lower():
             target = f"{url}?xssv_probe={_enc(payload)}"
         else:
             target = f"{url}#{_enc(payload)}"

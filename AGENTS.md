@@ -1815,3 +1815,62 @@ Windows 保留段、预算 0/0、后台启动无 exit 留痕、无笔记无提�
 顺带收尾:Phase 185 WIP 随本轮提交(2c2f613,受影响测试 5 passed 0.33s +
 ruff 过);`dev/_replay_case.py` 路由装载已修;10-10 00:25 的绿色 quick 切片
 产物(`benchmark_20261010_002510.json`,async 64 例 FP0/FN0/ERROR0)补入库。
+
+## Phase 213:DOM 投递键名回带 finding.param(210b 记账的"下一轮"落地)
+
+Phase 210b 记的缺口:真靶上那条最强的 finding(browser-executed 的
+`dom_dynamic`,落在 `#/search?q=`)里 **param=None** —— 引擎明明知道投递键
+(`_probes()` 造的 `#/search?q=` URL),报告的参数列却是空的,verify_fix 只能走
+`params["_"]` 兜底,修的人看不出该改哪个键。本轮把键名带回去,并按 Phase 209
+的说法用**来源限定形式**:`q@hash` —— 它必须一眼读出"这不是 query 参数"
+(fragment 永远不上 HTTP 线),否则下游会拿它造假重放。
+
+**七处生产改动**:
+1. `dom_engine._probes()`:三个键位探针携带 `param` —— 命名 query 探针
+   (`q`)、通用 search 探针(`__xss__`)、命名 hash 探针(`q@hash`);无键位
+   探针(裸 fragment/href/pathname/referrer/cookie/window.name/postMessage)
+   不带该键。
+2. `analyze()` 命中归因:finding dict 带 `"param": probe.get("param")`。
+3. sync `scanner_layers` / 4. async `async_scanner_layers`:`dom_dynamic`
+   Finding 回带 `d.get("param")`(静态 `dom` 提示仍 None —— 静态线索没有投递
+   发生,编一个键是造假)。
+5. `scanner._dedup_key`:dom 类键改为 **param 不敏感** —— 不改这条,"同一
+   sink 经 search 与 hash 都到达"会拆成两条 finding(今天靠 param=None 合并);
+   修的是 sink,组身份不该含键。findings 计数逐位不变。
+6. `poc.py`:`@hash` 参数**不得**落进 query-curl 分支(dom finding 的
+   method=GET 恰是那个分支的触发条件,不守卫就会产出 `?q@hash=<img …>` 的假
+   curl);HTML PoC 改按 finding 的 param 投递 —— `q@hash` → fragment 键位
+   (路由路径必须存活,复用 `_with_hash_param_value`),普通键 → query 键位
+   (复用 `_with_param_value`),无键保持原形。顺带修了一个旧形状:query 投递
+   的 dom finding,HTML PoC 过去导航到 `#payload`(错误源),现在导航到
+   `?q=payload`(扫描器真实投递的源)。
+7. `verify_fix._replay_request` + `_nuclei_template`:`@hash` 一律按无键处理
+   (兜底槽 / 键less 模板)—— 把 `q@hash` 当真查询参数打线上,重放必然"没有
+   载荷回来 → 判 fixed",是修复报告最坏方向(201 续十四的原话)。
+
+**门(15 例,`tests/test_phase213_dom_param_key.py`)**:探针契约**双向**钉死
+(带键探针逐个点名 + 无键探针集合恰好七个,未来探针既不能悄悄长出假键、
+键位探针也不能悄悄丢键);sync/async 回带(罐头引擎,无浏览器);去重 param
+盲性 + 非 dom 反向对照;poc 三形态(键位 curl/HTML 逐字符断言,含 `&amp;`
+转义);replay 两形态(录制型 requester,载荷必须带 vfix_ token —— 用
+alert 载荷,mark() 对无 callable 载荷不打 token 是文档化语义,第一版断言
+在这里翻过车);nuclei 无键。**变异对照四条全承重**(poc 守卫/verify_fix
+守卫/去重盲性/回带传播,摘掉即红,逐字节还原)。
+
+**端到端**:`test_phase209_spa_route_delivery`(真 Chromium,双引擎)的交付
+断言扩一行 —— hash 路由 sink 的 finding **param 必须是 `v@hash`**(该 fixture
+上裸 fragment 探针渲染空串,只有命名键探针能点火,断言不会被探针顺序稀释);
+**4/4 passed(73.66s)**。
+
+**回归**:受影响面 277 例全绿(离线 156 + report/verify_fix 79 + poc fidelity/
+fp scoring/async dom 42);strict 64 例切片双引擎 **FP0/FN0/ERROR0 f1=1.000**
+(sync TP36/TN28 343.7s;async TP36/TN27 299.0s,1 SKIP = sync-only)——
+与 Phase 190 以来基线逐项相同,dom 用例 findings 计数不变(去重守卫的实证);
+ruff 零告警。**未跑**:全量 192 例矩阵与 parity DOM 切片 —— 判定路径零改动
+(探针 URL/命中/引擎去重全不变,只有 param 字段传播),切片已覆盖 dom 族;
+按"改动面>切片"的记账惯例如实记下。
+
+**一条边界如实记**:引擎的 `seen` 去重按 (sink, source) 取**第一个**探针的
+命中 —— 若页面"任意参数都进 sink",通用 `__xss__` 探针(排在命名 swap 之前)
+先命中,finding 的 param 就是 `__xss__` 而非具体键。这是诚实形状("证明了
+任意键可行"),命名优先排序是另一处行为变更,本轮不做。
