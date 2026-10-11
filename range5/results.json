@@ -1,0 +1,98 @@
+{
+  "meta": {
+    "range": "range5",
+    "generated": "2026-10-11 20:28:20",
+    "engines": [
+      "sync",
+      "async"
+    ],
+    "max_payloads": 8,
+    "max_transforms": 4,
+    "per_case_timeout": 180,
+    "construct_validity": "server bytes are query-independent (static shells); pinned by tests/test_range5.py"
+  },
+  "counts": {
+    "sync": {
+      "TP": 1,
+      "FP": 0,
+      "TN": 1,
+      "FN": 0,
+      "ERROR": 0
+    },
+    "async": {
+      "TP": 1,
+      "FP": 0,
+      "TN": 1,
+      "FN": 0,
+      "ERROR": 0
+    }
+  },
+  "rows": [
+    {
+      "engine": "sync",
+      "case_id": "r5-pos-lit-unsafehtml",
+      "verdict": "TP",
+      "findings": 2,
+      "confirmed": 1,
+      "elapsed_s": 11.4,
+      "findings_detail": [
+        {
+          "type": "dom_dynamic",
+          "severity": "high",
+          "context": "Element.innerHTML",
+          "headless_outcome": "fired"
+        },
+        {
+          "type": "framework_lit_xss",
+          "severity": "medium",
+          "context": "framework_lit",
+          "headless_outcome": null
+        }
+      ],
+      "error": ""
+    },
+    {
+      "engine": "sync",
+      "case_id": "r5-neg-lit-text",
+      "verdict": "TN",
+      "findings": 0,
+      "confirmed": 0,
+      "elapsed_s": 11.7,
+      "findings_detail": [],
+      "error": ""
+    },
+    {
+      "engine": "async",
+      "case_id": "r5-pos-lit-unsafehtml",
+      "verdict": "TP",
+      "findings": 2,
+      "confirmed": 1,
+      "elapsed_s": 11.2,
+      "findings_detail": [
+        {
+          "type": "framework_lit_xss",
+          "severity": "medium",
+          "context": "framework_lit",
+          "headless_outcome": null
+        },
+        {
+          "type": "dom_dynamic",
+          "severity": "high",
+          "context": "Element.innerHTML",
+          "headless_outcome": "fired"
+        }
+      ],
+      "error": ""
+    },
+    {
+      "engine": "async",
+      "case_id": "r5-neg-lit-text",
+      "verdict": "TN",
+      "findings": 0,
+      "confirmed": 0,
+      "elapsed_s": 11.1,
+      "findings_detail": [],
+      "error": ""
+    }
+  ]
+}

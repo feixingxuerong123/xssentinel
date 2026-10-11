@@ -1,0 +1,10 @@
+{
+ "range": "range5",
+ "note": "REAL-framework range: Lit 3 unsafeHTML against a text-interpolation twin. Vendor bundles are pinned upstream releases served locally. The param NEVER touches server-side bytes (both pages are static shells; the app reads location.search client-side) -- construct validity by construction. All sinks are client-side: headless confirmation required.",
+ "cases": [
+  {"id": "r5-pos-lit-unsafehtml", "gt": "vulnerable", "path": "/unsafe", "param": "q", "headless": true,
+   "note": "URLSearchParams -> Lit unsafeHTML directive: parses markup by design (the analogue of React dangerouslySetInnerHTML / Vue v-html)"},
+  {"id": "r5-neg-lit-text",      "gt": "safe",       "path": "/safe",   "param": "q", "headless": true,
+   "note": "same param into ${expr} interpolation: Lit renders a TEXT node (auto-escaping), safe by construction"}
+ ]
+}

@@ -2177,3 +2177,45 @@ WAF 误检维持 209 已记账的两态形状(sync=Generic/Unknown、async=Cisco
 
 顺带:我误用 `js-official` 树时的环境动作已全部还原(挪走的 sqlite 归位、
 误建的空库删除),该树属于上一轮的探索残骸,不是本仓靶。
+
+## Phase 220:range5 —— Lit 真实框架靶场(2.3 的 Lit 线落地,门全绿)
+
+`dev/fetch_range5_vendor.py`(201 时代埋的伏笔)的选型论证成立:**三个
+剩余框架里只有 Lit 发布浏览器就绪的 ES module、无需编译步**(Svelte 的
+npm 包是编译器、Angular 要 TS+AOT,都得起工具链),且它带着精确的目标
+sink:`unsafeHTML` —— React `dangerouslySetInnerHTML` / Vue `v-html` 的
+Lit 对应物;safe 孪生是 `${expr}` 插值(Lit 渲染为 text node)。
+
+**四件套**:
+1. `range5/vendor/`(lit 3.3.3 / lit-html 3.3.3 / lit-element 4.2.2 /
+   @lit/reactive-element 2.1.2,共 141 个 .js,~396KB,npm tarball 直拉,
+   README 记版本可复跑);
+2. `range5/server.py` —— **参数零服务端插值**:两页都是静态壳,参数只活
+   在 `location.search` 由客户端读(range4 首版"safe 孪生的 config line
+   本身是 script-string sink"教训的全强度应用 —— 构造效度按构造成立,
+   不靠探针事后证明);
+3. `range5/manifest.json` + `range5/runner.py`(range4 门语义:TP/TN 必须
+   全中,FN/FP/ERROR ⇒ exit 1,`--out` 保留产物);
+4. `tests/test_range5.py` —— **构造效度做成入库守卫**(三种 query 的响应
+   字节相等 + attacker 串缺席,不再是一次性 dev 探针)、vendor 完整性
+   (真实入口文件 + README 版本钉)、`score()` 门语义单元、真浏览器对。
+
+**首跑抓到的真问题(活体对的价值)**:import map 想当然指向
+`lit-html/index.js` —— **lit-html 与 @lit/reactive-element v3 的包根是
+以包名命名的单模块**(无 index.js),错误入口让模块图 404、页面静默渲染
+为空、unsafeHTML 根本不执行 —— 活体对当场红,修正为
+`lit-html/lit-html.js` / `reactive-element/reactive-element.js` 后转绿,
+入口文件名钉进守卫。**sink 可观测性也实测过而非假设**:unsafeHTML 的
+提交走 `Element.innerHTML` setter(lit 模板自身解析不含 marker,无误命中
+源),引擎的原型钩子照常看见;text 孪生走 text node,无 sink。静态门
+(`page_can_run_sink` 对"sink 在 vendor 文件里的内联 module 页")担心的
+浏览器跳过没有发生。
+
+**门(双引擎,`range5/results.json` 入库)**:sync 与 async 各
+**TP1/FP0/TN1/FN0/ERR0,exit 0** —— pos 两侧都是 browser-confirmed=1
+(`dom_dynamic` high @ `Element.innerHTML`/fired),neg 全空。CI 已挂
+range5 钻孔(range4 旁,同门标准)。
+
+**记账**:2.3 的 Lit 线完成;Svelte/Angular 仍缺(需要编译工具链,
+按 vendor 脚本的论证记为独立轮);`page_can_run_sink` 对内联 module +
+vendor sink 页形的放行是本轮实测到的行为,若未来收紧需带本靶回归。
