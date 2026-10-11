@@ -2219,3 +2219,65 @@ range5 钻孔(range4 旁,同门标准)。
 **记账**:2.3 的 Lit 线完成;Svelte/Angular 仍缺(需要编译工具链,
 按 vendor 脚本的论证记为独立轮);`page_can_run_sink` 对内联 module +
 vendor sink 页形的放行是本轮实测到的行为,若未来收紧需带本靶回归。
+
+## Phase 221:六项收尾 —— 假回归复盘 + 被 kill 的跑分不再堆积临时文件
+
+批准清单六项的收尾轮。前四项此前已各自落地(`2c2f613` Phase 185 /
+`e897ea9` p212 记账 / `fa8e3c1` range5),本轮处理第五、六项,以及
+一次**发生在会话压缩之后**的回归复现。
+
+### p212 假回归的复盘:第一次复现也是假的
+
+会话检查点记录 p212 "sync 113→92 / async 108→33,待查"。HEAD 实际
+已到 Phase 220 —— `e897ea9` 已判定那是测量事故并归档无效产物。但本轮
+**第一次复现尝试同样是假阳性**,值得单独记账,因为它踩的是一个反复出现
+的坑:
+
+新写的 `dev/_replay_case.py` 起 `ThreadingHTTPServer` 后直接评测,
+`pos-script-02` 报 `detected=false / requests=53 / 0.459s` —— 形状与
+p212 的 FN 完全一致。**但它没有任何路由**:`run_benchmark_batched.py`
+的 `start_server()` 在 84 行做 `BenchmarkHandler.routes = load_routes()`,
+漏掉这行的探针让每个 case 都在对着 404 页面评分,而 404 页的形状恰好
+也是"请求正常、快速、无 error、零发现"。补上后同 case 立刻 **TP**。
+
+教训与既有规则同形:**一个"沉默且形状正确"的探针在证明任何事之前,先
+证明它真的到达了注入点**。p212 的调查者(我)与 Phase 211 摘要里"VOID
+probe"清单是同一条规则的两次应用。
+
+### 第五项:三文件从来不是 flaky,是被残留进程连累
+
+`test_api_ai_report.py` / `test_p27_api.py` /
+`test_vuln_server_concurrency.py` 在整套里长期 5 failed(全在
+`test_p27_api.py::TestEndToEndScan`)。独占重跑结论:
+
+| 组合 | 结果 |
+|---|---|
+| 三个文件单独跑 | 26 / 87 / 6 全 passed |
+| `api_ai_report` + `p27_api` | 113 passed |
+| `concurrency` + `p27_api` | 93 passed |
+| 三个一起(独占) | **119 passed in 76.40s** |
+| 三个一起(此前) | 5 failed, 228.66s |
+
+两两组合全绿、三者合跑也绿 ⇒ **不是产品缺陷**。真因是本会话早先被
+kill 的 benchmark 跑分留下的 `vuln_server.py` 进程仍占着 **8899**:
+`test_p27_api.py` 的 `vuln_server` fixture 是**函数作用域**,每个
+测试 spawn 一个绑死 8899 的进程再 terminate,残留进程让后续 spawn
+抢不到端口。独占跑之前先确认无 python 残留,该行即转绿。
+
+### 第六项:根因修复而不只是删文件
+
+252 个 `tmp*.json`(1.5 MB,git 全未跟踪)已删。但删完只是回到原状 ——
+它们由 `benchmark/runner.py` 的 `_report_tmp_path()` 每线程写一份,
+靠 `atexit` 回收;**被 kill 的跑分永远到不了 atexit**,而本仓在 Windows
+上被取消的跑分比跑完的多。新增 `_sweep_stale_report_tmps()`:在 runner
+**创建自己那份临时文件的同一刻**清扫(不在 import 期,避免给 pytest
+收集加副作用)。
+
+承重的是 age 阈值 —— **并发跑的另一个 benchmark 持有形状完全相同的活
+临时文件,age 是唯一能区分二者的信号**,故默认 6h 远大于观测到的最长
+一轮(~22min)。两个守卫都做了变异验证:去掉 age 检查 →
+`test_sweep_leaves_a_concurrent_runs_live_files_alone` FAIL;把形状
+匹配放宽成 `*.json` → `test_sweep_ignores_files_that_are_not_temp_shaped`
+FAIL。另三个测试覆盖目录缺失与 listdir/unlink 的 TOCTOU 竞态。
+
+`benchmark/results/` :252 → 0 个 tmp,12.15 MB → 10.65 MB。
