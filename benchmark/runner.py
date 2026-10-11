@@ -192,6 +192,12 @@ _TMP_LOCK = threading.Lock()
 def _report_tmp_path() -> str:
     path = getattr(_TMP_TLS, "path", None)
     if path is None:
+        # A killed run never reaches atexit, so the orphans are swept here --
+        # at the moment this runner is about to write its OWN temp file, and
+        # only once per thread (the guard below), never at import time.
+        if not getattr(_TMP_TLS, "swept", False):
+            _TMP_TLS.swept = True
+            _sweep_stale_report_tmps()
         fd, path = tempfile.mkstemp(suffix=".json", dir=str(_RESULTS_DIR))
         os.close(fd)
         _TMP_TLS.path = path
@@ -208,6 +214,42 @@ def _cleanup_report_tmps() -> None:
             os.unlink(p)
         except OSError:
             pass
+
+
+def _sweep_stale_report_tmps(max_age_s: float = 6 * 3600.0) -> int:
+    """Remove report temp files orphaned by a KILLED run.
+
+    Phase 97 onwards every case writes its raw CLI report into a per-thread
+    temp file under ``results/``.  ``atexit`` removes them, but a run that is
+    killed (this repo has spent more cancelled benchmark runs than completed
+    ones on Windows) never reaches it -- 252 orphans had accumulated, 1.5 MB
+    of JSON no code references.
+
+    A file is only swept when it is older than ``max_age_s``, because a
+    CONCURRENTLY RUNNING benchmark's worker threads own live temp files of
+    exactly the same shape.  Age is the only signal that separates the two,
+    so the default has to exceed a full run (the longest observed is ~22 min).
+    """
+    import time as _time
+    now = _time.time()
+    removed = 0
+    try:
+        names = os.listdir(str(_RESULTS_DIR))
+    except OSError:
+        return 0
+    for name in names:
+        # The prefix is what mkstemp() produces with no prefix argument.
+        if not (name.startswith("tmp") and name.endswith(".json")):
+            continue
+        full = _RESULTS_DIR / name
+        try:
+            if now - full.stat().st_mtime < max_age_s:
+                continue
+            os.unlink(full)
+            removed += 1
+        except OSError:
+            pass
+    return removed
 
 
 # Belt-and-braces: a transient Windows file lock can defeat the in-run
