@@ -1988,3 +1988,40 @@ sync Playwright 浏览器(及其 loop)绑到主测试线程,同一进程里 215 
 Phase 203 的既定形状:两个文件的 async 半场各跑**独立线程**(600s 上限,
 超时报"跨线程 loop 楔死"而非静默挂)。修后合跑 **46 passed / 240s**。
 同机 vuln-agent 负载只放大墙钟,不是成因。
+
+## Phase 216:爬取端点接 L8 载体与 JSONP 审计 —— 2.1.1 的爬取对等收官
+
+`_crawl_page_layers` 增至五层(`_scan_dom_async` / `_scan_advanced_page` /
+`_scan_csp_async` / **`_scan_request_layers`** / **`_scan_jsonp_async`**),
+helper 签名扩 `method`/`data` 透传(mined POST 表单的载体形状不再丢失)。
+**CORS 与 XS-Leaks 刻意不接**:两层在层内按 **origin** 去重
+(`_cors_checked` / `_xsleak_audited`),种子跑过之后,每个端点上的调用
+结构性不可达 —— 接了就是一根永远点不火的装饰线,按"不为对齐清单直接加
+sink"的同一条纪律记在注释里。
+
+**门(`tests/test_phase216_crawl_request_layers.py`,4 例)**:L8 端到端
+—— 链接页 `/l8` 把 User-Agent 头**原样**反射进 HTML,L8 的 UA 探针必须
+在爬取页上确认(param=`(header:User-Agent)`);JSONP 端到端 —— `/jp` 把
+任意 callback 名回显进 `<script>` 块(内联 JSONP 胶水形状),审计探针必须
+确认;textContent 安全孪生全静默;静态守卫(五层齐)。
+**变异对照 M1/M2 全承重**(L8 摘除 / JSONP 摘除),逐字节还原。
+
+**过程中量到并如实记下的一处层固有边界**:JSONP 层的确认完全依赖
+`verify_semantic`,而泛型上下文分析**没有 jsonp 感知** —— 裸 JS 文档
+(`cb({...})` + `application/javascript`)被判 html_element 非可执行;
+矩阵里也**没有任何 jsonp_xss 阳性用例**(只有 whitelist 安全孪生)。
+本轮不改判定(动判定面需要自己的对照 oracle),fixture 用
+`<script>` 包裹回显(内联 JSONP 胶水,script_block 上下文可确认)。
+裸 JS 响应的确认门记为**该层自身的既有形状**,与种子路径完全同款 ——
+接线对等不因此打折:层在爬取页上跑的是同一段代码。
+
+**fixture 自身的两次翻车(都当场被门抓住)**:① `staticmethod(_serve_vuln)`
+把 `self` 绑没了,每个请求 TypeError —— 而 safe 孪生的"静默"断言**空洞
+变绿**(服务器全挂 ⇒ 无 finding ⇒ 断言空转),正是"零永远不是通过"的
+201 续十六形状,靠阳性用例红才暴露;② 裸 JS fixture 想当然以为确认门认
+Content-Type —— 实测不认,才有了上面的边界记录。
+
+**回归**:214/215/216 门 + phase209 家族 + async wiring + 层记账 + 证据
+覆盖全绿;ruff 零告警;benchmark 矩阵结构性不可达(manifest 不开 crawl)。
+**2.1.1 至此全部收口**:sync 对 async 的爬取对等 = 反射探针(46)+ 页层
+五件套(214/215/216)+ mined 带参探针(176s/209),无一层缺席。

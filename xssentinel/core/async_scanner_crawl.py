@@ -294,23 +294,35 @@ class AsyncCrawlMixin:
         return extra
 
     async def _crawl_page_layers(self, url: str, text: str,
-                                 resp_headers: dict, params: dict):
-        """Phase 214/215: the page-level layers a CRAWLED endpoint gets.
+                                 resp_headers: dict, params: dict,
+                                 method: str = "GET",
+                                 data: dict | None = None):
+        """Phase 214/215/216: the page-level layers a CRAWLED endpoint gets.
 
-        The parity target is ``scan_endpoint``'s stack; this helper carries
-        the subset that needs only the page itself (``_scan_reflected``
-        already ran at discovery with the endpoint's own parameters).  CSP
-        rides the endpoint's OWN response headers (Phase 215 plumbing) --
-        the seed gets the same layer from the main loop with the seed's
-        headers.  L8 / JSONP / CORS / XS-Leaks stay recorded-off for crawled
-        endpoints: each opens its own request budget, which is its own
-        measured round (OPTIMIZATION 2.1.1 keeps that line visible).
+        The parity target is ``scan_endpoint``'s stack.  CSP rides the
+        endpoint's OWN response headers (Phase 215 plumbing) -- the seed
+        gets the same layer from the main loop with the seed's headers.
+        Phase 216 adds the L8 request-injection carriers and the JSONP
+        audit: sync runs both on every crawled endpoint, and neither needs
+        anything but the endpoint itself (JSONP opens its own short-lived
+        session; L8's probes are a handful of requests).
+
+        CORS and the XS-Leaks audit stay OUT deliberately: both dedupe per
+        ORIGIN inside the layer (``_cors_checked`` / ``_xsleak_audited``),
+        so a per-endpoint call is structurally unreachable after the seed's
+        run -- wiring it would be a decorative call that can never fire.
         """
-        async for finding in self._scan_dom_async(url, text, "GET", params):
+        async for finding in self._scan_dom_async(url, text, method, params):
             yield finding
         async for finding in self._scan_advanced_page(url, text, params):
             yield finding
         async for finding in self._scan_csp_async(url, resp_headers, text):
+            yield finding
+        async for finding in self._scan_request_layers(
+                url, method, params, data or {}):
+            yield finding
+        async for finding in self._scan_jsonp_async(
+                url, method, params, data or {}):
             yield finding
 
     async def _crawl_and_scan(self, session, start_url: str,
@@ -410,8 +422,7 @@ class AsyncCrawlMixin:
                     bare_url = current_url.split("?", 1)[0]
                     async for finding in self._crawl_page_layers(
                             bare_url, text, resp_headers, pop_params):
-                        yield finding
-            # Phase 214: extraction and mining stay depth-bounded exactly as
+                        yield finding            # Phase 214: extraction and mining stay depth-bounded exactly as
             # before -- a max-depth LINK entry was fetched for its OWN page
             # layers above, but contributes no child frontier.
             if depth >= self.crawl_depth:
@@ -509,7 +520,8 @@ class AsyncCrawlMixin:
                         m_text, m_headers = "", {}
                     if m_text:
                         async for finding in self._crawl_page_layers(
-                                m_base, m_text, m_headers, m_params):
+                                m_base, m_text, m_headers, m_params,
+                                method=m_method, data=m_data):
                             yield finding
             for f in mined_observations:
                 yield f
