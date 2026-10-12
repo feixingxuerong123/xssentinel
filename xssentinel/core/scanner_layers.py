@@ -373,6 +373,23 @@ class AdvancedLayerMixin:
                 context="csp_header",
                 severity="medium" if report.bypassable else "info",
                 type="csp_bypass",
+                # Phase 222: same defect class Phase 198 fixed for polyglot
+                # and Phase 209 for template_ssti_* -- this branch appends the
+                # Finding directly instead of going through ``_record``, so
+                # an unset ``confidence`` reached the report as null while
+                # every severity-driven consumer (report table, SARIF level,
+                # sorting) read it.  Measured as the ONLY confidence-less
+                # finding type in the whole 192-case matrix: dev/
+                # _parity_matrix.py drives both engines over all 182
+                # comparable cases and this was one of exactly two
+                # divergences, the async side already carrying
+                # confidence="medium" (async_scanner_layers.py:497).
+                #
+                # Medium is the honest value for the same reason Phase 209
+                # gave: the header parse is deterministic, but "this policy is
+                # bypassable" is inferred from policy analysis -- no browser
+                # ever executed anything through the claimed path.
+                confidence="medium",
                 evidence_class=EVIDENCE_NO_BROWSER,
                 evidence="; ".join(report.weak),
                 csp_header=csp_header,
