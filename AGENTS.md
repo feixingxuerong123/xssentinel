@@ -2381,6 +2381,39 @@ test_layer_guard.py:65  "wiring error was not escalated to WARNING"
 住在那里)。变异验证:关掉还原 → 精确复现 3 个失败;打开 → 15 passed /
 0.31s。
 
+### Phase 221d:全量 11 → 3,收尾只余两个环境 flake
+
+日志隔离落地后跑全量(13h03m,比前两次都慢 —— 本机退化):
+
+| | 第一次 | 第二次 | 第三次(修完 221c) |
+|---|---|---|---|
+| failed | 11 | 8 | **3** |
+| passed | 3123 | 3123 | **3137** |
+| `[loop-leak]` | (stderr 被吞) | (stderr 被吞) | **0** |
+
+`test_layer_guard` / `test_scenarios` / `test_vuln_server_concurrency` 三簇
+**整簇消失** —— 印证 221c 的定因。剩下的 3 个里又定因 1 个:
+
+**`test_range5.py::test_score_gate_semantics` —— 模块名撞车**。它写的是
+`from runner import score`,而本仓有**第二个**叫 `runner` 的模块
+(`benchmark/runner.py`)。裸名按 `sys.path` 顺序解析,全量跑里前面的用例
+已经把其中一个塞进 `sys.modules`,于是绑错文件:
+
+```
+ImportError: cannot import name 'score' from 'runner'
+  (D:\qoder\xssentinel\benchmark\runner.py)
+```
+
+改成按路径 `spec_from_file_location` 载入。**同名模块共用一条
+`sys.path` 就是一个等收集顺序来引爆的撞车**,把文件名写进代码即可消除。
+复现组合(`test_benchmark.py` + `test_range5.py`)验证:41 passed。
+
+**余下 2 个判为环境 flake,未修**:
+`test_passive_proxy::test_oversized_body_refused_413`(起代理,端口/时序
+依赖,单独跑 1 passed)与
+`test_range5::test_vulnerable_page_yields_browser_executed_dom_finding`
+(真实浏览器,单独跑 6/6 绿)。两者在 13 小时长跑里现,单独可复现不了。
+
 ### 本轮保留的取证工具(`dev/`,gitignore 内)
 
 | 工具 | 用途 |
