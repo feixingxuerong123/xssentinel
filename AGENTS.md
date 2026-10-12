@@ -2426,8 +2426,53 @@ ImportError: cannot import name 'score' from 'runner'
 | `_p23_poison_probe.py` | 无 pytest 复现 `configure_logging` 如何废掉 caplog |
 | `_suite_keep_stderr.py` | 全量跑,**stdout/stderr 直落盘**(被杀也不丢证据) |
 | `_replay_case.py` | 单例复现(走 benchmark 自己的 server,**含 load_routes**) |
+| `_parity_matrix.py` | 双引擎跑遍 manifest 182 例,量对等分歧(**入口点必须对齐**) |
+| `_entry_point_probe.py` | 证 pos-pmmine-01 的"分歧"来自量具:scan_endpoint vs scan_target |
+| `_parity_repro.py` | 单例分歧多轮复现,防把单次噪声当分歧 |
+| `_bench_err_retry.py` | 逐例重跑 benchmark 的 ERROR,分清环境超时与真缺陷 |
 
 最后一条是本轮最贵的一课:**它第一版漏了
 `BenchmarkHandler.routes = load_routes()`(batched runner 在 84 行做),
 于是每个 case 都在对着 404 评分,而 404 页的形状恰好就是 FN 的形状**
 (请求正常、快速、无 error、零发现)。与既有 "VOID probe" 清单同源。
+
+## Phase 223:靶场能力全量启动 —— range3/4/5 + benchmark 双引擎零漏报零误报
+
+请求是「启动靶场测试能力」,按**门语义**逐个跑真跑分器(不是测试套件):
+`range3/runner.py`、`range4/runner.py`、`range5/runner.py`、
+`benchmark/run_benchmark_batched.py`,双引擎各自独立进程。
+
+| 靶场 | 例数 | sync | async |
+|---|---|---|---|
+| range3(存储/二阶/会话/JSON) | 26 | **TP20 FP0 TN6 FN0 ERR0** | **TP18 FP0 TN6 FN0 SKIP2 ERR0** |
+| range4(React/Vue 真实框架) | 4 | TP2 FP0 TN2 FN0 ERR0 | TP2 FP0 TN2 FN0 ERR0 |
+| range5(Lit 真实框架) | 2 | TP1 FP0 TN1 FN0 ERR0 | TP1 FP0 TN1 FN0 ERR0 |
+| benchmark(自建矩阵) | 192 | **TP113 FP0 TN79 FN0 ERR0** | TP108 FP0 TN71 FN0 **ERR3** |
+
+**漏报与误报在所有四个靶场、两个引擎上一律为零**;sync benchmark
+recall=precision=f1=**1.000**(944s)。range4/5 的每个阳性都带
+**browser-confirmed**(`fired`:range4 每例 12 次,range5 每例 1 次),
+即"真浏览器执行过"而不是静态推断。
+
+**两笔必须读准的账,不许合并**:
+
+1. **async benchmark 的 3 个 ERROR 是环境,不是产品**:`neg-mx-01` /
+   `aux-s-formecho01` / `aux-s-jsecho01` 全部是 `timeout after 30s` 的
+   **同一形状**(本机 loopback 退化)。但"看起来像环境"是断言不是测量,
+   所以 `dev/_bench_err_retry.py` **逐例重跑**:9.7s / 1.2s / 0.5s,
+   0 findings、gt=safe —— **三条全部是正确的 TN**。async 的净成绩因此是
+   **TP111 FP0 TN74 FN0 ERR0**,recall=precision=1.000。
+2. **async 的 2 个 SKIP 不是漏测**:range3 manifest 里
+   `r3-pos-stored` 与 `r3-pos-so2` 标了 `engines: ["sync"]` —— 存储型要两趟
+   stored 路径,async 无此路径,故 manifest 主动排除。两条在 sync 上都是
+   **TP**。与 benchmark 里 10 例 `engines` 单边、parity 矩阵 182 例可比的
+   排除口径**完全一致**。
+
+**range5 跨引擎 finding 形状(核过,不是只看 verdict)**:两侧都是 2 条,
+只是顺序相反 —— `dom_dynamic/high/Element.innerHTML/fired`(浏览器确认)
++ `framework_lit_xss/medium/framework_lit/None`(静态层)。**集合相同、
+   顺序不同**,parity 门按规范化多重集比,不看顺序。
+
+**产物**:`dev/_r3_{sync,async}.json`、`dev/_r4_both.json`、
+`dev/_r5_both.json`、`dev/_bench_{sync,async}.json`(皆 dev/ 内,不入库;
+入库的仍是各 range 自带 results.json)。
