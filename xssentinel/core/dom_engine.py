@@ -677,6 +677,20 @@ def get_shared_browser():
                 return b
         except Exception:
             pass
+        # Phase 224: a DEAD thread-local browser (Chromium crashed / was
+        # OOM-killed / died with host pressure) used to be a one-way door.
+        # Its playwright instance left a greenlet loop parked in THIS
+        # thread, so the _loop_running() guard below refused every later
+        # launch and every analyze()/verify_headless()/harvest() in this
+        # thread silently returned nothing for the rest of the process --
+        # the silent-FN direction.  Measured as the test_range5 live-pair
+        # flake ("all findings: []" after a 13h suite run;
+        # dev/_stale_browser_probe.py reproduces it deterministically).
+        # Unwind the stale instance FIRST: shutdown_thread_browser() parks
+        # the old loop out of the way (verified: loop stops, relaunch
+        # succeeds -- dev/_stale_unwind_probe.py), then the launch below
+        # runs clean.
+        shutdown_thread_browser()
     # Playwright's sync API runs its asyncio loop *in the calling thread*
     # (greenlet-based).  Starting it while a loop is already running here
     # corrupts that loop and breaks every later asyncio.run() in the
@@ -1078,7 +1092,12 @@ class DynamicDomAnalyzer:
             browser = get_shared_browser()
             page = browser.new_page(
                 extra_http_headers=self.auth_headers or None)
-        except Exception:
+        except Exception as e:
+            # Phase 224: same never-silent rule as analyze() -- "no live
+            # input face was harvested" and "the browser could not start"
+            # must not look identical in the logs.
+            _log.warning("dom: harvest could not open a page for %s "
+                         "(%s: %s)", url, type(e).__name__, e)
             return empty
         try:
             if self.auth_cookies:
@@ -1327,10 +1346,6 @@ class DynamicDomAnalyzer:
         """
         if not self.available():
             return []
-        try:
-            pass
-        except Exception:
-            return []
         marker = marker or (_stem_marker("xssentinel_dom_") + secrets.token_hex(4))
         findings: list = []
         seen: set = set()
@@ -1565,6 +1580,16 @@ class DynamicDomAnalyzer:
                     page.close()
                 except Exception:
                     pass
-        except Exception:
+        except Exception as e:
+            # Phase 224: this used to be a bare `return []`, which made
+            # "the browser could not run at all" (stale shared instance,
+            # failed launch, host pressure) indistinguishable from "the
+            # page is clean" -- the exact shape that hid the range5
+            # live-pair failure as `all findings: []` for a whole 13h
+            # suite run.  A whole capability being unavailable is not a
+            # best-effort detail: warn with the reason.
+            _log.warning("dom: browser analysis failed for %s (%s: %s) -- "
+                         "dynamic DOM confirmation unavailable for this "
+                         "call", url, type(e).__name__, e, exc_info=True)
             return []
         return findings

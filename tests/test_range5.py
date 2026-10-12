@@ -153,8 +153,34 @@ def _scan(port: int, path: str):
     return [f.data or {} for f in sc.findings]
 
 
+def _live_browser_reason() -> str:
+    """'' when a real browser can be driven, else why it cannot.
+
+    Phase 224: the live pair used to fail with "no browser-executed DOM
+    finding ... all findings: []" whenever Chromium could not start --
+    a crashed shared browser (get_shared_browser() raising inside
+    analyze()'s catch-all) and a failed launch are indistinguishable
+    from the findings list.  The product fix makes a stale instance
+    self-heal; this guard turns a genuinely unavailable browser into a
+    skip that names the cause.  It matters doubly for the SAFE twin:
+    without a browser that test would pass vacuously (a false green --
+    a must-not assertion with no sensitivity anchor).
+    """
+    from xssentinel.core import dom_engine
+    try:
+        browser = dom_engine.get_shared_browser()
+        if not browser.is_connected():
+            return "shared browser exists but is not connected"
+        return ""
+    except Exception as e:
+        return f"{type(e).__name__}: {e}"
+
+
 @needs_browser
 def test_vulnerable_page_yields_browser_executed_dom_finding(lab_port):
+    reason = _live_browser_reason()
+    if reason:
+        pytest.skip(f"live browser unavailable: {reason}")
     found = _scan(lab_port, "/unsafe")
     dyn = [f for f in found
            if f.get("type") == "dom_dynamic"
@@ -168,6 +194,9 @@ def test_vulnerable_page_yields_browser_executed_dom_finding(lab_port):
 
 @needs_browser
 def test_safe_twin_stays_silent(lab_port):
+    reason = _live_browser_reason()
+    if reason:
+        pytest.skip(f"live browser unavailable: {reason}")
     found = _scan(lab_port, "/safe")
     dyn = [f for f in found if f.get("type") == "dom_dynamic"]
     assert not dyn, (

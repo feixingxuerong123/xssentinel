@@ -2476,3 +2476,74 @@ recall=precision=f1=**1.000**(944s)。range4/5 的每个阳性都带
 **产物**:`dev/_r3_{sync,async}.json`、`dev/_r4_both.json`、
 `dev/_r5_both.json`、`dev/_bench_{sync,async}.json`(皆 dev/ 内,不入库;
 入库的仍是各 range 自带 results.json)。
+
+## Phase 224:共享浏览器崩溃后的静默丢失 —— 一个真缺陷,和两个套件 flake 的收尾
+
+请求是「优化测试」。起点是 Phase 221d 留下的两个**环境 flake**(13h03m 全量里
+现、单独跑全绿、未定性)。动手前先取证——`dev/_suite_stdout.log`(10-12 16:26
+收尾的那轮)还在,三个失败的原始断言都拿到了:
+
+```
+test_passive_proxy.py:856: AssertionError: expected 413, got b''
+test_range5.py:105: ImportError: cannot import name 'score' from 'runner'   <- 221d 已修
+test_range5.py:148: AssertionError: no browser-executed DOM finding ...; all findings: []
+```
+
+### 1. `all findings: []` 不是环境,是一个确定性产品缺陷
+
+**机制(三级证据)**:
+① `dev/_stale_browser_probe.py` 确定性复现——TLS 里留一个死 browser
+   (`is_connected()` False、没走 `shutdown_thread_browser()`)后,
+   `get_shared_browser()` 抛 `RuntimeError`(死实例的 playwright 同步 API 已把
+   greenlet loop 停泊在本线程,`_loop_running()` 守卫拒绝再启动),
+   `analyze()` 的裸 `except Exception: return []` 把它吞掉;
+② `dev/_stale_unwind_probe.py` 证明修法可行——`shutdown_thread_browser()`
+   能把旧 loop 停出道路(`loop running: True → False`),重启成功;
+③ `dev/_stale_selfheal_probe.py` 真 Chromium 端到端——崩溃后直接再调
+   `get_shared_browser()`:**SELF-HEAL OK: True True**。
+
+**危害方向是最坏的静默 FN**:任何长扫描里 Chromium 崩一次(主机压力/OOM),
+本进程余下所有动态 DOM 确认、`verify_headless` 确认、harvest 全部静默变零,
+报告里一个字都不会提。`analyze()`/`harvest()` 的吞异常 except 因此补
+`_log.warning`(点名 URL + 异常类型)——"没有 finding"与"没有浏览器"
+从此在日志里不同形(221c 那个"日志状态污染"的邻居,同一个家族:
+**吞掉的是"锦上添花"还是"一个能力整体不可用"**)。
+
+**修法是一处,不是三处**:三个调用方(`analyze`/`harvest`/`verify_headless`
+加 mxss_verify)共用 `get_shared_browser()`,在入口处"失活先展开再重启",
+四家同时自愈。修共享路径前先 grep 全部调用方,是这个修法只改一行的原因。
+
+### 2. 413 flake:环境,按环境修,但断言一字未动
+
+`got b''` = 15 秒内一个字节都没收到。同文件同轮的 chunked 中继用例**通过**
+(小 body),失败集中在 **2.1 MB** 这一例;该轮整跑 13h03m vs 健康窗口 ~40min
+(**~20× 劣化**, runner 自己的 `_timings.txt` 与 AGENTS.md 221d 段都记了)。
+按第五/十二节判据(整轮耗时异常放大 + 单独全绿 + 同文件其他用例通过)
+定性为环境。修的是**预算与诊断**,不是判定:`_post_raw` 的 socket 超时
+15s→60s(2 MB loopback 传输在 20× 劣化下确实会超 15s),空响应时失败信息
+区分"主机劣化/代理从未应答",并写明"空响应不是截断转发的证据"。
+
+**顺带记一个未做的候选**:代理的 drain 循环只有字节上限、没有时间上限
+(`passive_proxy.py:_relay`),慢客户端可以钉死一个 handler 线程(DoS 形状)。
+本轮不动它——改真实客户端行为属于独立决策,已记入 docs/OPTIMIZATION.md。
+
+### 3. 测试侧三件
+
+- `tests/test_shared_browser_recovery.py`(3 例,0.28s,**无需真 Chromium**):
+  ① 死实例必被展开(pw.stop 被调)且重启返回新实例;② **反向守卫**——健康实例
+  原样返回、`pw.stop` 零调用(否则每次 analyze 都白付一次 ~1-2s 重启);
+  ③ `analyze()` 在 browser 路径抛错时必须 log WARNING 且点名 URL/异常。
+  两条**反证**各跑过:注掉 unwind → ①红;把 warning 改回裸 return [] → ③红。
+- `test_range5.py`:浏览器不可用 → 带原因 skip。**safe 孪生尤其需要这个**——
+  没浏览器时它原来是**假绿**(must-not 断言没有灵敏度锚,第十二节)。
+- `test_passive_proxy.py`:预算 + 诊断(见上)。
+
+### 4. 门禁
+
+新测试 3 passed;`test_range5` 6 passed(52.5s,含实时 Lit 对);
+`test_passive_proxy`+`test_layer_guard` 61 passed;`test_nav_recovery`+
+`test_dom_engine_probe_urls` 38 passed/4 skipped;`test_async_headless_verify`
+19 passed;pyflakes 四个改动文件零输出。全量分批回归另跑(见提交信息)。
+
+**没有跑基准**:本次只改浏览器**失活路径**——健康实例下行为逐字节不变
+(②号测试正是锁这个),判定语义零改动,够不上"改判定语义的验收四件套"。

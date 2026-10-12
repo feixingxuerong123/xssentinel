@@ -36,6 +36,27 @@
 
 ### Fixed
 
+- **共享 Chromium 崩溃后全进程静默丢失 DOM 确认(Phase 224)**:`get_shared_browser()`
+  发现线程本地的 browser 已死(崩溃/被 OOM kill/主机压力)时,旧代码直接走重启路径,
+  而那个死实例的 playwright 同步 API 已把 greenlet loop 停泊在本线程 ——
+  `_loop_running()` 守卫于是对**后续每一次**启动抛 `RuntimeError`,
+  `analyze()`/`harvest()`/`verify_headless()` 的裸 `except` 再把它吞成空结果:
+  浏览器一旦死掉,本进程余下所有动态 DOM 确认静默变零(最坏的静默 FN 方向)。
+  实测形态:13 小时全量套件里 `test_range5` 的实时 Lit 对败在
+  `all findings: []`;`dev/_stale_browser_probe.py` 可确定性复现。
+  现改为**先展开失活实例再重启**(`shutdown_thread_browser()` 会把旧 loop 停出道路,
+  真浏览器端到端验证自愈成功),同时 `analyze()`/`harvest()` 的吞异常 except 补
+  `_log.warning`(点名 URL 与异常)——"没有 finding"与"没有浏览器"从此在日志里
+  不再同形。门:`tests/test_shared_browser_recovery.py`(3 例,含反向守卫:
+  健康实例必须原样复用、绝不碰 `pw.stop()`;两条反证各验过)。
+- **两个全量套件顺序依赖 flake 的测试侧(Phase 224)**:①
+  `test_range5` 实时浏览器对在浏览器确实不可用时带原因 **skip**,不再报
+  "无 browser-executed finding"(safe 孪生同理——没浏览器时它原是**假绿**);
+  ② `test_passive_proxy::test_oversized_body_refused_413` 的 2.1 MB 传输预算
+  15s→60s(13h 套件实测本机 ~20× 劣化,2 MB loopback 传输超过 15s,客户端收到
+  `b''` 致走私安全断言败于环境),空响应时给出区分"主机劣化/代理从未应答"的
+  诊断信息;断言本身一字未动。
+
 - **`template_ssti_*` critical 假阳性(Phase 209)**:`detect_rendered()` 原为
   `"49" in response_text`。靶场把 `{{7*7}}` **原样回显**(无模板引擎),而 406
   错误页唯一的 `49` 是栈行号 `route.js:149:13`,于是发出 critical 发现且 evidence

@@ -760,10 +760,21 @@ class TestRequestBodyHandling:
     bodies must be refused with 413 instead of truncated-and-forwarded."""
 
     @staticmethod
-    def _post_raw(proxy_port, target, headers, body=b""):
+    def _post_raw(proxy_port, target, headers, body=b"", budget=60):
+        """POST a raw body through the proxy and return whatever came back.
+
+        ``budget`` is the socket timeout.  Phase 224 raised it 15s -> 60s:
+        this helper moves a 2.1 MB body, and in the 13h full-suite run
+        (measured ~20x slower than a healthy window on this host) the
+        transfer exceeded 15s, so the client saw b'' and the
+        smuggling-safety assertion below failed for environmental
+        reasons.  The assertion is unchanged -- only the patience for a
+        degraded host grows.  b'' on return means "no response at all",
+        which the caller must not confuse with "wrong status".
+        """
         import socket
-        s = socket.create_connection(("127.0.0.1", proxy_port), timeout=15)
-        s.settimeout(15)
+        s = socket.create_connection(("127.0.0.1", proxy_port), timeout=budget)
+        s.settimeout(budget)
         try:
             req = (f"POST {target} HTTP/1.1\r\nHost: 127.0.0.1\r\n"
                    + headers + f"Content-Length: {len(body)}\r\n"
@@ -852,6 +863,14 @@ class TestRequestBodyHandling:
                 proxy.port,
                 f"http://127.0.0.1:{srv.server_address[1]}/up",
                 "Content-Type: text/plain\r\n", big)
+            assert buf, (
+                "proxy sent NO response within the socket budget for a "
+                "2.1 MB body -- either the host is degraded (in the 13h "
+                "suite run a 2 MB loopback transfer took >15s at ~20x "
+                "slowdown) or the handler never ran at all.  Distinguish "
+                "with a direct probe against the proxy port before "
+                "blaming the 413 path; an empty response is not evidence "
+                "of a truncated forward.")
             status = buf.split(b"\r\n")[0]
             assert b"413" in status, f"expected 413, got {status!r}"
         finally:
