@@ -339,7 +339,12 @@ M2 更值钱 —— 遮掉"邻居也算"的循环后我的样本**仍然全绿**
 
 **验收(关键)**:新门必须能**复现历史那两次事故** —— 把 async 的 concat 重试摘掉、
 把 async 的 content-type 降置信摘掉,门必须红。**不能用"跑通就交差"**:一个
-抓不到已知事故的门,等于没有门(这条教训在 pyflakes 门禁那次已经付过一次学费)。
+抓不到已知事故的门,等于没有门(这条教训在 pyflakes 门禁那次已经付过一次学费,
+Phase 222 又付了一次 —— 见 2.1.2 的假绿)。
+
+> **已闭合(Phase 222,见 2.1.2)**:门从 24 个手挑端点扩到 manifest 全 192 例
+> (182 例可比),测量结果 182 例 **0 分歧**,并当场抓到 1 处真缺陷
+> (`csp_bypass` 缺 confidence)与 1 处我自己造的假分歧(两侧入口点不对齐)。
 
 
 > **DOM 家族扩容已落地(2026-10-06,Phase 203)**:manifest 的 12 个 DOM 端点
@@ -389,14 +394,20 @@ high/high **browser-executed**(`#/track-result?id=`,与 sync 命中的 `#/search
 门:`tests/test_phase209_spa_route_delivery.py` 现按 **双引擎** 参数化
 (阳性 + safe 孪生 × sync/async),变异对照(摘掉 `_crawl_spa` 的 merge)必红。
 
-**仍然开放的更大一支(未做)**:async 爬到的**非** fragment 端点仍只跑反射层
-(`async_scanner_crawl.py` 的 link 循环与 mined 循环都只调 `_scan_reflected`),
-而 sync 对每个爬到的端点跑全套 page tasks(L3/L6 DOM + 高级页面层 + 请求层)。
-本轮不一起改的理由仍然成立:那会把 async 爬取扫描的请求量按"端点数 × 页面层"
-放大,预算/超时/192 例 async 基线都要重测。**改法形状**:让 `_crawl_and_scan`
-复用 `_scan_raw` 的 page_tasks 组装(或抽出"对一个端点跑全套"的共享入口),
-并给 parity 门加一条**爬取切片** —— 同一目标 `-c` 双引擎比对 finding 集合。
-验收沿用 2.1 的规矩:门必须能复现本条事故(把 async 爬取里的 DOM 调用摘掉,门要红)。
+**仍然开放的更大一支(Phase 222 已闭合)**:async 爬到的**非** fragment 端点
+仍只跑反射层(`async_scanner_crawl.py` 的 link 循环与 mined 循环都只调
+`_scan_reflected`),而 sync 对每个爬到的端点跑全套 page tasks(L3/L6 DOM +
+高级页面层 + 请求层)。**Phase 214–216 已把这三条线补齐**(页层三件套 /
+mined 端点 / L8 + JSONP),门:`test_phase214_crawl_page_layers.py`、
+`test_phase215_crawl_mined_layers.py`、`test_phase216_crawl_request_layers.py`,
+各自双引擎参数化并带变异对照。CORS 与 XS-Leaks 审计**刻意不接线**:两者在
+层内按 ORIGIN 去重(`_cors_checked` / `_xsleak_audited`),seed 之后那一次
+在结构上不可达,接上去只会是一记永远打不响的空枪。
+
+**原改法形状的取舍记录**:没有抽"对一个端点跑全套"的共享入口,而是
+在 async 侧逐层接线。原因与本条 2026-10-09 记的一样 —— 抽共享入口会把
+async 爬取扫描的请求量按"端点数 × 页面层"放大,预算/超时/192 例 async
+基线都要重测;逐层接线让每条线各自可归因、各自带门。
 ### 2.2 报告层性能
 
 [report.py](file:///d:/qoder/xssentinel/xssentinel/core/report.py) **1428 行**,
@@ -623,17 +634,21 @@ ephemeral 绑定把机制本身去掉了。
 ## 5. 执行顺序建议
 
 ```
-已完成: 1.2 async 拆分(Phase 191)/ 1.0 外部效度对照(Phase 196b,60 例三工具同靶)
+已完成: 1.2 async 拆分(Phase 191)/ 1.0 外部效度对照(196b,60 例三工具同靶)
 已完成: CSP 投递通道判定(header+meta、report-only 不再冒充保护)/ API 前端门对齐(196b)
-本轮:  1.0 (外部效度对照集 -- 唯一能支撑对外目标的证据;需换机器)
-下一轮: 1.4 _probe_param 拆分(683 行单方法,属改逻辑,验收配全量矩阵)
-再下轮: 2.1 双引擎去重 → 2.3 range5   (1.3 已结项:第一刀完成,第二刀经测量不做)
+已完成: 1.0 真实靶场复跑(Phase 219,Juice Shop 20.2.0 双臂各 1 条 browser-executed)
+已完成: 2.3 range5(Phase 220,Lit)+ 2.1 parity 门扩到全 192 例(Phase 222,182 例 0 分歧)
+仍未做: 1.0 商业工具 × 真实第三方靶对跑(现只有自建矩阵上的切片)
+仍未做: 1.4 _probe_param 拆分(683 行单方法,属改逻辑,验收配全量矩阵)
+下一轮: 1.4 或 1.0 的"商业工具 × 真实第三方靶"那一支
 顺手:  3.x 随对应模块改动时一并处理
 ```
 
 每一项的验收标准都已给出,**1.0 之外全部可离线验证**(测试命令或 ruff 退出码)。
 1.0 是唯一依赖外部环境的项,也是唯一能回答"到底超没超越商业工具"的项
 —— 它不该因为"麻烦"被无限期推后。
+**Phase 222 的账要读准**:1.0 里"真实靶场"那一支(Juice Shop)已做并已出
+结果,"商业工具在真实第三方靶上对跑"那一支仍未做 —— 两者不要混读成"1.0 做完了"。
 
 **2026-10-03 环境复测(别把上面那段当成常驻事实)**:本机现在**完全出不了网**
 —— 代理 `127.0.0.1:17054` 无监听(netstat 空),直连 `raw.githubusercontent.com`
@@ -682,6 +697,55 @@ Phase 207 把同一个问题问到**交付面**:引擎判完之后,报告给用�
 `cors_misconfig` 因为走关键字形态而隐身)。
 
 **下一步候选**(仍未做,按价值排):
-1. **2.1 parity 门扩容**到全 192 例(现只覆盖 12 个 DOM 端点);
-2. **1.0 真独立靶场**(Juice Shop 全集 / 商业工具对跑);
-3. **2.3 range5**(Angular/Svelte/Lit,构造效度先行)。
+1. ~~**2.1 parity 门扩容**到全 192 例~~ ✅ **已做(Phase 222)** —— 见 2.1.2;
+2. **1.0 真独立靶场**(Juice Shop 全集 / 商业工具对跑):已做 Phase 219
+   (Juice Shop 20.2.0 双臂复跑),但"商业工具对跑"那一支仍未做;
+3. ~~**2.3 range5**(Angular/Svelte/Lit,构造效度先行)~~ ✅ 已做(Phase 220,
+   选型为 Lit:三个框架里只有它发布浏览器就绪的 ES module,无需编译步)。
+
+#### 2.1.2 Phase 222:parity 门扩到全 192 例 —— 量到 2 处分歧,1 处是真 bug
+
+方法先行:先写 `dev/_parity_matrix.py` 把双引擎跑遍 manifest(**182 例
+可比**,另 10 例 manifest 里标了 `engines` 单边,既不记功也不记过),
+再照测量结果建门。2.1 原文那句"难点不在写断言,而在先钉死可比的定义",
+在这里的落点就是**可比集合本身**:
+
+| # | case | 量到的形状 | 定性 |
+|---|---|---|---|
+| 1 | `pos-csp-02` | sync `csp_bypass medium None` / async `medium medium` | **真分歧(产品缺陷)** |
+| 2 | `pos-pmmine-01` | sync `[]` / async `reflected high high` | **假分歧(量具缺陷)** |
+
+**#1 是真 bug**:`scanner_layers._scan_csp` 直接 append `Finding` 而不走
+`_record`,`confidence` 就没设,到报告层是 `null` —— 与 Phase 198
+(polyglot)、Phase 209(`template_ssti_*`)**同一缺陷类**,那两次都补了,
+`csp_bypass` 是漏网的最后一个。实测它是**全矩阵唯一**没有 confidence 的
+finding 类型。已按 Phase 209 的同一理由补 `confidence="medium"`:
+header 解析是确定的,但"这条策略可绕过"是从策略分析推出来的,
+没有任何浏览器执行过被声称的路径。
+
+**#2 是我自己造的**:隐藏参数挖掘在 sync 里住在 `scan_target()`
+(`scanner.py:335`),在 async 里住在 `scan()` 生成器
+(`async_scanner.py:578`)。我第一版量具用 `scan_endpoint()` 进 sync、
+`scan()` 进 async —— **只在一侧挖矿**,于是凭空多出一条分歧。实测对照:
+
+```
+sync  scan_endpoint : []                      (53 req)
+sync  scan_target   : [['reflected','high','high']]  (60 req)
+async scan()        : [['reflected','high','high']]
+```
+
+改对入口后重跑全量:**182 例 0 分歧**(sync 586s / async 419s)。注意 sync
+墙钟 355s → 586s,**正是因为两侧现在都挖矿了** —— 是量变准了,不是引擎变慢。
+
+**门**:`tests/test_parity_full_matrix.py`。全量那一条 `XSSENTINEL_PARITY_FULL=1`
+显式开启(15–20 分钟,不进日常 pytest);常驻的是三条秒级 shape 测试。
+按 2.1 的规矩,AST 那条做了变异验证 —— **但它的第一版是假的**:
+拿 `keyword.value` 和字符串比,而那是 `ast.Constant` 节点,于是**匹配到 0 个
+调用**,在空列表上断言 `not offenders` 永远通过。摘掉 `confidence` 仍然是
+绿的。现在解包 Constant 并且**断言至少匹配到一个调用** ——
+匹配不到东西的门必须自己喊出来。
+
+**教训(与 3.9/207 同族,又一层)**:"先写门再写实现"里最容易出的不是
+假红,是**假绿**:一个语法上正确、逻辑上匹配不到任何东西的门,比没有门更
+危险,因为它看起来在工作。本轮是变异验证救了它 —— 如果省掉那一步,
+就会把这道假门当成"已覆盖 Phase 222"写进账上。
