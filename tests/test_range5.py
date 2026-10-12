@@ -102,7 +102,21 @@ def test_manifest_pairs_and_gate_standard():
 
 
 def test_score_gate_semantics():
-    from runner import score
+    # Phase 221d: load range5/runner.py BY PATH instead of `from runner
+    # import score`.  The bare name resolves by sys.path order, and this
+    # repo has a SECOND module called runner -- benchmark/runner.py.  In a
+    # full suite some earlier test has already imported one of them into
+    # sys.modules, so the bare import silently binds the wrong file and
+    # dies with "cannot import name 'score' from 'runner'".  Two modules
+    # with the same name and a shared sys.path is a name collision waiting
+    # for order; naming the file removes it.
+    import importlib.util
+    path = os.path.join(ROOT, "range5", "runner.py")
+    spec = importlib.util.spec_from_file_location("range5_runner", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    score = mod.score
+
     vuln = {"gt": "vulnerable"}
     safe = {"gt": "safe"}
     hit = {"findings": [{"type": "dom_dynamic", "severity": "high"}]}
