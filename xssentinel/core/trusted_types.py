@@ -33,7 +33,10 @@ This module performs STATIC analysis of a page's HTML/JS to detect:
      ``document.referrer``, ``event.data``, ``localStorage`` reads,
      ``new URLSearchParams(...).get(...)``) into a dangerous sink
      without a TT policy wrapping it.  This is a concrete DOM-XSS
-     finding, not just a defense-in-depth note.
+     finding -- unless a recognized sanitizer mediates the flow, in
+     which case the write is still TT-unprotected (reported) but the
+     DOM-XSS reading is unbacked and the severity is graded down to a
+     defense-in-depth note (Phase 225, measured on range6's safe twin).
 
 This module is pure-Python and uses regex heuristics; it is *not* a
 taint tracker.  False negatives are possible when the data flow is
@@ -44,6 +47,12 @@ engine (``dom.py``) for higher-fidelity detection.
 from __future__ import annotations
 
 import re
+
+# Phase 225: the recognized-sanitizer vocabulary is ONE definition, shared
+# with the sanitizer layer (the Phase 207 lesson: four copies of the same
+# list drift).  The name is imported rather than re-typed so the two
+# layers can never disagree about what a sanitizer call looks like.
+from .sanitizer_bypass import _SANITIZE_CALL_RE as SANITIZER_CALL_RE
 
 
 # ---------------------------------------------------------------------------
@@ -321,6 +330,17 @@ def find_taint_flows(html_or_js: str) -> list[dict]:
     A flow is reported when a taint source and a danger sink appear in
     the same ~300-char window AND no TT policy call (``policy.createHTML``)
     appears between them.  Each flow is a candidate DOM-XSS finding.
+
+    Phase 225: a recognized sanitizer call (``DOMPurify.sanitize``,
+    ``sanitizeHTML``, ...) between the source and the sink does NOT drop
+    the flow -- the write is still TT-unprotected, and that is this
+    layer's subject -- but it is recorded (``sanitizer_mediated`` /
+    ``sanitizer_call``) so the violation's *severity* can be graded by
+    what the page actually proves.  Measured on range6's safe twin: the
+    canonical correct usage (current DOMPurify, output to innerHTML) was
+    reported as a concrete DOM-XSS flow at "medium" while the payload is
+    provably stripped (no live element, no dialog) -- an unbacked claim
+    (see ``_scan_trusted_types`` and range6/GATE_STATUS.md).
     """
     if not html_or_js:
         return []
@@ -339,8 +359,21 @@ def find_taint_flows(html_or_js: str) -> list[dict]:
             window_start = max(0, sink_m.start() - 200)
             window_end = min(len(block), sink_m.end() + 200)
             window = block[window_start:window_end]
-            taint_m = _TAINT_SOURCE_RE.search(window)
-            if not taint_m:
+            # Phase 225: the source CLOSEST to the sink wins.  Taking the
+            # first match in the window mis-attributes adjacent
+            # statements: with `a.innerHTML = sanitize(q); b.innerHTML =
+            # location.hash;` both sinks sat in one window and both flows
+            # were credited to the FIRST source, so the raw write to b
+            # was measured by the span crossing a's sanitize() call --
+            # and with severity now graded by that span, the raw path
+            # would have been wrongly demoted.  (Caught by
+            # test_one_raw_write_path_keeps_the_page_level_claim_medium.)
+            sink_in_window = sink_m.start() - window_start
+            taint_m = min(
+                _TAINT_SOURCE_RE.finditer(window),
+                key=lambda m: abs(m.start() - sink_in_window),
+                default=None)
+            if taint_m is None:
                 continue
             # Check whether a policy.createHTML call sits between the
             # taint source and the sink -- if so, the data is wrapped and
@@ -351,6 +384,10 @@ def find_taint_flows(html_or_js: str) -> list[dict]:
             between = block[lo:hi]
             if POLICY_USE_RE.search(between):
                 continue  # mitigated by a policy call
+            # A recognized sanitizer between source and sink: the write is
+            # still TT-unprotected (this layer's subject), but the
+            # "concrete DOM-XSS" reading is not established for it.
+            san_m = SANITIZER_CALL_RE.search(between)
             # Sink name lookup.
             sink_name = "unknown"
             severity = "medium"
@@ -366,6 +403,9 @@ def find_taint_flows(html_or_js: str) -> list[dict]:
                 "taint_source": taint_m.group(0),
                 "snippet": window.strip()[:400],
                 "mitigated": False,
+                "sanitizer_mediated": san_m is not None,
+                "sanitizer_call": (san_m.group(0).replace("(", "").strip()
+                                   if san_m else ""),
             })
     return flows
 
@@ -449,18 +489,30 @@ def analyze_page(html: str | None, csp_header: str | None = None) -> dict:
     violations: list[dict] = []
 
     # Violation 1: unsafe sink + user taint + no policy wrapping.
-    # This is a concrete DOM-XSS finding.
+    # This is a concrete DOM-XSS finding -- unless a recognized sanitizer
+    # mediates the flow, in which case the write is still TT-unprotected
+    # (reported) but the DOM-XSS reading is unbacked and the severity is
+    # graded accordingly (Phase 225, measured on range6's safe twin).
     for flow in exploitable_flows[:3]:
+        sev = flow["severity"]
+        title = (
+            f"User-controlled data ({flow['taint_source']}) flows into "
+            f"{flow['sink_name']} without a Trusted Types policy"
+        )
+        if flow.get("sanitizer_mediated"):
+            sev = "low"
+            title += (
+                f" -- the flow passes through {flow['sanitizer_call']} "
+                f"first, so the TT gap is defense-in-depth; exploitability "
+                f"is not established by this flow")
         violations.append({
             "type": "tt_taint_flow",
-            "severity": flow["severity"],
-            "title": (
-                f"User-controlled data ({flow['taint_source']}) flows into "
-                f"{flow['sink_name']} without a Trusted Types policy"
-            ),
+            "severity": sev,
+            "title": title,
             "evidence": flow["snippet"],
             "sink": flow["sink_name"],
             "taint_source": flow["taint_source"],
+            "sanitizer_mediated": bool(flow.get("sanitizer_mediated")),
         })
 
     # Violation 2: identity/no-op policy registered (bypass).
@@ -499,6 +551,20 @@ def analyze_page(html: str | None, csp_header: str | None = None) -> dict:
             sev = "medium"
             note = ("CSP enforces Trusted Types but no policy is registered; "
                     "every sink call will throw at runtime (broken page)")
+        elif taint_flows and all(f.get("sanitizer_mediated")
+                                 for f in taint_flows):
+            # Phase 225: every detected user-data flow to a sink passes
+            # through a recognized sanitizer -- the "trivially exploitable"
+            # reading is unbacked, and this is the shape that used to turn
+            # correct-usage pages into RED gates (range6's safe twin; the
+            # benchmark dodged it twice: m_sanitizer_safe via textContent,
+            # Phase 128b via DOMParser).  The TT gap itself is real and
+            # stays reported -- as a defense-in-depth note.
+            sev = "low"
+            note = ("Page uses dangerous DOM sinks without Trusted Types, "
+                    "but every detected user-data flow passes through a "
+                    "recognized sanitizer first -- the TT gap is "
+                    "defense-in-depth; exploitability is not established")
         else:
             sev = "medium"
             note = ("Page uses dangerous DOM sinks without Trusted Types; "

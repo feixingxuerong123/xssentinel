@@ -1,0 +1,10 @@
+{
+ "range": "range6",
+ "note": "REAL-sanitizer range: vendored DOMPurify 2.0.7 (inside CVE-2020-26870's range; the namespace-confusion PoC produces a real dialog in Chromium -- dev/_r6_mxss_premise.py) against 3.4.17 (vendor's current release; every published advisory closed by 3.4.16; the identical PoC is stripped). The param NEVER touches server-side bytes (static shells; the app reads location.search client-side) -- construct validity by construction. The verdict comes from the STATIC sanitizer layer (version path in the script tag); the live pair in tests/test_range6.py separately proves the browser execution (positive fires / safe silent), so the gate does not require headless to score.",
+ "cases": [
+  {"id": "r6-pos-dompurify-207", "gt": "vulnerable", "path": "/unsafe", "param": "q", "headless": false,
+   "note": "URLSearchParams -> DOMPurify 2.0.7 sanitize() -> innerHTML: the mXSS PoC survives sanitization and executes in a real browser (measured)"},
+  {"id": "r6-neg-dompurify-3417", "gt": "safe", "path": "/safe", "param": "q", "headless": false,
+   "note": "identical shell and flow on 3.4.17: the PoC is stripped, no live element, no dialog (measured)"}
+ ]
+}

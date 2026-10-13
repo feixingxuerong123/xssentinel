@@ -52,8 +52,12 @@ _PKG_PATH_RE = re.compile(r"dompurify[@/](\d+)\.(\d+)\.(\d+)", re.IGNORECASE)
 #
 # The ranges come from the vendor's published advisory list, not from memory:
 # DOMPurify's GitHub security advisories (25 published as of 2026-09-23, latest
-# release 3.4.16).  Grouping them by *remediation line* instead of one entry per
-# CVE keeps a detected version from producing twenty violations.
+# release 3.4.16 then; the npm registry's current release is 3.4.17, checked
+# 2026-10-13).  The RANGE is what decides a verdict, and 3.4.16/3.4.17 are
+# both outside every entry below, so a one-patch staleness here changes no
+# verdict -- noted only so this comment is not read as a live inventory.
+# Grouping advisories by *remediation line* instead of one entry per CVE
+# keeps a detected version from producing twenty violations.
 _VULNERABLE_SANITIZERS = [
     {
         "sanitizer": "DOMPurify",
@@ -256,6 +260,37 @@ def _in_range(version_tuple: tuple, low: tuple, high: tuple) -> bool:
     return low <= version_tuple <= high
 
 
+def _mXSS_note_severity(detected: list[str], vulnerable: list[dict]) -> tuple:
+    """Grade the sanitize()->innerHTML note by what the page actually proves.
+
+    Range #6 (Phase 225) measured the alternative: the note used to be
+    unconditional medium on *every* sanitize()->innerHTML flow, so the
+    canonical correct usage -- a CURRENT sanitizer whose output goes to
+    innerHTML -- was reported as a medium "mXSS risk" on a page where the
+    CVE-2020-26870 payload is provably stripped (no live element, no
+    dialog; dev/_r6_mxss_premise.py).  That is an unbacked claim, and it
+    is why the benchmark's safe twin had to dodge the shape entirely by
+    using textContent instead (see ``m_sanitizer_safe`` in
+    benchmark/server.py, whose comment says so out loud).
+
+    The note is still worth making -- this is the mXSS class, and it has
+    recurred on every DOMPurify major line -- but it is graded by
+    evidence, like every other severity here:
+
+      * version recognised AND no vulnerable version on the page -> low
+        (the class is known; this page's build is not a known member)
+      * version unknown, or a vulnerable version is present -> medium
+        (unchanged behaviour)
+    """
+    if detected and not vulnerable:
+        return ("low",
+                "Sanitizer output passed to innerHTML (mXSS class); the "
+                "page's sanitizer is %s, which is outside every published "
+                "vulnerable range"
+                % ", ".join(detected))
+    return ("medium", "Sanitizer output passed to innerHTML (mXSS risk)")
+
+
 def analyze_page(html: str | None, page_url: str = "") -> dict:
     """Analyze a page for HTML sanitizer bypass vulnerabilities.
 
@@ -281,11 +316,18 @@ def analyze_page(html: str | None, page_url: str = "") -> dict:
     # case-insensitive, so a ``dompurify/3.1.2/`` URL matches both of that
     # entry's patterns, and the same library can be referenced twice on a page.
     reported_versions: set = set()
+    # Phase 225: every version the patterns recognised, vulnerable or not.
+    # It is what makes the mXSS note below evidence-graded instead of
+    # unconditional -- see _known_current_note_severity().
+    detected_versions: list[str] = []
     for adv in _VULNERABLE_SANITIZERS:
         low, high = adv["range"]
         for pattern in adv["patterns"]:
             for m in pattern.finditer(html):
                 version = (int(m.group(1)), int(m.group(2)), int(m.group(3)))
+                vstr = ".".join(str(v) for v in version)
+                if vstr not in detected_versions:
+                    detected_versions.append(vstr)
                 if not _in_range(version, low, high):
                     continue
                 key = (adv["sanitizer"], version)
@@ -330,18 +372,22 @@ def analyze_page(html: str | None, page_url: str = "") -> dict:
 
     # 3. Sanitizer output fed to innerHTML.
     # 3a. Direct: .innerHTML = DOMPurify.sanitize(...)
+    sev, title = _mXSS_note_severity(detected_versions, vulnerable_versions)
     for m in _SANITIZED_INNERHTML_RE.finditer(html):
         entry = {
             "match": m.group(0)[:100],
             "desc": "Sanitizer output passed directly to innerHTML",
+            "severity": sev,
         }
         sanitized_sinks.append(entry)
-        # This is informational (medium) -- sanitized HTML in innerHTML
-        # is the common pattern, but mXSS can bypass it.
+        # Phase 225: graded by the page's own evidence -- an unconditional
+        # medium on the correct-usage shape was a measured false positive
+        # (range6's safe twin), so "medium" now means "nothing on this
+        # page argues against the mXSS class".
         violations.append({
             "type": "sanitizer_output_to_innerhtml",
-            "severity": "medium",
-            "title": "Sanitizer output passed to innerHTML (mXSS risk)",
+            "severity": sev,
+            "title": title,
             "evidence": m.group(0)[:120],
         })
     # 3b. Indirect: var clean = DOMPurify.sanitize(x); ... el.innerHTML = clean;
@@ -367,12 +413,13 @@ def analyze_page(html: str | None, page_url: str = "") -> dict:
                     entry = {
                         "match": m.group(0)[:100],
                         "desc": f"Sanitizer output (var {var_name}) passed to innerHTML",
+                        "severity": sev,
                     }
                     sanitized_sinks.append(entry)
                     violations.append({
                         "type": "sanitizer_output_to_innerhtml",
-                        "severity": "medium",
-                        "title": "Sanitizer output passed to innerHTML (mXSS risk)",
+                        "severity": sev,
+                        "title": title,
                         "evidence": m.group(0)[:120],
                     })
                     break
@@ -401,6 +448,7 @@ def analyze_page(html: str | None, page_url: str = "") -> dict:
 
     return {
         "vulnerable_versions": vulnerable_versions,
+        "detected_versions": detected_versions,
         "unsafe_configs": unsafe_configs,
         "sanitized_sinks": sanitized_sinks,
         "unsanitized_sinks": unsanitized_sinks,

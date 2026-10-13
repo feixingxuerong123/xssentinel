@@ -523,15 +523,42 @@ JS config line(那本身就是 script-string sink),四例全 confirmed、safe
    blob 的数据是否攻击者可控,静态层面判不出来。要做就得按 176i/176j 的路子先给
    Chromium oracle 造出"可控/不可控"对照页测量,再决定接不接。竞品(nexa/ASTra)
    只把它当**提取源**,不当漏洞证据,这个尺度是对的。
-4. **净化器层没有独立靶场**:Phase 189 的 DOMPurify 配置面检测靠语料 + 单测,
-   没有 range5 那种"真实 sanitizer + 真实绕过"的端到端门禁。mXSS 家族已有
-   `mxss_verify.py` 与浏览器 oracle,可优先考虑把 sanitizer 配置面并进同一套
-   range 流程(先做构造效度)。
+4. ~~**净化器层没有独立靶场**~~ **靶场已落(Phase 225:`range6/`),门禁待 P1 修完
+   转绿**:vendored DOMPurify 2.0.7(在 CVE-2020-26870 区间内,form/math/mglyph
+   命名空间混淆 PoC 在真 Chromium 里**实测弹窗**)对 3.4.17(厂商当前版,同一
+   PoC **实测被剥**),两页只差 script 标签指向的构建。构造效度沿用 range5
+   (静态壳、参数只进客户端)。`tests/test_range6.py` 7 例全绿并含实时对。
+   靶场同时量出三处 detector 缺陷并修掉两处(mXSS 提示版本盲区;TT 两条在
+   sanitizer 介导流上的无证据 medium)——**红因已从三条收敛到一条**:
+   见下面新增的第 7 项(P1)。红因未清前不挂 CI,现状记在 `range6/GATE_STATUS.md`。
 5. ~~原有 1.2(async_scanner 拆分,现约 2960 行)~~ **已完成(Phase 191,纯移动 +
    逐字节/逐用例取证,见 1.2)**。剩余不变:1.3(sandbox 拆分)/ 2.1(双引擎
    判定去重)/ 2.3(range5 框架靶场)/ 1.0(第三方对照集,需换网络)。
    新增一项:**1.4 `_probe_param` 拆分**(683 行单方法)—— 它属于**改逻辑**,
    验收要配全量 192 例矩阵,不能和纯移动混做。
+7. **【最高优先级】DOM 层把"污点流入汇"当成了"执行",且证据是循环自证的
+   (Phase 225 由 range6 量出,未修)**:`dom_dynamic` 的
+   `evidence_class=browser-executed` / `headless.outcome=fired` / high-high
+   **全是常量**,不是量出来的。链路:① 探针注入的是**裸标记** `xssentinel_dom_<hex>`
+   (污点标记,不是可执行载荷);② `_init_script` 的 `hit()` 只要标记出现在任何
+   被挂钩的汇的入参里就记一击,**然后自己 `alert(MARKER)`**;③ `analyze()` 把每一击
+   无差别变成 `dom_dynamic`/"…(marker executed)";④ `scanner_layers.py:197`
+   (async 版 `async_scanner_layers.py:233`)硬编码 `{"confirmed": True,
+   "outcome": "fired", …}`。
+   **浏览器侧反证**(`dev/_r6_fp_probe.py`):把引擎自己记录的 replay 值送进去,
+   两个孪生页上都只落为纯文本,**零弹窗、零活元素** —— "marker executed"是假的。
+   设计意图就写在 `dom_engine.py` 的模块 docstring 里("fire alert(marker) so
+   the dialog event is captured as hard proof" / "it means attacker input truly
+   executed in a sink"),即**流入汇被等同于执行**。对未净化的 innerHTML 这条推断
+   尚可辩护(innerHTML 会解析标记),但**净化器一旦在路径上就断了**:净化后污点照样
+   进汇,载荷却会被剥。
+   **为什么 benchmark 从没抓到**:`m_sanitizer_safe` 为了让 negative 不红,被迫绕开
+   这个形状改用 textContent(注释里明说)。**canonical 正确用法(当前版 +
+   sanitize→innerHTML)从来没有任何负面用例覆盖过**,range6 是第一个。
+   **修法**:探针语料升级为**可执行载荷**,执行与否由页面自己弹的窗证明;去掉插桩里
+   的 `alert(MARKER)`(循环自证,且往被测页面注入弹窗);`outcome` 只在真的观测到
+   弹窗时才写 `fired`。**这是判定语义改动 ⇒ 四件套验收 + 基准重定基线**。
+
 6. **被动代理 drain 循环只有字节上限、没有时间上限(Phase 224 记候选,未做)**:
    `passive_proxy.py:_relay` 对超限 body 的 drain 按
    `_BODY_LIMIT + 65536` 字节读,不设期限。声明一个大 Content-Length 却

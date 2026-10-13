@@ -2547,3 +2547,152 @@ test_range5.py:148: AssertionError: no browser-executed DOM finding ...; all fin
 
 **没有跑基准**:本次只改浏览器**失活路径**——健康实例下行为逐字节不变
 (②号测试正是锁这个),判定语义零改动,够不上"改判定语义的验收四件套"。
+
+## Phase 225:range6(真实净化器靶场)—— 顺带量出一个 DOM 层的高危误报
+
+请求是「继续」,接OPTIMIZATION 3.6 第 4 项:净化器层只有语料 + 单测,没有端到端门禁。
+
+### 1. 靶场:一对真实 CVE 的孪生页
+
+vendored DOMPurify **2.0.7**(CVE-2020-26870 区间内)对 **3.4.17**(厂商当前版,
+所有已发布公告在 3.4.16 关闭)。两页是同一个静态壳、同一个流程
+(`URLSearchParams -> DOMPurify.sanitize -> innerHTML`),**只有 script 标签指向的
+构建不同**——构造效度沿用 range5:参数永不进服务端字节,参数只由客户端读。
+
+**前提实验先做,而且第一次就否掉了自己**:CVE-2020-26870 那个最常见的
+`<svg></p><style>…` 变体在本机 Chromium 上**打不穿 2.0.7**(foreign-content 解析下
+`onerror` 被剥)。换 form/math/mglyph 命名空间混淆变体后:
+
+```
+2.0.7  ->  sanitized 里保留 <img src onerror=alert(1)>   dialogs=['1']   FIRES
+3.4.17 ->  sanitized 只剩 <form>…</form>                 dialogs=[]      silent
+```
+
+`dev/_r6_mxss_premise.py` 可复跑。正负标签是**浏览器裁决**的,不是抄公告表的。
+
+### 2. 门禁跑出来:negative 红了,而且红出比预期更多的东西
+
+```
+sync r6-pos-dompurify-207   TP   high dom_dynamic ×2 + medium(sanitizer_vulnerable_version / 两条 TT / mXSS note)
+sync r6-neg-dompurify-3417  FP   high dom_dynamic + medium mXSS note
+```
+
+**FP 有两个来源,第二个是原计划要修的,第一个是意外收获(也是本轮最大的产出)**:
+
+#### P1(深,留待下轮):`dom_dynamic` 的"执行"声明是循环自证的
+
+全链路:
+
+1. 探针注入的是**裸标记** `xssentinel_dom_<hex>` —— 污点标记,不是可执行载荷;
+2. 注入脚本 `hit()` 只要标记出现在任何被挂钩的汇的入参里就记一击,
+   **然后自己 `alert(MARKER)`**;
+3. `analyze()` 把每一击无差别变成 `dom_dynamic` / confidence=high /
+   "DOM XSS CONFIRMED in real browser … reached … (marker executed)";
+4. `scanner_layers.py:197`(async 版 `async_scanner_layers.py:233`)再**硬编码**
+   `{"available": True, "confirmed": True, "outcome": "fired",
+   "detail": "marker executed in real browser sink"}`。
+
+即 `evidence_class=browser-executed`、`outcome=fired`、high/high **全是常量,
+不是量出来的**;而"硬证据"是插桩自己弹的窗。模块 docstring 把设计意图写得
+很直白,也正是缺陷本身:
+
+> "When the marker actually flows into a sink, record the hit and **fire
+> alert(marker)** so the dialog event is captured as **hard proof**."
+> "A confirmed dynamic hit is high-confidence: it means **attacker input truly
+> executed** in a sink."
+
+**流入汇 ≠ 执行**。纯静态地看,这条推断对"未净化的 innerHTML"尚可辩护(innerHTML
+会解析标记,污点进得去就意味着标记也进得去)——但**净化器一旦在路径上,推断就断了**:
+净化后污点照样进汇,而标记载荷会被剥掉。这正是 range6 的 safe 孪生。
+
+浏览器侧的反证(`dev/_r6_fp_probe.py`,用引擎自己报告的 replay 值):
+
+```
+/safe?q=xssentinel_dom_d94d341b  -> #out.innerHTML='xssentinel_dom_d94d341b'(纯文本)
+                                    marker in DOM = True    dialogs = []   silent
+/safe?q=<img src=x onerror=…>    -> #out.innerHTML='<img src="x">'        dialogs = []   silent
+```
+
+**两个页面上都没有任何弹窗、没有活元素**——"marker executed"是假的。
+
+**为什么 benchmark 从来没抓到**:`m_sanitizer_safe`(benchmark/server.py)为了让
+negative 不红,被迫绕开这个形状改用 textContent,注释里原话是
+"(The layer flags any sanitise->innerHTML flow, so changing only the version
+would still report.)"。**canonical 正确用法(当前版 + sanitize→innerHTML)从来
+没有任何负面用例覆盖过**,range6 是第一个。
+
+**修法方向(下轮,改判定语义 ⇒ 四件套)**:探针语料从"裸标记"升级为**可执行载荷**,
+执行与否由页面自己弹的窗证明;去掉插桩里的 `alert(MARKER)`(它既循环自证,又往
+被测页面里注入弹窗);`outcome` 只允许在真的观测到弹窗时才写 `fired`。
+
+#### P2(浅,本轮修):`sanitizer_output_to_innerhtml` 的版本盲区
+
+该函数对任何 sanitize→innerHTML 流**无条件**发 medium。于是"当前版 + 正确用法"
+的页面被报 medium "mXSS risk"——而该页的 PoC 被证明剥得干干净净。项目自己早就
+知道并变绕开了(见上面 `m_sanitizer_safe` 的注释)。
+
+修法是**按证据分级**(先例:Phase 179 JSON 反射 severity 连 confidence 一起降):
+页面识别出的版本存在、且**没有任何一个落在脆弱区间** ⇒ 降为 low 并在 title 里
+写明依据;版本未知或存在脆弱版本 ⇒ 维持 medium。
+
+### 3. 本轮的门与产物
+
+- `tests/test_range6.py` **7 例全绿**(构造效度字节相等、孪生只差版本、vendor
+  完整性 + integrity pin、manifest/门禁语义、**实时对**:2.0.7 真弹、3.4.17 全剥)。
+- 新测试 4 例:版本分级正向 3 + 反向守卫 1(current 与脆弱版本同时出现时以脆弱
+  者为准、recognized 版本要回报)。**反证跑过**:把降档注掉 ⇒ 2 条红。
+- parity gate **4 passed**(385s);quick benchmark 双引擎另跑(见提交信息)。
+- **range6 门禁仍红(P1 未修),因此未挂 CI**;`range6/GATE_STATUS.md` 记着实测红
+  与根因,等 P1 落地再挂。
+- 未修的 P1 与「代理 drain 无时间上限」一起进 OPTIMIZATION 待办。
+
+### 4. 续(第三次红因):TT 层有同款缺陷,而且项目两次绕开过它
+
+P2 修完后重跑门禁,safe 孪生**仍然红**——`GATE_STATUS.md` 当时只记了两条成因,
+实测有四条 finding 里的第三条家族没被记上:
+
+```
+sync r6-neg-dompurify-3417  FP
+  - high   dom_dynamic                                  <- P1(未修)
+  - medium trusted_types_taint_flow                     <- 本次修的
+  - medium trusted_types_no_policy                      <- 本次修的
+  - low    sanitizer_output_to_innerhtml                <- P2 已修
+```
+
+`tt_taint_flow` 的层内注释自称 "a concrete DOM-XSS finding",`tt_no_policy` 的
+文案写着 "trivially exploitable" —— 而 safe 孪生上载荷被证明剥净。**项目的
+变绕记录在案**:`benchmark/server.py` 的 `m_sanitizer_safe` 用 textContent 是
+因为 "The layer flags any sanitise->innerHTML flow"(注释原话);Phase 128b 的
+fixture 注释写着 innerHTML 家族 "would make the SAFE twin emit
+trusted_types_no_policy (medium), turning a correct case into a red gate",于是
+用了 DOMParser。**两次变绕正是这个形状一直没被量的原因**,range6 把它取消了。
+
+**修法(按证据分级,词汇复用不重抄)**:
+- 识别到的 sanitizer(`DOMPurify.sanitize` 等,**从 sanitizer 层导入
+  `_SANITIZE_CALL_RE`**,一处定义——Phase 207 的四处清单教训)位于 source→sink
+  之间 ⇒ flow **仍报**(写入依然无 TT 保护,这是本层本职)但**降为 low**,
+  title 点名 sanitizer 并写明 "exploitability is not established";
+- `policy.createHTML` 仍**整个丢弃** flow(不变,那才是 TT 的缓解);
+- `tt_no_policy` 仅当**每一条**已检测 flow 都是 sanitizer 介导时降 low——
+  存在任一未介导的写路径 ⇒ 维持 medium(反向守卫有测试锁);
+- 层内 severity 出口不变:未介导的 flow 仍是 high,由 Phase 218 帽子在下游
+  降为 medium——测试断言的是层内值,别把下游帽子写进层的契约。
+
+**顺带修掉一个测试抓出来的归因弱点**:`find_taint_flows` 原来取 ±200 字符窗口
+里**第一个** taint 源;两条相邻语句
+(`a.innerHTML = DOMPurify.sanitize(q); b.innerHTML = location.hash;`)时,
+raw 写入的 flow 会被 a 语句的 `sanitize()` 跨语句误标为"已介导"——severity
+不看 span 时无害,一旦按 span 分级就是错的。改为**离 sink 最近者胜**
+(先被 `test_one_raw_write_path_keeps_the_page_level_claim_medium` 抓红,
+再修)。这也说明:**判据一变,老启发式的"无害近似"就变成缺陷**。
+
+**验收**(与 P2 合并跑,代码冻结后):
+- 新测试 `tests/test_tt_sanitizer_mediation.py` 8 例;反证两条(关 taint_flow
+  降档 ⇒ 2 红;关 no_policy 降档 ⇒ 2 红),都已跑过;
+- quick sync **FP0 FN0 ERR0(64 例)**;quick async 首轮 FN=1 是环境超时
+  (`timeout after 90s`;单例复跑 `dev/_r6_redirect_replay.py` 12.5s 拿到
+  `open_redirect_xss medium`,确认非语义变化),重跑见提交信息;
+- parity gate / 全量 192 双引擎另跑(见提交信息)。
+
+**剩下唯一红因 = P1(dom_dynamic)**:range6 门禁继续不挂 CI,但红因从三条收敛到
+一条;P1 修完那个 commit 负责把它挂上(`GATE_STATUS.md` 同步)。

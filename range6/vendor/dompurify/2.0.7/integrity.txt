@@ -1,0 +1,3 @@
+dompurify@2.0.7
+tarball: https://registry.npmjs.org/dompurify/-/dompurify-2.0.7.tgz
+sha512: 4b73b4964eab149b4ed35653ccca2594238683e580b42c12dd4e44d9648363fc7fb32eeaef4463102e039ab8a1e7f52accb2c1f57a0a27c2aac01c5a36f06ee0

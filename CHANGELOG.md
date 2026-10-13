@@ -36,6 +36,32 @@
 
 ### Fixed
 
+- **TT 层"sanitizer 介导"流的两条 medium 无证据(Phase 225 续,range6 的第三条红因)**:
+  `trusted_types_taint_flow`(层内注释自称 "concrete DOM-XSS finding")与
+  `trusted_types_no_policy`("trivially exploitable")在 canonical 正确用法
+  (当前版 sanitizer + innerHTML)的页面上照发 medium,而该页载荷被证明剥净
+  (无活元素、无弹窗)。项目曾两次用变绕开这个形状(`m_sanitizer_safe` 用
+  textContent;Phase 128b 用 DOMParser)——变绕正是它一直隐形的原因。现按证据分级:
+  **识别到的 sanitizer 位于 source→sink 之间时**,flow 仍报(写入依然无 TT 保护,
+  这是本层的本职)但降为 **low** 并在 title 点名 sanitizer;`policy.createHTML`
+  仍整个丢弃 flow(不变,那才是 TT 的缓解);任一未介导的流存在 ⇒ 维持原级。
+  顺带修掉新测试抓出的归因弱点:taint 源从"窗口内第一个"改为"离 sink 最近"
+  (相邻语句的 `sanitize()` 曾会把另一条 raw 写入的流误标为介导)。sanitizer 词汇
+  从 sanitizer 层导入,一处定义(Phase 207)。测试
+  `tests/test_tt_sanitizer_mediation.py` 8 例,两条反证各验证。
+
+- **净化器 mXSS 提示按证据分级(Phase 225)**:`sanitizer_output_to_innerhtml`
+  此前对任何 `sanitize() -> innerHTML` 流**无条件**发 medium。于是"当前版 +
+  正确用法"的页面会拿到一条 medium 的 "mXSS risk" —— 而该页上 CVE-2020-26870
+  的载荷被证明剥得干干净净(无活元素、无弹窗,见新靶场 range6)。项目自己早就
+  知道这个盲区并用变绕开了:`benchmark/server.py` 的 `m_sanitizer_safe` 注释原话
+  是 "(The layer flags any sanitise->innerHTML flow, so changing only the
+  version would still report.)",于是 negative 孪生被迫改用 textContent ——
+  **canonical 正确用法(当前版 + sanitize→innerHTML)从来没有任何负面用例覆盖**。
+  现在按证据分级:页面识别出的版本存在且**没有一个落在脆弱区间** ⇒ 降为 low 并在
+  title 写明依据;版本未知或存在脆弱版本 ⇒ 维持 medium(先例:Phase 179 JSON
+  反射 severity 连 confidence 一起降)。识别到的版本另在 `detected_versions` 回报。
+
 - **共享 Chromium 崩溃后全进程静默丢失 DOM 确认(Phase 224)**:`get_shared_browser()`
   发现线程本地的 browser 已死(崩溃/被 OOM kill/主机压力)时,旧代码直接走重启路径,
   而那个死实例的 playwright 同步 API 已把 greenlet loop 停泊在本线程 ——

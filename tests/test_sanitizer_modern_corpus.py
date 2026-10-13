@@ -124,9 +124,63 @@ def test_plain_allowlist_config_is_not_a_finding():
     assert "sanitizer_config_add_attr_handler" not in types, types
     assert "sanitizer_config_in_place" not in types, types
     assert "sanitizer_config_add_uri_safe_attr" not in types, types
-    # The sanitizer-output-to-innerHTML note is expected and unrelated: it is
-    # the mXSS-risk observation this module has always made.
+    # The sanitizer-output-to-innerHTML note is expected and unrelated --
+    # but since Phase 225 it is graded by evidence: this page's sanitizer
+    # version IS recognised and is not in any vulnerable range, so the
+    # mXSS-class note is low (see test_mxss_note_is_graded_by_version).
     assert "sanitizer_vulnerable_version" not in types, types
+    sev = {v["type"]: v["severity"]
+           for v in sb.analyze_page(html)["violations"]}
+    assert sev["sanitizer_output_to_innerhtml"] == "low", sev
+
+
+# ---------------------------------------------------------------------------
+# Phase 225: the mXSS note is graded by the page's own sanitizer version
+# ---------------------------------------------------------------------------
+# Range #6 measured the previous behaviour: the note was an unconditional
+# medium on every sanitize()->innerHTML flow, so the canonical CORRECT
+# usage (a current sanitizer, output to innerHTML) was reported as a
+# medium "mXSS risk" on a page whose CVE-2020-26870 payload is provably
+# stripped.  Unbacked severity is a false positive for any consumer that
+# triages by level.
+
+def test_mxss_note_is_graded_by_version():
+    shell = ('<script src="/vendor/dompurify/%s/purify.min.js"></script>'
+             '<script>var q = new URLSearchParams(location.search).get("q");'
+             'var clean = DOMPurify.sanitize(q);'
+             'el.innerHTML = clean;</script>')
+
+    def sev(html):
+        return {v["type"]: v["severity"]
+                for v in sb.analyze_page(html)["violations"]}
+
+    # current build, correct usage: the class is known, this page is not a
+    # member of it -> low
+    assert sev(shell % "3.4.17")["sanitizer_output_to_innerhtml"] == "low"
+    # a version INSIDE a vulnerable range keeps the medium note (and gets
+    # the high version finding alongside it)
+    s = sev(shell % "2.0.7")
+    assert s["sanitizer_output_to_innerhtml"] == "medium", s
+    assert s["sanitizer_vulnerable_version"] == "high", s
+    # no version visible -> nothing argues against the class -> medium
+    assert sev(shell % "NOPE")["sanitizer_output_to_innerhtml"] == "medium"
+
+
+def test_mxss_note_grading_needs_a_current_and_a_known_version():
+    """Reverse guard: the demotion must not fire on evidence it does not
+    have.  A page that merely mentions a current version in prose while
+    its sanitize() flow has no recognisable build keeps the note at
+    medium; likewise a page carrying BOTH a current and a vulnerable
+    reference (the vulnerable one decides)."""
+    both = ('<script src="/vendor/dompurify/3.4.17/purify.min.js"></script>'
+            '<script src="/legacy/dompurify@2.0.7/purify.min.js"></script>'
+            '<script>var c = DOMPurify.sanitize(q); el.innerHTML = c;</script>')
+    sev = {v["type"]: v["severity"]
+           for v in sb.analyze_page(both)["violations"]}
+    assert sev["sanitizer_output_to_innerhtml"] == "medium", sev
+    assert sev["sanitizer_vulnerable_version"] == "high", sev
+    # recognised versions are reported so a consumer can see the basis
+    assert sb.analyze_page(both)["detected_versions"] == ["3.4.17", "2.0.7"]
 
 
 def test_ordinary_event_handler_name_in_code_is_not_a_config():
