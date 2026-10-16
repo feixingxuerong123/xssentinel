@@ -2744,3 +2744,44 @@ snippet 是**页面自己的** `<head>`——层扫到页面自带 `<svg>`+`<scr
 但**网的 FP 臂与记录没回来**(`dev/fn_net.py` 恢复成空文件,
 `dev/fn_net_browser_check.py` 直接没了)。网已凭方法重写并复验;浏览器 oracle
 脚本**待重建**(否则 Phase 235 的"99/99 浏览器一致"无法复跑)。
+
+## Phase 252:wipe 之后——把恢复的账算清,并指出唯一未能恢复的一项
+
+### 1. 先算账:恢复提交留下的是**新旧混搭**的树
+
+`a57b71f Recovery` 之后,树的实际状态是**新旧文件混搭**:有的文件是新版
+(如 `sandbox_parser.py` 从 common 导入 31 个名字),有的文件被还原成**旧版**
+(`benchmark/server.py` 少了 529 行/14 个辅助端点与 `_safe_header_value`)。
+实测后果:
+
+| 症状 | 根因 | 状态 |
+|---|---|---|
+| 严格门 FN=27、ERR=14 | `context.py` 丢失 `analyze_all`(Phase 177 多反射点选择),每次扫描直接 raise | **已修**(接回 wipe 前尾部) |
+| 同上(连带) | `DEFAULT_PORT` 被还原成 8877(Windows 保留段 8810-9109) | **已修**(18777) |
+| `pos-hdr-01` FN | server.py 被还原成旧版,头部反射端点没了 | **已修**(整文件恢复) |
+| `tests/test_async_budget.py` 少 4176 字节 | 截断 | **已修** |
+| `tests/test_zz_port_probe.py` 语法错 | **损坏的垃圾文件**(`try:/n` 字面量、保留段端口、`assert True` 空测试) | **已删** |
+| **2 个测试文件无法收集 + 验证器沙箱门关闭 + 门 FN=2** | **`sandbox_common.py` 的 tokenizer 实现整体丢失**(26 个名字:`Token`/`decode_entities`/`_read_name`/`P_CLOSERS`/`RAWTEXT`/`OPTION_SCOPE`/`TABLE_*`/`SELECT_*`/`FRAMESET_*`/`FOREIGN_BREAK`…),**任何提交里都没有** | **未能恢复** |
+
+### 2. 那唯一一项为什么不能"顺手修"
+
+新版 `sandbox.py`+`sandbox_parser.py` 把 tokenizer 搬进了 `sandbox_common.py`,
+而承载它的文件版本**从未入库**——只存在于被 wipe 的工作区。重建它等于从零写
+一个 HTML tokenizer + 隐含结束标签表 + 实体解码,这不是"恢复"而是"重写",
+且会静默改变沙箱保真度(1680 例 oracle 的判定基准)。**不做无声的重写**。
+
+已做的是把 common 恢复到 wipe 前版本并补回 `AUTO_CLOSE`(新版 parser 的 31 个
+导入里缺 26 个,补 1 个,缺口从 26 降到 25,行为不变)。
+
+### 3. 当前门的诚实读数
+
+`--quick --strict-gate`:**FN 27 → 2**(`pos-hdr-01`、`pos-ws-01`),ERR 14 → 0。
+这两例共同的疑似点是**沙箱门关闭**(日志:"verdict left un-gated … the gate is
+effectively off")——即它们可能本就依赖沙箱门定案。**在沙箱恢复前,门不能算绿。**
+
+### 4. 需要决策(下一轮)
+
+1. **重写 sandbox tokenizer**(以 1680 例 oracle 为验收,约一个完整 phase),或
+2. 找到 wipe 前的文件副本(别的机器/备份/编辑器的本地历史),或
+3. 把 `sandbox.py`+`sandbox_parser.py` 一并回退到 2959a34 的配套三件套
+   (丢失 225 之后的 parser 重构,但立即可恢复一致性与绿门)。

