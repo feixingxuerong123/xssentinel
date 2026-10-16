@@ -213,6 +213,15 @@ def build_html(findings: list, target: str, meta: dict) -> str:
             _bits.append("PoC replay: DID NOT replay (treat as unproven)")
         if _bits:
             sev_cell += '<div class="evid">' + "<br>".join(_bits) + "</div>"
+        # Phase 250: for stored/second-order findings the payload EXECUTES on
+        # the viewer page, not on the injected URL -- the operator needs that
+        # URL to reproduce.  It lives in proof["viewer_url"] (the JSON export
+        # ships it; the HTML summary dropped it, leaving only the detail text).
+        viewer_html = ""
+        _pv = (d.get("proof") or {}).get("viewer_url")
+        if isinstance(_pv, str) and _pv:
+            viewer_html = (f'<div class="evid">viewer (where the payload '
+                           f'executed): <code>{_esc(_pv)}</code></div>')
         shot_html = ""
         shot = (headless or {}).get("screenshot_b64")
         if headless and headless.get("confirmed") and shot:
@@ -237,7 +246,7 @@ def build_html(findings: list, target: str, meta: dict) -> str:
           <td class="sev-cell" data-val="{_SEV_RANK.get(sev, 9)}">{sev_cell}</td>
           <td data-val="{_CONF_RANK.get(str(d.get('confidence', '')), 9)}">{_esc(d.get('confidence'))}</td>
           <td data-val="{_HEAD_RANK.get(hstatus, 9)}">{_esc(hstatus)}</td>
-          <td>{_esc(d.get('detail'))}{compliance_badges}{shot_html}</td>
+          <td>{_esc(d.get('detail'))}{compliance_badges}{viewer_html}{shot_html}</td>
           <td class="poc">{poc_cell}</td>
         </tr>""")
     rows_html = "\n".join(rows) if rows else \

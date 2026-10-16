@@ -1,0 +1,64 @@
+{
+ "meta": {
+  "manifest_id": "378751387570",
+  "runner": "run_benchmark_batched.py",
+  "max_payloads": 12,
+  "max_transforms": 8,
+  "timeout": 1,
+  "engine": "sync",
+  "batch": 1,
+  "fn_retry_on": true,
+  "fn_retry_max": 1,
+  "fn_retry_wait": 1.0,
+  "fn_retry_timeout_scale": 3.0
+ },
+ "cases": [
+  {
+   "case_id": "pos-script-01",
+   "path": "/r/scr01",
+   "param": "q",
+   "mode": "raw_script_string_dq",
+   "ground_truth": "vulnerable",
+   "context": "script_string_dq",
+   "difficulty": "easy",
+   "detected": false,
+   "verdict": "FN",
+   "scan_time_s": 3.02,
+   "findings_count": 0,
+   "requests": 0,
+   "error": "timeout after 3s",
+   "timeout": 3,
+   "fn_retry": {
+    "retried": true,
+    "first": {
+     "verdict": "FN",
+     "scan_time_s": 1.01,
+     "requests": 0,
+     "error": "timeout after 1s"
+    },
+    "attempts": [
+     {
+      "verdict": "FN",
+      "scan_time_s": 1.01,
+      "requests": 0,
+      "error": "timeout after 1s"
+     },
+     {
+      "verdict": "FN",
+      "scan_time_s": 3.02,
+      "requests": 0,
+      "error": "timeout after 3s",
+      "timeout": 3
+     }
+    ]
+   }
+  }
+ ],
+ "counts": {
+  "tp": 0,
+  "fp": 0,
+  "tn": 0,
+  "fn": 1,
+  "errors": 0
+ }
+}

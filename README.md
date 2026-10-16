@@ -1,9 +1,5 @@
 # XSSentinel — 综合型 XSS 检测框架
 
-![CI](https://github.com/feixingxuerong123/xss/actions/workflows/ci.yml/badge.svg)
-![License](https://img.shields.io/badge/license-MIT-blue)
-![Python](https://img.shields.io/badge/python-3.9%2B-blue)
-
 > 一款**多层级、可扩展**的 XSS 检测工具：反射点上下文感知注入 + WAF 自适应绕过 + DOM 污点分析 +（可选）无头浏览器真实验证。
 
 ---
@@ -13,10 +9,6 @@
 市面上成熟的商业工具（如 Acunetix、Burp Suite Pro、Netsparker）由大型团队长期维护，覆盖大量私有规则与爬虫能力。**没有任何一款开源工具能"全面超过"它们**——这是个移动靶。
 
 XSSentinel 的目标是**在开源/自研工具中做到检测维度最全、架构最干净、最易扩展**：它把通常被单点工具割裂的能力整合进一个流水线，并且每一层都可单独替换/增强。它在以下方面优于常见的单技术 XSS 脚本：
-
-<details>
-<summary><b>展开完整能力清单（36 项，含实现出处与标定历史）</b></summary>
-
 
 - **6 层检测流水线**：反射 → WAF 绕过 → DOM 污点 → 存储型 → 盲打(OOB) → 无头确认，覆盖大多数工具只做其中 1–2 项的盲区。
 - **上下文感知**：先判断输入反射在 HTML 元素 / 属性 / 脚本字符串 / 事件处理器 / `javascript:` URI / SVG / MathML / CDATA / 模板 `{{}}` / meta-refresh / HTML 注释等 **20+ 种上下文**，再选对应 payload。
@@ -32,25 +24,13 @@ XSSentinel 的目标是**在开源/自研工具中做到检测维度最全、架
 - **DOM XSS 静态污点分析**：不依赖服务器响应，直接分析前端 JS 的 source→sink 流（如 `location.hash` → `innerHTML`、jQuery `.html()`、`postMessage` 事件、`dangerouslySetInnerHTML`、`v-html`、`{{ }}` 等）。
 - **JS AST 数据流分析（Phase 43）**：esprima ESTree 解析每个 `<script>` 块，跟踪污点变量跨声明/赋值/拼接的多跳传播（含压缩混淆代码与 postMessage 回调函数体），产出带 `[AST]` 标记的高置信 source→sink 链（DalFox v3 式）；解析失败透明回退正则通道（`pip install xssentinel[ast]` 启用，缺失时自动降级）。
 - **DOM XSS 真·浏览器执行确认（L6 强化）**：在真实无头浏览器（Playwright）里给危险 sink 插桩——`innerHTML`/`outerHTML`/`document.write`/`Function`/`setTimeout`/`location.*`/`window.open`/`setAttribute(on*)`/jQuery `.html()` 等，并把唯一标记注入 `location.hash`/`location.search`/`document.cookie`/`postMessage` 等可控源。**标记一旦真正流入 sink，即判定为已确认（high）DOM XSS**——这是猜测式静态分析无法给出的硬证据（静态命中仅作为 medium/low 提示）。Playwright 不可用时优雅降级为静态启发式，不影响其他层。
-- **DOM 重建链（Phase 185）**：覆盖 `DOMParser.parseFromString` → `importNode` / `adoptNode` / `cloneNode` → `appendChild` / `insertBefore` / `replaceChild` / `append` / `prepend` / `after` / `before` / `replaceWith` 这条「解析后重建 DOM 再插入」的链路——真实世界绕过 DOMPurify 类净化的主流写法。判定走**污点传播 + 插入时复查节点当下是否仍含标记**：净化器若已把 onerror 摘掉，插入时就不会命中；插入纯文本节点也**不算**命中（`benchmark/sink_execution.py` 实测它根本不执行）。
 - **存储型 XSS**：注入后重新拉取"展示页"确认持久化执行（多数开源工具不做）。
 - **盲打 XSS（OOB）自动确认**：注入带唯一 token 的带外回调 payload，再轮询回调监听服务——**收到 beacon 即判定为已确认（high）盲打**，而非只"撒网不收网"。支持自托管监听器（`--oob self`，离线可测）与公共 interactsh（`--oob interactsh`，真实场景）。
 - **双重确认**：语义确认（token 是否落在真实可执行汇聚点，且用 BeautifulSoup 结构化判定，可识别 `html.escape` 伪漏洞）+ 可选无头浏览器真实弹窗确认，显著降低误报。
 - **深度爬虫**：`-c` 自动发现同域 `<a>` 链接与 `<form>` 端点（BFS，`--crawl-depth` 控深度，`--scope` 限域），连"无参数纯 DOM 页面"也纳入扫描——多数单脚本工具跑完一个 URL 就停了。
 - **发现去重**：`dedup()` 按 `(type, URL, param, context)` 合并经不同爬取路径/变形变体发现的同一漏洞，避免重复告警刷屏（DOM 类忽略 query 差异）。
 - **隐藏参数挖掘（Phase 43）**：内置 313 个高产出候选词（分页/token/回跳/模板等 14 类），`--param-wordlist` 可追加自定义词表（操作符提示前置）；fuzzer 差分 triage 从大词表挑 top-N 深测，请求量可控。
-- **双引擎精度对齐（Phase 43）**：`benchmark/runner.py --engine {sync,async}` 用同一 192 用例矩阵分别标定两条流水线——async 经 CSP 响应头门、转义实体窗口、mXSS payload 自带结构守卫三层修复后已达 **recall 100% / precision 100% / FPR 0**，与 sync 完全对齐（Phase 69 重新标定：sync 98 用例 TP=64/FP=0/FN=0，recall/precision 100%，FPR 0——此前本机退化 loopback 曾出现 1 例环境性假 FN，单跑该用例 0.2s 即检出；runner 现对出错用例自动重试，且**漏洞用例若最终无法完成计入 FN**，不再让跑不完的用例悄悄缩小 recall 分母。Phase 176n 补上这句话当时做不到的部分：旧闸门是 `verdict != "FN"`，**只有出错的漏洞用例被重试**，出错的安全用例首试即被接受、直接从分母消失；现由 `_evaluate_with_retries()` 两类一并重测（并发路径此前一次都不重试），产物并记录 `engine` / `retried_cases` / 每例 `retries`）。**注意该标定已被 Phase 91/92 刷新**：当时 async 基线里 3 个 safe 用例存在从未暴露的误报（Phase 84 引入），最新数字见文末「当前基线」表——precision 仍是 1.000，但 recall 分母口径下的 FN 需先单跑复现再判定。
-- **SPA hash 路由自动发现（Phase 209）**：Angular/Vue 的 hash location strategy 只在
-  `location.hash` 里读路由，HTTP 探针打服务端路径（`/search`）永远碰不到客户端 sink。
-  现在从应用**自己的 bundle** 里配对 `navigate([/route], {queryParams:{…}})` → 得到
-  路由与参数名 → 注册成 `origin/#/route?param=` 端点（上限 12），sync 静态爬取、
-  sync SPA 爬取、async 爬取三条路径都接线。**外部效度实测**：OWASP Juice Shop 20.2.0
-  （第三方真实应用，非本仓 fixture）上 `xssentinel -u <origin> -c --headless` 一条命令
-  即报出 `dom_dynamic` **high/high browser-executed**（`location.hash` →
-  `Element.innerHTML`，对应上游 `challenges.yml` 的 `localXssChallenge`）；双引擎各命中
-  一个**不同**的真实 sink，且都经独立 Playwright 复核（注入 `<em class=…>` 后被解析成
-  元素而非文本）。同一轮还量出并修掉一个 **critical 级假阳性**（模板 SSTI 把错误页栈
-  行号里的 `49` 当成 `{{7*7}}` 的渲染结果），现为差分对照判定。
+- **双引擎精度对齐（Phase 43）**：`benchmark/runner.py --engine {sync,async}` 用同一 98 用例矩阵分别标定两条流水线——async 经 CSP 响应头门、转义实体窗口、mXSS payload 自带结构守卫三层修复后已达 **recall 100% / precision 100% / FPR 0**，与 sync 完全对齐（Phase 69 重新标定：sync 98 用例 TP=64/FP=0/FN=0，recall/precision 100%，FPR 0——此前本机退化 loopback 曾出现 1 例环境性假 FN，单跑该用例 0.2s 即检出；runner 现对出错用例自动重试，且**漏洞用例若最终无法完成计入 FN**，不再让跑不完的用例悄悄缩小 recall 分母）。**注意该标定已被 Phase 91/92 刷新**：当时 async 基线里 3 个 safe 用例存在从未暴露的误报（Phase 84 引入），最新数字见文末「当前基线」表——precision 仍是 1.000，但 recall 分母口径下的 FN 需先单跑复现再判定。
 - **可复现 PoC**：每个确认漏洞自动产出 **curl 命令 + 含 payload 的 URL + 自包含 HTML PoC 页面**（iframe / 自动提交表单 / `location.hash` 触发 DOM），HTML/JSON/CSV/SARIF 四报告均携带，直接交差或进缺陷单。
 - **被动代理扫描（Phase 44）**：`--passive` 起本地 HTTP 代理（对标 xray / w13scan 的被动模式），浏览器/工具挂代理即可把流量捕获进扫描流水线——按 `方法+主机+路径+参数名集合` 签名去重（分页/翻 token 不重扫），GET/POST 表单与 JSON body 全解析，HTTPS 默认走 CONNECT 隧道透传；加 `--mitm-ca ca.pem`（Phase 50）则自动生成本地 CA 并对 scope 内主机做 HTTPS 拦截——每主机证书由该 CA 签发，把 CA 证书 `ca-cert.pem` 装进浏览器/系统信任库后 HTTPS 参数/body 也能被捕获扫描（越 scope 主机保持盲透传）；后台 worker 把捕获端点直接喂给 L1 流水线，`--sqli-check` / `--check-outdated-js` 快检可联动（见下）。写端点（POST/PUT/PATCH）扫描后自动进入 **stored 二阶观察**：对 body 参数注入唯一 token 探针，之后浏览到的任意页面若原样渲染该 token（可执行上下文）即确认 high `second_order` finding——存储型 XSS 无需手动指定注入/查看端点（Phase 67）。
 - **目标级 CORS / XS-Leaks 审计（Phase 51/53）**：每 origin 探测 Origin 反射（GET+OPTIONS 兜底）——反射任意 Origin+Allow-Credentials → high `cors_misconfig`；`--audit-xs-leaks` 对无任何跨源隔离头（COOP/CORP/COEP/帧守卫）的页面记 low `xs_leak_surface`；`xs_leaks.py` 另附 img/frame-timing/window.name/history 四信道载荷库与免服务器演示 PoC（证明已确认 XSS 的跨站窃取半径）。sync/async 双引擎对齐（Phase 54）。
@@ -64,111 +44,12 @@ XSSentinel 的目标是**在开源/自研工具中做到检测维度最全、架
 - **批量输入管道（Phase 87 P0）**：`--batch urls.txt` 与 `--batch-stdin`（管道流式喂入，一行一个 URL，# 注释）——侦察链（httpx/gau/wayback）输出可直接接进扫描器，URL 去重、失败目标不中断整批、按目标分报告。对齐 DalFox pipe 模式。
 - **HAR 导入（Phase 88 P1）**：`--har capture.har` —— 浏览器 DevTools/Burp/ZAP 导出的 HTTP Archive 直接作为扫描入口：每个捕获请求展开为一个真实端点，method/form·JSON body/cookie/自定义头全部回填后走完整扫描管线（对齐 Burp/XSpear 的 HAR 入口）。
 - **OpenAPI/Swagger 导入（Phase 89 P1）**：`--openapi spec.json` —— 文档化的 API 契约（OpenAPI 3.x / Swagger 2.0）直接作为扫描入口：每个 path+operation 展开为端点（含浏览器从未访问过的路由），路径模板 `{id}` 按 example/schema 链解析为样本 URL，form/JSON body 由 schema 构建，apiKey/bearer 安全声明转为请求头。与 HAR 互补：HAR 覆盖"实际流量"，OpenAPI 覆盖"声明面"。
-- **抗劣化分批基准跑（Phase 44，Phase 91 扩参）**：`benchmark/run_benchmark_batched.py [out.json] [batch] [port] [sync|async] [max_payloads] [max_transforms] [timeout]` —— `run_benchmark.py` 在单进程内跑完 192 用例，遇到会间歇掐 loopback 的安全软件（WinError 10053/10054）时必然卡在中途（实测 7 次 0 完成）；分批版按小批（默认 6）评估、**每批落盘**、支持中断续跑与失败重试。位置参数 4-7 可选（默认 sync/10/6/45），传 `sync 14 12 90` 即复现标定口径；续跑时预算变了会丢弃旧结果。**Windows 本机跑完整矩阵请用这个入口**（默认预算 6–7 分钟全矩阵，14/12/90 口径 sync 约 12 分钟、async 约 25 分钟）。
-- **凭据不外泄给被扫页面选定的源（Phase 189，对标 Dalfox GHSA-mph2-gf5w-6f9f 的修复）**：实测确认（requests 2.32.5 / urllib3 2.6.3 / aiohttp 3.13.3）跨源 302 时 urllib3 只按 **host 字符串**剥 `Authorization`/`Cookie`（`localhost→127.0.0.1` 算跨、`h:8080→h:9090` 不算），自定义头 `X-Api-Key` 与无 domain 的 `--cookie` 照发；aiohttp 头与 jar cookie 全发。也就是**被扫页面通过 `Location:` 决定操作者凭据送到哪些源**。现规则一条：凭据只跟着"操作者点名的源"走——顶层请求恒带，仅因响应 `Location:` 才到达的源收不到（同族 `--headers`/`--cookies`/`Authorization`/`Cookie` 全剥，`User-Agent` 等浏览器形状头保留，跨源链不再像扫描器）。LLM 池的 `Bearer` API key 改为不跟随重定向。重定向仍被跟随、响应体仍被解析，**判定语义零变化**。可选 `--stop-at-cross-origin` 把同一规则升级为**授权边界**：页面 `Location:` 指向未点名源时连载荷都不发过去（返回 3xx 本身并在运行末尾列出被拒绝的跳转）。实测对照：默认关时一次扫描把 40 余个探针带到第三方 loopback 源，开启后为 0 个；同域重定向照常跟随、照常带凭据。async 侧凭据剥离同样生效，但 aiohttp 的跳转循环无法中途终止，故"停止跟随"目前仅 sync 引擎——CLI 显式警告而不是假装支持。
-- **CSP 交付家族粒度（Phase 189）**：`script-src-elem` / `script-src-attr` 不是"追加"到 `script-src`，而是对各自投递形态**替换**。原实现（`csp.analyze` / `is_strict_inline` / `gadget_chain_relevant` / `verifier._csp_blocks_inline`）一律只读 `script-src`，于是两个方向都错：`script-src 'self'; script-src-attr 'unsafe-inline'` 被判"内联全禁"（反射型 `onerror` 被否证 = FN，预算还被切到早停档），`script-src https://cdn.example.com`（没有 `'unsafe-inline'`）里的反射 `<script>` 被判可执行 = FP。nonce 的"使 `unsafe-inline` 失效"规则改为**按家族**判定：`script-src` 上的 nonce 不再吃掉 `script-src-attr` 里的 `unsafe-inline`。同时 `'unsafe-hashes'` 与 gadget 主机识别覆盖 `-elem`/`-attr` 列表。
-- **净化器语料现代化（Phase 189）**：DOMPurify 版本线从"停在 2020（<2.0.8）"改为三段**修复线**（<2.0.8 mXSS／<3.1.3 原型污染+嵌套 mXSS／≤3.4.15 2026 集群），编号取自厂商 advisory 列表（GitHub API 实测 25 条，最新发布 3.4.16），并按"一个版本一条发现"去重（横幅注释与 npm 路径两种形态不再各报一次）。2026 年全部 advisory 的利用面都是**配置项**而非标签白名单，故新增 `IN_PLACE` / `CUSTOM_ELEMENT_HANDLING` / `SAFE_FOR_TEMPLATES` / `setConfig()` 持久化 / `USE_PROFILES` / `ADD_ATTR` 里的 `on*`（high）/ `ADD_URI_SAFE_ATTR` / `ALLOWED_URI_REGEXP` / `RETURN_TRUSTED_TYPE` 检测，且带"加固过的页面必须沉默"反向对照。
-- **Source map 摄取（Phase 189，对标 nexa / ASTra 类 JS 源码挖掘）**：`//# sourceMappingURL=`（含 legacy `//@`、块注释形、`data:` 内联形）→ 取回 `.map` → `sourcesContent` 里的**未压缩原始源码**进既有 JS 端点/汇聚点挖矿通道（压缩改名的路由、被 tree-shake 掉的 API 路径只有在这里看得见）；能读回 `sourcesContent` 时另记一条 `source_map_exposed`（low）发现。两道硬限制：每个脚本最多取一个 map、引用指向别的源就不取（页面点名的 URL 不构成抓取授权）；非 JSON/超限 body 静默不炸挖矿。
+- **抗劣化分批基准跑（Phase 44，Phase 91 扩参）**：`benchmark/run_benchmark_batched.py [out.json] [batch] [port] [sync|async] [max_payloads] [max_transforms] [timeout]` —— `run_benchmark.py` 在单进程内跑完 98 用例，遇到会间歇掐 loopback 的安全软件（WinError 10053/10054）时必然卡在中途（实测 7 次 0 完成）；分批版按小批（默认 6）评估、**每批落盘**、支持中断续跑与失败重试。位置参数 4-7 可选（默认 sync/10/6/45），传 `sync 14 12 90` 即复现标定口径；续跑时预算变了会丢弃旧结果。**Windows 本机跑完整矩阵请用这个入口**（默认预算 6–7 分钟全矩阵，14/12/90 口径 sync 约 12 分钟、async 约 25 分钟）。
 - **多格式报告 + 并发**：HTML / JSON / CSV / **SARIF(2.1.0) / JUnit / Markdown** 六格式，SARIF 可直接接入 CI / 缺陷平台（如 GitHub code scanning、Defender、Jira）；多线程端点/参数并发扫描。
-
-
-</details>
 
 **只用于你被授权测试的系统。**
 
 ---
-
-## 外部参照：PortSwigger（Burp 官方）语料覆盖对照
-
-自有基准再满分也只能证明"内部一致"。要回答"检测面够不够广"，需要一个**第三方撰写的权威向量集**——
-[PortSwigger XSS cheat sheet](https://portswigger.net/web-security/cross-site-scripting/cheat-sheet)
-（Burp Suite 厂商维护，业界公认最全）就是这个参照，且自带两项第三方标注：是否需要用户交互、适用上下文。
-
-复现（cheat sheet 需自行抓取，本仓库不内联第三方内容）：
-
-```bash
-curl -o pw.html https://portswigger.net/web-security/cross-site-scripting/cheat-sheet
-python benchmark/portswigger_corpus_coverage.py --html pw.html \
-    --json benchmark/results/portswigger_corpus_coverage.json
-```
-
-当前结果（822 条向量，对照 `payloads.json` / `svg_xss.json` / `framework_xss.json`）：
-
-| 分组 | 向量数 | 事件处理器覆盖 | 标签覆盖 | 协议覆盖 |
-|---|---|---|---|---|
-| **无需用户交互**（主指标） | 57 | **100%**（52/52，Phase 192 补齐 40 个缺失事件） | 100%（21/21，Phase 192 补齐 6 个缺失标签） | 100%（1/1） |
-| 需用户交互（仅参考） | 520 | 15.4%（16/104） | 74.4%（29/39） | 100%（2/2） |
-| 其他（标签 / 框架 / 协议类） | 245 | **100%**（14/14，Phase 192） | 71.2%（37/52） | 100%（3/3） |
-
-**为什么只把"无需用户交互"当主指标**：cheat sheet 穷举了浏览器整个事件面，其中一大半
-（pointerdown / mousemove / mouseenter …）必须用户交互才触发，把它们算进分母会得出一个
-误导性的低数字（三组混算只有 15.4%）。公平口径是看注入即执行的那一组——Phase 192 起该组
-**三维全部 100%**。
-
-**这个数字不能说明什么**（别拿它自欺）：
-
-- 字符串出现 ≠ 语义等价：语料里出现 `onanimationend` 不代表有一条能真正触发它的完整载荷；
-- 覆盖 ≠ 能检出：这只测"检测面有没有提到这项技术"，不测端到端检出率；
-- 忽略 PortSwigger 标注的浏览器支持差异。
-
-缺口 top（`no_interaction` 组，按 PortSwigger 使用频次）：`beforematch`、`durationchange`、
-`scrollend`、`beforeprint`、`webkitanimationiteration`、`scrollsnapchange`、`popstate`、
-`transitionrun` 等 40 个事件处理器；标签侧缺 `slot`、`address`、`camera`、`span`、`br`、`b`。
-
-
-## 外部参照：同类开源扫描器同靶跑分（2026-10-04）
-
-覆盖对照说明"检测面提到没提到"，它回答不了另一个问题：**同一批靶，别人扫得出多少**。
-所以把 XSSentinel、[DalFox](https://github.com/hahwul/dalfox) 与
-[nuclei](https://github.com/projectdiscovery/nuclei) 的官方 DAST XSS 模板放到**完全相同的
-目标**上各跑一遍——同一个 URL 构造（含 cookie-tossing 用例需要的 `sub.localhost` host 别名）、
-同一个探针值，逐例对照 manifest 里独立撰写的 ground truth。
-
-```bash
-# dalfox 经 Go 模块代理安装（落 $GOPATH/bin，适配器会自己找到）
-go install github.com/hahwul/dalfox/v2@latest
-python benchmark/run_cross_tool.py --sample 60 \
-    --tools XSSentinel,dalfox,nuclei-dast-xss \
-    --out benchmark/results/phase196_cross_tool.json \
-    --md  benchmark/results/phase196_cross_tool.md
-```
-
-60 例是按 `(ground_truth, context)` 分层的确定性切片（64 个族各取一条，不靠随机种子）：
-
-| 工具 | 版本 | TP | FP | TN | FN | ERR | recall | f1 | 墙钟 |
-|---|---|---|---|---|---|---|---|---|---|
-| **XSSentinel** | 本仓（与门禁同口径 14/12 预算） | 35 | 0 | 24 | 1 | 0 | 0.972 | **0.986** | 346s |
-| DalFox | v2.13.0 | 26 | 1 | 22 | 10 | 1 | 0.722 | **0.825** | 1173s |
-| nuclei（dast/xss 模板） | v3.9.0 | 26 | 0 | 23 | 10 | 1 | 0.722 | **0.839** | 49s |
-
-**这张表的三条限定，缺一条就会被误读**：
-
-- **目标仍是我们自己构造的**。判定语料（nuclei 模板、DalFox 载荷与挖掘策略）来自第三方，
-  靶场不是——所以"别人出的题"只到位一半。真正的独立验证（真实应用、商业工具对跑）仍未做。
-- **我方唯一那条 FN 是打分口径，不是漏检**：XS-Leaks 审计层按设计产出 low/firm 结论，
-  而这里"检出"定义为 high/medium/critical 的 XSS 级 finding；这一层两个第三方工具根本没有。
-- **速度不是单向优势**：nuclei 用 49s 拿到 0.839，比我们先完成 7 倍。任何"性能优于同类"的
-  说法都得对着这一行校准。
-
-ERR 记的是"没测到"（超时 / 该工具结构上无法接收这条用例的输入形状），不计入 TN/FN——
-一次没跑成的扫描不该伪装成一个否证结论。
-
-## Range #3 —— 第三方意见应用靶场
-
-`range3/` 是一个刻意与 benchmark 异形的**应用**靶场:SQLite 持久化、登录会话与
-401 门、混合内容类型(HTML/JSON/纯文本/UTF-7 旧字符集)、多反射点页面、RCDATA、
-cookie/header 载体回显、base64/JWT 容器解码回显、存储型与二阶流、认证后反射、
-CSP strict/nonce、DVWA 式分级防御(medium/high/impossible)。ground truth 从
-**服务器行为**独立撰写;runner 驱动真实 CLI(双引擎)评分。
-
-```bash
-python range3/runner.py --engine both      # 全量 26 例,sync+async 各跑一轮
-python range3/server.py 8902               # 单独起靶场(app 模式)
-```
-
-评分采用"服务器行为 = 真值":vulnerable/safe/low(JSON 反射必须保留但降置信)。
-首轮即暴露 6 个扫描器缺陷(全部已修,见 AGENTS.md 178c);当前基线
-**sync TP20/FP0/FN0,async TP17/FP0/FN0(2 SKIP 为 sync-only 载体)**。
 
 ## 检测架构（6 层）
 
@@ -328,72 +209,6 @@ python -m xssentinel --har capture.har -o reports/ -f json
 python -m xssentinel --openapi openapi.json -o reports/ -f json
 ```
 
-**站点地图导入（Phase 184，DalFox 同款）**——sitemap index / urlset / 纯文本
-sitemap.txt 都吃，`<loc>` 越域 URL 按 HAR 同款 scope 规则丢弃：
-
-```bash
-python -m xssentinel --sitemap https://target.com/sitemap.xml -o reports/ -f json
-```
-
-**Wayback 历史URL导入（Phase 192，gau/waymore 管道一键化）**——域名（可带路径
-前缀收窄）查 Internet Archive CDX API，历史捕获过的 URL 全部成为扫描目标；
-`fl=original` + `collapse=urlkey` + `statuscode:200` 过滤，越域 URL 同样按
-scope 规则丢弃：
-
-```bash
-python -m xssentinel --wayback target.com -o reports/ -f json
-# 路径前缀收窄：--wayback target.com/app
-```
-
-**MCP stdio server（Phase 192/202，dalfox v3 同款）**——把扫描器作为工具暴露给
-LLM Agent（JSON-RPC over stdin/stdout），三个工具组成侦察链：
-
-```bash
-python -m xssentinel --mcp
-# xssentinel_scan    全量扫描,返回压缩后的 finding 判定,无发现=成功
-# xssentinel_discover  无头渲染一次,回 SPA 表单字段名 + 同源 API 端点
-# xssentinel_profile   单请求反射画像(context + raw=/stripped=/encoded= 元字符分类)
-```
-
-**浏览器渲染输入发现（`--discover`，Phase 196）**——渲染目标一次：SPA 表单
-字段名并入挖矿词表，页面自己 fetch 的同源 API 端点在主目标后扫描（上限 10）；
-需要 playwright，sync 引擎专属。**已知边界（Phase 209 记录）**：`--discover` 目前
-只回表单字段名与同源资源 URL，**不回 hash 路由表**——SPA 的 `/#/route?param=` 由
-爬取路径（`-c`）发现并投递 DOM 探测，不走 `--discover`；把路由也暴露给
-`xssentinel_discover`（供 Agent 编排）是排后的下一步。
-
-```bash
-python -m xssentinel -u "https://target.com/app" --discover -o reports/
-```
-
-**GraphQL introspection 输入面（`--gql`，Phase 195）**——schema 里 String 型
-mutation 参数 / input 字段 / query 参数按写入侧优先并入挖矿词表，端点本身
-成为扫描目标；与 `--stored-view` 配对即得 API 写入的存储型验证链：
-
-```bash
-python -m xssentinel --gql https://target.com/graphql -o reports/ -f json
-```
-
-**HPP 参数污染探针（`--hpp` 语义内建，Phase 193/196）**——检测到 WAF 且标准
-梯子未确认时自动尝试：同参数投递两次（首现 benign、次现 payload），只查首现
-的过滤器被绕过；query 与 form 体双位置。
-
-**会话失效策略（`--session-check` / `--on-session-loss`，Phase 194）**——
-响应体正则检测死会话（200 页写"请先登录"defeating 状态码检查）；
-`--on-session-loss abort` 让死会话诚实停扫（findings 保留、原因记账）：
-
-```bash
-python -m xssentinel -u "https://target.com/admin" --login-url ...   --session-check "please log in" --on-session-loss abort
-```
-
-**跳过指定参数（`--skip-param`）**——命中的参数 L1/L2 不再探测、隐藏参数
-挖矿也不再为其花费预算（挖矿默认额外跳过 utm_* / gclid / fbclid 等追踪
-噪声；页面**已声明**的参数不受默认噪声表影响，仍会被主探针覆盖）：
-
-```bash
-python -m xssentinel -u "https://target.com/p?a=1&b=2" --skip-param "b,debug"
-```
-
 三个批量源（`--batch` / `--batch-stdin` / `--har` / `--openapi`）与 `-u` 互斥，报告均按目标
 分文件写入 `-o DIR`；URL 去重、失败目标不中断整批、结束时汇总统计。
 
@@ -439,14 +254,6 @@ xssentinel/
     ├── scanner_layers.py  # AdvancedLayerMixin：L3 DOM + L7 jsonp/csp/cors/mXSS/
     │   │                  #  clobber/template/polyglot
     ├── scanner_crawl.py   # CrawlMixin：SPA 无头爬取 + 隐藏参数挖掘 + BFS
-    ├── async_scanner.py   # AsyncScanner 核心（Phase 191 起 = 编排 + _probe_param
-    │   │                  #  + 传输/会话/预算三块，与下面三个 Mixin 组合）
-    ├── async_scanner_verify.py  # AsyncHeadlessVerifyMixin：--headless 逐 finding 确认
-    ├── async_scanner_layers.py  # AsyncDetectionLayersMixin：预编码/DOM/高级层/请求层/
-    │   │                  #  CSP/CORS/XS-Leaks/上传/JSONP/盲打收网
-    ├── async_scanner_crawl.py   # AsyncCrawlMixin：隐藏参数挖掘 + 端点/source map 挖掘 + BFS
-    ├── async_scanner_common.py  # 共享 helper：egress cookie jar、非 HTML 降级、
-    │   │                  #  JSONP 回调名、_AsyncScannerShim…
     ├── cors_check.py      # 目标级 CORS 审计（Phase 51：Origin 反射 + 凭据判定）
     ├── xs_leaks.py        # XS-Leaks（Phase 53：隔离头审计 + 通道载荷库/演示 PoC）
     ├── findings.py        # Finding 数据类 + 默认变形阶梯（mixins 共享）
@@ -508,81 +315,7 @@ python tests/passive_demo.py         # 产出 tests/passive_demo_report.html
 
 测试策略（Phase 37）：`tests/test_pipeline.py` 把靶场 2 的精简切片纳入 pytest —— **主流程回归在每次 pytest 就会暴露**，不再依赖手动靶场演练；`tests/test_async_pipeline.py` 补上 async 扫描器首批测试（曾靠 0% 覆盖掩盖了 `for_context` 缺失导致 async L1 静默失效的 bug）；core 的 verbose 诊断已统一路由到 `logger.debug`（`--verbose` 即 DEBUG 级）。Phase 43 补齐 `tests/test_fuzzer.py`（`--fuzz` 七个评分维度全断言，覆盖率 0%→全路径）与 `tests/test_form_miner.py`（表单抽取/填充/端点转换），并拆分 `__main__.py`（1145→497 行 + cli_runner/cli_commands）。Phase 44 新增三个测试文件共 42 例：`tests/test_passive_proxy.py`（签名去重/scope 匹配/body 解析/裸 socket 真代理端到端捕获 + 真实 Scanner 反射命中回归）、`tests/test_sqli.py`（五家族指纹全路径 + 真回显服务命中）、`tests/test_retire_js.py`（库名锚定版本提取防路径数字泄漏/版本区间边界/去重）。
 
-**push 精度门禁（64 例分层切片，双引擎零容错）**：`python -m benchmark.runner --quick` 现在取"每个 `(ground_truth, context)` 一条" = **64 例**（36 正 / 28 负），覆盖 manifest 里全部 36 个正例上下文与 28 个负例上下文。旧的 `per_class=5` 在字母序中途就停止取样，于是最大家族 `html_element`（48 正 + 34 负 = 矩阵的 43%）在每次 push 里被测量 **0 次**；而 CI 沿用的 `FPR>20% / recall<50%` 阈值在 10 例切片上**容忍 1 个误报 + 2 个漏报仍然绿灯**。`--strict-gate` 改为要求 `FP0 / FN0 / ERROR0`（ERROR 也算失败：没测到的用例不能让门禁"绿"得像是测过了）。2026-10-03 在本机（劣化 loopback、安全软件间歇掐连接，即最坏口径）实测：
-
-| 引擎 | 用例 | TP | FP | TN | FN | ERROR | SKIP | 墙钟 | 产物 |
-|------|------|----|----|----|----|-------|------|------|------|
-| sync | 64 | 36 | 0 | 28 | 0 | 0 | 0 | 370.3s | `benchmark/results/phase190_quick_sync.json` |
-| async | 64 | 36 | 0 | 27 | 0 | 0 | 1 | 267.3s | `benchmark/results/phase190_quick_async.json` |
-
-（那 1 例 SKIP 是 `engines:["sync"]` 声明的存储型负样本，异步不实现，记 SKIP 不记通过。切片大小与文档口径的一致性由 `tests/test_quick_gate_slice.py` 6 例锁定，其中一条断言"CI / CONTRIBUTING / OPTIMIZATION 里写的切片数字 == 代码实际产生的数字"——本次修的就是这类数字烂掉后没人发现。）
-
-**当前基线（192 用例矩阵，两引擎同一口径）**：`benchmark/run_benchmark_batched.py`，默认预算 10/6/90；结果 `benchmark/results/benchmark_20260924_022744.json`（sync）与 `benchmark/results/benchmark_20260925_asyncfix.json`（async，含 Phase 177 主循环 concat 重试补齐）。**双引擎在各自计分口径内均为 recall 1.000 / precision 1.000 / FPR 0**——此前 async 的 6 条 FN 已归零。async 的 10 例 SKIP 是 manifest 声明 `engines:["sync"]` 的存储型 / 二阶链路，异步不实现，**记 SKIP 而不是记通过或记漏报**，故分母是 182 而非 192：
-
-| 引擎 | 用例 | 计分 | TP | FP | TN | FN | ERROR | recall | precision | FPR | 墙钟 |
-|------|------|------|----|----|----|----|-------|--------|-----------|-----|------|
-| sync | 192 | 192 | 113 | 0 | 79 | 0 | **0** | 1.000 | 1.000 | 0.000 | 1214s |
-| async | 192 | 182 | 108 | 0 | 74 | **0** | **0** | 1.000 | 1.000 | 0.000 | 未记录 |
-
-（async 那格留空的原因：`benchmark_20260925_asyncfix.json` 只记录逐例 `scan_time_s`（累计 1719s，含 FN 重试），与 sync 的墙钟口径不可直接比较。**宁可空着，也不填一个看着能比的数字**。）
-
-- **sync 192/192 全部计分**（`scored=192`、`errors=0`、产物里新增 `engine` /
-  `retried_cases` 字段）；async 是 `scored=186 / skipped=6`——那 6 例
-  （`pos/neg-stored-01..03`）在 manifest 里声明 `engines:["sync"]`，异步引擎不实现
-  存储型链路，**记 SKIP 而不是记通过或记漏报**。Phase 176t 之后这一类又加 4 例
-  （`pos/neg-so2-01`、`pos/neg-scn-01`）：它们靠 `--second-order-inject` /
-  `--scenarios` 驱动，而这两个 flag 在异步里本来就**被明确拒绝并告警**
-  （`cli_runner.py:838-844`），此前没写 `engines` 就等于让异步为一条被告知忽略的
-  flag 背漏检锅。**注意这是重新分类、不是新检测到**，异步分母随之从 113 变 111。
-  上一轮同一改动集是 `errors=1`：
-  `neg-graphql-01` 在扫描里 90.036s 超时被判 ERROR，
-  而单跑 9.2s 就是 TN。根因不是那条用例慢，是**重试策略只重试出错的"易受攻击"用例**
-  （`runner.py` 旧闸门 `verdict != "FN"`），出错的**安全**用例首试即被接受、
-  直接从分母消失——一趟跑可以报双 1.0 而其中一格从未被测。现已由
-  `_evaluate_with_retries()` 对两类一并重测（串行与**并发路径**此前完全不重试），
-  预算用尽仍保留 ERROR/FN，不把"没扫完"洗成"扫了没发现"。
-- **闸门本身在 Phase 176t 又被抓到一次漏**：旧条件是 `if not r.error`，而扫描器
-  **自己的** `--timeout 10` 在扫描中途到期时，CLI 交回的是**一份干净可解析的空报告**
-  ——`error=''`、`requests=0`。同一轮矩阵里三行是这个形状：`pos-elem-05` FN(0 请求，
-  前两轮都是 TP/30 请求)、`pos-ctoss-01` FN(0 请求)、`neg-csp-01` 竟被记成
-  **0 请求的 TN**（一个没向服务器要过任何东西的扫描被算作"正确未发现"），三行耗时
-  都在 11.2-11.9s。现在 `_unanswered()` 把"无错误但零流量"与"有错误"同等对待
-  （`SKIP` 例外，否则每例白烧 2 次扫描），头条新增 `zero_request_rows`，
-  预算用尽也不伪造 `error`。5 条新用例做了变异验证：把旧闸门换回去时**恰好**
-  3 条重试用例失败，而 2 条"真漏检不得重试"的对照仍通过——这个修法危险的方向
-  是放宽成"所有 FN 都重试"，那会把真实缺口洗成通过。
-- **本轮补上的异步层**（矩阵实测）：`_crawl_mine_endpoints`（form_miner + js_miner，
-  发现端点时**带上字段**）与 `_scan_time_based`（CSP 下的 OOB 资源探测回退）。
-  `pos-formmine-01` 23→33 请求 FN→TP、`pos-jsmine-01` 23→33 请求 FN→TP、
-  `pos-tb-01` 105→110 请求 FN→TP。另两条机制性修复**目前只有逐例 repro 证据，
-  尚未跑整轮**：`_scan_advanced_page` 原本给页面层传 `req=None`（cookie tossing
-  需要一次 follow-up GET 去读 `Set-Cookie`，AttributeError 被吞掉后它拿着空头列表继续跑，
-  于是永远报不出它存在的唯一理由）—— `pos-ctoss-01` repro 28 请求 TP；
-  `_scan_dom_async` 原本把**不含 query 的裸 URL**交给浏览器（异步内部 url 与 params
-  分开传，所以 `location.search` 读到时是空的，同步在 `scanner.py:479-486` 正是为此
-  把参数拼回去）—— `pos-dom-02`（`location.search -> eval`）repro 28 请求 TP，
-  命中类型 `dom_dynamic`、context `eval`。
-- **异步只剩 1 条真漏**：`neg-filter-05` 异步 **222 请求仍 FN**（不是环境窗口），
-  同步 129 请求 TP，命中载荷 `<a id=x href=javascript:window['ale'+'rt'](...)>`
-  在语料里属 **`dom_clobber`** 族（`payloads[528]`/`payloads[558]`，
-  tags `id_shadow`/`named_property`）——即同步是靠 DOM-clobbering gadget 链在这条
-  raw 回显页上赢的，异步这一族没走到。与 `ctx.analyze` 那次修复无关。
-- **两个引擎现在并排，但结论仍是「不对齐」**：`--async` 误报为 0、比同步快，
-  但覆盖仍小于同步；而 CORS / XS-leaks / CSP / JSONP / upload / stored / DOM-engine
-  **都在**。
-- **本轮修掉的一条大 bug**：`ctx.classify` 从来不存在，异步在
-  `try: … except Exception: context = "html_element"` 里调它 —— **每个参数**都抛
-  AttributeError 后被咽掉，于是上下文恒为 `html_element`、`url_href`/`cdata`/`css`
-  的兄弟语料从未被查过。实测：异步曾在 104 个请求上漏掉 `pos-url-04` 与
-  `pos-cdata-01`；改用与同步相同的 `ctx.analyze`（并去掉 swallow）后两条变 TP，
-  请求数降到 31–38 —— **3 倍的工作量换 0 结果**。守卫见 `tests/test_async_wiring.py`，
-  其中一条自测拿 HEAD 的坏文件重跑检测器，因为"匹配不到任何东西的守卫"和"引擎已修好"
-  长得一模一样。
-- 另注：`pos-jsmine-01` 在整轮矩阵里同步是 TP（162 请求），单独复跑同步却是 FN（23 请求）
-  ——同步侧存在**顺序/状态依赖**，所以"sync FN=0"这一格不是逐格稳定复现的头条，
-  见 `实战验证交付报告` 176r。
-
-**历史基线（2026-09-06 实测，Phase 93 后，98 用例，预算 14/12/90）**：`benchmark/results/post_audit_sync.json` / `post_audit_async.json`：
+**当前基线（2026-09-06 实测，Phase 93 后）**：双引擎 98 用例矩阵（预算 14/12/90，结果 `benchmark/results/post_audit_sync.json` / `post_audit_async.json`）：
 
 | 引擎 | TP | FP | TN | FN | ERROR | recall | precision | FPR | 全矩阵耗时 |
 |------|----|----|----|----|-------|--------|-----------|-----|-----------|
@@ -706,27 +439,6 @@ sync 首次跑出**全绿**（旧基线有 6 个 safe 用例因 loopback 中断�
 **顺带发现并规避的一颗雷**：`xssentinel/core/mxss_verify.py` 被 `.git/info/exclude` 排除、**从未进过仓库**，而全仓库**没有任何已跟踪代码**引用它。如果我的修复就这么 `import` 它，别人 clone 后这里会 ImportError、再被 `_mxss_confirm` 的 `except` 吞掉——**整条 mXSS 确认分支静默失效**，比原来的误报更糟。因此该检查最终写成 verifier 自带的 `_marker_in_exec_context()`，不引入对未跟踪模块的依赖（那个模块本身仍是未跟踪状态，是否入库由你决定）。
 
 **教训**：**不要因为助手函数名字合理就信任它的语义**——这次我把 Phase 123 的修复思路套用到一个语义更弱的助手（`marker_in_exec_context`）上，同款 bug 换了个地方复现；而且差点把 shipped 代码绑上一个不在仓库里的模块。凡是"判断某段文本是否构成真实标记/真可执行"的地方，都要用同一条纪律：真实标签体 + 属性分词 + 对转义免疫的信号一律不作数。
-
-**Phase 138：再加 3 种过滤（共 9 种），并修掉我自己这张网的方法缺陷——单次零结果不算证据**。
-
-新增过滤：`strip_handlers`（黑名单删 `on*=`）、`entity_decode`（输出前先解一次实体，双解码那类 bug）、`escape_lt_only`（半吊子转义，只转义 `<`）。矩阵脚本也支持了"只跑指定过滤"，新维度可以单独探（否则 81 组太慢）。
-
-**这轮真正的产出是一次自我修正**：首跑报了个 FN（`attr_sq` + 只转义 `<`），但我注意到一个矛盾——那条载荷里根本没有 `<`，所以该模式与"原样"渲染出的页面**应当完全一样**，而"原样"是确认的。连跑 6 次验证：两种模式**6/6 全报**，那个"FN"是抖动（抖动成本也看得出：该组合要 59 个请求，原样只要 45，请求越多越容易被本机那口子掐掉一次）。
-
-于是给矩阵加了**复跑确认**：零结果先重扫 2 次，仍为零且**验证器基准真相**也确认才算 FN。加完之后重跑同一批：**PASS**，那个假 FN 消失，剩下的零结果被正确归为"过滤器确实中和了"。
-
-**教训（与上一轮"假绿"同源）**：在这台机器上，**任何单次运行的"零"或"绿"都不是证据**——零可能是漏扫，绿可能是没扫到。判据要么复跑，要么配一个"该报的必须报"的锚。
-
-**Phase 137：过滤维度从 3 种扩到 6 种，再抓 2 个 FN——根因是元素上下文从不试 `javascript:` URI 载荷**。
-
-把 `/fuzz/render` 的过滤维度补到 6 种：原样 / 去 `<script>` / 只转义尖括号 / **只转义引号**（`encode_angles` 的镜像）/ **去全部标签** / **递归去 `<script>`**（`strip_script` 的加固版）。矩阵变成 **9 上下文 × 6 过滤 = 54 组**，抓到 2 个 FN，而且两个都是"载荷的力量来自引号或协议名，而不是标签"这种过滤器管不着的形状：
-
-- `text` + 去 `<script>`：`<a href="javascript:alert(1)">x</a>` 不含 script 标签，过滤器原样放过 → 验证器确认、扫描无报。
-- `script_dq` + 去全部标签：载荷 `"></script><script>alert(1)</script>` 被剥成 `">alert(1)`，`"` 照样闭合，JS 变成 `var a = "" > alert(1)` → **`alert(1)` 真的执行** → 验证器确认、扫描无报。
-
-根因（`payloads.py` 的 `_CROSS_CONTEXT`）：`url_javascript` 只作为 `url_href` / `meta_refresh` 的跨上下文候选，**`html_element` 从来不试它**——于是元素上下文里引擎根本不会送 `javascript:` URI 载荷。加上 `("url_javascript", 2)`（n 取小值，遵守 Phase 43 的教训：跨上下文样本会重排预算窗口）后，两个 FN 都变成 `reflected` high。
-
-**代价必须验**：这类改动最容易换来误报。所以同一轮跑了**全部 70 个安全用例的直连复查：误报 0**。
 
 **Phase 130：不变量网扩到"上下文一致性"（找 FN 的那半边），并修掉第七个引擎缺陷——单引号属性被判成无引号属性**。
 
@@ -881,69 +593,6 @@ API 攻击面加固：--serve 状态变更路由同源防御（Phase 70）+ Host
 
 **基准工具链**：`benchmark/run_benchmark_batched.py [out.json] [batch] [port] [sync|async] [max_payloads] [max_transforms] [timeout]` —— 位置参数 4-7 可选，默认 sync/10/6/45；传 `sync 14 12 90` 才能复现 `python -m benchmark.runner` 的标定口径（旧基线就是 14/12/90，用默认 10/6 跑出来的数不能直接跟它比）。续跑时若检测到预算变了会丢弃旧结果而非静默合并。`benchmark/compare_runs.py A.json B.json` 做逐用例 diff（聚合分会掩盖"哪些用例移动了"，ERROR→FP 单独分桶，不会被当成改进）；`benchmark/repro_case.py CASE_ID [port] [sync|async]` 单跑一个用例并打印服务端原始回显 + 判定 + finding 详情——**排误报和验证 FN 是否是环境问题都用它**。
 
-**Phase 176：LLM 多供应商故障转移池 + AI 报告章节（`--ai-report`）**。报告此前只有确定性模板与语料修复建议；现在可选配一段由大模型撰写的叙事章节（执行摘要 / 风险评级 / 逐条成因与修复 / 修复优先级）。**判定权不下放**：类型、严重度、URL、参数、载荷全部来自确定性引擎，模型只写散文——prompt 明令禁止编造，`report_ai._verify_facts` 事后核对模型引用的 URL 与载荷是否真在输入里，对不上的进报告页脚告警而非当作事实。**默认关闭**：开启后目标 URL/参数/载荷会发给第三方供应商，帮助文本里已写明。**必须降级**：池全挂时回落 `data/fix_advice.json` 语料模板并在文首标注原因，报告永远有产出。
-
-**Phase 185：DOMParser 重建链（真实世界绕过净化器的主流写法，此前零覆盖）**。
-`DOMParser.parseFromString` → `importNode` / `adoptNode` → 插入主文档这条链，在
-`dom_engine.py` 与 `benchmark/sink_matrix.py` 里**一处都没有**——「DOMPurify 之类净化后
-重建 DOM 再插入」是真实世界高频写法，引擎完全看不见它。
-
-动手前先**测量而不是假设**（`benchmark/sink_execution.py` 新增 11 个形状，sentinel 是
-`document.title`）：DOMParser 链 9 个形状**全部真执行**（parseFromString 产出的文档是
-inert 的，执行发生在节点被转移进主文档并插入之后），`document.writeln` 执行，
-而对照 `appendChild(createTextNode(<img onerror>))` **不执行**。
-
-那条对照决定了实现方式：**不能只看「参数字符串含标记」**——那样会把插入纯文本节点也报成
-「marker executed」。现在做的是**污点传播 + 插入时复查**：parseFromString 的输入含标记
-就把产出的 document 记为污点源，importNode / adoptNode / cloneNode 把污点传给结果节点，
-插入点只在污点节点上判定、且要求它**当下**仍含标记，Text 节点一律排除。普通 appendChild
-只多一次 O(1) 的 WeakSet 命中，不会拖慢页面。
-
-过程中踩到一个真 bug：`adoptNode` 会把节点**迁出**原文档，调用一返回 `node.ownerDocument`
-就已经是主文档了，所以污点若在调用*之后*判定就恒为 False——整条 adoptNode 链静默漏报；
-`importNode` 不移动源节点，踩不到这个坑，**正是它掩盖了 adoptNode 的问题**（最小复现
-`dev/dom_parser_hook_repro.py`：importNode 命中、adoptNode 静默）。修法是先判污点、再调原生。
-
-结果：`benchmark/sink_matrix.py` 新增 9 个契约形状——**must-confirm 21/21 全部命中，
-5 个 measured-not-a-sink 全部保持沉默，零契约冲突**；`tests/test_dom_sink_matrix.py`
-钉住最脆的 4 个 confirm + 1 个 no-exec 对照（完整矩阵留给 probe 工具，不把测试拖慢）。
-
-**Phase 186：jQuery 那一批——11 个方法，此前一个都没测过**。
-`dom_engine.py` 的 `wrapJQ()` 包装了 jQuery 的 11 个方法，但 `benchmark/sink_matrix.py`
-里**没有对应形状**：写了，却从未验证过。补测之后一次抓出两个方向相反的问题。
-
-**先测量**（`benchmark/sink_execution.py` 新增 jQuery 组，页面注入仓库内 vendored 的
-`benchmark/vendor/jquery.min.js`，离线可跑，不依赖 CDN）：`.html` / `.append` /
-`.prepend` / `.after` / `.before` / `.replaceWith` **全部真执行**；`.text()`、`.val()`、
-`.attr('onclick', …)` **都不执行**。
-
-**修掉两条误报**：`.text()` 只写文本、`.val()` 只写表单值，HTML 根本不解析，而 `wrapJQ`
-判的是「参数字符串含标记」——它们一直会命中。两个方法已从包装列表摘掉。`.attr()` 保留：
-属性值可以是可执行载体（srcdoc、带 `javascript:` 的 src/href），与 `setAttribute(on*)`
-的既有口径一致，跟着收紧会引入漏报。
-
-**修掉一整批漏报（更严重）**：`wrapJQ()` 只在 init 时和 `DOMContentLoaded` 时各调一次，
-而页面里同步执行的脚本会在那之前就用到 `$.append()`——那时 `fn` 还没被包装。矩阵的 6 个
-jQuery 形状里 **5 个因此整批 MISS**（`jQuery.html` 之所以命中，只是因为它内部走
-`innerHTML` setter，跟 `wrapJQ` 无关，正好掩盖了问题）。现在改成拦截 `window.jQuery`
-的赋值：jQuery 一挂上来就立刻包装，原来那两次调用留作兜底。
-
-结果：矩阵 **must-confirm 27/27 全部命中**，6 个 measured-not-a-sink 全部静默，零契约冲突。
-契约测试钉住 `jQuery.append`（时序问题的代表）与 `jQuery.text`（防误报回归）。
-
-
-池本体 `core/llm_pool.py`（零新依赖，仅 `requests`）：候选按「provider × key × model」展开（**model-outer / key-inner**，多 key 视为同一模型列表的配额冗余，先把首选模型在所有 key 上试一遍）；失败分类读 **body** 而不只看状态码——实测供应商会返回两种含义相反的 403（账户被封 vs 某个模型不在 token plan），只看码会把一个健康 key 整个停掉。冷却分作用域：`rate_limit` / `model_error` / `empty_response` / `truncated_response` 记在**候选级**（AMD 的并发上限是 **per-model**：「Model 'GLM-5.3-Flash' is at its concurrency limit (8)」，同 key 其他模型完全可用），`auth_error` / `server_error` / `timeout` 记在 **key 级**；同一轮内 key 级失败后同 key 的兄弟候选直接跳过（实测这处浪费让一次报告从 45s 涨到 95s+）。冷却带指数退避并持久化到 `data/llm_state.json`（跨进程保留限流窗口），全池冷却时取最快恢复者强行试一次，退化而非死掉。
-
-**实测（2026-09-22，全部真实调用）**：4 家供应商里 3 家的模型名有误或已下线（`stealth/ox-alpha` 404 测试期已结束、`z-ai/glm-5.2` 410 于 2026-08-21 EOL、`glm 5.3 flash` 真名 `GLM-5.3-Flash`），1 家整个账户被封（OpenRouter 403 "Inference is blocked on this account"）→ 配置里 `enabled: false` 并留证据。**ping 延迟不能用来排序**：AMD `DeepSeek-V4-Flash` 用 16-token ping 测是 0.9s，生成真实报告 **153s 超时**；最终首选 `sensenova/deepseek-v4-flash`（9.3s 出 1712 字符完整报告）。另有两种 200 假成功被识别并拦住：flash 类模型随机返回**空 body**（7 次探测 3 次），推理模型把预算烧在思考通道上导致**正文仅 95 字符** → 新增 `truncated_response` 与调用方传入的 `report_ai.MIN_REPORT_CHARS` 门槛。端到端：v1 排序 3 次转移 / 95.4s，最终排序 1 次转移 / 44.5s，全程无人工干预。报告 HTML 渲染 **escape-first**（正文按构造即含活载荷，报告不能自己变成载体），模型输出的思考通道由 `clean_completion` 两段式清洗。CLI：`--ai-report --ai-config --ai-lang --ai-model --ai-max-findings --ai-timeout`，另有 `--ai-check`（逐候选真实探测打健康表，key 全程脱敏）与 `--ai-reset`。测试 `tests/test_llm_pool.py` + `tests/test_ai_report.py` 共 104 例，全部用本地 mock（真 HTTP，不改 transport）；**mock server 必须用 `HTTP/1.0`**——禁用 keep-alive 才不会在本机劣化 loopback 下出现池化连接撞死 socket（`WinError 10054`）的假失败。
-
-**REST API（`--serve`）同样可选该章节**：`POST /api/v1/scans` 带 `{"ai_report": true}` 时，扫描**自己的 worker 线程**在收尾阶段撰写章节，因此**没有任何 HTTP 请求会等模型**，客户端第一次取报告就已带章节；`GET .../report?ai=1` 用于给没提前要求的扫描补生成（会阻塞该次请求），`?ai=refresh` 强制重建。每扫描可调 `ai_lang`（zh|en）/ `ai_model`（模型白名单）/ `ai_timeout` / `ai_max_findings`。结果缓存在 job 上（**内存态**，重启即失效——它是派生产物，重算即可，为此不动 sqlite schema），并用锁保证并发请求最多只产生一次模型调用。池路径只由服务端 `--ai-config` 决定（缺省用包内池），请求体只能挑模型、不能指定路径。三个测试文件合计 **128 例**。
-
-**本轮踩到的真问题（测试隔离）**：`ai_config` 为空时池发现顺序会**回落到包内的真池（真 key）**，于是"未配池"的 API 测试会真的调用外部供应商——曾让 4 个用例各花 34s 出网，整组 438s。两层修法：`tests/conftest.py` 默认把 `XSSENTINEL_LLM_CONFIG` 指向一个不存在的路径（任何忘记显式传池的测试都降级而非出网；`XSSENTINEL_ALLOW_LIVE_LLM_IN_TESTS=1` 可放开跑真集成），而**显式传入的 `config_path` 优先于环境变量**，所以真正测池的用例不受影响。修复后同一组 438s → 49s。
-
-**复测报告（`--verify-fix`）也能带该章节**（Phase 176c）：复测结果是给客户的交付物，让模型把"哪些已修复、哪些仍可利用、哪些因类型限制无法自动复测"写成叙事并给出后续步骤，价值明确。它走**另一套 brief**（`report_ai` 的 `task="verify"`）：prompt 明令**禁止改动任何一条的复测状态**，且 `skipped`/`error` 必须叙述为「未知」而不得混入「已修复」——这正是复测报告唯一会骗到客户的地方。digest 不截断（交付物要交代每一条）并按 `still_vuln` 优先排序；降级模板同样保持固定结构、空章节写「无」。HTML/JSON 两种复测报告都支持（JSON 里 `ai_report` 不含 html 字段）。`--diff` **未接入**——那是对比工具而非报告，加叙事意义不大。
-
-**顺带修掉一个既有假阴性（同轮实测发现）**：复测把注入的载荷**追加**到 finding 的 URL query 之后（`?q=test&q=<marked>`），服务器读第一个 → payload 从未到达目标参数 → 判定为 `fixed`。而 finding 的 URL 自带被测参数正是扫描器输出的常态，所以复测在**最常见场景下静默失效**，把**未修复的漏洞报成已修复**——这是复测报告最危险的失败模式（客户被告知已修复，实际洞还开着）。修法：先把 URL 自身的 query 搬进 `params` 再注入，使注入成为**覆盖**，同时保留其他兄弟参数。同一靶场实测：修复前 `Fixed 2 / Still vulnerable 0`（全假阴性，CI gate 形同虚设），修复后 `Still vulnerable 1 / Fixed 1`（真实结论，exit=1 正确拦截）。加 3 例回归锁定（覆盖不重复、兄弟参数保留、POST 路径不受影响）。四个 AI 测试文件合计 **168 例**，`tests/test_verify_fix.py` 从 5 例增至 8 例。
-
 ---
 
 ## 扩展指南
@@ -954,7 +603,6 @@ jQuery 形状里 **5 个因此整批 MISS**（`jQuery.html` 之所以命中，�
 - **加绕过变形**：在 `core/transform.py` 的 `REGISTRY` 注册新函数即可被审计引擎调用。
 - **加 WAF 指纹**：在 `core/waf.py` 的 `_WAF_SIGNATURES` 增加 `(名称, 正则)`。
 - **加 sink/source**：扩展 `core/dom.py` 的源/汇列表。
-- **加 LLM 供应商**：编辑 `data/llm_providers.json` 的 `providers` 数组（`base_url` + `keys` + `models`，`enabled` 控制开关；`base_url` 带不带 `/chat/completions` 都会归一化）。凭据可用 `XSSENTINEL_LLM_KEY_<PROVIDER_ID>`（逗号分隔）覆盖，池路径用 `XSSENTINEL_LLM_CONFIG` 覆盖。改完**务必用 `--ai-check` 实测一遍**——供应商给的模型名与可用性别照抄（Phase 176 里 4 家有 3 家的名字是错的，1 家账户已被封）。
 
 ---
 
@@ -967,5 +615,4 @@ jQuery 形状里 **5 个因此整批 MISS**（`jQuery.html` 之所以命中，�
 - 可复现 PoC 对 DOM 类漏洞会用真实执行型 payload（`<img src=x onerror=alert(document.domain)>`）替换内部标记，确保 PoC 页面点开即触发。
 - **盲打 XSS（L5）已支持自动确认**：`--oob self` 起本地监听器、`--oob interactsh` 用公共服务器，收到 beacon 即判定为已确认盲打；若超时未收到回调则不报（避免误判）。`interactsh` 模式需要公网可达的 callback 域名与网络连通，离线时优雅降级为"注入但未确认"。
 - **存储型 XSS（L4）需要"展示页"**：你必须提供注入接口与其对应的展示/列表接口（如评论提交页 + 评论列表页），框架才会重新拉取确认持久化执行。
-- **AI 报告（`--ai-report`）默认关闭**：一旦开启，目标 URL、参数与载荷会发送给 `data/llm_providers.json` 里配置的第三方 LLM 供应商。检测结论不受影响（模型只写叙事章节），但数据出网这件事由操作者决定。REST API（`--serve`）走同一套开关：扫描时 `{"ai_report": true}`，或取报告时 `?ai=1`。
 - 这是安全研究/授权测试工具，请勿用于未授权目标。

@@ -101,6 +101,10 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer  # noqa: E40
 
 from tests.conftest import SOCKETPAIR_OK  # noqa: E402
 
+pytestmark = pytest.mark.skipif(
+    not SOCKETPAIR_OK,
+    reason="Windows loopback degraded (security software/TCP state)")
+
 
 class _EchoHandler(BaseHTTPRequestHandler):
     def log_message(self, *a):  # silence
@@ -119,8 +123,6 @@ class _EchoHandler(BaseHTTPRequestHandler):
         self.wfile.write(body.encode())
 
 
-@pytest.mark.skipif(not SOCKETPAIR_OK,
-                    reason="needs loopback (moved down from the file-level gate)")
 def test_async_cli_poc_replays_credentials():
     from xssentinel.cli_runner import _run_async_scan
     from xssentinel.__main__ import build_parser

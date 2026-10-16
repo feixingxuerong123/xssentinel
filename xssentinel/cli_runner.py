@@ -410,6 +410,8 @@ def _run_scan(args, url: str, requester, oob, progress, checkpoint,
     # target.  Best-effort: a missing browser or a dead page degrades to
     # the static wordlist, never to a failed scan.
     _discovered_urls: list[str] = []
+    _spa_write_faces: list = []
+    _spa_routes: list[str] = []
     if getattr(args, "discover", False):
         try:
             from .core.dom_engine import DynamicDomAnalyzer
@@ -419,7 +421,10 @@ def _run_scan(args, url: str, requester, oob, progress, checkpoint,
                                        auth_cookies=_c or [],
                                        auth_local_storage=_ls or {})
             if _disc.available():
-                _res = _disc.harvest(base_url)
+                _res = _disc.harvest(
+                    base_url,
+                    write_faces=bool(getattr(args, "spa_write_faces",
+                                             False)))
                 _names = _res.get("names") or []
                 if _names:
                     _param_wl = list(dict.fromkeys(
@@ -432,6 +437,7 @@ def _run_scan(args, url: str, requester, oob, progress, checkpoint,
                 # first; the rest stay informational (see _discover_scan_order
                 # for the measurement that reversed my first ordering).
                 _routes = _res.get("routes") or []
+                _spa_routes = list(_routes)
                 if _routes:
                     _discovered_urls = _discover_scan_order(_routes,
                                                            _discovered_urls)
@@ -442,6 +448,34 @@ def _run_scan(args, url: str, requester, oob, progress, checkpoint,
                     print(f"[*] Discover: {len(_discovered_urls)} same-origin "
                           f"endpoint(s) the page itself fetched -- they will "
                           f"be scanned after the main target")
+                # Phase 247: reap the base page AND the routes it links.
+                # Phase 242 measured multi-route reaping as low-value on
+                # Juice Shop (only one extra face) -- but that asked "how
+                # many MORE faces", and the measurement that matters is the
+                # opposite one: on a route-based app the PRIMARY write face
+                # lives on a route, so base-only reaping finds nothing at
+                # all when the operator points at the app root (measured).
+                # Bounded: one render per route, renders are the cost.
+                _spa_write_faces = list(_res.get("write_faces") or [])
+                from urllib.parse import urljoin as _urljoin
+                for _route in _spa_routes[:5]:
+                    # Routes are relative hrefs ("#/write"); harvest opens a
+                    # fresh page, so they must be absolutised against the
+                    # target or the navigation has no base to resolve to.
+                    try:
+                        _rf = _disc.harvest(_urljoin(base_url, _route),
+                                            write_faces=True)
+                    except Exception as _e:
+                        _log.debug("route write-face harvest failed (%s): %s",
+                                   _route, _e)
+                        continue
+                    for _f in (_rf.get("write_faces") or []):
+                        if _f not in _spa_write_faces:
+                            _spa_write_faces.append(_f)
+                if _spa_write_faces:
+                    print(f"[*] Discover: {len(_spa_write_faces)} SPA write "
+                          f"face(s) OBSERVED by driving the page's own UI "
+                          f"(the stored round-trip will run over them)")
             else:
                 print("[!] Discover: playwright/chromium not available -- "
                       "continuing with the static wordlist")
@@ -473,6 +507,7 @@ def _run_scan(args, url: str, requester, oob, progress, checkpoint,
     # Phase 46: JSON-carrier mode (see _run_scan docstring above).
     if json_body is not None:
         scanner.json_body = json_body
+
 
     # Fuzzer pre-flight (Phase 17 + Phase 22-4): if --fuzz is set, run the
     # response-difference fuzzer on the endpoint's params before the main
@@ -591,6 +626,27 @@ def _run_scan(args, url: str, requester, oob, progress, checkpoint,
     # Phase 44 standalone fast checks (--sqli-check / --check-outdated-js).
     _maybe_run_fast_checks(args, requester, base_url, args.method,
                            params, data, scanner.findings)
+
+    # Phase 241: run the stored round-trip over the SPA write faces
+    # observed while driving the rendered page (opt-in via
+    # --spa-write-faces).  It lives HERE, after the main scan, because
+    # scan_stored needs the per-scan state the main loop initialises -- an
+    # earlier placement (right after Scanner construction) raised and the
+    # warning was swallowed by --log-level error, which is exactly how the
+    # first acceptance run showed 'L4_stored runs: 0' with no error text.
+    if _spa_write_faces:
+        try:
+            # Phase 243: the discovered routes are the VIEWER candidates --
+            # on an SPA the stored payload becomes visible on another route,
+            # not on the write page, so viewing only the write page made the
+            # medium self-view downgrade the common case by construction.
+            ran = scanner.scan_spa_write_faces(
+                _spa_write_faces, base_url, view_urls=_spa_routes[:8])
+            print(f"[*] SPA write faces: ran the stored round-trip over "
+                  f"{len(ran)}/{len(_spa_write_faces)} observed face(s)")
+        except Exception as e:
+            _log.warning("SPA write-face round-trip failed (continuing): %s",
+                         e, exc_info=args.verbose)
 
     if args.stored_inject:
         if getattr(args, "stored_dom", False):

@@ -29,6 +29,10 @@ from tests.conftest import SOCKETPAIR_OK, loopback_healthy
 
 # asyncio.run() needs a working loopback socketpair (see conftest.py);
 # skip instead of hanging when the environment throttles it.
+pytestmark = pytest.mark.skipif(
+    not SOCKETPAIR_OK,
+    reason="Windows loopback socketpair hangs (security software/TCP state)")
+
 
 def _echo_origin():
     """Start a local HTTP origin that raw-echoes the User-Agent header
@@ -100,20 +104,7 @@ class TestAsyncRequestLayers:
                        if f.data.get("type") == "header_xss")
             assert hdr.data.get("param", "").startswith("(header:"), \
                 f"unexpected header finding param: {hdr.data.get('param')}"
-            # Phase 221: Phase 218's evidence-shape cap demotes a high claim
-            # to medium when nothing checkable backs it, and the header/path
-            # layers attach no proof and no evidence excerpt (measured:
-            # evidence_class=browser-unavailable, proof/evidence both absent --
-            # the same shape dev/_severity_shape_probe.py measured on sync).
-            # So the invariant to assert is the 1.5-① one -- a high letter
-            # must carry a basis -- not the letter itself.  The sync
-            # counterpart of this test never asserted a severity at all,
-            # which is why only the async side went stale.
-            assert hdr.data.get("severity") in ("high", "medium")
-            if hdr.data.get("severity") == "high":
-                assert (bool(hdr.data.get("proof") or hdr.data.get("evidence"))
-                        or (hdr.data.get("headless") or {}).get("confirmed")), \
-                    "a high claim must carry a checkable basis"
+            assert hdr.data.get("severity") == "high"
         finally:
             srv.shutdown()
 
@@ -179,8 +170,6 @@ class TestAsyncRequestLayers:
         finally:
             srv.shutdown()
 
-    @pytest.mark.skipif(not SOCKETPAIR_OK,
-                        reason="needs loopback (moved down from the file-level gate)")
     def test_scan_advanced_page_forwards_params(self):
         """Phase 87: run_page_layers receives the endpoint params in
         async mode (import map / CSSI / dangling markup reflection

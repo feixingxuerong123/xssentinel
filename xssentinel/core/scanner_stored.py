@@ -44,7 +44,9 @@ class StoredBlindMixin:
     def scan_stored(self, inject_url: str, view_url: str | None = None,
                     method: str = "POST", param: str = "q",
                     req: Requester | None = None,
-                    fresh_session: bool = False):
+                    fresh_session: bool = False,
+                    data_json: bool = False,
+                    extra_view_urls: list | None = None):
         """Inject a payload, then re-fetch a 'view' page to detect persisted
         (stored) XSS. The view page must render previously stored entries.
 
@@ -57,6 +59,9 @@ class StoredBlindMixin:
         * ``fresh_session=True`` re-fetches the view page from a cookie-free
           clone (same auth headers, no session cookies) -- if the payload is
           still rendered, persistence is proven from an independent viewer.
+        * Phase 243: ``extra_view_urls`` are additional viewer pages tried
+          in order after the primary one (deduped, capped at 9 total).
+          Stored XSS is about the payload being visible to OTHER viewers.
         * When the view page is the inject page itself (no explicit
           --stored-view), the finding is downgraded to confidence=medium
           with an explicit "same-session self-view" note, so operators can
@@ -106,6 +111,10 @@ class StoredBlindMixin:
         # Both filters are verdict-neutral: a pair that cannot confirm only
         # ever returns "not confirmed".  Cost went 1176 -> 400 requests.
         seen_variants: set = set()
+        # Phase 245: remember every (variant, token) we wrote, so the browser
+        # arm can judge them all in ONE render per view instead of one render
+        # per (variant, view).
+        injected: list = []
         for base in bases:
             token = "xssv_" + secrets.token_hex(4)
             marked = verifier.mark(base["payload"], token)
@@ -130,9 +139,18 @@ class StoredBlindMixin:
                 seen_variants.add(key)
                 try:
                     if method.upper() == "POST":
-                        req.request(method, inject_url, data={param: variant})
+                        # Phase 241: data_json sends the injection as a JSON
+                        # body, matching the encoding the page itself used
+                        # for this field (an observed SPA write face).
+                        if data_json:
+                            req.request(method, inject_url,
+                                        json={param: variant})
+                        else:
+                            req.request(method, inject_url,
+                                        data={param: variant})
                     else:
                         req.request(method, inject_url, params={param: variant})
+                    injected.append((variant, token, tset))
                     self._bump()
                     # Phase 21-3: invalidate any cached GET for the view URL
                     # so the next fetch actually sees the just-stored payload.
@@ -147,13 +165,46 @@ class StoredBlindMixin:
                     # `verify_semantic` then could not find the newer token, and
                     # the whole stored pass could report "not stored" having
                     # really tested one payload out of ~n.
-                    vresp = view_req.get(view_url, cache_get=False)
-                    self._bump()
+                    # Phase 243: the primary view first, then the extra
+                    # candidates (deduped, capped).  The first one that
+                    # renders the token is the viewer page that proves
+                    # persistence -- which is the whole point of stored XSS:
+                    # on an SPA the viewer is usually another route, so the
+                    # self-view downgrade used to be the common case BY
+                    # CONSTRUCTION rather than by evidence.
+                    views = [view_url]
+                    for u in (extra_view_urls or []):
+                        if u and u not in views and len(views) < 9:
+                            views.append(u)
+                    vresp = None
+                    v = None
+                    hit_view = None
+                    # Phase 244: when the BROWSER is what confirmed (an SPA
+                    # viewer), that evidence must reach the finding's
+                    # headless field -- otherwise the grading machinery sees
+                    # "no browser evidence" and correctly but uselessly
+                    # downgrades a fired payload to low.
+                    browser_evidence = None
+                    for cand in views:
+                        try:
+                            vresp = view_req.get(cand, cache_get=False)
+                            self._bump()
+                        except Exception:
+                            continue
+                        cand_v = verifier.verify_semantic(
+                            vresp.text, token,
+                            response_headers=dict(vresp.headers))
+                        if cand_v.get("confirmed"):
+                            v, hit_view = cand_v, cand
+                            break
+                        # The browser arm is NOT here any more: rendering
+                        # per (variant, view) is 24 x 8 x ~2.5s (measured well
+                        # over 20 minutes for one face).  It runs once per
+                        # view after the injection loop -- see below.
                 except Exception:
                     continue
-                v = verifier.verify_semantic(vresp.text, token,
-                                             response_headers=dict(vresp.headers))
-                if v["confirmed"]:
+                view_url = hit_view or view_url
+                if v is not None and v.get("confirmed"):
                     if fresh_session and view_req is not req:
                         confidence = "high"
                         note = ("persistence CONFIRMED from a fresh "
@@ -183,13 +234,93 @@ class StoredBlindMixin:
                         "severity": "high", "confidence": _conf,
                         "detail": _det,
                         "evidence_class": _cls,
-                        "headless": None,
+                        "headless": browser_evidence,
                         "proof": {"view_url": view_url, "token": token,
                                   "fresh_session": bool(fresh_session and
                                                         view_req is not req),
                                   "snippet": _safe_snippet(vresp.text, token)}}))
                     return True
+
+        # Phase 245: one browser render per candidate view, judging EVERY
+        # injected token at once.  Cheap injections, expensive renders --
+        # so the loops are inverted.  Still opt-in via --headless, and still
+        # only "fired" counts: "rendered" is delivery, and reporting it
+        # would flag every app that echoes input into a text node.
+        if getattr(self, "use_headless", False) and injected:
+            views = [view_url]
+            for u in (extra_view_urls or []):
+                if u and u not in views and len(views) < 9:
+                    views.append(u)
+            all_tokens = [t for _v, t, _t in injected]
+            for cand in views:
+                bres = verifier.verify_token_in_browser(
+                    cand, None, tokens=all_tokens,
+                    headers=dict(getattr(getattr(self.req, "session", None),
+                                         "headers", {}) or {}),
+                    auth_local_storage=getattr(self, "auth_local_storage",
+                                               None))
+                if bres.get("outcome") != "fired":
+                    continue
+                fired_token = bres.get("token")
+                for variant, tok, tset in injected:
+                    if tok != fired_token:
+                        continue
+                    browser_evidence = {"outcome": "fired", "available": True,
+                                        "detail": bres.get("detail"),
+                                        "method": "browser_render"}
+                    _d0 = (f"payload persisted and was EXECUTED in the "
+                           f"browser on {cand} ({bres.get('detail')})")
+                    _cls, _conf, _det = _grade_evidence(browser_evidence,
+                                                        "high", _d0)
+                    self._add(Finding(**{
+                        "url": inject_url, "method": method, "param": param,
+                        "type": "stored", "context": "stored_view",
+                        "payload": variant, "transform": tset,
+                        "severity": "high", "confidence": _conf,
+                        "detail": _det, "evidence_class": _cls,
+                        "headless": browser_evidence,
+                        "proof": {"view_url": cand, "token": fired_token,
+                                  "fresh_session": bool(fresh_session),
+                                  "snippet": ""}}))
+                    return True
         return False
+
+    def scan_spa_write_faces(self, faces: list, page_url: str,
+                             req: Requester | None = None,
+                             view_urls: list | None = None) -> list:
+        """Phase 241: run the stored round-trip over OBSERVED SPA write faces.
+
+        ``faces`` are the triples the browser harvest observed: the page
+        itself emitted ``(method, url, field)`` while we were driving its
+        own UI, so these are evidence, not guesses.  Each face is injected
+        and then viewed at ``page_url`` -- the page that owns the form --
+        which keeps scan_stored's honest same-session self-view downgrade
+        (medium confidence, explicit note) instead of inventing persistence
+        we did not prove.
+
+        Returns the faces that were actually run.
+        """
+        ran: list = []
+        req = req or self.req
+        for face in faces or []:
+            if not isinstance(face, dict):
+                continue
+            url = face.get("url")
+            field = face.get("field")
+            method = (face.get("method") or "POST").upper()
+            if not url or not field or method in ("GET", "HEAD", "OPTIONS"):
+                continue
+            encoding = (face.get("encoding") or "form").lower()
+            try:
+                self.scan_stored(url, view_url=page_url, method=method,
+                                 param=field, req=req,
+                                 data_json=(encoding == "json"),
+                                 extra_view_urls=list(view_urls or []))
+                ran.append(face)
+            except Exception as e:
+                _log.warning("spa write face %s %s (%s) failed: %s",
+                             method, url, field, e, exc_info=self.verbose)
+        return ran
 
     @staticmethod
     def _fresh_session_view_req(req):

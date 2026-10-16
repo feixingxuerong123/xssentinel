@@ -10,7 +10,7 @@
   },
   "svg_raw_patterns": [
     [
-      "<svg[^>]*>[\\s\\S]*?<script\\b",
+      "<svg[^>]*>(?:(?!</svg>)[\\s\\S])*?<script\\b",
       "SVG <script> element executes JavaScript in the SVG namespace",
       "high",
       "svg_script"
@@ -28,25 +28,25 @@
       "svg_script_jsuri"
     ],
     [
-      "<foreignObject\\b[^>]*>[\\s\\S]*?<script\\b",
+      "<foreignObject\\b[^>]*>(?:(?!</foreignObject>)[\\s\\S])*?<script\\b",
       "SVG <foreignObject> with embedded <script> (HTML namespace)",
       "high",
       "svg_foreignobject_script"
     ],
     [
-      "<foreignObject\\b[^>]*>[\\s\\S]*?<iframe\\b",
+      "<foreignObject\\b[^>]*>(?:(?!</foreignObject>)[\\s\\S])*?<iframe\\b",
       "SVG <foreignObject> with embedded <iframe>",
       "high",
       "svg_foreignobject_iframe"
     ],
     [
-      "<foreignObject\\b[^>]*>[\\s\\S]*?\\bon\\w+\\s*=\\s*['\\\"]",
+      "<foreignObject\\b[^>]*>(?:(?!</foreignObject>)[\\s\\S])*?\\bon\\w+\\s*=\\s*['\\\"]",
       "SVG <foreignObject> with inline event handler",
       "high",
       "svg_foreignobject_event"
     ],
     [
-      "<foreignObject\\b[^>]*>[\\s\\S]*?javascript:",
+      "<foreignObject\\b[^>]*>(?:(?!</foreignObject>)[\\s\\S])*?javascript:",
       "SVG <foreignObject> with javascript: URI",
       "high",
       "svg_foreignobject_jsuri"
@@ -82,7 +82,7 @@
       "svg_set_event"
     ],
     [
-      "<set\\b[^>]*\\battributeName\\s*=\\s*['\\\"]\\s*(?:href|xlink:href)['\\\"][\\s\\S]*?\\bto\\s*=\\s*['\\\"]\\s*javascript:",
+      "<set\\b[^>]*\\battributeName\\s*=\\s*['\\\"]\\s*(?:href|xlink:href)['\\\"](?:(?!</set>)[\\s\\S])*?\\bto\\s*=\\s*['\\\"]\\s*javascript:",
       "SVG <set> rewrites href to javascript: (SMIL-based XSS)",
       "high",
       "svg_set_href_jsuri"
@@ -94,7 +94,7 @@
       "svg_animate_event"
     ],
     [
-      "<animate\\b[^>]*\\battributeName\\s*=\\s*['\\\"]\\s*(?:href|xlink:href)['\\\"][\\s\\S]*?\\b(?:to|values)\\s*=\\s*['\\\"]\\s*javascript:",
+      "<animate\\b[^>]*\\battributeName\\s*=\\s*['\\\"]\\s*(?:href|xlink:href)['\\\"](?:(?!</animate>)[\\s\\S])*?\\b(?:to|values)\\s*=\\s*['\\\"]\\s*javascript:",
       "SVG <animate> rewrites href to javascript: (SMIL XSS)",
       "high",
       "svg_animate_href_jsuri"
@@ -196,19 +196,19 @@
       "svg_event_handler"
     ],
     [
-      "<svg[^>]*>[\\s\\S]*?<style\\b[^>]*>[\\s\\S]*?expression\\s*\\(",
+      "<svg[^>]*>(?:(?!</svg>)[\\s\\S])*?<style\\b[^>]*>[\\s\\S]*?expression\\s*\\(",
       "SVG <style> with expression() (legacy IE CSS XSS)",
       "high",
       "svg_style_expression"
     ],
     [
-      "<svg[^>]*>[\\s\\S]*?<style\\b[^>]*>[\\s\\S]*?-moz-binding\\s*:",
+      "<svg[^>]*>(?:(?!</svg>)[\\s\\S])*?<style\\b[^>]*>[\\s\\S]*?-moz-binding\\s*:",
       "SVG <style> with -moz-binding (legacy Firefox XSS)",
       "high",
       "svg_style_mozbinding"
     ],
     [
-      "<svg[^>]*>[\\s\\S]*?<style\\b[^>]*>[\\s\\S]*?behavior\\s*:\\s*url",
+      "<svg[^>]*>(?:(?!</svg>)[\\s\\S])*?<style\\b[^>]*>[\\s\\S]*?behavior\\s*:\\s*url",
       "SVG <style> with behavior:url() (IE HTC XSS)",
       "high",
       "svg_style_behavior"

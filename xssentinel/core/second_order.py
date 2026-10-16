@@ -164,6 +164,41 @@ def check_viewers(req: "Requester", viewers: list[tuple[str, str]],
     return findings
 
 
+def check_viewers_in_browser(viewers: list[tuple[str, str]],
+                              tokens: list[str],
+                              headers: dict | None = None,
+                              auth_local_storage: dict | None = None,
+                              max_renders: int = 9) -> list[dict]:
+    """Phase 246: the browser arm for second-order viewers.
+
+    ``check_viewers`` judges the response text, which is blind to an SPA
+    viewer: the payload is rendered by client-side code and never appears
+    in the HTML (``if token not in text: continue`` skips it outright).
+    Same blind spot Phase 244 closed for scan_stored, same fix: render the
+    viewer, and say only whether OUR token was EXECUTED ("fired").  A token
+    that is merely present ("rendered") is delivery, not execution, and is
+    not reported.
+
+    One render per viewer (capped) judging every injected token -- renders
+    are the expensive part, injections are not (Phase 245).
+    """
+    from . import verifier
+    out: list[dict] = []
+    for viewer_url, _m in viewers[:max_renders]:
+        res = verifier.verify_token_in_browser(
+            viewer_url, None, tokens=tokens, headers=headers,
+            auth_local_storage=auth_local_storage)
+        if res.get("outcome") != "fired":
+            continue
+        out.append({"viewer_url": viewer_url, "token": res.get("token"),
+                    "detail": res.get("detail"),
+                    "browser_evidence": {"outcome": "fired",
+                                         "available": True,
+                                         "detail": res.get("detail"),
+                                         "method": "browser_render"}})
+        break                     # one executed viewer is the answer
+    return out
+
 def scan_second_order(scanner, inject_url: str, param: str = "q",
                       method: str = "POST",
                       start_url: str | None = None,
@@ -213,6 +248,9 @@ def scan_second_order(scanner, inject_url: str, param: str = "q",
               f"({method} {param}), checking {len(viewers)} viewer page(s)")
 
     results: list[dict] = []
+    # Phase 246: remember every (payload, token) we wrote, so the browser
+    # arm can judge them all in ONE render per viewer afterwards.
+    injected: list[tuple[str, str]] = []
     # Try each payload shape until one surfaces unescaped on a viewer.
     for shape in _SECOND_ORDER_SHAPES:
         token = "xsso_" + secrets.token_hex(4)
@@ -222,6 +260,7 @@ def scan_second_order(scanner, inject_url: str, param: str = "q",
         if not ok:
             continue
         scanner._bump()  # count the inject request
+        injected.append((payload, token))
         found = check_viewers(req, viewers, token, verbose=verbose)
         # Each viewer fetch also counts as a request.
         scanner.requests_made += len(viewers)
@@ -240,4 +279,36 @@ def scan_second_order(scanner, inject_url: str, param: str = "q",
         if results:
             # One confirmed shape is enough -- no need to try the rest.
             break
+
+    # Phase 246: nothing confirmed in HTML.  If the operator asked for
+    # headless, render each viewer once and let the browser tell us
+    # whether any injected token actually EXECUTED there -- an SPA viewer
+    # never had the token in its HTML to begin with.
+    if not results and injected and getattr(scanner, "use_headless", False):
+        headers = dict(getattr(getattr(req, "session", None),
+                               "headers", {}) or {})
+        for hit in check_viewers_in_browser(
+                viewers, [t for _p, t in injected], headers=headers,
+                auth_local_storage=getattr(scanner, "auth_local_storage",
+                                           None)):
+            for payload, token in injected:
+                if token != hit.get("token"):
+                    continue
+                results.append({
+                    "inject_url": inject_url, "inject_method": method,
+                    "inject_param": param, "viewer_url": hit["viewer_url"],
+                    "context": "browser_render",
+                    "detail": hit.get("detail"),
+                    "snippet": "", "payload": payload, "token": token,
+                    # Phase 249: the SAME key the stored path uses
+                    # (scan_stored puts its browser evidence under
+                    # "headless").  One evidence contract, one code path in
+                    # report.py -- with a private "browser_evidence" key the
+                    # summary table read nothing and the row said "no
+                    # browser check" next to a finding the browser HAD
+                    # confirmed.
+                    "headless": hit["browser_evidence"],
+                    "evidence_class": "browser-executed",
+                })
+                break
     return results

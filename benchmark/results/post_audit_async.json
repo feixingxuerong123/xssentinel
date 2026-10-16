@@ -19,7 +19,7 @@
    "difficulty": "easy",
    "detected": true,
    "verdict": "TP",
-   "scan_time_s": 0.76,
+   "scan_time_s": 1.38,
    "findings_count": 1,
    "error": ""
   },
@@ -33,7 +33,7 @@
    "difficulty": "easy",
    "detected": true,
    "verdict": "TP",
-   "scan_time_s": 0.75,
+   "scan_time_s": 1.16,
    "findings_count": 1,
    "error": ""
   },
@@ -47,7 +47,7 @@
    "difficulty": "easy",
    "detected": true,
    "verdict": "TP",
-   "scan_time_s": 0.75,
+   "scan_time_s": 1.3,
    "findings_count": 1,
    "error": ""
   },
@@ -61,7 +61,7 @@
    "difficulty": "easy",
    "detected": true,
    "verdict": "TP",
-   "scan_time_s": 0.75,
+   "scan_time_s": 1.31,
    "findings_count": 1,
    "error": ""
   },
@@ -75,7 +75,7 @@
    "difficulty": "easy",
    "detected": true,
    "verdict": "TP",
-   "scan_time_s": 0.71,
+   "scan_time_s": 1.25,
    "findings_count": 1,
    "error": ""
   },
@@ -89,7 +89,7 @@
    "difficulty": "easy",
    "detected": true,
    "verdict": "TP",
-   "scan_time_s": 0.79,
+   "scan_time_s": 1.16,
    "findings_count": 1,
    "error": ""
   },
@@ -103,7 +103,7 @@
    "difficulty": "easy",
    "detected": true,
    "verdict": "TP",
-   "scan_time_s": 0.72,
+   "scan_time_s": 1.27,
    "findings_count": 1,
    "error": ""
   },
@@ -117,7 +117,7 @@
    "difficulty": "medium",
    "detected": true,
    "verdict": "TP",
-   "scan_time_s": 0.72,
+   "scan_time_s": 1.38,
    "findings_count": 1,
    "error": ""
   },
@@ -131,7 +131,7 @@
    "difficulty": "easy",
    "detected": true,
    "verdict": "TP",
-   "scan_time_s": 0.76,
+   "scan_time_s": 1.33,
    "findings_count": 1,
    "error": ""
   },
@@ -145,7 +145,7 @@
    "difficulty": "medium",
    "detected": true,
    "verdict": "TP",
-   "scan_time_s": 0.76,
+   "scan_time_s": 1.36,
    "findings_count": 1,
    "error": ""
   },
@@ -159,7 +159,7 @@
    "difficulty": "medium",
    "detected": true,
    "verdict": "TP",
-   "scan_time_s": 0.76,
+   "scan_time_s": 1.25,
    "findings_count": 1,
    "error": ""
   },
@@ -173,7 +173,7 @@
    "difficulty": "easy",
    "detected": true,
    "verdict": "TP",
-   "scan_time_s": 2.2,
+   "scan_time_s": 2.23,
    "findings_count": 1,
    "error": ""
   },
@@ -187,7 +187,7 @@
    "difficulty": "hard",
    "detected": true,
    "verdict": "TP",
-   "scan_time_s": 0.77,
+   "scan_time_s": 1.27,
    "findings_count": 1,
    "error": ""
   },
@@ -201,7 +201,7 @@
    "difficulty": "medium",
    "detected": true,
    "verdict": "TP",
-   "scan_time_s": 0.75,
+   "scan_time_s": 1.18,
    "findings_count": 1,
    "error": ""
   },
@@ -215,7 +215,7 @@
    "difficulty": "medium",
    "detected": true,
    "verdict": "TP",
-   "scan_time_s": 0.79,
+   "scan_time_s": 1.25,
    "findings_count": 1,
    "error": ""
   },
@@ -229,7 +229,7 @@
    "difficulty": "easy",
    "detected": true,
    "verdict": "TP",
-   "scan_time_s": 2.4,
+   "scan_time_s": 2.43,
    "findings_count": 1,
    "error": ""
   },
@@ -243,7 +243,7 @@
    "difficulty": "easy",
    "detected": true,
    "verdict": "TP",
-   "scan_time_s": 2.38,
+   "scan_time_s": 2.52,
    "findings_count": 1,
    "error": ""
   },
@@ -257,7 +257,7 @@
    "difficulty": "easy",
    "detected": true,
    "verdict": "TP",
-   "scan_time_s": 2.38,
+   "scan_time_s": 2.57,
    "findings_count": 1,
    "error": ""
   },
@@ -271,7 +271,7 @@
    "difficulty": "medium",
    "detected": true,
    "verdict": "TP",
-   "scan_time_s": 2.36,
+   "scan_time_s": 2.42,
    "findings_count": 1,
    "error": ""
   },
@@ -285,7 +285,7 @@
    "difficulty": "medium",
    "detected": true,
    "verdict": "TP",
-   "scan_time_s": 2.43,
+   "scan_time_s": 2.46,
    "findings_count": 1,
    "error": ""
   },
@@ -299,7 +299,7 @@
    "difficulty": "easy",
    "detected": true,
    "verdict": "TP",
-   "scan_time_s": 2.41,
+   "scan_time_s": 2.5,
    "findings_count": 1,
    "error": ""
   },
@@ -313,7 +313,7 @@
    "difficulty": "easy",
    "detected": true,
    "verdict": "TP",
-   "scan_time_s": 0.76,
+   "scan_time_s": 1.27,
    "findings_count": 1,
    "error": ""
   },
@@ -327,7 +327,7 @@
    "difficulty": "medium",
    "detected": true,
    "verdict": "TP",
-   "scan_time_s": 0.78,
+   "scan_time_s": 1.26,
    "findings_count": 1,
    "error": ""
   },
@@ -341,7 +341,7 @@
    "difficulty": "easy",
    "detected": true,
    "verdict": "TP",
-   "scan_time_s": 1.88,
+   "scan_time_s": 1.94,
    "findings_count": 1,
    "error": ""
   },
@@ -355,7 +355,7 @@
    "difficulty": "hard",
    "detected": true,
    "verdict": "TP",
-   "scan_time_s": 0.69,
+   "scan_time_s": 1.36,
    "findings_count": 1,
    "error": ""
   },
@@ -369,7 +369,7 @@
    "difficulty": "medium",
    "detected": true,
    "verdict": "TP",
-   "scan_time_s": 0.76,
+   "scan_time_s": 1.2,
    "findings_count": 1,
    "error": ""
   },
@@ -383,7 +383,7 @@
    "difficulty": "hard",
    "detected": true,
    "verdict": "TP",
-   "scan_time_s": 0.74,
+   "scan_time_s": 1.3,
    "findings_count": 1,
    "error": ""
   },
@@ -397,7 +397,7 @@
    "difficulty": "easy",
    "detected": true,
    "verdict": "TP",
-   "scan_time_s": 0.77,
+   "scan_time_s": 1.15,
    "findings_count": 1,
    "error": ""
   },
@@ -411,7 +411,7 @@
    "difficulty": "medium",
    "detected": true,
    "verdict": "TP",
-   "scan_time_s": 0.71,
+   "scan_time_s": 1.24,
    "findings_count": 1,
    "error": ""
   },
@@ -425,7 +425,7 @@
    "difficulty": "medium",
    "detected": true,
    "verdict": "TP",
-   "scan_time_s": 1.94,
+   "scan_time_s": 1.98,
    "findings_count": 1,
    "error": ""
   },
@@ -439,7 +439,7 @@
    "difficulty": "medium",
    "detected": true,
    "verdict": "TP",
-   "scan_time_s": 0.8,
+   "scan_time_s": 1.15,
    "findings_count": 1,
    "error": ""
   },
@@ -453,7 +453,7 @@
    "difficulty": "medium",
    "detected": true,
    "verdict": "TP",
-   "scan_time_s": 0.77,
+   "scan_time_s": 1.32,
    "findings_count": 1,
    "error": ""
   },
@@ -467,7 +467,7 @@
    "difficulty": "hard",
    "detected": true,
    "verdict": "TP",
-   "scan_time_s": 0.77,
+   "scan_time_s": 1.23,
    "findings_count": 1,
    "error": ""
   },
@@ -481,7 +481,7 @@
    "difficulty": "hard",
    "detected": true,
    "verdict": "TP",
-   "scan_time_s": 2.68,
+   "scan_time_s": 1.17,
    "findings_count": 1,
    "error": ""
   },
@@ -495,7 +495,7 @@
    "difficulty": "medium",
    "detected": true,
    "verdict": "TP",
-   "scan_time_s": 26.27,
+   "scan_time_s": 1.1,
    "findings_count": 1,
    "error": ""
   },
@@ -508,10 +508,10 @@
    "context": "cdata",
    "difficulty": "hard",
    "detected": true,
-   "verdict": "FN",
-   "scan_time_s": 90.04,
+   "verdict": "TP",
+   "scan_time_s": 1.3,
    "findings_count": 1,
-   "error": "timeout after 90s"
+   "error": ""
   },
   {
    "case_id": "pos-tpl-01",
@@ -522,10 +522,10 @@
    "context": "template_angular",
    "difficulty": "medium",
    "detected": true,
-   "verdict": "FN",
-   "scan_time_s": 90.02,
+   "verdict": "TP",
+   "scan_time_s": 1.21,
    "findings_count": 1,
-   "error": "timeout after 90s"
+   "error": ""
   },
   {
    "case_id": "pos-tpl-02",
@@ -536,10 +536,10 @@
    "context": "template_angular",
    "difficulty": "medium",
    "detected": true,
-   "verdict": "FN",
-   "scan_time_s": 90.04,
+   "verdict": "TP",
+   "scan_time_s": 1.24,
    "findings_count": 1,
-   "error": "timeout after 90s"
+   "error": ""
   },
   {
    "case_id": "pos-embed-01",
@@ -551,7 +551,7 @@
    "difficulty": "medium",
    "detected": true,
    "verdict": "TP",
-   "scan_time_s": 1.79,
+   "scan_time_s": 1.36,
    "findings_count": 1,
    "error": ""
   },
@@ -565,7 +565,7 @@
    "difficulty": "medium",
    "detected": true,
    "verdict": "TP",
-   "scan_time_s": 0.74,
+   "scan_time_s": 72.75,
    "findings_count": 1,
    "error": ""
   },
@@ -578,10 +578,10 @@
    "context": "html_element",
    "difficulty": "easy",
    "detected": true,
-   "verdict": "TP",
-   "scan_time_s": 0.74,
+   "verdict": "FN",
+   "scan_time_s": 90.03,
    "findings_count": 1,
-   "error": ""
+   "error": "timeout after 90s"
   },
   {
    "case_id": "pos-select-01",
@@ -592,10 +592,10 @@
    "context": "html_element",
    "difficulty": "easy",
    "detected": true,
-   "verdict": "TP",
-   "scan_time_s": 0.76,
+   "verdict": "FN",
+   "scan_time_s": 90.03,
    "findings_count": 1,
-   "error": ""
+   "error": "timeout after 90s"
   },
   {
    "case_id": "pos-details-01",
@@ -606,10 +606,10 @@
    "context": "html_element",
    "difficulty": "easy",
    "detected": true,
-   "verdict": "TP",
-   "scan_time_s": 0.72,
+   "verdict": "FN",
+   "scan_time_s": 90.01,
    "findings_count": 1,
-   "error": ""
+   "error": "timeout after 90s"
   },
   {
    "case_id": "pos-video-01",
@@ -621,7 +621,7 @@
    "difficulty": "easy",
    "detected": true,
    "verdict": "TP",
-   "scan_time_s": 0.78,
+   "scan_time_s": 1.29,
    "findings_count": 1,
    "error": ""
   },
@@ -635,7 +635,7 @@
    "difficulty": "easy",
    "detected": true,
    "verdict": "TP",
-   "scan_time_s": 0.77,
+   "scan_time_s": 1.37,
    "findings_count": 1,
    "error": ""
   },
@@ -649,7 +649,7 @@
    "difficulty": "easy",
    "detected": true,
    "verdict": "TP",
-   "scan_time_s": 0.74,
+   "scan_time_s": 1.3,
    "findings_count": 1,
    "error": ""
   },
@@ -663,7 +663,7 @@
    "difficulty": "medium",
    "detected": true,
    "verdict": "TP",
-   "scan_time_s": 0.77,
+   "scan_time_s": 1.38,
    "findings_count": 1,
    "error": ""
   },
@@ -677,7 +677,7 @@
    "difficulty": "hard",
    "detected": true,
    "verdict": "TP",
-   "scan_time_s": 0.73,
+   "scan_time_s": 1.33,
    "findings_count": 1,
    "error": ""
   },
@@ -691,7 +691,7 @@
    "difficulty": "medium",
    "detected": true,
    "verdict": "TP",
-   "scan_time_s": 0.75,
+   "scan_time_s": 1.16,
    "findings_count": 1,
    "error": ""
   },
@@ -705,7 +705,7 @@
    "difficulty": "hard",
    "detected": true,
    "verdict": "TP",
-   "scan_time_s": 0.74,
+   "scan_time_s": 1.22,
    "findings_count": 1,
    "error": ""
   },
@@ -719,7 +719,7 @@
    "difficulty": "easy",
    "detected": true,
    "verdict": "TP",
-   "scan_time_s": 2.51,
+   "scan_time_s": 2.56,
    "findings_count": 4,
    "error": ""
   },
@@ -733,7 +733,7 @@
    "difficulty": "medium",
    "detected": true,
    "verdict": "TP",
-   "scan_time_s": 2.39,
+   "scan_time_s": 2.44,
    "findings_count": 3,
    "error": ""
   },
@@ -747,7 +747,7 @@
    "difficulty": "medium",
    "detected": true,
    "verdict": "TP",
-   "scan_time_s": 2.44,
+   "scan_time_s": 2.46,
    "findings_count": 6,
    "error": ""
   },
@@ -761,7 +761,7 @@
    "difficulty": "easy",
    "detected": true,
    "verdict": "TP",
-   "scan_time_s": 2.41,
+   "scan_time_s": 2.49,
    "findings_count": 3,
    "error": ""
   },
@@ -775,7 +775,7 @@
    "difficulty": "medium",
    "detected": true,
    "verdict": "TP",
-   "scan_time_s": 3.17,
+   "scan_time_s": 3.29,
    "findings_count": 3,
    "error": ""
   },
@@ -789,7 +789,7 @@
    "difficulty": "hard",
    "detected": true,
    "verdict": "TP",
-   "scan_time_s": 2.38,
+   "scan_time_s": 2.46,
    "findings_count": 1,
    "error": ""
   },
@@ -803,7 +803,7 @@
    "difficulty": "hard",
    "detected": true,
    "verdict": "TP",
-   "scan_time_s": 0.79,
+   "scan_time_s": 1.33,
    "findings_count": 1,
    "error": ""
   },
@@ -817,7 +817,7 @@
    "difficulty": "easy",
    "detected": true,
    "verdict": "TP",
-   "scan_time_s": 0.79,
+   "scan_time_s": 1.28,
    "findings_count": 1,
    "error": ""
   },
@@ -831,7 +831,7 @@
    "difficulty": "easy",
    "detected": true,
    "verdict": "TP",
-   "scan_time_s": 0.76,
+   "scan_time_s": 1.34,
    "findings_count": 1,
    "error": ""
   },
@@ -845,7 +845,7 @@
    "difficulty": "easy",
    "detected": false,
    "verdict": "TN",
-   "scan_time_s": 1.05,
+   "scan_time_s": 22.79,
    "findings_count": 0,
    "error": ""
   },
@@ -859,7 +859,7 @@
    "difficulty": "easy",
    "detected": false,
    "verdict": "TN",
-   "scan_time_s": 1.03,
+   "scan_time_s": 23.11,
    "findings_count": 0,
    "error": ""
   },
@@ -873,7 +873,7 @@
    "difficulty": "easy",
    "detected": false,
    "verdict": "TN",
-   "scan_time_s": 1.04,
+   "scan_time_s": 22.7,
    "findings_count": 0,
    "error": ""
   },
@@ -887,7 +887,7 @@
    "difficulty": "medium",
    "detected": false,
    "verdict": "TN",
-   "scan_time_s": 2.53,
+   "scan_time_s": 21.73,
    "findings_count": 0,
    "error": ""
   },
@@ -901,7 +901,7 @@
    "difficulty": "medium",
    "detected": false,
    "verdict": "TN",
-   "scan_time_s": 1.16,
+   "scan_time_s": 26.13,
    "findings_count": 0,
    "error": ""
   },
@@ -915,7 +915,7 @@
    "difficulty": "medium",
    "detected": false,
    "verdict": "TN",
-   "scan_time_s": 1.14,
+   "scan_time_s": 25.7,
    "findings_count": 0,
    "error": ""
   },
@@ -929,7 +929,7 @@
    "difficulty": "medium",
    "detected": false,
    "verdict": "TN",
-   "scan_time_s": 2.21,
+   "scan_time_s": 20.22,
    "findings_count": 0,
    "error": ""
   },
@@ -943,7 +943,7 @@
    "difficulty": "medium",
    "detected": false,
    "verdict": "TN",
-   "scan_time_s": 12.8,
+   "scan_time_s": 19.91,
    "findings_count": 0,
    "error": ""
   },
@@ -957,7 +957,7 @@
    "difficulty": "hard",
    "detected": false,
    "verdict": "TN",
-   "scan_time_s": 0.91,
+   "scan_time_s": 20.5,
    "findings_count": 0,
    "error": ""
   },
@@ -971,7 +971,7 @@
    "difficulty": "hard",
    "detected": false,
    "verdict": "TN",
-   "scan_time_s": 0.91,
+   "scan_time_s": 20.31,
    "findings_count": 0,
    "error": ""
   },
@@ -985,21 +985,7 @@
    "difficulty": "medium",
    "detected": false,
    "verdict": "TN",
-   "scan_time_s": 1.0,
-   "findings_count": 0,
-   "error": ""
-  },
-  {
-   "case_id": "neg-comment-02",
-   "path": "/s/cmt02",
-   "param": "q",
-   "mode": "comment_encoded",
-   "ground_truth": "safe",
-   "context": "html_comment",
-   "difficulty": "easy",
-   "detected": false,
-   "verdict": "TN",
-   "scan_time_s": 1.02,
+   "scan_time_s": 23.07,
    "findings_count": 0,
    "error": ""
   },
@@ -1013,7 +999,21 @@
    "difficulty": "medium",
    "detected": false,
    "verdict": "TN",
-   "scan_time_s": 1.06,
+   "scan_time_s": 23.45,
+   "findings_count": 0,
+   "error": ""
+  },
+  {
+   "case_id": "neg-comment-02",
+   "path": "/s/cmt02",
+   "param": "q",
+   "mode": "comment_encoded",
+   "ground_truth": "safe",
+   "context": "html_comment",
+   "difficulty": "easy",
+   "detected": false,
+   "verdict": "TN",
+   "scan_time_s": 22.47,
    "findings_count": 0,
    "error": ""
   },
@@ -1027,7 +1027,7 @@
    "difficulty": "easy",
    "detected": false,
    "verdict": "TN",
-   "scan_time_s": 1.1,
+   "scan_time_s": 25.63,
    "findings_count": 0,
    "error": ""
   },
@@ -1041,7 +1041,7 @@
    "difficulty": "easy",
    "detected": false,
    "verdict": "TN",
-   "scan_time_s": 1.06,
+   "scan_time_s": 22.6,
    "findings_count": 0,
    "error": ""
   },
@@ -1055,7 +1055,7 @@
    "difficulty": "medium",
    "detected": false,
    "verdict": "TN",
-   "scan_time_s": 1.06,
+   "scan_time_s": 23.93,
    "findings_count": 0,
    "error": ""
   },
@@ -1069,7 +1069,7 @@
    "difficulty": "hard",
    "detected": false,
    "verdict": "TN",
-   "scan_time_s": 0.97,
+   "scan_time_s": 20.33,
    "findings_count": 0,
    "error": ""
   },
@@ -1083,7 +1083,7 @@
    "difficulty": "hard",
    "detected": false,
    "verdict": "TN",
-   "scan_time_s": 0.99,
+   "scan_time_s": 21.21,
    "findings_count": 0,
    "error": ""
   },
@@ -1097,7 +1097,7 @@
    "difficulty": "hard",
    "detected": false,
    "verdict": "TN",
-   "scan_time_s": 0.97,
+   "scan_time_s": 20.48,
    "findings_count": 0,
    "error": ""
   },
@@ -1111,7 +1111,7 @@
    "difficulty": "hard",
    "detected": false,
    "verdict": "TN",
-   "scan_time_s": 0.99,
+   "scan_time_s": 20.63,
    "findings_count": 0,
    "error": ""
   },
@@ -1125,8 +1125,50 @@
    "difficulty": "medium",
    "detected": false,
    "verdict": "TN",
-   "scan_time_s": 0.89,
+   "scan_time_s": 20.73,
    "findings_count": 0,
+   "error": ""
+  },
+  {
+   "case_id": "neg-filter-01",
+   "path": "/s/flt01",
+   "param": "q",
+   "mode": "filter_script_tag",
+   "ground_truth": "vulnerable",
+   "context": "html_element",
+   "difficulty": "hard",
+   "detected": false,
+   "verdict": "FN",
+   "scan_time_s": 90.01,
+   "findings_count": 0,
+   "error": "timeout after 90s"
+  },
+  {
+   "case_id": "neg-filter-02",
+   "path": "/s/flt02",
+   "param": "q",
+   "mode": "filter_event_handlers",
+   "ground_truth": "vulnerable",
+   "context": "html_element",
+   "difficulty": "hard",
+   "detected": false,
+   "verdict": "FN",
+   "scan_time_s": 90.03,
+   "findings_count": 0,
+   "error": "timeout after 90s"
+  },
+  {
+   "case_id": "neg-filter-03",
+   "path": "/s/flt03",
+   "param": "q",
+   "mode": "filter_javascript_uri",
+   "ground_truth": "vulnerable",
+   "context": "url_href",
+   "difficulty": "hard",
+   "detected": true,
+   "verdict": "TP",
+   "scan_time_s": 1.17,
+   "findings_count": 1,
    "error": ""
   },
   {
@@ -1139,50 +1181,8 @@
    "difficulty": "medium",
    "detected": false,
    "verdict": "TN",
-   "scan_time_s": 0.9,
+   "scan_time_s": 20.65,
    "findings_count": 0,
-   "error": ""
-  },
-  {
-   "case_id": "neg-filter-01",
-   "path": "/s/flt01",
-   "param": "q",
-   "mode": "filter_script_tag",
-   "ground_truth": "vulnerable",
-   "context": "html_element",
-   "difficulty": "hard",
-   "detected": true,
-   "verdict": "TP",
-   "scan_time_s": 0.79,
-   "findings_count": 1,
-   "error": ""
-  },
-  {
-   "case_id": "neg-filter-02",
-   "path": "/s/flt02",
-   "param": "q",
-   "mode": "filter_event_handlers",
-   "ground_truth": "vulnerable",
-   "context": "html_element",
-   "difficulty": "hard",
-   "detected": true,
-   "verdict": "TP",
-   "scan_time_s": 0.74,
-   "findings_count": 1,
-   "error": ""
-  },
-  {
-   "case_id": "neg-filter-03",
-   "path": "/s/flt03",
-   "param": "q",
-   "mode": "filter_javascript_uri",
-   "ground_truth": "vulnerable",
-   "context": "url_href",
-   "difficulty": "hard",
-   "detected": true,
-   "verdict": "TP",
-   "scan_time_s": 0.77,
-   "findings_count": 1,
    "error": ""
   },
   {
@@ -1195,7 +1195,7 @@
    "difficulty": "easy",
    "detected": false,
    "verdict": "TN",
-   "scan_time_s": 12.67,
+   "scan_time_s": 21.1,
    "findings_count": 0,
    "error": ""
   },
@@ -1207,11 +1207,11 @@
    "ground_truth": "vulnerable",
    "context": "html_element",
    "difficulty": "hard",
-   "detected": false,
-   "verdict": "FN",
-   "scan_time_s": 90.04,
-   "findings_count": 0,
-   "error": "timeout after 90s"
+   "detected": true,
+   "verdict": "TP",
+   "scan_time_s": 9.09,
+   "findings_count": 1,
+   "error": ""
   },
   {
    "case_id": "neg-filter-06",
@@ -1223,7 +1223,7 @@
    "difficulty": "hard",
    "detected": true,
    "verdict": "TP",
-   "scan_time_s": 0.73,
+   "scan_time_s": 9.31,
    "findings_count": 1,
    "error": ""
   },
@@ -1237,7 +1237,7 @@
    "difficulty": "medium",
    "detected": false,
    "verdict": "TN",
-   "scan_time_s": 1.15,
+   "scan_time_s": 26.28,
    "findings_count": 0,
    "error": ""
   },
@@ -1251,7 +1251,7 @@
    "difficulty": "easy",
    "detected": false,
    "verdict": "TN",
-   "scan_time_s": 0.81,
+   "scan_time_s": 1.24,
    "findings_count": 0,
    "error": ""
   },
@@ -1265,7 +1265,7 @@
    "difficulty": "medium",
    "detected": false,
    "verdict": "TN",
-   "scan_time_s": 1.04,
+   "scan_time_s": 23.38,
    "findings_count": 0,
    "error": ""
   },
@@ -1279,7 +1279,7 @@
    "difficulty": "medium",
    "detected": false,
    "verdict": "TN",
-   "scan_time_s": 0.92,
+   "scan_time_s": 20.54,
    "findings_count": 0,
    "error": ""
   },
@@ -1293,7 +1293,7 @@
    "difficulty": "medium",
    "detected": false,
    "verdict": "TN",
-   "scan_time_s": 2.65,
+   "scan_time_s": 21.93,
    "findings_count": 0,
    "error": ""
   },
@@ -1307,7 +1307,7 @@
    "difficulty": "medium",
    "detected": false,
    "verdict": "TN",
-   "scan_time_s": 2.51,
+   "scan_time_s": 21.61,
    "findings_count": 0,
    "error": ""
   },
@@ -1321,7 +1321,7 @@
    "difficulty": "easy",
    "detected": false,
    "verdict": "TN",
-   "scan_time_s": 0.83,
+   "scan_time_s": 1.21,
    "findings_count": 0,
    "error": ""
   },
@@ -1335,7 +1335,7 @@
    "difficulty": "medium",
    "detected": false,
    "verdict": "TN",
-   "scan_time_s": 2.45,
+   "scan_time_s": 22.64,
    "findings_count": 0,
    "error": ""
   },
@@ -1349,7 +1349,7 @@
    "difficulty": "easy",
    "detected": false,
    "verdict": "TN",
-   "scan_time_s": 2.56,
+   "scan_time_s": 21.88,
    "findings_count": 0,
    "error": ""
   },
@@ -1363,7 +1363,7 @@
    "difficulty": "easy",
    "detected": false,
    "verdict": "TN",
-   "scan_time_s": 1.03,
+   "scan_time_s": 22.85,
    "findings_count": 0,
    "error": ""
   },
@@ -1377,16 +1377,16 @@
    "difficulty": "hard",
    "detected": false,
    "verdict": "TN",
-   "scan_time_s": 0.94,
+   "scan_time_s": 20.6,
    "findings_count": 0,
    "error": ""
   }
  ],
  "counts": {
-  "tp": 60,
+  "tp": 59,
   "fp": 0,
   "tn": 34,
-  "fn": 4,
+  "fn": 5,
   "errors": 0
  }
 }

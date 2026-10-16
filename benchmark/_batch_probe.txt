@@ -1,0 +1,3 @@
+http://127.0.0.1:8877/r/scr01?q=xssentinel_bench_probe
+http://127.0.0.1:8877/r/scr02?q=xssentinel_bench_probe
+http://127.0.0.1:8877/s/flt01?q=xssentinel_bench_probe

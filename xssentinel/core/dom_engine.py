@@ -11,11 +11,18 @@ page in a real headless browser:
   2. Instrument the dangerous sinks (innerHTML, document.write, eval/Function,
      location.*, jQuery .html/.append/..., setAttribute on* ..., window.open)
      with an init script that runs BEFORE the page's own scripts.
-  3. When the marker actually flows into a sink, record the hit and fire
-     alert(marker) so the dialog event is captured as hard proof.
+  3. When the marker reaches a sink, record the hit -- and then try to make
+     the PAGE ITSELF execute, with executable carrier payloads
+     (`_CARRIER_SHAPES`) on the same channel.  Only a dialog fired by the
+     page's own code earns the "browser-executed" tier; everything else is
+     reported as delivery evidence at a graded severity.
 
-A confirmed dynamic hit is high-confidence: it means attacker input truly
-executed in a sink.  If Playwright is unavailable, `analyze()` returns [] and
+Phase 226 (measured on range6, GATE_STATUS.md): step 2's instrumentation
+used to fire ``alert(MARKER)`` ITSELF on every hit, so "executed" was
+circular -- the engine's own dialog was the "hard proof", and sanitized
+text reaching innerHTML claimed "DOM XSS CONFIRMED".  Delivery to a sink
+and execution are different measurements now, and the tiers say which one
+was obtained.  If Playwright is unavailable, `analyze()` returns [] and
 the caller falls back to the static heuristic.
 
 This is the "real DOM engine" upgrade over static taint analysis.
@@ -36,15 +43,24 @@ _log = logging.getLogger(__name__)
 
 
 def _init_script(marker: str) -> str:
-    """JS instrumented before page scripts: wraps sinks, records marker hits."""
+    """JS instrumented before page scripts: wraps sinks, records marker hits.
+
+    Phase 226: ``hit()`` no longer fires its own ``alert(MARKER)``.  That
+    self-alert was the "hard proof" the whole engine's execution claim
+    rested on -- the instrumentation proving its own observation.  It made
+    a sanitized page (marker arrives as inert text) indistinguishable from
+    a page where attacker code ran.  Execution is now measured by the
+    page's OWN dialogs during the carrier wave (see ``analyze`` and
+    ``_try_carriers``); this script only records delivery.
+    """
     return r"""
 (function(){
   var MARKER = "__MARKER__";
   window.__xss_dom_hits = [];
   function hit(sink, snippet){
     window.__xss_dom_hits.push({sink: sink, snippet: String(snippet||'').slice(0,200),
-                                via: window.__xss_dispatching ? 'interaction' : 'auto'});
-    try { alert(MARKER); } catch(e){}
+                                via: window.__xss_pm_dispatching ? 'postmsg'
+                                     : (window.__xss_dispatching ? 'interaction' : 'auto')});
   }
   // Phase 144: do NOT require a primitive string.  Angular (Trusted Types)
   // hands the innerHTML setter a TrustedHTML wrapper -- typeof is 'object',
@@ -477,14 +493,23 @@ def _init_script(marker: str) -> str:
   function pmFire(handler){
     setTimeout(function(){
       for (var i = 0; i < PM_ORIGINS.length; i++){
-        try { handler({ data: MARKER, origin: PM_ORIGINS[i],
-                        source: null, isTrusted: true }); } catch(e){}
+        try { window.__xss_pm_dispatching = 1;
+              handler({ data: MARKER, origin: PM_ORIGINS[i],
+                        source: null, isTrusted: true }); }
+        catch(e){}
+        finally { window.__xss_pm_dispatching = 0; }
       }
     }, 50);
   }
+  // Phase 226: keep the handlers so the carrier wave can re-dispatch them
+  // with an executable payload (data = carrier) on the same page, instead
+  // of baking one fixed message into the closure.  The initial pmFire
+  // above is unchanged: wave 0 still delivers the bare marker.
+  window.__xss_dom_pm = [];
   var oAE = window.addEventListener;
   window.addEventListener = function(type, handler, opts){
     if (type === 'message' && typeof handler === 'function'){
+      window.__xss_dom_pm.push(handler);
       pmFire(handler);
     }
     return oAE.call(window, type, handler, opts);
@@ -497,7 +522,9 @@ def _init_script(marker: str) -> str:
     Object.defineProperty(window, 'onmessage', {
       configurable: true,
       set: function(fn){ _omVal = fn;
-                         if (typeof fn === 'function') pmFire(fn); },
+                         if (typeof fn === 'function') {
+                           window.__xss_dom_pm.push(fn); pmFire(fn);
+                         } },
       get: function(){ return _omVal; }
     });
   } catch(e){}
@@ -855,6 +882,135 @@ _MAX_SEARCH_PARAM_PROBES = 4
 # is actually enabled.
 _DOM_SETTLE_MS = 700
 
+# Phase 241: write-face reaping.  A modern SPA has no <form action> -- its
+# write requests are emitted by component code when the operator clicks
+# something.  So the face is OBSERVED, not inferred: fill the page's named
+# inputs with a marker, click a bounded set of buttons, and keep the
+# requests whose body carries the marker.  Measured on OWASP Juice Shop
+# (Phase 240): 60 endpoints, L4_stored ran 0 times because every form had
+# no action; this probe recovered POST /api/Complaints/ + field
+# "message" from the page's own fetch call.
+#
+# Clicking is a REAL side effect (an admin session's "delete user" button
+# is destructive), so this is opt-in and the button set is deny-listed.
+_WRITE_FACE_MARK = "wf7k"
+_WRITE_FACE_DENY = (
+    "delete", "remove", "logout", "log out", "sign out", "signout",
+    "reset", "clear", "cancel", "close", "discard", "revoke",
+)
+_WRITE_FACE_SETTLE_MS = 900
+_WRITE_FACE_MAX_FACES = 20
+
+# The request log: installed on the page after load and BEFORE any click,
+# so it captures the requests the interaction causes.  Read once, discarded
+# with the page.
+_WRITE_FACE_LOGGER_JS = r"""
+(function(){
+  if (window.__wf_log) { return; }
+  window.__wf_log = [];
+  var push = function(kind, method, url, body, ct){
+    try {
+      window.__wf_log.push({kind: kind, method: String(method||'GET').toUpperCase(),
+        url: String(url||''), body: String(body||'').slice(0, 400),
+        ct: String(ct||'')});
+    } catch(e){}
+  };
+  var of = window.fetch;
+  window.fetch = function(input, init){
+    try {
+      var u = (typeof input === 'string') ? input : (input && input.url);
+      var b = (init && init.body !== undefined && init.body !== null)
+        ? (typeof init.body === 'string' ? init.body : '[nonstring]')
+        : '';
+      var h = (init && init.headers) ? init.headers : null;
+      var ct = (h && (h.get ? h.get('content-type') : h['Content-Type'])) || '';
+      push('fetch', (init && init.method) || 'GET', u, b, ct);
+    } catch(e){}
+    return of.apply(this, arguments);
+  };
+  var oo = XMLHttpRequest.prototype.open;
+  var os = XMLHttpRequest.prototype.send;
+  XMLHttpRequest.prototype.open = function(m, u){ this.__wf_m = m; this.__wf_u = u; return oo.apply(this, arguments); };
+  XMLHttpRequest.prototype.send = function(b){
+    try {
+      var ct = '';
+      try { ct = this.getResponseHeader('content-type') || ''; } catch(e){}
+      push('xhr', this.__wf_m, this.__wf_u,
+           (typeof b === 'string' ? b : ''), ct);
+    } catch(e){}
+    return os.apply(this, arguments);
+  };
+})();
+"""
+
+# Fills every named text control with a marker derived from its field name,
+# so a body can be attributed to the field that carried it.  The harness
+# flag mirrors Phase 193's interaction dispatch: our own writes must not be
+# recorded as page-initiated script execution.
+_WRITE_FACE_FILL_JS = r"""
+(function(mark){
+  var out = [];
+  var ctrls = document.querySelectorAll(
+    "input:not([type=hidden]):not([type=checkbox]):not([type=radio]),textarea");
+  ctrls.forEach(function(el){
+    var id = el.getAttribute('name') || el.getAttribute('formcontrolname')
+             || el.id || '';
+    if (!id) return;
+    var v = mark + String(id).replace(/[^A-Za-z0-9]/g, '');
+    try { el.value = v; el.dispatchEvent(new Event('input', {bubbles:true})); } catch(e){}
+    out.push(String(id));
+  });
+  try { window.__xss_dom_harness = 1; } catch(e){}
+  return out;
+})(%s)
+"""
+
+# Picks and clicks ONE button -- the most submit-like one outside the
+# navigation chrome.  Phase 241: clicking several in a loop was measured to
+# be wrong twice over: the first six buttons on a Material page are the nav
+# bar (so the submit button was never reached), and an SPA navigates away
+# after the first click anyway.  One click, best candidate, is both safer
+# and sufficient -- the log is read after it.
+_WRITE_FACE_PICK_JS = r"""
+(function(deny){
+  var btns = Array.from(document.querySelectorAll(
+    "button, [role=button], input[type=submit]"));
+  var SUBMIT = ['send', 'submit', 'save', 'post', 'apply', 'confirm',
+                'create', 'add', 'register', 'sign up', 'update'];
+  var MIN_SCORE = 5;   // submit-like text, type=submit, or inside a form
+  var best = null, bestScore = MIN_SCORE - 1;
+  btns.forEach(function(b){
+    if (b.disabled) return;
+    if (b.closest('nav, header, mat-toolbar, mat-drawer, .navbar, footer')) return;
+    var txt = ((b.textContent || '') + ' ' +
+               (b.getAttribute('aria-label') || '') + ' ' +
+               (b.getAttribute('title') || '')).toLowerCase();
+    for (var d = 0; d < deny.length; d++) {
+      if (txt.indexOf(deny[d]) >= 0) return;      // deny-listed: never
+    }
+    var score = 0;
+    for (var s = 0; s < SUBMIT.length; s++) {
+      if (txt.indexOf(SUBMIT[s]) >= 0) { score += 10; break; }
+    }
+    var isSubmit = (b.getAttribute('type') || '') === 'submit';
+    if (isSubmit) score += 5;
+    if (b.closest('form')) score += 3;
+    if (b.tagName === 'MAT-FLAT-BUTTON' || b.tagName === 'MAT-RAISED-BUTTON'
+        || b.tagName === 'MAT-BUTTON' || b.tagName === 'BUTTON') score += 1;
+    // Phase 242: an icon-only control with no accessible name is never the
+    // write action -- clicking it is useless at best and a destructive icon
+    // at worst.  It must ALSO be a submit: an empty-text button inside a
+    // form is plausible; an empty-text button outside one is not.
+    if (!txt.trim() && !(isSubmit && b.closest('form'))) score = 0;
+    if (score > bestScore) { bestScore = score; best = b; }
+  });
+  if (!best) return '';
+  try { window.__xss_dom_harness = 1; best.click(); } catch(e){}
+  try { window.__xss_dom_harness = 0; } catch(e){}
+  return ((best.textContent || '').trim().slice(0, 40) || '(icon)');
+})(%s)
+"""
+
 # Phase 147: total wall-clock budget for probing ONE url.
 #
 # Each goto probe waits up to ``timeout`` seconds for its own navigation, so
@@ -875,6 +1031,59 @@ _DOM_SETTLE_MS = 700
 # most of a case's wall clock turns "slow page" into "case timeout", which
 # reads as an error rather than a result.
 _DOM_PROBE_BUDGET_S = 30.0
+
+# Phase 226: executable carrier shapes for the confirmation wave.
+#
+# Wave 0 delivers a BARE marker: it answers "does this source reach a sink"
+# for every channel, including ones that build the payload themselves
+# (``iframe.src = 'javascript:' + q``).  A bare token, though, arrives
+# intact even through a sanitizer -- it contains nothing to strip -- so a
+# reachability hit alone cannot tell "attacker code would run here" from
+# "inert text landed in innerHTML" (measured: range6's safe twin, where
+# DOMPurify strips the payload but the marker survived as text and the
+# engine claimed "marker executed").
+#
+# So when a hit stands and no dialog has been observed, the same channel is
+# replayed with these shapes; ONLY a dialog fired by the page's own code
+# earns "browser-executed".  Shape order matters: HTML first (innerHTML/
+# document.write/jQuery family -- most common), then the JS shape (eval /
+# setTimeout(string) / Function family), then the URL scheme (iframe.src
+# family; measured executable in Phase 163).
+#
+# The alert argument is a NUMBER (%d), not a quoted string, and that is a
+# measured design requirement, not taste: range4's fixture reflects the
+# param into a single-quoted JS config line (`{q: '{value}'}`), so a
+# carrier containing `'` closes the string and the whole script fails
+# syntax -- the page never runs, no dialog fires, and a genuinely
+# vulnerable page measures as delivery-only.  A decimal token survives
+# every string/attribute context a real app interpolates into.
+_CARRIER_SHAPES = (
+    ("html", "<img src=x onerror=alert(%d)>"),
+    ("js", "alert(%d)"),
+    ("url", "javascript:alert(%d)"),
+)
+
+# Phase 226: cap on carrier-wave navigations per analyze() call.  Wave 1 is
+# only paid when a hit exists without a dialog, and one dialog proves the
+# channel; the cap keeps a page with many reachable channels from turning
+# its probe budget into carrier replays.
+_DOM_CARRIER_WAVE_MAX = 4
+
+
+def _carrier_token(marker: str) -> str:
+    """Deterministic decimal token the carrier dialogs carry (Phase 226).
+
+    Derived from the marker so every carrier shape and every dialog check
+    agree, and reproducible across calls.  Always exactly ten digits, no
+    leading zero (``alert(0123...)`` would be a legacy-octal SyntaxError in
+    sloppy mode).  Ten random digits make an exact-match collision with
+    anything else a page might alert negligible, and the value carries no
+    quotes, spaces or percent-encoded characters -- the form survives every
+    string/attribute interpolation context our carrier shapes ride through.
+    """
+    import hashlib
+    h = int(hashlib.sha256(marker.encode("utf-8")).hexdigest()[:12], 16)
+    return str(1_000_000_000 + (h % 9_000_000_000))
 
 # Phase 200: budget for the post-failure recovery navigation (see
 # _recover_nav).  Measured at 0.02s against a silent server -- 5s is a
@@ -1062,7 +1271,129 @@ class DynamicDomAnalyzer:
         # of any third-party origin the page embeds.
         self.auth_local_storage: dict = dict(auth_local_storage or {})
 
-    def harvest(self, url: str) -> dict:
+    @staticmethod
+    def _marker_field(body: str, marker: str) -> str:
+        """The API field that carried the marker, parsed out of the body.
+
+        JSON and form bodies both work, and a wrong answer here is worse
+        than none: the stored layer injects INTO this field name, and the
+        control's own id is often not the API field (Juice Shop: control id
+        "complaintMessage", API field "message").
+        """
+        if not body or marker not in body:
+            return ""
+        import json as _json
+        from urllib.parse import parse_qs
+        text = body.strip()
+        if text[:1] in ("{", "["):
+            try:
+                data = _json.loads(text)
+            except Exception:
+                data = None
+            if isinstance(data, dict):
+                # Nested leaves are checked BEFORE the top level: a marker
+                # inside {"user":{"bio":...}} also matches str({"bio":...}),
+                # and the leaf is where the marker actually travelled.
+                # (Honest limit, recorded: the stored layer injects a flat
+                # {field: payload} body, so a nested face may not reproduce
+                # the shape on injection -- the round-trip then confirms
+                # nothing, which is the correct outcome.)
+                for k, v in data.items():
+                    if isinstance(v, dict):
+                        for k2, v2 in v.items():
+                            if marker in str(v2):
+                                return str(k2)
+                for k, v in data.items():
+                    if marker in str(v):
+                        return str(k)
+        try:
+            for k, vals in parse_qs(text, keep_blank_values=True).items():
+                if any(marker in str(v) for v in vals):
+                    return str(k)
+        except Exception:
+            pass
+        return ""
+
+    def _reap_write_faces(self, page, page_url: str, host: str) -> list:
+        """Phase 241: observe the write requests the page emits for itself.
+
+        Fills every named text control with a marker derived from the field
+        name, clicks a deny-list-filtered bounded set of buttons, and keeps
+        the requests whose BODY carries the marker.  Attribution is by
+        marker presence (the socket.io/analytics traffic that also flows
+        through has no marker), so what comes back is evidence, not a guess.
+
+        Returns ``[{"method","url","field","encoding"}]``, same-origin only.
+        """
+        import json as _json
+        from urllib.parse import urljoin, urlparse
+        faces: list = []
+        try:
+            page.evaluate(_WRITE_FACE_LOGGER_JS)
+        except Exception as e:
+            _log.debug("dom: write-face logger install failed (%s)",
+                       type(e).__name__, exc_info=True)
+            return faces
+        try:
+            filled = page.evaluate(
+                _WRITE_FACE_FILL_JS % _json.dumps(_WRITE_FACE_MARK))
+        except Exception as e:
+            _log.debug("dom: write-face fill failed (%s)",
+                       type(e).__name__, exc_info=True)
+            return faces
+        if not filled:
+            return faces
+        try:
+            clicked = page.evaluate(
+                _WRITE_FACE_PICK_JS % _json.dumps(list(_WRITE_FACE_DENY)))
+            page.wait_for_timeout(_WRITE_FACE_SETTLE_MS)
+            if clicked:
+                _log.debug("dom: write-face probe clicked %r on %s",
+                           clicked, page_url)
+        except Exception as e:
+            _log.debug("dom: write-face interaction failed (%s)",
+                       type(e).__name__, exc_info=True)
+        try:
+            log = page.evaluate("window.__wf_log || []") or []
+        except Exception:
+            log = []
+        if not isinstance(log, list):
+            return faces
+        seen: set = set()
+        for entry in log:
+            if not isinstance(entry, dict):
+                continue
+            body = entry.get("body") or ""
+            if _WRITE_FACE_MARK not in body:
+                continue                     # not our write
+            method = (entry.get("method") or "GET").upper()
+            if method in ("GET", "HEAD", "OPTIONS"):
+                continue                     # a read, not a write face
+            try:
+                abs_url = urljoin(page_url, entry.get("url") or "")
+                p = urlparse(abs_url)
+            except Exception:
+                continue
+            if p.scheme not in ("http", "https") or p.netloc.lower() != host:
+                continue                     # same-origin rule (Phase 176l)
+            field = self._marker_field(body, _WRITE_FACE_MARK)
+            if not field:
+                for name in filled:
+                    if name and name in body:
+                        field = name
+                        break
+            encoding = "json" if body.lstrip()[:1] in ("{", "[") else "form"
+            key = (method, abs_url, field, encoding)
+            if key in seen:
+                continue
+            seen.add(key)
+            faces.append({"method": method, "url": abs_url, "field": field,
+                          "encoding": encoding})
+            if len(faces) >= _WRITE_FACE_MAX_FACES:
+                break
+        return faces
+
+    def harvest(self, url: str, write_faces: bool = False) -> dict:
         """Phase 196: render ``url`` once and harvest the input face the
         RENDERED page exposes.
 
@@ -1141,10 +1472,23 @@ class DynamicDomAnalyzer:
 (function(){
   var names = [];
   try {
+    // Phase 241 fix: formcontrolname too.  Angular template-driven forms
+    // bind controls by formcontrolname and often carry no name attribute
+    // at all -- measured on Juice Shop (4 controls, 0 with name), where
+    // the name-only selector made this harvest blind on a modern Material
+    // app, which is exactly what it exists for.  ids are NOT collected:
+    // mat-input-1 in a mining wordlist is noise.
     document.querySelectorAll(
-      "input[name],textarea[name],select[name],button[name]"
+      "input[name],textarea[name],select[name],button[name],"
+      + "input[formcontrolname],textarea[formcontrolname],"
+      + "select[formcontrolname],input[id],textarea[id],select[id]"
     ).forEach(function(e){
-      var n = e.getAttribute("name");
+      var n = e.getAttribute("name") || e.getAttribute("formcontrolname");
+      if (!n) {
+        n = e.getAttribute("id") || '';
+        // Framework-generated ids are noise in a mining wordlist.
+        if (/^(mat|cdk|ng|input|elec)-/i.test(n)) return;
+      }
       if (n) names.push(n);
     });
   } catch(e) {}
@@ -1166,12 +1510,20 @@ class DynamicDomAnalyzer:
 """)
             except Exception:
                 return empty
+            faces: list = []
+            if write_faces:
+                # Phase 241: opt-in (clicking real UI has side effects).
+                from urllib.parse import urlparse as _up
+                faces = self._reap_write_faces(
+                    page, page.url, _up(url).netloc.lower())
         finally:
             try:
                 page.close()
             except Exception:
                 pass
-        return _normalize_harvest(raw, url)
+        result = _normalize_harvest(raw, url)
+        result["write_faces"] = faces
+        return result
 
     @staticmethod
     def available() -> bool:
@@ -1329,6 +1681,114 @@ class DynamicDomAnalyzer:
             # converts a 763s stall into a 0.02s empty read.
             _recover_nav(page)
 
+    def _try_carriers(self, page, probe: dict, marker: str, numtok: str,
+                      dialog_msgs: list, deadline: float) -> tuple[bool, str]:
+        """Replay ``probe``'s channel with executable carriers (Phase 226).
+
+        Returns ``(executed, carrier_name)``.  ``executed`` is True only when
+        a dialog carrying the numeric carrier token appeared while a carrier
+        was in flight -- i.e. the PAGE's own code ran, because the
+        instrumentation no longer fires dialogs of its own.  Absence of a
+        dialog is a measured "not observed", never "impossible": the caller
+        reports that as delivery evidence at a graded severity, not as an
+        execution claim.
+
+        Each carrier rides the SAME channel as the wave-0 probe (hash/query/
+        cookie/referer/window.name/postMessage) so the replay differs from
+        the original in exactly one variable: the payload shape.
+        """
+        kind = probe["kind"]
+        for name, tpl in _CARRIER_SHAPES:
+            carrier = tpl % int(numtok)
+            if time.monotonic() > deadline:
+                return False, ""
+            start = len(dialog_msgs)
+            try:
+                if kind == "goto":
+                    # Raw replacement (not quote()): the carrier must arrive
+                    # the way an attacker's link would.  Query channels
+                    # decode via URLSearchParams; fragment channels are
+                    # percent-encoded by the browser itself, and that is
+                    # the measured reality the verdict is allowed to see.
+                    target = probe["url"].replace(marker, carrier)
+                    # Phase 226 (measured on pos-dom-06): when only the
+                    # FRAGMENT differs from the current URL, goto performs a
+                    # same-document navigation -- the page's load-time code
+                    # does NOT run again, so a `setTimeout(location.hash...)`
+                    # page never sees the carrier and measures as not-fired
+                    # although it is trivially exploitable.  Hop through
+                    # about:blank when the non-fragment parts match, so the
+                    # carrier always arrives with a full document load.
+                    try:
+                        same_doc = (page.url.split("#", 1)[0]
+                                    == target.split("#", 1)[0])
+                    except Exception:
+                        same_doc = False
+                    if same_doc:
+                        self._bounded_goto(page, "about:blank", deadline)
+                    self._bounded_goto(page, target, deadline)
+                    page.wait_for_timeout(_DOM_SETTLE_MS)
+                elif kind == "cookie":
+                    page.context.add_cookies(
+                        [{"name": "__xss__", "value": carrier,
+                          "url": probe["origin"]}])
+                    self._bounded_goto(page, probe["url"], deadline)
+                    page.wait_for_timeout(_DOM_SETTLE_MS)
+                elif kind == "referer":
+                    hdrs = dict(self.auth_headers)
+                    hdrs["Referer"] = probe["referer_value"].replace(marker, carrier)
+                    page.context.set_extra_http_headers(hdrs)
+                    try:
+                        self._bounded_goto(page, probe["url"], deadline)
+                        page.wait_for_timeout(_DOM_SETTLE_MS)
+                    finally:
+                        page.context.set_extra_http_headers(
+                            dict(self.auth_headers))
+                elif kind == "window_name":
+                    self._bounded_goto(page, probe.get("origin")
+                                       or probe["url"], deadline)
+                    page.evaluate("window.__xss_dom_harness = 1;")
+                    try:
+                        page.evaluate("window.name = %s;" % json.dumps(carrier))
+                    finally:
+                        page.evaluate("window.__xss_dom_harness = 0;")
+                    self._bounded_goto(page, probe["url"], deadline)
+                    page.wait_for_timeout(_DOM_SETTLE_MS)
+                elif kind == "postmsg":
+                    # Fresh document (state from wave 0 is not reused), then
+                    # re-dispatch every handler recorded by the init script
+                    # with the carrier as the message data.  Origins are the
+                    # same attacker-reachable pair the harness uses; the
+                    # dispatching flag makes hits caused by this dispatch
+                    # attributable to postMessage rather than to whichever
+                    # probe happened to be running.
+                    self._bounded_goto(page, probe["url"], deadline)
+                    page.wait_for_timeout(200)
+                    page.evaluate(
+                        """(cm) => {
+                             var O = ["https://attacker.example", "null"];
+                             (window.__xss_dom_pm || []).forEach(function(h){
+                               O.forEach(function(o){
+                                 try {
+                                   window.__xss_pm_dispatching = 1;
+                                   h({data: cm, origin: o, source: null,
+                                      isTrusted: true});
+                                 } catch(e) {}
+                                 finally { window.__xss_pm_dispatching = 0; }
+                               });
+                             });
+                           }""", carrier)
+                    page.wait_for_timeout(_DOM_SETTLE_MS)
+                else:
+                    return False, ""
+            except Exception:
+                _log.debug("dom: carrier %r skipped for %r probe",
+                           name, kind, exc_info=True)
+                continue
+            if any(numtok in (m or "") for m in dialog_msgs[start:]):
+                return True, name
+        return False, ""
+
     def analyze(self, url: str, marker: str | None = None,
                 dialog_token: str | None = None) -> list:
         """Render ``url`` in the instrumented browser and report sink hits.
@@ -1347,6 +1807,11 @@ class DynamicDomAnalyzer:
         if not self.available():
             return []
         marker = marker or (_stem_marker("xssentinel_dom_") + secrets.token_hex(4))
+        # Phase 226: the decimal token carrier dialogs carry (see
+        # _carrier_token).  Dialogs are attributed by EITHER token: the
+        # string marker (a page alerting the value it received) or the
+        # numeric carrier token (a carrier actually executing).
+        numtok = _carrier_token(marker)
         findings: list = []
         seen: set = set()
         try:
@@ -1399,6 +1864,11 @@ class DynamicDomAnalyzer:
                 # _DOM_PROBE_BUDGET_S).  Findings are collected per probe, so
                 # stopping early keeps everything already confirmed.
                 deadline = time.monotonic() + _DOM_PROBE_BUDGET_S
+                # Phase 226: dialog watermark for per-probe attribution, and
+                # the carrier-wave counter (see _DOM_CARRIER_WAVE_MAX); the
+                # PM carrier wave runs at most once per analyze() call.
+                carrier_waves = 0
+                pm_wave_done = False
                 for probe in self._probes(url, marker):
                     if time.monotonic() > deadline:
                         _log.debug(
@@ -1406,6 +1876,7 @@ class DynamicDomAnalyzer:
                             "with %d finding(s)",
                             _DOM_PROBE_BUDGET_S, url, len(findings))
                         break
+                    dlg_start = len(dialog_msgs)
                     try:
                         if probe["kind"] == "goto":
                             # Phase 141: wait_until="load" (the old default)
@@ -1542,28 +2013,102 @@ class DynamicDomAnalyzer:
                             hits.append({"sink": "dialog",
                                          "snippet": _tok[0][:200],
                                          "via": "dialog"})
+                    # Phase 226: execution tier.  A dialog carrying either
+                    # token that fired during THIS probe's slice means the
+                    # page's own code ran it (the instrumentation no longer
+                    # alerts).  Otherwise the channel is replayed with
+                    # executable carriers -- and only a dialog fired by the
+                    # page during that replay earns "browser-executed".
+                    executed = any(
+                        marker in (m or "") or numtok in (m or "")
+                        for m in dialog_msgs[dlg_start:])
+                    carrier_used = ""
+                    # Phase 226: hits caused by the init script's own
+                    # postMessage delivery carry via='postmsg' -- they are
+                    # postMessage evidence no matter which probe's document
+                    # they landed on (the dispatch fires on EVERY document
+                    # load, which used to misattribute them to whatever
+                    # source probe was running).  One PM carrier wave per
+                    # analyze() call answers for all of them.
+                    pm_hits = [h for h in hits if h.get("via") == "postmsg"]
+                    other_hits = [h for h in hits if h.get("via") != "postmsg"]
+                    pm_executed, pm_carrier_used = False, ""
+                    if (pm_hits and not pm_wave_done and not executed
+                            and carrier_waves < _DOM_CARRIER_WAVE_MAX
+                            and time.monotonic() <= deadline):
+                        pm_wave_done = True
+                        carrier_waves += 1
+                        pm_executed, pm_carrier_used = self._try_carriers(
+                            page, {"kind": "postmsg", "url": url,
+                                   "source": "postMessage"},
+                            marker, numtok, dialog_msgs, deadline)
+                    if (other_hits and not executed
+                            and not any(h.get("via") == "dialog"
+                                        for h in other_hits)
+                            and carrier_waves < _DOM_CARRIER_WAVE_MAX
+                            and time.monotonic() <= deadline):
+                        carrier_waves += 1
+                        executed, carrier_used = self._try_carriers(
+                            page, probe, marker, numtok, dialog_msgs, deadline)
+                    elif any(h.get("via") == "dialog" for h in hits):
+                        # Stored-payload token channel: the dialog IS the
+                        # execution (Phase 194), no replay needed.
+                        executed = True
                     for h in hits:
                         sink = h.get("sink")
-                        key = (sink, probe["source"])
+                        _pm = h.get("via") == "postmsg"
+                        src = "postMessage" if _pm else probe["source"]
+                        key = (sink, src)
                         if key in seen:
                             continue
                         seen.add(key)
+                        _exec = bool(executed
+                                     or (_pm and pm_executed)
+                                     or h.get("via") == "dialog")
+                        _carrier = (pm_carrier_used if _pm else carrier_used) \
+                            if _exec else ""
+                        if _exec:
+                            detail = (
+                                f"DOM XSS CONFIRMED in real browser: "
+                                f"attacker-controlled source "
+                                f"'{src}' reached executable "
+                                f"sink '{sink}' and the page's own handler "
+                                f"fired alert(marker)"
+                                + (f" (carrier: {_carrier})"
+                                   if _carrier else "") + ".")
+                        else:
+                            # Plain reachability: the marker arrived but no
+                            # execution was observed for any carrier shape.
+                            # Report as delivery evidence; the grading in
+                            # scanner_layers turns this into a low-severity
+                            # browser-refuted finding, NEVER a high claim
+                            # (Phase 226; measured on range6's safe twin,
+                            # where the old wording claimed "marker executed"
+                            # for inert text).
+                            detail = (
+                                f"Attacker-controlled source "
+                                f"'{src}' reached sink "
+                                f"'{sink}', but no execution was observed "
+                                f"in this browser (carrier shapes tried: "
+                                f"html/js/url).  Delivery evidence only -- "
+                                f"not proof of absence.")
                         findings.append({
                             "type": "dom_dynamic",
                             "sink": sink,
-                            "source": probe["source"],
+                            "source": src,
                             # Phase 213: the delivered key (``q`` / ``q@hash``
                             # / ``__xss__``), or None when the probe had no
                             # key position (raw fragment, pathname, cookie...).
-                            "param": probe.get("param"),
+                            # PM-attributed hits have no key position either.
+                            "param": None if _pm else probe.get("param"),
                             "snippet": h.get("snippet", ""),
-                            "confidence": "high",
-                            "detail": (f"DOM XSS CONFIRMED in real browser: "
-                                       f"attacker-controlled source "
-                                       f"'{probe['source']}' reached executable "
-                                       f"sink '{sink}' (marker executed)."),
+                            "confidence": "high" if _exec else "medium",
+                            # Phase 226: the tier the wrappers grade by.
+                            "executed": _exec,
+                            "carrier": _carrier,
+                            "detail": detail,
                         })
-                        if probe["source"] == "postMessage":
+                        if src == "postMessage":
                             findings[-1]["detail"] += (
                                 " Message delivered with an ATTACKER origin "
                                 "(https://attacker.example / sandboxed null) "
