@@ -36,6 +36,16 @@
 
 ### Fixed
 
+- **SVG 向量不再把兄弟 `<script>` 算成 SVG XSS(Phase 251,真 FP)**:`/fuzz/render`
+  的 FP 臂抓到 2 例——反射已死(转义后)而页面带 `<svg>`+`<script>`(script 在
+  `<svg>` 闭合**之后**)时,`svg_xss_svg_script` 照报 medium/high。根因在语料
+  `xssentinel/data/svg_xss.json`:`<svg[^>]*>[\s\S]*?<script` 的 `[\s\S]*?`
+  跨越了 `</svg>`。SVG 里的 `<script>` 只在 SVG 命名空间内执行,故 10 处跨越式
+  pattern 改为"不得跨过自身闭合标签"的温和点;嵌套仍命中(不引 FN)、兄弟节点
+  不再命中。发现手段:`dev/fn_net.py` 补上 **FP 臂**(验证器拒绝时也扫描——
+  此前只记 neutralised 就跳过)与 **sink 维度**(端点参数 Phase 129 就有,网从未
+  串上),198 组合首轮 covered=122/FN 0/FP 候选 33,逐 finding 回验后 3 真 FP。
+
 - **TT 层"sanitizer 介导"流的两条 medium 无证据(Phase 225 续,range6 的第三条红因)**:
   `trusted_types_taint_flow`(层内注释自称 "concrete DOM-XSS finding")与
   `trusted_types_no_policy`("trivially exploitable")在 canonical 正确用法

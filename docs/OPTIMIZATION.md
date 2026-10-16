@@ -736,6 +736,13 @@ Phase 207 把同一个问题问到**交付面**:引擎判完之后,报告给用�
 **下一步候选**(仍未做,按价值排):
 1. ~~**2.1 parity 门扩容**到全 192 例~~ ✅ **已做(Phase 222)** —— 见 2.1.2;
 2. **1.0 真独立靶场**(Juice Shop 全集 / 商业工具对跑):已做 Phase 219
+        **FN 网的 FP 臂 + sink 维度(Phase 251)**:网此前单边(只猎 FN),
+        验证器拒绝的组合从不扫描 ⇒ 转义盲 FP 家族结构性漏检;现已四态判定
+        (covered/FN/neutralised/**FP 候选**)+ sink 第三维(198 组合)。首轮
+        covered=122/FN 0/FP 候选 33,逐 finding 回验后 3 个真 FP(其中 2 个
+        同一根因:SVG 语料的 `[\s\S]*?` 跨越 `</svg>`,已修)。**1 个未决**:
+        UTF-7 `javascript:` URI 的 href reflected(高/高)与验证器无 charset
+        分歧,动它即动严重度语义,留待带完整门的下一轮。
    (Juice Shop 20.2.0 双臂复跑),但"商业工具对跑"那一支仍未做;
 3. ~~**2.3 range5**(Angular/Svelte/Lit,构造效度先行)~~ ✅ 已做(Phase 220,
    选型为 Lit:三个框架里只有它发布浏览器就绪的 ES module,无需编译步)。

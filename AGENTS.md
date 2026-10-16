@@ -2696,3 +2696,51 @@ raw 写入的 flow 会被 a 语句的 `sanitize()` 跨语句误标为"已介导"
 
 **剩下唯一红因 = P1(dom_dynamic)**:range6 门禁继续不挂 CI,但红因从三条收敛到
 一条;P1 修完那个 commit 负责把它挂上(`GATE_STATUS.md` 同步)。
+
+## Phase 251:FN 网补上 FP 臂 + sink 维度 —— 抓到并修掉 2 个真 FP
+
+### 1. 缺口:网是**单边**的(只猎 FN)
+
+`dev/fn_net.py` 对"验证器确认"的组合查扫描器是否也报(⇒ covered/FN 候选),
+但对**"验证器拒绝"**的组合只记 neutralised 就跳过——**从不问"扫描器是否照样
+报了"**。而那一问正是 Phase 123/128/130 的**转义盲 FP 家族**:反射已死、
+页面特征活着、层照着特征报。且 `/fuzz/render` 的 `sink` 参数(Phase 129 就有)
+**网从未串上过**。
+
+### 2. 修网(sink 维度 + FP 臂),再逐 finding 回验
+
+三态判定扩为四态;`sink` 成为第三维(9 ctx × 11 esc × 2 sink = 198 组合)。
+**候选 ≠ 已证 FP**:网只试 top-3 语料,扫描器可能用了没试过的形状 ⇒
+`dev/_p251_fp_check.py` 用**finding 自己的载荷**回渲 + 回验。
+
+首轮 198 组合:**covered=122 / FN 候选 0 / FP 候选 33 / neutralised 76**。
+33 个候选逐条回验后:**3 个真 FP,30 个是网语料太窄**(扫描器的载荷确实活着)。
+
+### 3. 两个真 FP 是同一个根因,已修
+
+`svg/html/sink=dom` 与 `svg/attr/sink=dom` 报 `svg_xss_svg_script`
+(medium/high 置信),但 **payload 是占位标签 `'(SVG vector: svg_script)'`**,
+snippet 是**页面自己的** `<head>`——层扫到页面自带 `<svg>`+`<script>` 就报,
+而那个 `<script>` 是 sink 加的、在 `<svg>` **闭合之后**的兄弟节点。
+根因在语料:`xssentinel/data/svg_xss.json` 的
+`<svg[^>]*>[\s\S]*?<script\b` 用 `[\s\S]*?` 跨越了 `</svg>`。
+**SVG 里的 `<script>` 只在 SVG 命名空间内执行** ⇒ 把 10 处跨越式 pattern 改成
+"不得跨过自身闭合标签"的温和点(`(?:(?!</svg>)[\s\S])*?`)。
+验:嵌套 `<svg><script>…` 仍命中(**不引入 FN**),兄弟 script 不再命中(**FP 消除**)。
+真靶复测:svg FP 候选 2 → 0,其余候选仍为真检出。
+
+### 4. 剩下 1 个候选:如实记账为未决(不半修)
+
+`href/html` 的 `reflected`(high/high):载荷是 **UTF-7 编码的 `javascript:` URI**
+(`javascript:alert+ACg-…`)。`html` 转义不碰它(无 `<>&"'`),所以它**原样反射**;
+但 UTF-7 生效**需要 charset 声明**,页面没有 ⇒ 引擎验证器拒绝。
+即"扫描器说 user-activation 即可执行"与"验证器说没 charset 就不执行"的
+**语义分歧**,动它就动严重度语义 ⇒ 需完整门(parity + benchmark + 全量),
+本轮不半修,记为下一轮候选。
+
+### 5. wipe 之后的账(环境侧)
+
+本轮中途发生过 **workspace wipe**:`a57b71f Recovery` 恢复了 241–251 源码,
+但**网的 FP 臂与记录没回来**(`dev/fn_net.py` 恢复成空文件,
+`dev/fn_net_browser_check.py` 直接没了)。网已凭方法重写并复验;浏览器 oracle
+脚本**待重建**(否则 Phase 235 的"99/99 浏览器一致"无法复跑)。
