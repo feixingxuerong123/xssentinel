@@ -545,3 +545,77 @@ class TestWriteNucleiDir:
         out = str(tmp_path / "empty")
         assert report.write_nuclei_dir([], "http://t", META, out) == []
         assert os.path.isdir(out)
+
+
+class TestBrowserEvidenceReachesTheSummaryRow:
+    """Phase 249: one evidence contract, one key.
+
+    The stored path puts its browser evidence under ``headless`` and the
+    summary table reads it ("browser executed").  The second-order path
+    first used a private ``browser_evidence`` key -- the table read nothing
+    and the row said "no browser check" next to a finding the browser HAD
+    confirmed.  The evidence text still reached the reader through
+    ``detail`` (measured: all six formats), so this was a structural
+    inconsistency rather than invisible data -- fixed by unifying the key.
+    """
+
+    EVID = {"outcome": "fired", "available": True,
+            "detail": "a dialog carried our token on http://t/viewer",
+            "method": "browser_render"}
+
+    def test_headless_key_renders_the_state(self):
+        d = _f(ftype="stored", detail="a dialog carried our token")
+        d["headless"] = dict(self.EVID)
+        html = report.build_html([d], "http://t", META)
+        assert "browser executed" in html
+
+    def test_second_order_shape_renders_the_state(self):
+        """The regression: the finding exactly as Phase 246/249 emits it."""
+        d = _f(ftype="second_order", ctx="browser_render",
+               detail="a dialog carried our token")
+        d["headless"] = dict(self.EVID)
+        d["evidence_class"] = "browser-executed"
+        html = report.build_html([d], "http://t", META)
+        assert "browser executed" in html
+
+    def test_old_private_key_was_invisible(self):
+        """Counter-proof: with the evidence under the OLD key the row says
+        "no browser check" -- which is what the contract test must catch if
+        anyone reintroduces a private key."""
+        d = _f(ftype="second_order", ctx="browser_render",
+               detail="a dialog carried our token")
+        d["browser_evidence"] = dict(self.EVID)
+        html = report.build_html([d], "http://t", META)
+        assert "browser executed" not in html
+        assert "no browser check" in html
+
+
+class TestViewerUrlReachesTheHtml:
+    """Phase 250: the viewer page is where a stored/second-order payload
+    EXECUTES, so the operator needs that URL to reproduce.  It lives in
+    proof["viewer_url"], which the JSON export shipped but the HTML summary
+    dropped -- only the free-text detail mentioned it, if at all."""
+
+    def _mk(self, viewer=None):
+        d = _f(ftype="second_order", ctx="browser_render",
+               detail="a dialog carried our token")
+        d["headless"] = {"outcome": "fired", "available": True,
+                         "detail": "a dialog carried our token"}
+        d["proof"] = ({"viewer_url": viewer} if viewer else {})
+        return d
+
+    def test_viewer_url_is_rendered(self):
+        html = report.build_html([self._mk("http://t/viewer")], "http://t",
+                                 META)
+        assert "viewer (where the payload executed)" in html
+        assert "http://t/viewer" in html
+
+    def test_hostile_viewer_url_is_escaped(self):
+        """escape-first: the viewer URL is target-controlled text."""
+        html = report.build_html(
+            [self._mk('"><script>alert(1)</script>')], "http://t", META)
+        assert "<script>alert(1)</script>" not in html
+
+    def test_no_viewer_no_empty_line(self):
+        html = report.build_html([self._mk(None)], "http://t", META)
+        assert "viewer (where" not in html

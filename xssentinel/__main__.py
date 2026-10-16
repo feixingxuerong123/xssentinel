@@ -443,6 +443,17 @@ def build_parser():
                             " endpoints the page itself fetched are scanned"
                             " after the main target (bounded).  Requires"
                             " playwright; sync engine only.")
+    g_det.add_argument("--spa-write-faces", dest="spa_write_faces",
+                       action="store_true",
+                       help="With --discover: drive the rendered SPA's own "
+                            "UI (fill every text control with a marker, "
+                            "click ONE submit-like button outside the nav "
+                            "and off the deny list) and treat the requests "
+                            "whose BODY carries the marker as OBSERVED write "
+                            "faces, then run the stored round-trip over "
+                            "them (Phase 241).  OFF by default: clicking a "
+                            "real app's UI has side effects.  Sync engine "
+                            "only.")
     g_det.add_argument("--upload-field", dest="upload_field", default=None,
                        action="append",
                        help="Name of a file-upload form field to multipart-"
