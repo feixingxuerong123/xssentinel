@@ -1155,6 +1155,109 @@ def _mxss_confirm(response_text: str, token: str, idx: int) -> dict | None:
     return None
 
 
+def verify_token_in_browser(url: str, token: str | None = None,
+                            headers: dict | None = None,
+                            auth_local_storage: dict | None = None,
+                            timeout: int = 20,
+                            tokens: list | None = None) -> dict:
+    """Phase 244/245: did OUR stored token execute, or merely appear, on a
+    page that renders itself in the browser?
+
+    Stored confirmation until now was pure HTML: the viewer page was
+    fetched and ``verify_semantic`` judged the response text.  That is
+    blind to an SPA viewer, where the stored value is rendered by
+    client-side code and never appears in the initial HTML -- so a real,
+    executing stored XSS on an SPA route could not be confirmed at all.
+
+    Two DISTINCT outcomes, deliberately not merged:
+
+      * ``fired``    -- a dialog carried one of our tokens: it EXECUTED.
+      * ``rendered`` -- the token is in the live DOM but nothing fired:
+        delivery evidence only (it may be sitting in a text node).
+
+    Phase 245: one render can judge EVERY injected token at once -- renders
+    are the expensive part, injections are not.  Pass ``tokens=[...]`` and
+    the result names which one fired (``result["token"]``); the single
+    ``token=`` form still works and is equivalent to a one-element list.
+    """
+    try:
+        from .dom_engine import get_shared_browser
+    except Exception:
+        return {"available": False, "confirmed": False,
+                "outcome": "unavailable",
+                "detail": "playwright not installed; skipped"}
+    import json as _json
+    from urllib.parse import urlparse as _up
+    watched: list = list(tokens or [])
+    if token is not None and token not in watched:
+        watched.append(token)
+    if not watched:
+        return {"available": False, "confirmed": False,
+                "outcome": "unavailable", "token": None,
+                "detail": "no token to watch"}
+    page = None
+    try:
+        browser = get_shared_browser()
+        page = browser.new_page()
+        if headers:
+            try:
+                page.set_extra_http_headers(headers)
+            except Exception:
+                pass
+        if auth_local_storage:
+            origin = "{0.scheme}://{0.netloc}".format(_up(url))
+            pairs = "; ".join(
+                "try { window.localStorage.setItem(%s, %s); } catch (e) {}"
+                % (_json.dumps(k), _json.dumps(v))
+                for k, v in auth_local_storage.items())
+            page.add_init_script(
+                "if (location.origin === %s) { %s }"
+                % (_json.dumps(origin), pairs))
+        fired: list = []
+        page.on("dialog", lambda d: (fired.append(str(d.message)),
+                                     d.dismiss()))
+        page.goto(url, wait_until="commit", timeout=int(timeout * 1000))
+        try:
+            page.wait_for_timeout(1200)   # let the SPA render its route
+        except Exception:
+            pass
+        hit = None
+        for m in fired:
+            for t in watched:
+                if t and t in m:
+                    hit = t
+                    break
+            if hit is not None:
+                break
+        if hit is not None:
+            return {"available": True, "confirmed": True,
+                    "outcome": "fired", "token": hit,
+                    "detail": f"a dialog carried our token on {url}"}
+        try:
+            html = page.evaluate("document.documentElement.outerHTML") or ""
+        except Exception:
+            html = ""
+        for t in watched:
+            if t and t in html:
+                return {"available": True, "confirmed": False,
+                        "outcome": "rendered", "token": t,
+                        "detail": ("the token is in the live DOM but nothing "
+                                   f"fired -- delivery evidence only ({url})")}
+        return {"available": True, "confirmed": False,
+                "outcome": "not-found", "token": None,
+                "detail": f"the token never appeared in {url}"}
+    except Exception as e:
+        return {"available": False, "confirmed": False,
+                "outcome": "error", "token": None,
+                "detail": f"{type(e).__name__}: {e}"}
+    finally:
+        if page is not None:
+            try:
+                page.close()
+            except Exception:
+                pass
+
+
 def verify_headless(url: str, method: str, params: dict | None,
                     data: dict | None, headers: dict | None,
                     token: str, timeout: int = 20) -> dict:
