@@ -2898,3 +2898,9 @@ Phase 253 增补把 FN=1 + 28 ERR 归因于主机 loopback。实测证明是**�
 
 wipe 之后遗留的唯一未决项到此关闭:**严格门全绿**。树是完整的:
 全量收集 3183 例 0 错误、沙箱三件套自洽(1680 例 oracle 背书)、门 FP0/FN0/ERROR0。
+
+### Phase 256 续:语料 +116 条之后重跑门,仍全绿
+
+`[+] Strict quality gate PASSED: FP0 FN0 ERROR0 over 64 scored cases (0 SKIP)`
+(干净端口 18935 + `dev/gate_run_scratch.py` 外置暂存)。**无位移纪律得到实证**:
+主族 `html_element` 保持 206 条不变,新增 116 条没有扰动任何既有确认路径。
