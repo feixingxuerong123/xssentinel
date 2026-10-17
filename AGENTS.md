@@ -2969,3 +2969,23 @@ importNode/adoptNode/cloneNode → appendChild/insertBefore/…)。
 element text")。⇒ 本轮 5 个候选回验后**真 FP 0**(两次跑的语料相同,新候选来自
 扫描预算/时序差异,不是修复的副作用——裁定过了才这么说)。
 基线落盘 `benchmark/results/fn_net_20261017_after257.json`。
+
+### 7. Phase 251 那个"未决的 UTF-7 项"也关掉了——它是沙箱损坏的伪影
+
+Phase 251 留下的唯一未决项:`href/html` 的 `reflected`(high/high),载荷是 UTF-7
+编码的 `javascript:` URI;当时记为"扫描器说 user-activation 即可执行、验证器说没
+charset 就不执行"的**语义分歧**,因动它即动严重度语义而搁置。
+
+现按同一组合在当前树上复测:**`verify_semantic` ⇒ `confirmed=True`**
+("token reflected in a.href=javascript: URI (runs when the user activates it)"),
+与扫描器的报告**一致**。
+
+⇒ 那不是语义分歧,是**沙箱损坏的伪影**:251 时 tokenizer 已被 wipe 毁掉,验证器走的
+是降级路径("sandbox gate … the gate is effectively off"),才给出"token not
+reflected"。**沙箱三件套复位(253)之后,这个分歧自动消失。**
+
+教训:凡是"验证器与扫描器不一致"的裁定,**先确认验证器自己是不是在降级路径上**——
+它的降级是静默的,只在日志里留一行。
+
+**至此 wipe 引发的全部问题(恢复损伤 + 由此产生的误判)都已关闭**:门 FP0/FN0/ERROR0,
+双边网 5 个候选回验后真 FP 0,全量收集 3183 例 0 错误。
