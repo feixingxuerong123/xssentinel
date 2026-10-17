@@ -105,6 +105,22 @@ MUTATING_SINKS = [
     "after(",
 ]
 
+# The two entries above that only PARSE.  They turn a string into live markup
+# only as the first half of the rebuild chain, so on their own they are not
+# evidence of a mutating sink (see has_mutating_sink).
+_PARSE_ONLY_SINKS = {"DOMParser", "parseFromString"}
+
+# The insertion half of that chain -- the step without which a parsed tree
+# stays a detached document and never reaches the live DOM.
+_INSERTION_RE = re.compile(
+    r"\.appendChild\s*\(|\.insertBefore\s*\(|\.replaceChild\s*\("
+    r"|\.replaceChildren\s*\(|\.append\s*\(|\.prepend\s*\("
+    r"|\.after\s*\(|\.before\s*\(|\.replaceWith\s*\("
+    r"|\.importNode\s*\(|\.adoptNode\s*\(|\.cloneNode\s*\("
+    r"|\.insertAdjacentElement\s*\(",
+    re.IGNORECASE,
+)
+
 
 def payloads() -> list[str]:
     """Return the mXSS payload list (for compatibility with payload loaders)."""
@@ -164,6 +180,20 @@ def has_mutating_sink(response_text: str) -> list[str]:
     for sink in MUTATING_SINKS:
         if sink in haystack:
             found.append(sink)
+    # Phase 257: ``DOMParser.parseFromString`` only PARSES -- it never turns a
+    # string into live markup by itself.  The parsed tree has to be INSERTED
+    # for it to matter (the Phase 185 "DOM rebuild chain": parseFromString ->
+    # importNode/adoptNode/cloneNode -> appendChild/insertBefore/...).  Taking
+    # the parse half alone as a mutating sink let the layer report
+    # mutation_xss on any page that merely mentions DOMParser, with no path
+    # from the reflected value to it.  Measured: /fuzz/render ctx=script_dq
+    # and script_sq x esc=encode_quotes x sink=dom -- the payload lands in a
+    # JS string literal (sandbox: inert, round-trip unchanged) while the page
+    # parses the constant 'x' and writes it with textContent, yet the layer
+    # called it exploitable.
+    if found and not [s for s in found if s not in _PARSE_ONLY_SINKS]:
+        if not _INSERTION_RE.search(haystack):
+            found = [s for s in found if s not in _PARSE_ONLY_SINKS]
     return found
 
 

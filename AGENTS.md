@@ -2904,3 +2904,51 @@ wipe 之后遗留的唯一未决项到此关闭:**严格门全绿**。树是完�
 `[+] Strict quality gate PASSED: FP0 FN0 ERROR0 over 64 scored cases (0 SKIP)`
 (干净端口 18935 + `dev/gate_run_scratch.py` 外置暂存)。**无位移纪律得到实证**:
 主族 `html_element` 保持 206 条不变,新增 116 条没有扰动任何既有确认路径。
+
+## Phase 257:FP 臂再抓一个家族同根的真 FP——mXSS 层把"只解析"当成 sink
+
+### 1. 网重跑(树健康之后),候选 33 → 6
+
+wipe 丢掉基线后重跑双边网(198 组合,1913s):**covered=144 / FN 0 /
+FP 候选 6 / neutralised=54**(修复前那轮是 122 / 0 / **33** / 76——svg 修复 +
+沙箱复位已把候选从 33 砍到 6;covered 涨到 144 是沙箱门重新启用后能确认更多形状)。
+
+### 2. 6 个候选逐个回验 ⇒ 2 个真 FP,同根因
+
+`script_dq/encode_quotes/sink=dom` 与 `script_sq/encode_quotes/sink=dom` 报
+`mutation_xss`,载荷 `<svg><style><img src=x onerror=alert(1)></style>`。
+三条独立证据都说它是死的:
+
+- `sandbox.judge` ⇒ **inert**("token 坐在 JS 字符串字面量里,是数据不是调用实参,
+  载荷从未逃出");`roundtrip` 序列化**逐字节不变**;
+- `encode_quotes` 不碰尖括号 ⇒ 载荷原样落进 `<script>var a = "…";</script>`
+  的**字符串字面量**里;
+- 而 `mutation.analyze` 在页面上只要有 `DOMParser/parseFromString` 就判
+  `exploitable=True`——**层只数 sink 是否存在,完全不看反射值能不能到达它**。
+  这一页的 DOMParser 解析的是**常量 `'x'`**、写出用 `textContent`,毫无数据流。
+
+**与 Phase 251 的 svg 是同一家族:层照着页面特征就报,而不是照着反射。**
+
+### 3. 修法:解析半程不成链
+
+`DOMParser.parseFromString` **只解析、不插入**——解析出的树必须被 INSERT 才可能
+进活 DOM(README 里 Phase 185 的"DOM 重建链":parseFromString →
+importNode/adoptNode/cloneNode → appendChild/insertBefore/…)。
+⇒ 新增 `_PARSE_ONLY_SINKS` 与 `_INSERTION_RE`:**只有解析半程而无任何插入 API 时,
+不予计入 mutating sink**。
+
+双向验证:解析+textContent ⇒ `sinks=[]` `exploitable=False`(FP 消除);
+解析+appendChild / importNode 链 / 直接 `innerHTML` ⇒ 仍 `exploitable=True`
+(**不引入 FN**)。
+
+### 4. 一个测试锁住了旧的退化契约
+
+`tests/test_mxss_exec_context.py` 的 `_SINK_SCRIPT` 恰好就是那个**退化 fixture**
+(解析常量、结果不用),它锁的"raw reflection beside a sink is confirmed"于是失败。
+按"测试有没有锁住旧的错误契约"的规矩:把 fixture 补成**真链路**(parse + appendChild),
+并新增 `TestMutatingSinkNeedsTheInsertionStep` 7 例锁住新契约。
+
+### 5. 门
+
+`--quick --strict-gate` **PASSED FP0 FN0 ERROR0**(64 例);
+6 个候选回验后**真 FP 0**(`script_*` 改报 `polyglot_reflection` 这一真检出)。
