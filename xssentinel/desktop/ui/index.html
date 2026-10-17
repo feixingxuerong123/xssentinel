@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>XSSentinel 桌面控制台</title>
+<style>
+  :root {
+    --bg: #0f1419; --panel: #161d26; --panel2: #1c2530; --line: #2a3644;
+    --fg: #d7e0ea; --dim: #8b9bab; --acc: #4da3ff; --ok: #3ecf8e;
+    --warn: #ffb454; --bad: #ff6b6b; --chip: #243244;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 14px/1.5 "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+  }
+  header {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--line);
+  }
+  header h1 { font-size: 15px; margin: 0; font-weight: 600; letter-spacing: .5px; }
+  header .ver { color: var(--dim); font-size: 12px; }
+  header .spacer { flex: 1; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); display: inline-block; }
+  .dot.off { background: var(--bad); }
+  main { display: grid; grid-template-columns: 340px 1fr; gap: 12px; padding: 12px; height: calc(100vh - 47px); }
+  .col { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
+  .card h2 { margin: 0 0 10px; font-size: 13px; color: var(--dim); text-transform: uppercase; letter-spacing: .8px; }
+  label { display: block; font-size: 12px; color: var(--dim); margin: 8px 0 3px; }
+  input, select, textarea {
+    width: 100%; background: var(--panel2); color: var(--fg);
+    border: 1px solid var(--line); border-radius: 5px; padding: 6px 8px; font: inherit;
+  }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--acc); }
+  textarea { resize: vertical; min-height: 46px; font-family: Consolas, monospace; font-size: 12px; }
+  .row { display: flex; gap: 8px; }
+  .row > * { flex: 1; }
+  button {
+    background: var(--acc); color: #06121f; border: 0; border-radius: 5px;
+    padding: 7px 12px; font: inherit; font-weight: 600; cursor: pointer;
+  }
+  button.ghost { background: var(--chip); color: var(--fg); font-weight: 500; }
+  button.small { padding: 3px 8px; font-size: 12px; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  .checks { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+  .checks label { display: flex; align-items: center; gap: 5px; margin: 0; color: var(--fg); font-size: 12px; }
+  .checks input[type=checkbox] { width: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; color: var(--dim); font-weight: 500; font-size: 12px;
+       padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  td { padding: 6px 8px; border-bottom: 1px solid #1e2733; vertical-align: top; }
+  tr.sel td { background: #1d2b3a; }
+  .scroll { overflow: auto; min-height: 0; }
+  #scanList { max-height: 38vh; }
+  #findings { flex: 1; }
+  .pill { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 11px;
+          background: var(--chip); color: var(--dim); white-space: nowrap; }
+  .pill.queued, .pill.running { background: #27405c; color: #9ccbff; }
+  .pill.completed { background: #1e4438; color: var(--ok); }
+  .pill.failed, .pill.cancelled { background: #4a2626; color: var(--bad); }
+  .sev-high { color: var(--bad); font-weight: 600; }
+  .sev-medium { color: var(--warn); }
+  .sev-low { color: var(--dim); }
+  .mono { font-family: Consolas, monospace; font-size: 12px; }
+  .empty { color: var(--dim); text-align: center; padding: 28px 0; font-size: 13px; }
+  .hint { color: var(--dim); font-size: 12px; margin-top: 6px; }
+  .toolbar { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+  .toolbar .spacer { flex: 1; }
+  a { color: var(--acc); }
+  .toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%);
+           background: var(--panel2); border: 1px solid var(--line); color: var(--fg);
+           padding: 8px 14px; border-radius: 6px; font-size: 13px; opacity: 0;
+           transition: opacity .25s; pointer-events: none; max-width: 70vw; }
+  .toast.show { opacity: 1; }
+  .toast.err { border-color: var(--bad); color: var(--bad); }
+</style>
+</head>
+<body>
+<header>
+  <span class="dot" id="apiDot"></span>
+  <h1>XSSentinel 桌面控制台</h1>
+  <span class="ver" id="verInfo">…</span>
+  <span class="spacer"></span>
+  <button class="ghost small" id="refreshBtn">刷新</button>
+</header>
+
+<main>
+  <!-- 左栏：新建扫描 -->
+  <div class="col">
+    <div class="card">
+      <h2>新建扫描</h2>
+      <label for="url">目标 URL *</label>
+      <input id="url" placeholder="https://target.example/search?q=test" spellcheck="false">
+      <div class="row">
+        <div>
+          <label for="method">方法</label>
+          <select id="method"><option>GET</option><option>POST</option></select>
+        </div>
+        <div>
+          <label for="domEngine">DOM 引擎</label>
+          <select id="domEngine">
+            <option value="auto">auto</option>
+            <option value="playwright">playwright</option>
+            <option value="static">static</option>
+            <option value="off">off</option>
+          </select>
+        </div>
+      </div>
+      <label for="params">参数（JSON，可空）</label>
+      <textarea id="params" spellcheck="false" placeholder='{"q": "test"}'></textarea>
+      <label for="data">POST 体（JSON，可空）</label>
+      <textarea id="data" spellcheck="false" placeholder='{"q": "test"}'></textarea>
+      <label for="headers">请求头（JSON，可空）</label>
+      <textarea id="headers" spellcheck="false" placeholder='{"User-Agent": "..."}'></textarea>
+      <label for="cookies">Cookie（JSON，可空）</label>
+      <textarea id="cookies" spellcheck="false" placeholder='{"session": "..."}'></textarea>
+      <div class="checks">
+        <label><input type="checkbox" id="headless"> 浏览器确认</label>
+        <label><input type="checkbox" id="crawl"> 爬取</label>
+        <label><input type="checkbox" id="aiReport"> AI 叙述</label>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <div>
+          <label for="threads">线程</label>
+          <input id="threads" type="number" value="4" min="1" max="32">
+        </div>
+        <div>
+          <label for="crawlDepth">爬取深度</label>
+          <input id="crawlDepth" type="number" value="2" min="0" max="6">
+        </div>
+      </div>
+      <div style="margin-top:12px">
+        <button id="startBtn" style="width:100%">开始扫描</button>
+      </div>
+      <div class="hint" id="formHint"></div>
+    </div>
+  </div>
+
+  <!-- 右栏：扫描列表 + 发现 -->
+  <div class="col">
+    <div class="card" style="flex-shrink:0">
+      <h2>扫描任务</h2>
+      <div class="scroll" id="scanList"><div class="empty">还没有扫描任务</div></div>
+    </div>
+    <div class="card" id="findings">
+      <div class="toolbar">
+        <h2 style="margin:0">发现</h2>
+        <span class="spacer"></span>
+        <span class="hint" id="findingCount"></span>
+        <button class="ghost small" id="reportBtn" disabled>打开 HTML 报告</button>
+        <select id="reportFmt" style="width:auto;padding:4px 6px;font-size:12px">
+          <option value="html">HTML</option><option value="json">JSON</option>
+          <option value="sarif">SARIF</option><option value="csv">CSV</option>
+          <option value="junit">JUnit</option><option value="markdown">Markdown</option>
+        </select>
+        <button class="ghost small" id="dlBtn" disabled>下载</button>
+      </div>
+      <div class="scroll" id="findingRows"><div class="empty">选择左侧任务查看发现</div></div>
+    </div>
+  </div>
+</main>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+var BASE = location.origin;
+var scans = [];        // 任务列表
+var selected = null;   // 选中的 scan id
+var pollTimer = null;
+
+function $(id) { return document.getElementById(id); }
+function esc(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+    return {"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c];
+  });
+}
+function toast(msg, isErr) {
+  var t = $("toast");
+  t.textContent = msg;
+  t.className = "toast show" + (isErr ? " err" : "");
+  setTimeout(function () { t.className = "toast"; }, 3200);
+}
+function api(path, opts) {
+  return fetch(BASE + path, opts).then(function (r) {
+    return r.json().catch(function () { return {}; }).then(function (j) {
+      if (!r.ok) throw new Error(j.detail || j.error || ("HTTP " + r.status));
+      return j;
+    });
+  });
+}
+function parseJsonField(id, what) {
+  var raw = $(id).value.trim();
+  if (!raw) return {};
+  try {
+    var v = JSON.parse(raw);
+    if (v === null || typeof v !== "object" || Array.isArray(v)) {
+      throw new Error(what + " 必须是 JSON 对象");
+    }
+    return v;
+  } catch (e) {
+    toast(what + " 不是合法 JSON:" + e.message, true);
+    throw e;
+  }
+}
+
+/* ---------- 启动扫描 ---------- */
+function startScan() {
+  var url = $("url").value.trim();
+  if (!url) { toast("请填写目标 URL", true); $("url").focus(); return; }
+  var body;
+  try {
+    body = {
+      url: url, method: $("method").value,
+      params: parseJsonField("params", "参数"),
+      data: parseJsonField("data", "POST 体"),
+      headers: parseJsonField("headers", "请求头"),
+      cookies: parseJsonField("cookies", "Cookie"),
+      dom_engine: $("domEngine").value,
+      headless: $("headless").checked,
+      crawl: $("crawl").checked,
+      crawl_depth: parseInt($("crawlDepth").value, 10) || 0,
+      threads: parseInt($("threads").value, 10) || 4,
+      ai_report: $("aiReport").checked
+    };
+  } catch (e) { return; }
+  $("startBtn").disabled = true;
+  api("/api/v1/scans", {
+    method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify(body)
+  }).then(function (j) {
+    toast("已创建扫描 " + (j.scan_id || j.id || ""));
+    $("url").value = "";
+    refreshScans();
+  }).catch(function (e) {
+    toast("创建失败:" + e.message, true);
+  }).then(function () { $("startBtn").disabled = false; });
+}
+
+/* ---------- 任务列表 ---------- */
+function statePill(state) {
+  var cls = String(state || "").toLowerCase();
+  return '<span class="pill ' + esc(cls) + '">' + esc(state || "?") + "</span>";
+}
+function refreshScans() {
+  api("/api/v1/scans").then(function (j) {
+    scans = j.scans || j.jobs || [];
+    renderScans();
+    checkApi(true);
+  }).catch(function (e) {
+    checkApi(false);
+    toast("拉取任务失败:" + e.message, true);
+  });
+}
+function renderScans() {
+  var box = $("scanList");
+  if (!scans.length) { box.innerHTML = '<div class="empty">还没有扫描任务</div>'; return; }
+  var html = '<table><thead><tr><th>目标</th><th>状态</th><th>发现</th><th>开始</th><th></th></tr></thead><tbody>';
+  scans.forEach(function (s) {
+    var id = s.scan_id || s.id;
+    var when = (s.created_at || s.started_at || "").replace("T", " ").slice(0, 19);
+    html += '<tr class="' + (id === selected ? "sel" : "") + '" data-id="' + esc(id) + '">'
+      + '<td class="mono" style="max-width:190px;overflow:hidden;text-overflow:ellipsis" title="'
+      + esc(s.url || "") + '">' + esc(s.url || "") + "</td>"
+      + "<td>" + statePill(s.state) + "</td>"
+      + "<td>" + esc(s.finding_count != null ? s.finding_count : (s.findings || []).length) + "</td>"
+      + '<td class="mono" style="color:var(--dim)">' + esc(when) + "</td>"
+      + '<td style="white-space:nowrap">'
+      + '<button class="ghost small" data-act="view">查看</button> '
+      + '<button class="ghost small" data-act="cancel">取消</button> '
+      + '<button class="ghost small" data-act="del">删除</button>'
+      + "</td></tr>";
+  });
+  box.innerHTML = html + "</tbody></table>";
+}
+$("scanList").addEventListener("click", function (e) {
+  var tr = e.target.closest("tr[data-id]");
+  if (!tr) return;
+  var id = tr.getAttribute("data-id");
+  var act = e.target.getAttribute && e.target.getAttribute("data-act");
+  if (act === "cancel") { cancelScan(id); return; }
+  if (act === "del") { deleteScan(id); return; }
+  selected = id;
+  renderScans();
+  loadFindings();
+});
+
+function cancelScan(id) {
+  api("/api/v1/scans/" + encodeURIComponent(id) + "/cancel", {method: "POST"})
+    .then(function () { toast("已请求取消"); refreshScans(); })
+    .catch(function (e) { toast("取消失败:" + e.message, true); });
+}
+function deleteScan(id) {
+  if (!confirm("删除扫描 " + id + " ?")) return;
+  api("/api/v1/scans/" + encodeURIComponent(id), {method: "DELETE"})
+    .then(function () {
+      toast("已删除");
+      if (selected === id) { selected = null; renderFindingsEmpty(); }
+      refreshScans();
+    })
+    .catch(function (e) { toast("删除失败:" + e.message, true); });
+}
+
+/* ---------- 发现 ---------- */
+function renderFindingsEmpty() {
+  $("findingRows").innerHTML = '<div class="empty">选择左侧任务查看发现</div>';
+  $("findingCount").textContent = "";
+  $("reportBtn").disabled = true;
+  $("dlBtn").disabled = true;
+}
+function loadFindings() {
+  if (!selected) { renderFindingsEmpty(); return; }
+  api("/api/v1/scans/" + encodeURIComponent(selected) + "/findings")
+    .then(function (j) { renderFindings(j.findings || []); })
+    .catch(function (e) {
+      $("findingRows").innerHTML = '<div class="empty">加载失败:' + esc(e.message) + "</div>";
+    });
+}
+function renderFindings(list) {
+  $("reportBtn").disabled = false;
+  $("dlBtn").disabled = false;
+  var counts = {high: 0, medium: 0, low: 0};
+  list.forEach(function (f) {
+    var s = (f.severity || "low").toLowerCase();
+    if (counts[s] != null) counts[s]++;
+  });
+  $("findingCount").innerHTML = "共 " + list.length + " 项 · "
+    + '<span class="sev-high">' + counts.high + " high</span> · "
+    + '<span class="sev-medium">' + counts.medium + " medium</span> · "
+    + '<span class="sev-low">' + counts.low + " low</span>";
+  if (!list.length) {
+    $("findingRows").innerHTML = '<div class="empty">该任务没有发现</div>';
+    return;
+  }
+  var html = '<table><thead><tr><th>类型</th><th>严重度</th><th>置信</th>'
+    + "<th>参数</th><th>上下文</th><th>说明</th></tr></thead><tbody>";
+  list.forEach(function (f) {
+    var sev = (f.severity || "low").toLowerCase();
+    html += "<tr><td>" + esc(f.type) + "</td>"
+      + '<td class="sev-' + esc(sev) + '">' + esc(f.severity) + "</td>"
+      + "<td>" + esc(f.confidence) + "</td>"
+      + '<td class="mono">' + esc(f.param || "-") + "</td>"
+      + "<td>" + esc(f.context || "-") + "</td>"
+      + '<td style="color:var(--dim);font-size:12px">' + esc((f.detail || "").slice(0, 160)) + "</td></tr>";
+  });
+  $("findingRows").innerHTML = html + "</tbody></table>";
+}
+
+/* ---------- 报告 ---------- */
+function reportUrl(fmt) {
+  return BASE + "/api/v1/scans/" + encodeURIComponent(selected)
+    + "/report?format=" + encodeURIComponent(fmt || "html");
+}
+$("reportBtn").addEventListener("click", function () {
+  if (!selected) return;
+  window.open(reportUrl($("reportFmt").value), "_blank");
+});
+$("dlBtn").addEventListener("click", function () {
+  if (!selected) return;
+  var fmt = $("reportFmt").value;
+  var ext = {html: "html", json: "json", sarif: "sarif", csv: "csv",
+             junit: "xml", markdown: "md"}[fmt] || fmt;
+  fetch(reportUrl(fmt)).then(function (r) {
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    return r.blob();
+  }).then(function (b) {
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(b);
+    a.download = "xssentinel-" + selected + "." + ext;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }).catch(function (e) { toast("下载失败:" + e.message, true); });
+});
+
+/* ---------- 状态轮询 ---------- */
+function checkApi(ok) {
+  $("apiDot").className = "dot" + (ok ? "" : " off");
+}
+function poll() {
+  api("/api/v1/health").then(function () { checkApi(true); }).catch(function () { checkApi(false); });
+  refreshScans();
+  if (selected) loadFindings();
+}
+$("refreshBtn").addEventListener("click", poll);
+$("startBtn").addEventListener("click", startScan);
+$("url").addEventListener("keydown", function (e) { if (e.key === "Enter") startScan(); });
+
+/* ---------- 初始化 ---------- */
+api("/api/v1/info").then(function (j) {
+  var layers = (j.layers || j.detection_layers || []).length;
+  $("verInfo").textContent = "v" + (j.version || "?")
+    + (layers ? " · " + layers + " 个检测层" : "");
+}).catch(function () { $("verInfo").textContent = "API 不可达"; });
+
+refreshScans();
+pollTimer = setInterval(poll, 4000);
+</script>
+</body>
+</html>

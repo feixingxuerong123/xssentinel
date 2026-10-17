@@ -3116,3 +3116,64 @@ async 侧没跟上",但这需要跑起来才能证实。
 **但这仍是假设**:loopback 当前不通(探针 0/6、新起端口 curl `000`),
 无法跑 A/B 或单次复现,所以**不据此改任何代码**。下一轮 loopback 一通,
 先做这个实验:同一端点上,让 async 复用 sync 那样的单实例,看 `_exec` 是否对齐。
+
+## Phase 260:桌面控制台(桌面端)——一个进程、一个窗口、零额外服务
+
+回答"桌面端做好了吗"的结论是**从来没做过**;本轮把它做成最小可用形态。
+
+### 1. 形态:不改 API,只包一层
+
+控制台 = 项目**自己的 REST API**(`xssentinel.api.server`)在进程内伺服 + 一个单页 HTML,
+窗口只负责框住这个 origin。**不新增服务进程、不引数据库、不引前端构建链**。
+
+```
+xssentinel/desktop/
+├── app.py        # 入口:装 UI 路由 → 起 API 线程 → 开窗口 → 关停
+├── shell.py      # 窗口后端:pywebview → tkinter → 系统浏览器
+├── assets.py     # UI 定位/加载(文件缺失时给"说明页"而非空白)
+└── ui/index.html # 控制台单页(原生 JS)
+```
+
+### 2. 三个关键设计决定(都有理由)
+
+**(a) UI 路由用"追加到共享路由表",不分叉 handler**。`_StdlibHandler` 是硬编码在
+`serve_forever/start_in_thread` 里的,子类化 `StdlibServer` 改不了它;而 `_ROUTES`
+在 `api/server.py` 里被描述为 "canonical route table (shared by both backends)",
+追加一条 `GET ^/$` 就是它给的扩展点。分叉 handler 会让两个前端悄悄走岔路。
+`install_ui_route()` **幂等**(重复调用返回 False,不重复挂载)。
+
+**(b) 只绑回环,`--host 0.0.0.0` 直接拒绝**(rc=2)。桌面控制台把扫描器连同
+`-b/-H` 凭据暴露给网络,正是 `--serve` 用一整段警告防的事;端口默认 `0` 自动分配,
+不会撞上已有的 `--serve` 部署。
+
+**(c) 页面与 API 必须同源**。API 的 same-origin 门(Phase 70)会拒绝 `file://` 页面的
+所有变更类调用,所以 UI 不能做成"本地 HTML 文件 + fetch API",必须由同一个 server 伺服。
+
+### 3. 窗口后端三级递降(都不需要额外服务)
+
+| 后端 | 本机现状 | 说明 |
+|---|---|---|
+| `pywebview` | 未装 | 原生窗口,Windows 走系统自带 Edge WebView2(本机已有 154/155) |
+| `tkinter` | **可用** | Python 自带;给原生小窗(地址/浏览器打开/复制) |
+| 系统浏览器 | 可用 | 零依赖兜底 |
+
+按环境纪律**没有往用户的 Python39 里装包**;pywebview 声明为
+`[project.optional-dependencies] desktop`,README 写明 `pip install -e ".[desktop]"`
+即可升级为原生窗口。
+
+### 4. 验证
+
+- `GET /` → 200、16KB、正是控制台页;`/api/v1/health|info` → 200;未知路径仍 404;
+- `install_ui_route()` 幂等;`--host 0.0.0.0` → rc=2;`--print-url-only` 正常;
+- `tests/test_desktop_shell.py` **17 passed**(窗口后端用猴子补丁验选择逻辑与递降,
+  不在 CI 里真开窗;路由表是模块级全局,测试因此自备"先清再装"以免互相污染);
+- 相关 API 测试 `test_p27_api / test_phase196_api_gate / test_api_ai_report`
+  合计 **142 passed**,无回归。
+
+### 5. 已知边界(下一步候选)
+
+1. **API 密钥模式下 UI 不可用**:`--api-key` 要求每个请求带 `X-API-Key`,而当前单页没有
+   注入头的地方。已打印明确提示;要做的话得在 UI 加一个"本地代理层注入"或改成
+   session cookie。默认单机回环场景不需要。
+2. `--crawl`/`--headless` 等只是表单开关,没有把 Range 系列靶场/批量入口接进来;
+3. 没有把"取消"之外的实时进度条做出来(目前是 4 秒轮询状态)。

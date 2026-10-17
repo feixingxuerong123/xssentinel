@@ -409,6 +409,44 @@ for f in sc.findings:
     print(f.data["type"], f.data["context"], f.data["payload"])
 ```
 
+### 桌面控制台
+
+```bash
+xssentinel-desktop                 # 或: python -m xssentinel.desktop
+```
+
+一个进程、一个窗口：控制台页面由项目**自己的 REST API**（`xssentinel.api.server`）在进程内
+伺服，窗口只是框住这个 origin。因此它不需要额外的服务进程，也不需要数据库或反向代理。
+
+| 能力 | 说明 |
+|---|---|
+| 新建扫描 | URL / 方法 / 参数 / POST 体 / 请求头 / Cookie / DOM 引擎 / 线程 / 爬取 / 浏览器确认 |
+| 任务管理 | 列表 + 4 秒轮询、取消、删除 |
+| 发现查看 | 类型 / 严重度 / 置信 / 参数 / 上下文 / 说明，按 high-medium-low 汇总 |
+| 报告 | HTML / JSON / SARIF / CSV / JUnit / Markdown 六格式，可新窗打开或下载 |
+
+**窗口后端按可用性递降**，三者都不需要额外服务：
+
+1. `pywebview` —— 原生窗口（Windows 上走系统自带的 Edge WebView2）。装上即是：
+   `pip install -e ".[desktop]"`；
+2. `tkinter` —— Python 自带，本机必有；本机未装 pywebview 时它给出一个原生小窗，
+   含地址、一键用浏览器打开、复制地址；
+3. 系统默认浏览器 —— 零依赖兜底。
+
+**安全边界**：只允许绑定回环地址（`127.0.0.1` / `localhost` / `::1`），
+`--host 0.0.0.0` 直接拒绝并提示改用 `xssentinel --serve`；端口默认 `0`（自动分配），
+不会与已有的 `--serve` 部署冲突。控制台页面与 API 同源——这正是 API 的
+same-origin 门（Phase 70）所要求的，`file://` 页面会被所有变更类调用拒绝。
+
+其他用法：
+
+```bash
+xssentinel-desktop --no-window     # 只起 API 并打印地址（脚本/排查用）
+xssentinel-desktop --port 8787     # 固定端口
+xssentinel-desktop --backend tkinter   # 强制窗口后端
+xssentinel-desktop --print-url-only    # 只打印 URL 后退出（自动化）
+```
+
 ---
 
 ## 目录结构
@@ -463,6 +501,13 @@ xssentinel/
     ├── advanced_layers.py # 高级层门面（run_* 入口 + 向后兼容 re-export）
     ├── fix_advice.py      # 修复建议引擎（语料在 data/fix_advice.json）
     └── report.py          # HTML / JSON / CSV / SARIF / JUnit / Markdown 报告（含 PoC 渲染）
+├── api/                   # REST API（--serve）：stdlib / Flask 双前端、任务队列、
+│   │                      #  持久化、webhook、metrics、MCP server
+└── desktop/               # 桌面控制台：进程内 API + 单页 UI + 窗口后端
+    ├── app.py             #   入口：装 UI 路由、起 API 线程、开窗口、关停
+    ├── shell.py           #   窗口后端 pywebview → tkinter → 系统浏览器
+    ├── assets.py          #   UI 页面定位与加载（含缺失时的说明页）
+    └── ui/index.html      #   控制台单页（原生 JS，无构建步骤）
 tests/
 ├── vuln_server.py         # 本地脆弱测试服务（自测用，含 WAF 模拟端点）
 ├── run_self_test.py       # 逐层自检脚本

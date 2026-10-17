@@ -31,6 +31,11 @@ async = ["aiohttp>=3.9"]
 headless = ["playwright>=1.40"]
 api = ["flask>=2.0"]
 ast = ["esprima>=4.0"]  # Phase 43: JS AST data-flow channel (regex fallback when absent)
+# The desktop console works with ZERO extra dependencies: the page is served
+# by the stdlib API server and the window falls back tkinter -> OS browser.
+# This extra only upgrades the window to a native one backed by the OS
+# webview (Edge WebView2 on Windows, already present on any supported box).
+desktop = ["pywebview>=4.0"]
 dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
@@ -51,9 +56,10 @@ dev = [
 
 [project.scripts]
 xssentinel = "xssentinel.__main__:main"
+xssentinel-desktop = "xssentinel.desktop.app:main"
 
 [tool.setuptools]
-packages = ["xssentinel", "xssentinel.core", "xssentinel.core.layers", "xssentinel.api"]
+packages = ["xssentinel", "xssentinel.core", "xssentinel.core.layers", "xssentinel.api", "xssentinel.desktop"]
 
 [tool.setuptools.dynamic]
 # Where the dynamic version above resolves from.  A plain literal assignment
@@ -62,7 +68,7 @@ packages = ["xssentinel", "xssentinel.core", "xssentinel.core.layers", "xssentin
 version = { attr = "xssentinel.__version__" }
 
 [tool.setuptools.package-data]
-xssentinel = ["data/*.json"]
+xssentinel = ["data/*.json", "desktop/ui/*.html"]
 
 [tool.pytest.ini_options]
 minversion = "7.0"
