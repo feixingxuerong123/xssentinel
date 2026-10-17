@@ -85,7 +85,7 @@ from __future__ import annotations
 
 import json
 import re
-from typing import Iterable, Optional
+from typing import Optional
 
 try:                          # optional extra; js validity gating degrades to
     import esprima as _esprima  # type: ignore[import-untyped]  # "cannot decide" without it
@@ -106,6 +106,7 @@ except ImportError:           # noqa: E402
 from .sandbox_common import (
     Doc,  # noqa: F401  (re-export:外部按 sandbox.<name> 访问)
     MATHML_TEXT_INTEGRATION,  # noqa: F401  (re-export:外部按 sandbox.<name> 访问)
+    NO_ESCAPE_TEXT,  # noqa: F401  (re-export:外部按 sandbox.<name> 访问)
     Node,  # noqa: F401  (re-export:外部按 sandbox.<name> 访问)
     SVG_HTML_INTEGRATION,  # noqa: F401  (re-export:外部按 sandbox.<name> 访问)
     VOID,  # noqa: F401  (re-export:外部按 sandbox.<name> 访问)
@@ -116,7 +117,6 @@ from .sandbox_parser import (
     FOREIGN_BREAK,  # noqa: F401  (re-export:外部按 sandbox.<name> 访问)
     FRAMESET_OK_KILLERS,  # noqa: F401  (re-export:外部按 sandbox.<name> 访问)
     FRAMESET_ONLY_STARTS,  # noqa: F401  (re-export:外部按 sandbox.<name> 访问)
-    NO_ESCAPE_TEXT,  # noqa: F401  (re-export:外部按 sandbox.<name> 访问)
     OPTION_SCOPE,  # noqa: F401  (re-export:外部按 sandbox.<name> 访问)
     PLAINTEXT,  # noqa: F401  (re-export:外部按 sandbox.<name> 访问)
     P_CLOSERS,  # noqa: F401  (re-export:外部按 sandbox.<name> 访问)
@@ -147,10 +147,31 @@ from .sandbox_parser import (
     decode_entities,  # noqa: F401  (re-export:外部按 sandbox.<name> 访问)
 )
 
+#: Scripting is enabled in every browser we care about, so <noscript> is
+#: raw text -- the vector family that depends on it only bites after a
+#: serialise/re-parse into a *scripting-disabled* context.
 NOSCRIPT_RAWTEXT = frozenset({"noscript"})
 
+
+# ---------------------------------------------------------------------------
+# Sink semantics -- which attribute/element pairs can actually RUN.
+#
+# Every entry below is traceable to a measurement, not to memory:
+#   benchmark/sink_execution.py  (2026-09-18, headless Chromium, per-shape)
+#   benchmark/results/browser_dom_oracle.json (payload x context x sink)
+# An unmeasured shape is UNKNOWN and the caller is told so; that is the whole
+# reason the three-state Verdict exists.
+# ---------------------------------------------------------------------------
+
+#: javascript: URI sinks that execute with no user activation.
 JS_URI_EXECUTES = {("iframe", "src"), ("frame", "src")}
 
+
+#: javascript: URI sinks that are real XSS behind a user gesture.  Chromium
+#: will not run a javascript: URI from a script-synthesised click at all
+#: (measured: `a.href = javascript:CODE (synthetic click)` and even the
+#: trusted-click shape both no-exec in that harness), so only a human clicking
+#: the link completes the chain -- hence "activation", never "executes".
 JS_URI_ACTIVATION = {
     ("a", "href"), ("area", "href"), ("form", "action"),
     ("button", "formaction"), ("input", "formaction"), ("select", "formaction"),
@@ -162,6 +183,13 @@ JS_URI_ACTIVATION = {
     ("a", "xlink:href"),
 }
 
+
+#: Measured NOT to execute a javascript: URI.  Listed because the absence of a
+#: table entry would be UNKNOWN, and "unknown" is expensive: it sends the
+#: scanner back to a 5.6 s browser probe for a shape we have proved inert.
+#: `frame.src` is deliberately absent -- it executes (see JS_URI_EXECUTES), and
+#: having it in both tables once meant the rule below was reachable only by the
+#: order of two dict lookups.
 JS_URI_INERT = {
     ("img", "src"), ("link", "href"), ("script", "src"), ("base", "href"),
     ("embed", "src"), ("object", "data"), ("source", "src"),
@@ -192,6 +220,10 @@ JS_URI_INERT = {
     ("img", "href"),
 }
 
+
+#: Events that fire without user interaction, and the elements they can fire on
+#: once the node has been inserted by the *parser*.  A handler on anything not
+#: listed here is a real vulnerability one click away -> activation, not inert.
 AUTO_FIRING_EVENTS = {
     "onerror": {"img", "script", "iframe", "source", "video", "audio", "link",
                 "object", "embed", "input", "track"},
@@ -204,37 +236,91 @@ AUTO_FIRING_EVENTS = {
     "onscroll": {"*"},           # fires on restore; treat as auto
 }
 
+
+#: SMIL timing events.  These were listed as auto-firing on `{'*'}` while
+#: `judge` simultaneously demanded user interaction -- and both halves were
+#: wrong: a SMIL timeline belongs to the animation element, not to any element.
+#: Measured element x event x `begin` value in
+#: benchmark/results/smil_probe.json (23 shapes, both sinks).
 SMIL_TIMING_EVENTS = frozenset({"onbegin", "onend", "onrepeat"})
 
+
+#: The SMIL elements that really do start a timeline on their own: `<animate
+#: onbegin>` fires within 300 ms of the parse with no interaction, in the
+#: document parse *and* through innerHTML.
 SMIL_TIMING_ELEMENTS = frozenset({"animate", "set", "animatetransform",
                                   "animatemotion"})
 
+
+#: SMIL-adjacent elements measured NOT to fire their timing handler.  `<discard>`
+#: is the instructive one: it is an animation element, and it still does not
+#: raise `begin` here, so the set above is a measured list rather than "anything
+#: SMIL-looking".
 SMIL_TIMING_INERT = frozenset({"discard", "svg", "circle", "rect"})
 
+
+#: A SMIL clock value: `0s`, `2s`, `1.5s`, or a bare number (seconds implied).
+#: Anything else in `begin` is offset/event/syncbase syntax and is not measured.
 _SMIL_CLOCK_RE = re.compile(r"^\d+(\.\d+)?(s|ms)?$")
 
+
+#: `begin="<dom event>"` waits for that event, which is what `activation` means
+#: here: not inert, but not something the gate may promote either.
 SMIL_GESTURE_TRIGGERS = frozenset({
     "mouseover", "mouseout", "mousedown", "mouseup", "click", "dblclick",
     "focus", "blur", "keypress",
 })
 
+
+#: Media *loading* events, measured on `<audio>` with a loadable src: they fire
+#: with no user interaction, in every context that instantiates the element
+#: (plain div, `<select><option>`, `<table><td>`, `<svg><foreignObject>`) and in
+#: neither a `<template>` nor an unquoted-attribute swallow.  See
+#: benchmark/results/media_probe.json -- 19 shapes x 6 reflection contexts.
+#:
+#: Deliberately only these six.  `onplaying`/`onended`/`ontimeupdate` belong to
+#: playback, which autoplay policy gates (`video ontimeupdate` measured no-exec
+#: in all six contexts), so they stay in the generic tail rather than being swept
+#: in by the family name.  `<video>` uses the same loading machinery but was not
+#: measured for these events, so it is not claimed either.
 MEDIA_LOAD_EVENTS = frozenset({
     "onloadstart", "ondurationchange", "onloadedmetadata", "onloadeddata",
     "oncanplay", "oncanplaythrough",
 })
 
+
+#: The only elements a media event can be dispatched to.  `<audio>` is the one
+#: measured here; the rest keep the sandbox out of claiming a verdict for a
+#: loading path it has not watched.
 MEDIA_EVENT_TARGETS = frozenset({"audio", "video", "source", "track"})
 
+
+#: CSS animation events.  Both sides measured and they cancel out: an inline
+#: `animation:` fires by itself only where the `@keyframes` rule actually exists,
+#: and deciding that needs stylesheet resolution, which this module does not do.
+#: So `_css_animation_state` declines; the name is kept here as the marker for
+#: which it declines.
 CSS_ANIMATION_EVENTS = frozenset({"onanimationstart", "onanimationend",
                                   "onanimationiteration"})
 
+
+#: Elements the HTML spec makes focusable without help.  Anything else becomes
+#: focusable with `tabindex`, which is why `_handler_state` has to test both --
+#: a form-control-only list called `<span tabindex=1 autofocus onfocus=...>`
+#: inert, and that shape fired in Chromium.
 FOCUSABLE_CONTROLS = frozenset({
     "input", "button", "select", "textarea", "a", "area", "summary",
     "details", "dialog", "audio", "video", "object", "embed", "label",
     "legend", "option", "optgroup", "slot",
 })
 
+
+#: `on` + letters.  A NUL in a handler name becomes U+FFFD and a `<x one-error>`
+#: style name is not a handler at all; both must be rejected before they can be
+#: scored as an event.
 _HANDLER_NAME_RE = re.compile(r"^on[a-z]+$")
+
+
 
 def _svg_case(name: str) -> tuple[str, str]:
     """Foreign content adjusts a handful of tag names and camel-cases SVG
@@ -246,6 +332,8 @@ def _svg_case(name: str) -> tuple[str, str]:
     if low in ("desc", "title"):
         return low, "svg"
     return low, "svg"
+
+
 
 def parse(html: str, fragment: bool = True) -> Doc:
     """Build a DOM from `html` the way a browser parser would.
@@ -272,6 +360,8 @@ def parse(html: str, fragment: bool = True) -> Doc:
     html = html.replace("\r\n", "\n").replace("\r", "\n")
     return _Parser(html, fragment=fragment).run()
 
+
+
 def _is_integration(node: Node) -> bool:
     lname = node.name.lower()
     if node.ns == "svg" and lname in SVG_HTML_INTEGRATION:
@@ -279,6 +369,8 @@ def _is_integration(node: Node) -> bool:
     if node.ns == "mathml" and lname in MATHML_TEXT_INTEGRATION:
         return True
     return False
+
+
 
 def _serialize_attr_value(v: str) -> str:
     # Exactly what Chromium escapes in an attribute value, measured character by
@@ -294,6 +386,8 @@ def _serialize_attr_value(v: str) -> str:
     return (v.replace("&", "&amp;").replace('"', "&quot;")
              .replace("<", "&lt;").replace(">", "&gt;")
              .replace("\xa0", "&nbsp;"))
+
+
 
 def serialize(node: Node) -> str:
     out: list[str] = []
@@ -314,6 +408,8 @@ def serialize(node: Node) -> str:
             out.append(f"</{tag}>")
     return "".join(out)
 
+
+
 def roundtrip(html: str, times: int = 3) -> list[str]:
     """parse -> serialise -> parse -> ...  Returns each serialisation.
 
@@ -326,6 +422,12 @@ def roundtrip(html: str, times: int = 3) -> list[str]:
         cur = serialize(parse(cur).root)
         out.append(cur)
     return out
+
+
+
+# ---------------------------------------------------------------------------
+# Liveness / verdict
+# ---------------------------------------------------------------------------
 
 class Verdict:
     __slots__ = ("state", "reason", "node", "activation", "evidence")
@@ -348,6 +450,8 @@ class Verdict:
 
     def __repr__(self) -> str:
         return f"Verdict({self.state},{self.reason!r})"
+
+
 
 def _smil_state(el: Node, ev: str, nested: bool = False) -> tuple[str, str]:
     """Does a SMIL timing handler (`onbegin`/`onend`/`onrepeat`) ever start?
@@ -400,6 +504,8 @@ def _smil_state(el: Node, ev: str, nested: bool = False) -> tuple[str, str]:
                          f"(measured no-exec)")
     return "unknown", f"{name}.{ev} is not measured on a {el.ns} element"
 
+
+
 def _css_animation_state(el: Node, ev: str) -> tuple[str, str]:
     """`onanimationstart` needs a running animation, which is a CSS answer.
 
@@ -414,6 +520,8 @@ def _css_animation_state(el: Node, ev: str) -> tuple[str, str]:
     return "unknown", (f"{el.name}.{ev} needs a running CSS animation whose "
                        f"@keyframes is actually defined; stylesheets are not "
                        f"resolved here")
+
+
 
 def _handler_state(el: Node, attr: str, sink: str = "parser",
                    nested: bool = False) -> tuple[str, str]:
@@ -560,6 +668,8 @@ def _handler_state(el: Node, attr: str, sink: str = "parser",
         return "activation", "onscroll needs scroll position restoration"
     return "activation", f"{name}.{ev} requires user interaction"
 
+
+
 def _js_uri_state(el: Node, attr: str, value: str) -> tuple[str, str]:
     key = (el.name.lower(), attr.lower())
     if key in JS_URI_EXECUTES:
@@ -570,16 +680,34 @@ def _js_uri_state(el: Node, attr: str, value: str) -> tuple[str, str]:
         return "inert", f"{key[0]}.{key[1]}=javascript: measured no-exec in Chromium"
     return "unknown", f"{key[0]}.{key[1]}=javascript: not measured"
 
+
+
+# Browsers strip ASCII control characters (and space) from a URL before the
+# scheme is resolved, which is the whole of `jav&#x09;ascript:` and
+# `javascript:`.  Match on the normalised value, never the raw one: a
+# regex over the raw text cannot express "the parser deletes these bytes first".
 _JS_URI_RE = re.compile(r"^javascript:", re.I)
 
+# C0 controls (0x00-0x1F), space and DEL: removed by the URL parser
+# before it looks at the scheme.
 _URL_STRIP_SET = frozenset(chr(c) for c in list(range(0x00, 0x21)) + [0x7F])
+
+
 
 def normalize_uri(value: str) -> str:
     """The scheme-relevant form of a URL attribute, after the byte deletions a
     browser performs before parsing it."""
     return "".join(ch for ch in value if ch not in _URL_STRIP_SET)
 
+
+#: Characters after which a `/` opens a regex literal.  Missing a keyword here
+#: (return, typeof, ...) only ever misreads a regex as division or the reverse,
+#: and both land in "unknown" when the token is inside the span -- the safe
+#: direction.  A word-boundary matcher would be more accurate and buys nothing
+#: that a fallback to the browser does not already cover.
 _REGEX_PREV_CHARS = frozenset("(,=:[!&|?{};+-*%<>~^\n\r")
+
+
 
 def js_state_at(text: str, needle: str) -> str:
     """Where does `needle` sit inside a <script> body: code, string, comment,
@@ -661,6 +789,8 @@ def js_state_at(text: str, needle: str) -> str:
         i += 1
     return "unknown" if state != "code" else "code"
 
+
+
 def _skip_regex(text: str, i: int) -> int:
     """End index of a regex literal starting at text[i] == '/', or -1."""
     n = len(text)
@@ -683,6 +813,8 @@ def _skip_regex(text: str, i: int) -> int:
         j += 1
     return -1
 
+
+
 def _in_template(el: Node) -> bool:
     """Inside an HTML <template>.  The namespace test is the whole point: a
     `<template>` created inside `<svg>` is an SVG element that happens to be
@@ -696,6 +828,14 @@ def _in_template(el: Node) -> bool:
         p = p.parent
     return False
 
+
+
+#: Element names that only exist as HTML behaviours.  Carrying one of these
+#: names inside `<svg>`/`<math>` produces an element the HTML spec has nothing
+#: to say about: it is not focusable, has no `open` state, does not load a
+#: resource -- so a handler written on it never fires.  Each name here is a row
+#: of benchmark/results/browser_dom_oracle.json where Chromium created the
+#: element, kept the handler attribute, and executed nothing.
 HTML_ONLY_ELEMENTS = frozenset({
     "input", "button", "select", "textarea", "details", "summary", "source",
     "video", "audio", "iframe", "frame", "object", "embed", "marquee",
@@ -703,10 +843,22 @@ HTML_ONLY_ELEMENTS = frozenset({
     "span", "table", "td", "tr", "option", "label", "legend", "dialog",
 })
 
+
+#: SVG elements that reference no resource, so `onload` has nothing that could
+#: ever raise it.  Each name is a row of `benchmark/probe_svg_ns.py`: served in a
+#: document, handler attached, sentinel never reached -- and unlike a click-gated
+#: sink there is no interaction that changes the answer, so the False is the
+#: bounded kind that licenses INERT rather than the one that hides a finding.
+#: `<use onload>` and `<image onload>` are deliberately absent: both take an href,
+#: so a load event is at least conceivable, and what was measured was a broken
+#: reference (`href="/nope"`, `xlink:href="#nope"`).  A broken reference proves
+#: the failure path, not that a resolving one stays quiet.
 SVG_UNLOADABLE_ELEMENTS = frozenset({
     "desc", "g", "clippath", "ellipse", "filter", "lineargradient", "path",
     "foreignobject",
 })
+
+
 
 def _foreign_handler_state(el: Node, ev: str, sink: str) -> tuple[str, str]:
     """Handler on an element in the svg/mathml namespace; ('', '') if not.
@@ -751,6 +903,8 @@ def _foreign_handler_state(el: Node, ev: str, sink: str) -> tuple[str, str]:
                        f"measured, and foreign elements do not inherit HTML "
                        f"event rules")
 
+
+
 def _js_parses(body: str, wrapped: bool = False) -> Optional[bool]:
     """Can the JS engine even compile this?  None means "no parser available".
 
@@ -771,10 +925,22 @@ def _js_parses(body: str, wrapped: bool = False) -> Optional[bool]:
         return False
     return True
 
+
+
+#: Callees whose argument, if it carries the token, proves the token was
+#: *reached*.  Deliberately the same family `verifier.mark()` stamps tokens
+#: into: the token only means anything inside the call the scanner wrote it
+#: into, so "is it an argument of any call at all" is the wrong question.
+#: `console.log("...TOKEN...")` is a call carrying the token and it proves
+#: nothing but that a string was printed -- measured the hard way, when that
+#: reading turned the defended cases `neg-js-02` and `neg-sanitizer-01` into
+#: false positives.
 _EXECUTING_CALLEES = frozenset({
     "alert", "confirm", "prompt", "eval", "setTimeout", "setInterval",
     "Function", "write", "writeln", "unescape",
 })
+
+
 
 def _callee_name(callee) -> str:
     """`alert`, `window.alert`, `top.alert`, `document.write` -> last segment."""
@@ -785,6 +951,8 @@ def _callee_name(callee) -> str:
     if isinstance(callee, dict) and callee.get("type") == "Identifier":
         return callee.get("name") or ""
     return ""
+
+
 
 def _token_in_executing_call(body: str, token: str) -> str:
     """Is the token an argument of a call that would *demonstrate* execution?
@@ -836,6 +1004,8 @@ def _token_in_executing_call(body: str, token: str) -> str:
 
     walk(data)
     return "call" if found[0] else "data"
+
+
 
 def _script_candidate(el: Node, body: str, token: str, sink: str,
                       inert_host: bool) -> dict:
@@ -904,6 +1074,8 @@ def _script_candidate(el: Node, body: str, token: str, sink: str,
             "why": f"token sits in a JS {pos} literal that is data, not a call "
                    f"argument, and the payload never breaks out of it",
             "el": el}
+
+
 
 def find_live_nodes(root: Node, token: str = "", *,
                     nested: bool = False,
@@ -1001,6 +1173,8 @@ def find_live_nodes(root: Node, token: str = "", *,
     worst = cands[0]["state"]
     return worst, cands
 
+
+
 def judge(html: str, token: str = "", *, sink: str = "parser") -> Verdict:
     """Decide whether `html` (as served, or as re-parsed by a DOM sink) is live.
 
@@ -1043,6 +1217,8 @@ def judge(html: str, token: str = "", *, sink: str = "parser") -> Verdict:
                    + "; ".join(f"{d['node']} {d['why']}" for d in detail[:3]),
                    None, False, ev)
 
+
+
 def judge_roundtrip(html: str, token: str = "", *,
                     sink: str = "innerhtml", depth: int = 3) -> Verdict:
     """The mXSS question: does the payload become live only after the browser
@@ -1070,6 +1246,12 @@ def judge_roundtrip(html: str, token: str = "", *,
         cur = serialize(parse(cur).root)
     return best
 
+
+
+# ---------------------------------------------------------------------------
+# Host templates for the CLI: mirrors benchmark/browser_dom_oracle.py
+# ---------------------------------------------------------------------------
+
 HOSTS = {
     "text": "<div>__P__</div>",
     "attr_dq": '<div class="__P__">t</div>',
@@ -1092,6 +1274,8 @@ HOSTS = {
     "href_dq": '<a href="__P__">t</a>',
     "iframe_srcdoc": '<iframe srcdoc="__P__"></iframe>',
 }
+
+
 
 def main(argv: Optional[list[str]] = None) -> int:
     import argparse
@@ -1129,3 +1313,8 @@ def main(argv: Optional[list[str]] = None) -> int:
         for k, ser in enumerate(roundtrip(html)):
             print(f"  ser{k + 1}: {ser[:220]}")
     return 0 if v.state != "unknown" else 2
+
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

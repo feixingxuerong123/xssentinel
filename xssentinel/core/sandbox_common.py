@@ -32,30 +32,6 @@ NO_ESCAPE_TEXT = frozenset(
 
 
 #: MathML integration points: children are parsed as HTML, not MathML.
-#: Implied end tags: a start tag in this table auto-closes the nearest open
-#: element of one of the listed names (HTML spec "optional tags").  Consumed
-#: by sandbox_parser.close_scoped, which is what keeps the breakout
-#: `<noscript><p title="...` family alive in the round-trip.
-#: RECONSTRUCTED after the workspace wipe (no commit carried the final
-#: pre-wipe copy): the shapes come from the spec, and the fidelity oracle
-#: (tests/test_sandbox_fidelity.py) is what says whether this table is right.
-AUTO_CLOSE = {
-    "li": {"li"},
-    "dt": {"dt", "dd"},
-    "dd": {"dt", "dd"},
-    "option": {"option"},
-    "optgroup": {"option", "optgroup"},
-    "td": {"td", "th"},
-    "th": {"td", "th"},
-    "tr": {"tr", "td", "th"},
-    "thead": {"tr", "td", "th", "thead", "tbody", "tfoot"},
-    "tbody": {"tr", "td", "th", "thead", "tbody", "tfoot"},
-    "tfoot": {"tr", "td", "th", "thead", "tbody", "tfoot"},
-    "caption": {"caption", "colgroup"},
-    "colgroup": {"caption", "colgroup"},
-}
-
-
 MATHML_TEXT_INTEGRATION = frozenset(
     {"mtext", "mi", "mo", "mn", "ms", "mmultiscripts", "mprescripts",
      "none", "annotation-xml"})
@@ -158,3 +134,13 @@ def serialize_text(node: Node) -> str:
     return (data.replace("&", "&amp;")
                 .replace("<", "&lt;").replace(">", "&gt;")
                 .replace(" ", "&nbsp;"))
+
+
+# Phase 253: this trio was rolled back to the consistent pre-wipe set
+# (2959a34).  The workspace wipe destroyed the post-225 refactor's
+# sandbox_common.py (the tokenizer that sandbox_parser.py imports) and
+# NO copy of that version exists anywhere on this machine -- verified
+# against the Desktop copy, D:\qoder\_recovery, D:	rae and D:\op.
+# The refactor was a code MOVE (behaviour unchanged, same public API:
+# the rest of the tree imports only `judge`), so function is restored
+# ahead of structure; the split can be redone later from this file.

@@ -2785,3 +2785,35 @@ effectively off")——即它们可能本就依赖沙箱门定案。**在沙箱�
 2. 找到 wipe 前的文件副本(别的机器/备份/编辑器的本地历史),或
 3. 把 `sandbox.py`+`sandbox_parser.py` 一并回退到 2959a34 的配套三件套
    (丢失 225 之后的 parser 重构,但立即可恢复一致性与绿门)。
+
+## Phase 253:沙箱三件套回退到自洽版本——功能优先于结构
+
+### 1. 先把"找回原文件"这条路走到底(结果:没有)
+
+Phase 252 记了三个选项。先实测选项 2:**全盘找 wipe 前的 `sandbox_common.py`
+**(tokenizer 版)**。查过:桌面 `XSS项目` 副本、`D:\qoder\_recovery`、
+`D:\3\trae`、`D:\op`,以及 37KB 的 `sandbox.cpython-39.pyc`(名字来自 import 的
+co_names,不是定义——虚惊)。**没有任何副本带 tokenizer**:桌面副本三个文件
+恰好等于 2959a34;`_recovery` 与 HEAD 同样是坏的。⇒ 选项 2 穷尽,不可行。
+
+### 2. 决策:选项 3(回退),因为那次重构只是"搬代码"
+
+新版把 tokenizer 搬进 `sandbox_common.py`(docs 1.3 的结构拆分),**公开 API 不变**
+——全树其他地方只从 sandbox 导入 `judge` 一个名字(实测)。行为不变的重构,
+其价值在结构;而结构已随 wipe 失去载体。**功能优先于结构**:把
+`sandbox_common.py`/`sandbox_parser.py`/`sandbox.py` 三件套回退到 2959a34
+的自洽版本,并在 common 尾部写明为何回退、拆分可在今后凭本文件重做。
+
+### 3. 验收(不离网,可信)
+
+- `tests/test_sandbox.py` + `tests/test_sandbox_fidelity.py`(1680 例 Chromium
+  oracle)**67 passed**;
+- `judge` 冒烟:`Verdict(live,'img.onerror fires when the src resource fails')`;
+- ruff 三文件零债务。
+
+### 4. 待复跑(当前不可信,不是结论)
+
+沙箱门重新启用后跑严格门:FN 2→1(`pos-ws-01` 恢复为 TP),但出现 28 个 ERR
+(全是 neg 安全孪生、每个 31.1s、exit=3 无消息)。**当时 loopback 正在故障**:
+单独探针 12/12 全败、curl 对 18777 全 `000`(连以前正常的路径也是)。
+⇒ 该轮门的 FN=1 与 28 ERR **不能作为判定**,loopback 恢复后必须重跑。
