@@ -2952,3 +2952,20 @@ importNode/adoptNode/cloneNode → appendChild/insertBefore/…)。
 
 `--quick --strict-gate` **PASSED FP0 FN0 ERROR0**(64 例);
 6 个候选回验后**真 FP 0**(`script_*` 改报 `polyglot_reflection` 这一真检出)。
+
+### 6. Phase 257 续:修复后网复跑,候选 6 → 5,回验后真 FP 0
+
+第二次复跑(198 组合,1729s):**covered=143 / FN 0 / FP 候选 5**。与上一轮逐条 diff:
+
+| 组合 | 上一轮 | 本轮 |
+|---|---|---|
+| `attr_dq/encode_quotes/sink=dom` | `mutation_xss` | **消失** |
+| `attr_sq/encode_quotes/sink=dom` | `mutation_xss` | **消失** |
+| `script_dq/encode_quotes/sink=dom` | `mutation_xss`(假) | `polyglot_reflection`(真) |
+| `script_sq/encode_quotes/sink=dom` | `mutation_xss`(假) | `polyglot_reflection`(真) |
+| `script_dq/strip_script_recursive/sink=none` | —— | `reflected`(**新出现**,需裁定) |
+
+新出现的那条已按同一规矩回验:**真检出**("token reflected inside `<script>`
+element text")。⇒ 本轮 5 个候选回验后**真 FP 0**(两次跑的语料相同,新候选来自
+扫描预算/时序差异,不是修复的副作用——裁定过了才这么说)。
+基线落盘 `benchmark/results/fn_net_20261017_after257.json`。
