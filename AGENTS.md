@@ -3070,3 +3070,25 @@ sync 报 `dom_dynamic high/high`,async 报 `dom_dynamic high/medium`(还有
 `@hash` 这类**函数体内的内容删除**两种都抓不到。⇒ 补一条判别:
 **同一文件行数/顶层名字都与旧版一致、但某个语义分支的测试挂了,且该分支在 wipe 前
 提交里存在**,就是这一类。
+
+### Phase 259 续:`test_engine_parity_gate` 的分歧定位到机制,但归因未完成
+
+**稳定失败**(单独跑该用例两次,第一次明确 FAILED,不是抖动)。
+
+机制已定位(读代码即可,不需要跑引擎):
+- 两侧都用 `dom_engine="auto"` 的**同一个动态引擎 harness**;
+- sync 走 `Scanner._scan_dom`,async 走 Phase-65 路径;
+- `dom_dynamic` 的 `"confidence": "high" if _exec else "medium"` —— sync 拿到了
+  harness 的 `_exec=True`,async 没拿到(`executed` 没被传播进 finding);
+- 即 **async 的 DOM 路径没有把动态引擎观察到的"已执行"传播进 finding**,正是该门
+  文档所说的 "wiring drift"(sync `_scan_dom` vs async Phase-65 路径)。
+
+**归因未完成,不猜**:要判定它是 wipe 丢失、还是 225 之后某次改动的副作用,需要在
+工作着的 loopback 上做 A/B(Phase 254 工作树的那次跑被我自己的 30 分钟超时杀了,
+日志被缓冲没留下判词);而**此刻 loopback 又断了**(新起端口 curl 也 `000`),
+连单次引擎复现都做不了。
+
+已知边界:`async_scanner.py` / `async_scanner_layers.py` 与 225 **逐字节相同**
+(Phase 183 的 `_scan_raw`/`headless_concurrency` 都在),而 `dom_engine.py` 从
+1595 行**长到** 2140 行(225 之后的改动都在这)——所以嫌疑在"harness 的输出形状变了、
+async 侧没跟上",但这需要跑起来才能证实。
