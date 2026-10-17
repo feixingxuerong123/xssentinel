@@ -25,7 +25,12 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from xssentinel.core import payloads  # noqa: E402
 
 _EXPECTED_FAMILY_SIZE = 48
-_EXPECTED_HTML_ELEMENT_SIZE = 205
+# 206, not 205: `p173-probe` (the Phase 173 control-experiment probe) was
+# added to html_element after the 205 baseline.  The workspace wipe rolled
+# this test file back to its pre-addition copy while keeping the corpus
+# that has the payload, so the two disagreed; the corpus is the newer
+# artefact and the constant follows it.
+_EXPECTED_HTML_ELEMENT_SIZE = 206
 
 
 def test_family_loads_and_is_registered():

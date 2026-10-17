@@ -12,6 +12,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import pytest
 
 from xssentinel.core.poc import build_poc, _poc_headers
 
@@ -98,7 +99,7 @@ def test_upload_poc_carries_auth_header():
 import threading  # noqa: E402
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer  # noqa: E402
 
-
+from tests.conftest import SOCKETPAIR_OK  # noqa: E402
 
 
 class _EchoHandler(BaseHTTPRequestHandler):
@@ -118,6 +119,8 @@ class _EchoHandler(BaseHTTPRequestHandler):
         self.wfile.write(body.encode())
 
 
+@pytest.mark.skipif(not SOCKETPAIR_OK,
+                    reason="needs loopback (moved down from the file-level gate)")
 def test_async_cli_poc_replays_credentials():
     from xssentinel.cli_runner import _run_async_scan
     from xssentinel.__main__ import build_parser

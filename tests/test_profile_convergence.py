@@ -27,11 +27,12 @@ import threading
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import pytest
 
+from tests.conftest import SOCKETPAIR_OK
 from xssentinel.core import reflection_profile as rp
 from xssentinel.core.async_scanner import AsyncScanner
 from xssentinel.core.scanner import Scanner
-
 
 MARKER = "xssm_deadbeef"
 
@@ -219,6 +220,8 @@ def _aprobe():
     return asyncio.run(run())
 
 
+@pytest.mark.skipif(not SOCKETPAIR_OK,
+                    reason="needs loopback (moved down from the file-level gate)")
 def test_async_escaped_endpoint_converges_budget() -> None:
     findings, session = _aprobe()
     assert findings == []
@@ -226,6 +229,8 @@ def test_async_escaped_endpoint_converges_budget() -> None:
         f"async escaped endpoint still spent {len(session.calls)} requests")
 
 
+@pytest.mark.skipif(not SOCKETPAIR_OK,
+                    reason="needs loopback (moved down from the file-level gate)")
 def test_async_escaped_endpoint_sandwich_probe_fires_once() -> None:
     """The convergence-decision probe is the ONLY xssap_ request.
 
@@ -387,6 +392,8 @@ def _aprobe_rcdata():
     return asyncio.run(run())
 
 
+@pytest.mark.skipif(not SOCKETPAIR_OK,
+                    reason="needs loopback (moved down from the file-level gate)")
 def test_async_rcdata_raw_echo_confirms_breakout() -> None:
     findings, session = _aprobe_rcdata()
     assert findings, (
