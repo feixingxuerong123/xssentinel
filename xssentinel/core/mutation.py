@@ -110,16 +110,34 @@ MUTATING_SINKS = [
 # evidence of a mutating sink (see has_mutating_sink).
 _PARSE_ONLY_SINKS = {"DOMParser", "parseFromString"}
 
-# The insertion half of that chain -- the step without which a parsed tree
-# stays a detached document and never reaches the live DOM.
-_INSERTION_RE = re.compile(
-    r"\.appendChild\s*\(|\.insertBefore\s*\(|\.replaceChild\s*\("
-    r"|\.replaceChildren\s*\(|\.append\s*\(|\.prepend\s*\("
-    r"|\.after\s*\(|\.before\s*\(|\.replaceWith\s*\("
-    r"|\.importNode\s*\(|\.adoptNode\s*\(|\.cloneNode\s*\("
-    r"|\.insertAdjacentElement\s*\(",
-    re.IGNORECASE,
-)
+_PARSE_CALL_RE = re.compile(r"parseFromString\s*\(", re.IGNORECASE)
+
+# A first argument that is entirely a quoted literal: the parsed bytes do not
+# depend on the attacker in any way.
+_PURE_LITERAL_RE = re.compile(r"\s*(['\"`])(?:\\.|(?!\1).)*?\1\s*[,)]")
+
+
+def _parse_input_is_dynamic(haystack: str) -> bool:
+    """Whether some ``parseFromString`` call takes anything but a literal.
+
+    The mXSS question is "can the reflected value reach the parser?".  A call
+    whose argument is a quoted constant -- ``parseFromString('x', 'text/html')``
+    -- answers no: it parses attacker-independent bytes every time, so the
+    parse half carries no mutation risk by itself.  That is exactly what the
+    /fuzz/render ``sink=dom`` feature is, and what the layer used to count as
+    a mutating sink.  Anything else (a variable, a member access, a
+    concatenation) can carry attacker bytes and still counts.
+
+    Note that the INSERTION half is deliberately NOT required: the benchmark's
+    pos-mx-01 parses ``stage.textContent`` and writes the result back with
+    textContent, and the scanner reports the risk, not a proven insertion.
+    """
+    for m in _PARSE_CALL_RE.finditer(haystack):
+        rest = haystack[m.end():m.end() + 200]
+        if _PURE_LITERAL_RE.match(rest):
+            continue          # a constant: no attacker bytes can enter here
+        return True           # a variable / expression / member access
+    return False
 
 
 def payloads() -> list[str]:
@@ -192,7 +210,7 @@ def has_mutating_sink(response_text: str) -> list[str]:
     # parses the constant 'x' and writes it with textContent, yet the layer
     # called it exploitable.
     if found and not [s for s in found if s not in _PARSE_ONLY_SINKS]:
-        if not _INSERTION_RE.search(haystack):
+        if not _parse_input_is_dynamic(haystack):
             found = [s for s in found if s not in _PARSE_ONLY_SINKS]
     return found
 

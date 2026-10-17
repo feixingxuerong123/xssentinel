@@ -35,8 +35,9 @@ TOKEN = "xssv_abc123"
 # rebuild chain), so the fixture now completes the chain.  A page that merely
 # mentions parseFromString is not a sink; see
 # TestMutatingSinkNeedsTheInsertionStep.
-_SINK_SCRIPT = ("<script>var d = new DOMParser().parseFromString('x',"
-                "'text/html'); document.body.appendChild(d.body);</script>")
+_SINK_SCRIPT = ("<script>var d = new DOMParser().parseFromString("
+                "document.getElementById('stage').textContent, 'text/html');"
+                " document.body.appendChild(d.body);</script>")
 
 # The parse half on its own: parses the CONSTANT 'x' and does nothing with the
 # result.  This is what the /fuzz/render ``sink=dom`` feature is, and it is
@@ -106,8 +107,21 @@ class TestMxssConfirmIsNotEscapingBlind:
         assert _mxss_confirm(page, TOKEN, page.find(TOKEN)) is None
 
 
-class TestMutatingSinkNeedsTheInsertionStep:
-    """Phase 257: the parse half of the rebuild chain is not a sink alone.
+class TestMutatingSinkNeedsReachableInput:
+    """Phase 257: a parser that only ever sees a constant is not a sink.
+
+    The mXSS question is "can the reflected value reach the parser?", not
+    "is a mutation-capable API mentioned?".  A ``parseFromString('x', ...)``
+    parses attacker-independent bytes, so on its own it is not a mutating
+    sink; a ``parseFromString(stage.textContent, ...)`` can carry attacker
+    bytes and still is, even though this benchmark writes the result back
+    with textContent.
+
+    The INSERTION half is deliberately NOT required: pos-mx-01's sink is
+    ``parseFromString(document.getElementById('stage').textContent,
+    'text/html')`` and its result is written with textContent.  An earlier
+    cut of this fix required an insertion API and turned that case FN -- the
+    full 192-case matrix caught it, the 64-case quick slice did not.
 
     Measured by the FN net's FP arm on /fuzz/render -- ctx=script_dq and
     ctx=script_sq x esc=encode_quotes x sink=dom: the payload lands inside a
@@ -127,8 +141,24 @@ class TestMutatingSinkNeedsTheInsertionStep:
         page = "<div id=stage>%s</div>%s" % (_LIVE, _PARSE_ONLY_SCRIPT)
         assert mutation.has_mutating_sink(page) == []
 
-    def test_parse_plus_insertion_is_a_mutating_sink(self):
-        page = "<div id=stage>%s</div>%s" % (_LIVE, _SINK_SCRIPT)
+    def test_parse_of_dynamic_content_is_a_mutating_sink(self):
+        """This is pos-mx-01's shape, and it must keep counting.
+
+        Parses ``stage.textContent`` (attacker bytes) and writes the result
+        back with textContent -- no markup insertion anywhere.  The scanner
+        reports the mutation RISK, not a proven insertion.
+        """
+        reparse = ("<script>var doc = new DOMParser().parseFromString("
+                   "document.getElementById('stage').textContent,"
+                   " 'text/html');"
+                   "document.getElementById('out').textContent ="
+                   " doc.body.textContent;</script>")
+        page = "<div id=stage>%s</div><div id=out></div>%s" % (_LIVE, reparse)
+        assert mutation.has_mutating_sink(page) != []
+
+    def test_a_concatenated_argument_counts_too(self):
+        page = ("<div>%s</div><script>var d = new DOMParser()"
+                ".parseFromString('a' + q, 'text/html');</script>" % _LIVE)
         assert mutation.has_mutating_sink(page) != []
 
     def test_direct_markup_sink_needs_no_chain(self):
@@ -141,7 +171,7 @@ class TestMutatingSinkNeedsTheInsertionStep:
             "<div>%s</div>%s" % (_LIVE, _PARSE_ONLY_SCRIPT), _LIVE)
         assert r["exploitable"] is False
 
-    def test_analyse_accepts_the_full_chain(self):
+    def test_analyse_accepts_dynamic_input(self):
         r = mutation.analyze(
             "<div>%s</div>%s" % (_LIVE, _SINK_SCRIPT), _LIVE)
         assert r["exploitable"] is True

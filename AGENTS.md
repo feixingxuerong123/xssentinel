@@ -2989,3 +2989,45 @@ reflected"。**沙箱三件套复位(253)之后,这个分歧自动消失。**
 
 **至此 wipe 引发的全部问题(恢复损伤 + 由此产生的误判)都已关闭**:门 FP0/FN0/ERROR0,
 双边网 5 个候选回验后真 FP 0,全量收集 3183 例 0 错误。
+
+## Phase 258:全量矩阵抓回 Phase 257 造成的 FN,修法改判——**能否到达**而非**是否插入**
+
+### 1. quick 切片过了,全量没过
+
+`--quick`(64 例)过 ⇒ 提交 257。跑**全量 192 例**:**FN=1 —— `pos-mx-01`**,
+正是 257 修复造成的。该用例 note 明写:mXSS 用例**故意用 DOMParser 而非 innerHTML**
+(innerHTML 会触发 Trusted Types 层,把安全孪生变成红门);它的 sink 是
+`parseFromString(document.getElementById('stage').textContent, 'text/html')`,
+写出用 `textContent`——**没有任何插入型 API**,被我 257 的"必须有插入"一刀切掉。
+
+**教训:quick 切片(64)抓不到这一类,涉及判定语义的改动必须跑全量 192。**
+
+### 2. 改判:正确的问句是"攻击者数据能不能进解析器"
+
+不是"有没有插入 API"。`parseFromString('x', …)` 每次解析的都是**与攻击者无关的常量**
+⇒ 解析半程本身不携带变异风险(这正是 `/fuzz/render` 的 `sink=dom` 特征);
+`parseFromString(stage.textContent, …)` / `变量` / `拼接` 才可能携带攻击者字节 ⇒ 仍算 sink。
+
+⇒ 用 `_parse_input_is_dynamic()` 取代 `_INSERTION_RE`:逐条看 `parseFromString(`
+的第一个实参,**纯引号字面量**则不计,其余(变量/成员访问/拼接)照算。**不再要求插入。**
+
+四向实测:
+
+| 页面形状 | exploitable |
+|---|---|
+| 常量 `'x'` + textContent(**那个 FP**) | **False** |
+| `pos-mx-01` 形状(stage.textContent + textContent 写出) | **True** |
+| 动态 + appendChild | True |
+| 常量 + appendChild(攻击者字节进不去) | False |
+
+### 3. 测试同步改判,并显式锁住 pos-mx-01 的形状
+
+新增 `test_parse_of_dynamic_content_is_a_mutating_sink`(就是 pos-mx-01 的形状,
+并写明"插入半程**故意不要求**——早先那版要求插入,把它打成 FN")与
+`test_a_concatenated_argument_counts_too`。18 passed。
+
+### 4. 终裁
+
+- **全量门 `--strict-gate`:`PASSED FP0 FN0 ERROR0 over 192 scored cases (0 SKIP)`**;
+- 网标的 4 个组合实证:`script_*` 报真检出 `polyglot_reflection`,`attr_*` 的假
+  `mutation_xss` 已消失 ⇒ **真 FP 0**。
