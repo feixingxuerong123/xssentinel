@@ -3092,3 +3092,27 @@ sync 报 `dom_dynamic high/high`,async 报 `dom_dynamic high/medium`(还有
 (Phase 183 的 `_scan_raw`/`headless_concurrency` 都在),而 `dom_engine.py` 从
 1595 行**长到** 2140 行(225 之后的改动都在这)——所以嫌疑在"harness 的输出形状变了、
 async 侧没跟上",但这需要跑起来才能证实。
+
+### Phase 259 再续:排除法与残余嫌疑(静态)
+
+把两侧消费链读完,**排除**了两件事:
+
+1. **URL 不是原因**:`scanner.py:517-523` 与 `async_scanner_layers.py:180-186` 的
+   `page_url` 构造**逐字节相同**(同样的 `urlencode(params)` + `?`/`&` 拼接),
+   Phase 176t 的守卫在两侧都在;
+2. **判级不是原因**:sync 把 `d.get("confidence")` 交给 `_grade_evidence(_h, …)`
+   且 `_h` 硬写 `confirmed/outcome=fired`;async 原样透传同一个 `d` 的 confidence。
+   若两侧拿到同一个 `d`,输出应当一致。
+
+**残余嫌疑(需跑才能证)**:引擎**实例生命周期**不同——
+- sync:`engine = self._dom_engine`(**复用同一个实例**,浏览器/会话可能是热的);
+- async:`await asyncio.to_thread(self._resolve_dom_engine)` **每次调用新建一个**
+  `DynamicDomAnalyzer(auth_headers=…, auth_cookies=…, auth_local_storage=…)`。
+
+若新建实例丢掉了 sync 那份实例上累积的状态(cookie/localStorage/已加载页面),
+`location.search`/`location.hash` 读取时点的差异就足以让 `_exec` 翻面——
+`confidence = "high" if _exec else "medium"` 于是分叉。
+
+**但这仍是假设**:loopback 当前不通(探针 0/6、新起端口 curl `000`),
+无法跑 A/B 或单次复现,所以**不据此改任何代码**。下一轮 loopback 一通,
+先做这个实验:同一端点上,让 async 复用 sync 那样的单实例,看 `_exec` 是否对齐。
