@@ -3031,3 +3031,42 @@ reflected"。**沙箱三件套复位(253)之后,这个分歧自动消失。**
 - **全量门 `--strict-gate`:`PASSED FP0 FN0 ERROR0 over 192 scored cases (0 SKIP)`**;
 - 网标的 4 个组合实证:`script_*` 报真检出 `polyglot_reflection`,`attr_*` 的假
   `mutation_xss` 已消失 ⇒ **真 FP 0**。
+
+## Phase 259:全量套件(141 文件)首跑——4 个失败,1 个是新的 wipe 损伤(已修)
+
+wipe 之后第一次跑**全量文件级套件**(`tests/run_all_batched.py`,141 个文件,逐文件
+超时+重试,1h13m):**4 个文件失败**。逐个定性:
+
+### 1. `test_phase213_dom_param_key.py` —— **新的 wipe 损伤,已修**
+
+`_replay_request` 丢了 Phase 213 的 `@hash` 分支:DOM 引擎产出的片段键
+(`param="q@hash"`)在回放时**必须**当无键处理(走探针槽 `params["_"]`),
+否则会发出一个页面路由根本不读的 `q@hash=` 参数,并把"没复现"误报成"已修复"。
+- 证据:该分支在**所有 wipe 前提交里都有**(`2959a34..8f78d76` 各 3 处),在
+  `e7b621b`(re-init)起归零;
+- **为什么前几轮没扫到**:它不是截断——wipe 后的副本**行数相同、顶层名字一个没少**,
+  只是函数体内少了一段。截断扫描与缺名扫描都看不见它。
+- 已按 wipe 前原文恢复(含注释),并加了一段"为什么被漏扫"的说明。修复后
+  `test_phase213_dom_param_key.py` + `test_verify_fix.py` **32 passed**。
+
+### 2. `test_async_budget.py` —— **既有失败,不是本轮引入**
+
+A/B:在 Phase 254(语料 +116 之前)的工作树里跑同一用例,**同样失败**(1 failed /
+14 passed),首轮跑出的"15 skipped"是 async 探测抖动。⇒ 与 255–258 无关,留作既有缺陷。
+
+### 3. `test_engine_parity_gate.py` —— 双引擎分歧(正在 A/B 定性)
+
+sync 报 `dom_dynamic high/high`,async 报 `dom_dynamic high/medium`(还有
+`jquery-html` 的条数差异)。该测试在 192 例矩阵里是过的,属于更细的双引擎一致性。
+
+### 4. `test_vuln_server_concurrency.py` —— 判为环境
+
+7 个 worker 全是 `RemoteDisconnected` / `socket.timeout`,正是本机 loopback 的老毛病
+(见 skill §1),非产品缺陷;健康窗口复跑即可。
+
+### 教训:wipe 损伤不止"截断"一种
+
+前几轮的扫描只覆盖**截断**(当前是旧版的严格前缀)与**缺名**(导入的名字不存在)。
+`@hash` 这类**函数体内的内容删除**两种都抓不到。⇒ 补一条判别:
+**同一文件行数/顶层名字都与旧版一致、但某个语义分支的测试挂了,且该分支在 wipe 前
+提交里存在**,就是这一类。
