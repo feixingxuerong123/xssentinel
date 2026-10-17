@@ -2817,3 +2817,21 @@ co_names,不是定义——虚惊)。**没有任何副本带 tokenizer**:桌面�
 (全是 neg 安全孪生、每个 31.1s、exit=3 无消息)。**当时 loopback 正在故障**:
 单独探针 12/12 全败、curl 对 18777 全 `000`(连以前正常的路径也是)。
 ⇒ 该轮门的 FN=1 与 28 ERR **不能作为判定**,loopback 恢复后必须重跑。
+
+### 5. Phase 253 续:pos-hdr-01 的 FN——离线 exonerate(不是产品缺陷)
+
+门复跑被 loopback outage 挡住(持续数小时,探针 12/12 败、curl 全 `000`)。
+趁离线把 `pos-hdr-01` 追到底,三条证据都指向**环境**而非产品:
+
+1. **检测链离线全通**:喂“服务器会返回的页面”给
+   `analyze_response` ⇒ `reflected=True`;`verify_semantic` ⇒
+   `confirmed=True`(event_handler);`sandbox.judge` ⇒ `Verdict(live,
+   'svg<svg> load event fires …')`;
+2. **接线无条件**:`advanced_layers.run_request_layers` 对每个 URL 都调
+   `_scan_header_xss`(不依赖参数是否有反射),而 `/s/hdr02` 的处理器故意忽略
+   query 参数、只反射 `True-Client-IP` 头;
+3. **契约测试在跑且绿**:`test_header_slice_coverage.py` 等 41 passed。
+
+而那轮门的同一次运行还有 **28 个 ERR**(neg 孪生、31.1s、exit=3 无消息)——
+整轮就跑在 outage 窗口里。⇒ **FN=1 与 28 ERR 都归因于 loopback,
+不构成产品判定**;loopback 恢复后重跑门,这一条应随之转绿。
