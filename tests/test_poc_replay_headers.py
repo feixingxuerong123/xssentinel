@@ -12,7 +12,6 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import pytest
 
 from xssentinel.core.poc import build_poc, _poc_headers
 
@@ -99,11 +98,7 @@ def test_upload_poc_carries_auth_header():
 import threading  # noqa: E402
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer  # noqa: E402
 
-from tests.conftest import SOCKETPAIR_OK  # noqa: E402
 
-pytestmark = pytest.mark.skipif(
-    not SOCKETPAIR_OK,
-    reason="Windows loopback degraded (security software/TCP state)")
 
 
 class _EchoHandler(BaseHTTPRequestHandler):

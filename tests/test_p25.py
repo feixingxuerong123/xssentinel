@@ -11,7 +11,6 @@ import json
 import os
 import sys
 import threading
-from io import StringIO
 from unittest.mock import MagicMock, patch
 
 # Make xssentinel importable when run from the project root.

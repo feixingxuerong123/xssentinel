@@ -19,7 +19,7 @@ from xssentinel.core.async_scanner import AsyncScanner
 from xssentinel.core import dom_engine
 from range2_server import start_range2  # noqa: E402
 
-from tests.conftest import SOCKETPAIR_OK, loopback_healthy
+from tests.conftest import loopback_healthy
 
 _HAS_PW = dom_engine.DynamicDomAnalyzer.available()
 

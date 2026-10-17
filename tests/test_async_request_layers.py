@@ -25,13 +25,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pytest
 
-from tests.conftest import SOCKETPAIR_OK, loopback_healthy
+from tests.conftest import loopback_healthy
 
 # asyncio.run() needs a working loopback socketpair (see conftest.py);
 # skip instead of hanging when the environment throttles it.
-pytestmark = pytest.mark.skipif(
-    not SOCKETPAIR_OK,
-    reason="Windows loopback socketpair hangs (security software/TCP state)")
 
 
 def _echo_origin():

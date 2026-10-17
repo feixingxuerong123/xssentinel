@@ -20,7 +20,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import pytest
 
 from benchmark.runner import _case_extra_args, _build_target_url
-from tests.conftest import SOCKETPAIR_OK, loopback_healthy
+from tests.conftest import loopback_healthy
 
 
 # -- flag construction (pure) ------------------------------------------------
@@ -52,9 +52,6 @@ def test_stored_case_gets_inject_and_view_urls():
 
 # -- the server's store round-trips (integration) ---------------------------
 
-pytestmark = pytest.mark.skipif(
-    not SOCKETPAIR_OK,
-    reason="Windows loopback degraded (security software/TCP state)")
 
 
 def _roundtrip(server_path, view_path, payload):

@@ -17,11 +17,9 @@ import threading
 
 import pytest
 
-from tests.conftest import SOCKETPAIR_OK, loopback_healthy
+from tests.conftest import loopback_healthy
 from xssentinel.cli_commands import _run_marker_fuzz
 
-pytestmark = pytest.mark.skipif(
-    not SOCKETPAIR_OK, reason="loopback socketpair degraded")
 
 
 class _EchoBodyHandler(http.server.BaseHTTPRequestHandler):

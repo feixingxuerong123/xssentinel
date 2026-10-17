@@ -24,10 +24,6 @@ from xssentinel.core import async_scanner as asc_mod
 from xssentinel.core.async_scanner import AsyncScanner, _extract_links, is_available
 
 # asyncio.run() needs a working loopback socketpair (see conftest.py).
-pytestmark = pytest.mark.skipif(
-    not SOCKETPAIR_OK,
-    reason="Windows loopback socketpair hangs (security software/TCP state)")
-
 
 def _run(fn):
     """Build a scanner inside the loop, run fn(asc), return its result."""
@@ -65,6 +61,8 @@ class TestPureHelpers:
 
 
 class TestAddFindingAndShim:
+    @pytest.mark.skipif(not SOCKETPAIR_OK,
+                        reason="needs loopback (moved down from the file-level gate)")
     def test_add_finding_appends(self):
         async def fn(asc):
             from xssentinel.core.findings import Finding
@@ -92,6 +90,8 @@ class TestAddFindingAndShim:
 
 
 class TestThrottle:
+    @pytest.mark.skipif(not SOCKETPAIR_OK,
+                        reason="needs loopback (moved down from the file-level gate)")
     def test_zero_delay_returns_immediately(self):
         async def fn(asc):
             asc.per_host_delay = 0
@@ -101,6 +101,8 @@ class TestThrottle:
             return time.monotonic() - t0
         assert _run(fn) < 0.1
 
+    @pytest.mark.skipif(not SOCKETPAIR_OK,
+                        reason="needs loopback (moved down from the file-level gate)")
     def test_per_host_delay_enforced(self):
         async def fn(asc):
             asc.per_host_delay = 0.3
@@ -113,6 +115,8 @@ class TestThrottle:
 
 
 class TestScanCspAsync:
+    @pytest.mark.skipif(not SOCKETPAIR_OK,
+                        reason="needs loopback (moved down from the file-level gate)")
     def test_bypassable_csp_yields_finding(self):
         async def fn(asc):
             from xssentinel.core.csp import CSPReport
@@ -126,6 +130,8 @@ class TestScanCspAsync:
         assert findings[0].data["type"] == "csp_bypass"
         assert findings[0].data["evidence"] == "unsafe-inline"
 
+    @pytest.mark.skipif(not SOCKETPAIR_OK,
+                        reason="needs loopback (moved down from the file-level gate)")
     def test_strict_csp_yields_nothing(self):
         async def fn(asc):
             from xssentinel.core.csp import CSPReport
@@ -137,6 +143,8 @@ class TestScanCspAsync:
 
 
 class TestScanDomAsync:
+    @pytest.mark.skipif(not SOCKETPAIR_OK,
+                        reason="needs loopback (moved down from the file-level gate)")
     def test_dom_results_streamed(self):
         async def fn(asc):
             with patch("xssentinel.core.dom.analyze",
@@ -154,6 +162,8 @@ class TestScanDomAsync:
         assert f["severity"] == "medium"
         assert f["confidence"] == "medium"
 
+    @pytest.mark.skipif(not SOCKETPAIR_OK,
+                        reason="needs loopback (moved down from the file-level gate)")
     def test_dom_exception_swallowed(self):
         async def fn(asc):
             with patch("xssentinel.core.dom.analyze",
@@ -163,6 +173,8 @@ class TestScanDomAsync:
 
 
 class TestPollOob:
+    @pytest.mark.skipif(not SOCKETPAIR_OK,
+                        reason="needs loopback (moved down from the file-level gate)")
     def test_token_hit_returns_true(self):
         async def fn(asc):
             class _OOB:
@@ -171,12 +183,16 @@ class TestPollOob:
             return await asc._poll_oob("abc123")
         assert _run(fn) is True
 
+    @pytest.mark.skipif(not SOCKETPAIR_OK,
+                        reason="needs loopback (moved down from the file-level gate)")
     def test_no_oob_returns_false(self):
         async def fn(asc):
             asc.oob = None
             return await asc._poll_oob("abc123")
         assert _run(fn) is False
 
+    @pytest.mark.skipif(not SOCKETPAIR_OK,
+                        reason="needs loopback (moved down from the file-level gate)")
     def test_token_miss_returns_false(self):
         async def fn(asc):
             class _OOB:
@@ -251,6 +267,8 @@ class _BlindOOB:
 class TestAsyncBlindParity:
     """Phase 64: async blind mirrors the sync _inject_blind contract."""
 
+    @pytest.mark.skipif(not SOCKETPAIR_OK,
+                        reason="needs loopback (moved down from the file-level gate)")
     def test_escaped_echo_never_arms_oob(self):
         async def fn(asc):
             sess = _BlindSession("<p>q:&lt;script&gt;escaped&lt;/script&gt;</p>")
@@ -262,6 +280,8 @@ class TestAsyncBlindParity:
         assert asc._oob_pending == []
         assert asc._oob_started is False   # listener never started
 
+    @pytest.mark.skipif(not SOCKETPAIR_OK,
+                        reason="needs loopback (moved down from the file-level gate)")
     def test_executable_echo_arms_pending_with_param_attribution(self):
         async def fn(asc):
             sess = _BlindSession("<p>q:<script>beacon()</script></p>")
@@ -281,6 +301,8 @@ class TestAsyncBlindParity:
             return asc
         _run(fn)
 
+    @pytest.mark.skipif(not SOCKETPAIR_OK,
+                        reason="needs loopback (moved down from the file-level gate)")
     def test_collect_yields_confirmed_findings_and_empties_pending(self):
         async def fn(asc):
             oob = _BlindOOB(received={"tok1"})
@@ -300,6 +322,8 @@ class TestAsyncBlindParity:
         assert f["severity"] == "high" and f["confidence"] == "high"
         assert asc._oob_pending == []      # consumed
 
+    @pytest.mark.skipif(not SOCKETPAIR_OK,
+                        reason="needs loopback (moved down from the file-level gate)")
     def test_keep_listening_rearms_unconfirmed(self):
         async def fn(asc):
             oob = _BlindOOB(received=set())   # nothing beaconed
@@ -320,6 +344,8 @@ class TestAsyncDomParity:
     """Phase 65: async DOM layer mirrors sync _scan_dom (is_html flag,
     dynamic confirmation, static-hint suppression)."""
 
+    @pytest.mark.skipif(not SOCKETPAIR_OK,
+                        reason="needs loopback (moved down from the file-level gate)")
     def test_static_analysis_gets_is_html_true(self):
         async def fn(asc):
             with patch("xssentinel.core.dom.analyze",
@@ -329,6 +355,8 @@ class TestAsyncDomParity:
         m = _run(fn)
         assert m.call_args.kwargs.get("is_html") is True
 
+    @pytest.mark.skipif(not SOCKETPAIR_OK,
+                        reason="needs loopback (moved down from the file-level gate)")
     def test_dynamic_confirms_and_suppresses_static_hint(self):
         async def fn(asc):
             asc.dom_engine = "playwright"
@@ -366,6 +394,8 @@ class TestAsyncDomParity:
         assert d["severity"] == "high"
         assert d["headless"]["confirmed"] is True
 
+    @pytest.mark.skipif(not SOCKETPAIR_OK,
+                        reason="needs loopback (moved down from the file-level gate)")
     def test_static_only_when_engine_static(self):
         async def fn(asc):
             asc.dom_engine = "static"

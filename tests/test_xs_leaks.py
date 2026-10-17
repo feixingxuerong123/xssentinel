@@ -24,11 +24,8 @@ from xssentinel.core import xs_leaks
 from xssentinel.core.requester import Requester
 from xssentinel.core.scanner import Scanner
 
-from tests.conftest import SOCKETPAIR_OK, loopback_healthy
+from tests.conftest import loopback_healthy
 
-pytestmark = pytest.mark.skipif(
-    not SOCKETPAIR_OK,
-    reason="Windows loopback socketpair hangs (security software/TCP state)")
 
 
 class TestAuditMitigations:
@@ -155,18 +152,11 @@ class _Origin:
             def log_message(self, *a):
                 pass
 
-        for port in range(9002, 9014):
-            try:
-                self.server = ThreadingHTTPServer(("127.0.0.1", port), _H)
-                break
-            except OSError:
-                continue
-        if self.server is None:
-            import socket
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                s.bind(("127.0.0.1", 0))
-                free = s.getsockname()[1]
-            self.server = ThreadingHTTPServer(("127.0.0.1", free), _H)
+        # Port hygiene (tests/test_fixture_port_hygiene.py): bind port 0 and
+        # let the OS pick a free one.  Probing a range is unsafe on Windows --
+        # http.server sets SO_REUSEADDR, which binds over a LIVE listener, so
+        # the client can be pointed at the wrong server and never find out.
+        self.server = ThreadingHTTPServer(("127.0.0.1", 0), _H)
         self.port = self.server.server_address[1]
         threading.Thread(target=self.server.serve_forever, daemon=True).start()
         time.sleep(0.2)

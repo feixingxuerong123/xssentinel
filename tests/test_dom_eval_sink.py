@@ -31,7 +31,7 @@ import pytest  # noqa: E402
 
 from xssentinel.core import dom_engine  # noqa: E402
 
-from tests.conftest import SOCKETPAIR_OK, loopback_healthy  # noqa: E402
+from tests.conftest import loopback_healthy  # noqa: E402
 
 _HAS_PW = dom_engine.DynamicDomAnalyzer.available()
 

@@ -27,7 +27,7 @@ from xssentinel.core.mitm_ca import MitmManager, available
 from xssentinel.core.passive_proxy import PassiveProxy
 from xssentinel.core.requester import Requester
 
-from tests.conftest import SOCKETPAIR_OK, loopback_healthy
+from tests.conftest import loopback_healthy
 
 requires_crypto = pytest.mark.skipif(
     not available(),
@@ -116,17 +116,12 @@ class _TlsOrigin:
             def log_message(self, *a):
                 pass
 
-        for port in range(8962, 8974):
-            try:
-                self.server = _TlsServer(("127.0.0.1", port), _H, ctx)
-                break
-            except OSError:
-                continue
-        if self.server is None:
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                s.bind(("127.0.0.1", 0))
-                free = s.getsockname()[1]
-            self.server = _TlsServer(("127.0.0.1", free), _H, ctx)
+        # Port hygiene (tests/test_fixture_port_hygiene.py): bind port 0
+        # and let the OS pick a free one.  Probing a range is unsafe on
+        # Windows -- http.server sets SO_REUSEADDR, which binds over a
+        # LIVE listener, so the client can be pointed at the wrong server
+        # and never find out.
+        self.server = _TlsServer(("127.0.0.1", 0), _H, ctx)
         self.port = self.server.server_address[1]
         threading.Thread(target=self.server.serve_forever, daemon=True).start()
         time.sleep(0.2)

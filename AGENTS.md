@@ -2835,3 +2835,30 @@ co_names,不是定义——虚惊)。**没有任何副本带 tokenizer**:桌面�
 而那轮门的同一次运行还有 **28 个 ERR**(neg 孪生、31.1s、exit=3 无消息)——
 整轮就跑在 outage 窗口里。⇒ **FN=1 与 28 ERR 都归因于 loopback,
 不构成产品判定**;loopback 恢复后重跑门,这一条应随之转绿。
+
+## Phase 254:趁 loopback outage 跑全量——又抓到 5 处 wipe 损伤(全修)
+
+门的复跑仍被 outage 挡着,于是按 `degraded-loopback-longrun` 的做法用
+`tests/run_all_batched.py` 跑**全量 187 个文件**:**187 ok / 19 FAIL**,
+并把 19 个失败分成“网络类(环境)”与“静态类(真损伤)”。静态类 5 处,全部指向
+wipe/恢复,且全部已修:
+
+| 失败 | 根因(实测) | 修法 |
+|---|---|---|
+| `test_coverage_matrix_parity` | **manifest 丢了 4 个用例**(192→188:`pos/neg-jsonct-01`、`pos/neg-ctoss-01`);矩阵引用无用例的 mode 即报错 | 按 wipe 前邻居位置**字节级插回**(54 行纯插入,`git diff` 零删除)⇒ 192 例,与卫生测试注释自述的 “FULL 192-case matrix” 互印 |
+| `test_quick_gate_slice` | README 现在时声称“同一 98 用例矩阵” | 改为“该矩阵现为 192 用例;Phase 43/69 标定时为 98 用例” |
+| `test_noqa_hygiene` | `xssentinel/_noqa_probe_tmp.py`(未追踪垃圾,内容仅一行 `import os # noqa: F401`) | 删除 |
+| `test_fixture_port_hygiene` | **4 个 fixture 用 range() 探测绑端口**(8982/9022/8962/9002 起,还都在保留段 8810-9109 附近) | 一律改直绑 `('127.0.0.1', 0)`——探测在 Windows 上会因 SO_REUSEADDR 绑到**活着的监听器**上,客户端打到错的服务器且永远不知道 |
+| `test_loopback_gate_placement` | **11 个测试文件被加了模块级 `pytestmark` 门**(wipe 前都没有)+ `test_verify_carriers_live.py` 被恢复成**旧版**(224 行/模块级门,而 wipe 前是 478 行、门下推版——正是该测试文档串点名的 2026-10-06 实测案例);另有一个文档串写着 `"""injected violation"""` 的垃圾文件 | 摘掉 10 个门、删垃圾文件、`test_verify_carriers_live.py` 恢复 wipe 前版本(478 行、6 处 in-test 探针) |
+
+### 为什么这些门是“恢复期补丁”而不是设计
+
+各文件内**本来就有 8 处 `loopback_healthy()` 运行时探针**;模块级门纯属冗余,
+且把不需要网络的测试一起跳过——正是该卫生测试要防的“能跳过的门不是门”。
+它治了症状(挂死),毁了契约(静默丢覆盖)。
+
+### 验收与状态
+
+5 个静态测试**全绿**(14 + 5 passed);`ruff check tests/` 零债务;全量收集
+**3193 例 0 错误**。其余 14 个 FAIL 都需 loopback(扫描编排 / 双引擎 parity /
+OOB / 活体靶场),**留待 outage 恢复后复跑**——届时才能判定它们是环境还是产品。

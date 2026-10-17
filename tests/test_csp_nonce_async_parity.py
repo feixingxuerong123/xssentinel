@@ -24,13 +24,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import pytest
 
-from tests.conftest import SOCKETPAIR_OK
 
-pytestmark = pytest.mark.skipif(
-    not SOCKETPAIR_OK,
-    reason="Windows loopback socketpair hangs (security software/TCP state)")
 
 NONCE = "k8Fj3x9Qm2Rw7Yp4"
 CSP = (f"default-src 'self'; script-src 'strict-dynamic' "
