@@ -25,7 +25,7 @@ from . import polyglot as poly_mod
 from . import dom as dommod
 from . import dom_engine
 from .findings import (Finding, EVIDENCE_MODEL, EVIDENCE_NO_BROWSER,
-                       _grade_evidence)
+                       _grade_evidence, dom_dynamic_evidence)
 from .logger import get_logger
 from .requester import JsonBody
 
@@ -190,14 +190,16 @@ class AdvancedLayerMixin:
             self.coverage.record_finding(url, "GET")
 
         for d in dyn_findings:
-            # This one ran: the sink fired the marker in a real browser.  State
-            # the outcome instead of leaving `_grade_evidence` to infer it from
-            # `confirmed`, and keep `proof` a string only because that is what
-            # dom_engine hands back -- report.py's Burp fallback guards for it.
-            _h = {"available": True, "confirmed": True, "outcome": "fired",
-                  "detail": "marker executed in real browser sink"}
-            _cls, _conf, _det = _grade_evidence(_h, d.get("confidence", "high"),
-                                                d.get("detail", ""))
+            # Phase 260: the emit contract lives in dom_dynamic_evidence (ONE
+            # definition for both engines -- see findings.py).  This site used
+            # to hard-code `outcome="fired"`, which `_grade_evidence` turns
+            # into browser-executed/high: it MASKED the engine's own
+            # `executed` flag, so a row the browser never showed executing was
+            # still reported as an execution.  The parity gate measured
+            # exactly that on three DOM endpoints.  `proof` stays a string
+            # only because that is what dom_engine hands back -- report.py's
+            # Burp fallback guards for it.
+            _ev = dom_dynamic_evidence(d)
             self._add(Finding(**{
                 "url": url, "method": "GET",
                 # Phase 213: the delivered key (``q`` / ``q@hash`` /
@@ -207,10 +209,10 @@ class AdvancedLayerMixin:
                 "param": d.get("param"),
                 "type": "dom_dynamic", "context": d.get("sink"),
                 "payload": d.get("snippet", ""), "transform": [],
-                "severity": "high", "confidence": _conf,
-                "detail": _det,
-                "evidence_class": _cls,
-                "headless": _h,
+                "severity": "high", "confidence": _ev["confidence"],
+                "detail": _ev["detail"],
+                "evidence_class": _ev["evidence_class"],
+                "headless": _ev["headless"],
                 "proof": d.get("snippet", ""),
             }))
             self.coverage.record_finding(url, "GET")

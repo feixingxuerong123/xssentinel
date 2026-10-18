@@ -106,6 +106,59 @@ def _grade_evidence(headless, confidence: str, detail: str,
             detail + " | no browser replay available; execution unverified")
 
 
+def dom_dynamic_evidence(d: dict) -> dict:
+    """Phase 260: the DOM-dynamic emit contract, in ONE place.
+
+    ``d`` is one row of ``DynamicDomAnalyzer.analyze``'s output.  Since
+    Phase 226 that row carries ``executed`` -- the engine's own statement of
+    what the browser did: True means the page's handler fired the marker at
+    the instrumented sink; False means the attacker-controlled source
+    REACHED the sink but no execution was observed in that browser
+    ("delivery evidence only -- not proof of absence").
+
+    Both wrappers must state exactly that, and Phase 260 measured what two
+    hand-kept copies cost.  On the parity gate's DOM slice the two engines
+    handed back byte-identical rows (``confidence=medium``,
+    ``executed=False`` on all three flagged endpoints) and still emitted
+    different findings:
+
+      * sync hard-coded ``outcome="fired"``, which ``_grade_evidence`` turns
+        into browser-executed/high -- so it MASKED the engine's
+        ``executed=False`` and claimed an execution that was never observed;
+      * async passed the engine's raw row confidence through, so the same
+        row read as ``medium``.
+
+    Same input, two claims, gate red.  Hence: one function, called by
+    ``scanner_layers._scan_dom`` (sync) and
+    ``async_scanner_layers._scan_dom_async`` (async).
+
+    Severity is NOT part of the returned contract, on ``_grade_evidence``'s
+    own terms: severity is what ``benchmark/runner.py`` reads as "was this
+    detected", so expressing doubt through it would convert true positives
+    into silent false negatives.  Doubt lives in ``confidence`` and in the
+    named ``evidence_class``; callers keep their ``severity="high"``.
+
+    ``executed`` absent (a pre-Phase-226 row, or a hand-built one): fall back
+    to the row's own ``confidence``, because that is what the flag was split
+    out of -- "high" there MEANT the sink fired.  Reading absence as "not
+    executed" instead would silently demote every legacy row to
+    browser-refuted, which is a claim nobody made.
+    """
+    executed = d.get("executed")
+    if executed is None:
+        executed = d.get("confidence") == "high"
+    if executed:
+        h = {"available": True, "confirmed": True, "outcome": "fired",
+             "detail": "marker executed in real browser sink"}
+    else:
+        h = {"available": True, "confirmed": False, "outcome": "not-fired",
+             "detail": "marker delivered to the sink; execution unobserved"}
+    cls, conf, detail = _grade_evidence(h, d.get("confidence", "high"),
+                                        d.get("detail", ""))
+    return {"headless": h, "evidence_class": cls,
+            "confidence": conf, "detail": detail}
+
+
 def extract_replay_token(payload: str) -> str | None:
     """The unique marker a fired dialog must carry for confirmation.
 

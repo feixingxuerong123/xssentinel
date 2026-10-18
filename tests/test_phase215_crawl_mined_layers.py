@@ -154,10 +154,23 @@ async def _scan(base: str):
     return out, asc
 
 
-def _dyn_on(found, path: str) -> list:
+def _dyn_on(found, path: str, require_executed: bool = True) -> list:
+    """dom_dynamic findings whose URL lands on ``path``.
+
+    ``require_executed=False`` drops the ``evidence_class`` filter, and the
+    count/dedupe assertions need that: Phase 260 measured this lab with
+    dev/_p260_recorder.py and the engine discriminates by SOURCE --
+    ``innerHTML = location.hash`` pages (/ and /dup) come back with
+    ``executed=False`` (marker delivered to the sink, no execution observed,
+    so the honest grade is browser-refuted), while the ``?v=`` pages (/fa,
+    /sink) come back ``executed=True, carrier=html`` and grade
+    browser-executed.  Filtering on browser-executed therefore counted "did
+    the sink execute", not "was this page-layered exactly once".
+    """
     return [f for f in found
             if f.get("type") == "dom_dynamic"
-            and f.get("evidence_class") == "browser-executed"
+            and (not require_executed
+                 or f.get("evidence_class") == "browser-executed")
             and str(f.get("url", "")).split("?")[0].split("#")[0]
             .rstrip("/").endswith(path)]
 
@@ -233,7 +246,7 @@ def test_fragment_anchor_layers_run_once(lab):
     must run once: async has no finding dedup, so two browser passes would
     ship two identical findings."""
     found, _asc = _scan_res(lab)
-    hits = _dyn_on(found, "/dup")
+    hits = _dyn_on(found, "/dup", require_executed=False)
     assert len(hits) == 1, (
         f"expected exactly one dom_dynamic on /dup (fragment-stripped "
         f"dedupe), got {len(hits)}: {[f.get('url') for f in hits]}")

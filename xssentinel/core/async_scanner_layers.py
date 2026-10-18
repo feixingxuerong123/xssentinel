@@ -12,8 +12,8 @@ import secrets
 from typing import AsyncIterator
 from urllib.parse import urlencode
 from .scanner import Finding, json_leaf_paths
-from .findings import (EVIDENCE_BROWSER_EXECUTED, EVIDENCE_MODEL,
-                       EVIDENCE_NO_BROWSER, EVIDENCE_OOB)
+from .findings import (EVIDENCE_MODEL,
+                       EVIDENCE_NO_BROWSER, EVIDENCE_OOB, dom_dynamic_evidence)
 from .requester import CountingRequester
 from . import payloads as payloads_mod
 from . import reflection_profile as rp_mod   # Phase 37: reflection-profile parity
@@ -218,6 +218,15 @@ class AsyncDetectionLayersMixin:
                     evidence_class=EVIDENCE_NO_BROWSER,
                 )
             for d in dyn_findings:
+                # Phase 260: same emit contract as sync's _scan_dom, from the
+                # same one definition (findings.dom_dynamic_evidence).  This
+                # site used to pass the engine's raw row confidence through
+                # while hard-coding browser-executed + a confirmed "fired"
+                # headless dict -- so a row the browser never showed executing
+                # still claimed browser evidence, and the two engines emitted
+                # different findings from byte-identical engine rows (measured
+                # by the parity gate on three DOM endpoints).
+                _ev = dom_dynamic_evidence(d)
                 yield Finding(
                     url=url, method="GET",
                     # Phase 213: delivered key (``q`` / ``q@hash`` /
@@ -226,14 +235,12 @@ class AsyncDetectionLayersMixin:
                     context=d.get("sink"),
                     payload=d.get("snippet", ""),
                     severity="high",
-                    confidence=d.get("confidence", "high"),
-                    detail=d.get("detail", ""),
+                    confidence=_ev["confidence"],
+                    detail=_ev["detail"],
                     type="dom_dynamic",
-                    headless={"available": True, "confirmed": True,
-                              "outcome": "fired",
-                              "detail": "marker executed in real browser sink"},
+                    headless=_ev["headless"],
                     proof=d.get("snippet", ""),
-                    evidence_class=EVIDENCE_BROWSER_EXECUTED,
+                    evidence_class=_ev["evidence_class"],
                 )
         except Exception as e:
             _log.warning("async DOM layer error: %s", e, exc_info=self.verbose)

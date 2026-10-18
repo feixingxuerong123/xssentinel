@@ -216,12 +216,24 @@ def test_linked_nonfragment_page_gets_its_dom_layer(lab, engine):
     dyn = [f for f in found
            if f.get("type") == "dom_dynamic"
            and f.get("evidence_class") == "browser-executed"]
+    # Phase 260: the SEED count below must NOT filter by evidence class.
+    # The seed page's sink is ``innerHTML = location.hash`` (SEED_JS above),
+    # and the engine hands that row back with ``executed=False`` -- the
+    # marker reaches the sink, no execution is observed -- so the honest
+    # grade for it is browser-refuted, not browser-executed.  Measured on
+    # this lab with dev/_p260_recorder.py: the seed row is
+    # (source=location.hash, executed=False, carrier='') while /sink's is
+    # (source=location.search, executed=True, carrier=html).  Counting only
+    # the browser-executed rows therefore answered "did the sink execute",
+    # not the "was the seed page-layered exactly once" question this
+    # assertion asks.
+    all_dyn = [f for f in found if f.get("type") == "dom_dynamic"]
     # Sync re-attaches the endpoint's params to the DOM layer's URL
     # (scanner.py), so the finding url can carry the query -- match on the
     # path, not the raw string.
     sink_hits = [f for f in dyn
                  if str(f.get("url", "")).split("?")[0].endswith("/sink")]
-    seed_hits = [f for f in dyn
+    seed_hits = [f for f in all_dyn
                  if str(f.get("url", "")).split("?")[0].rstrip("/")
                  == lab.rstrip("/")]
     assert sink_hits, (
