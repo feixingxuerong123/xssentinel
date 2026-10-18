@@ -3177,3 +3177,66 @@ xssentinel/desktop/
    session cookie。默认单机回环场景不需要。
 2. `--crawl`/`--headless` 等只是表单开关,没有把 Range 系列靶场/批量入口接进来;
 3. 没有把"取消"之外的实时进度条做出来(目前是 4 秒轮询状态)。
+
+## Phase 261:双引擎 DOM 判定统一——一个契约,两个调用点(附实测门)
+
+关掉 Phase 259 唯一未归因的遗留项。
+
+### 根因不是 259 猜的那个
+
+259 收尾时的残余嫌疑是"**引擎实例生命周期不同**"(sync 复用单实例、async 每次新建
+`DynamicDomAnalyzer`)。**该假设被否证**:真正的原因是两侧各写了一份 emit 契约——
+
+| | 行为 | 后果 |
+|---|---|---|
+| sync `_scan_dom` | 硬写 `outcome="fired"` | `_grade_evidence` 把它抬成 **browser-executed/high**,**掩盖了引擎自己的 `executed=False`**——浏览器没观测到执行,却报成"已执行" |
+| async `_scan_dom_async` | 原样透传行里的 `confidence` | 同一行读成 `medium` |
+
+引擎交回**逐字节相同**的行(`confidence=medium`、`executed=False`),两侧却给出两种结论 ——
+正是 parity 门自称要抓的 wiring drift。这与实例生命周期无关:即使两侧共用同一个实例,
+只要两处定义不统一,输出照样分叉。
+
+### 修法:一个函数,两个调用点
+
+`findings.dom_dynamic_evidence(d)`(Phase 226 起行里带 `executed`):
+`True` → fired/browser-executed/high;`False` → not-fired/browser-refuted/**low**,
+detail 带 "not proof of absence";`executed` 缺失 → 回退到行自身的 `confidence`
+(旧行里 "high" 就等于 sink fired),**不把缺失读成未执行**(否则所有历史行被静默降级)。
+**返回里没有 severity**——按 `_grade_evidence` 自身的规矩:severity 是
+`benchmark/runner.py` 读作"是否检出"的通道,用它表达怀疑会把 TP 变成静默 FN。
+
+### 连带改的两个测试(不是迁就,是修正)
+
+`test_phase214/215` 原来按 `evidence_class == browser-executed` **计数**。实测
+(`dev/_p260_recorder.py`):引擎按 **source** 区分——`innerHTML = location.hash` 的页
+回来是 `executed=False`(到达 sink、未观测到执行),`?v=` 的页是
+`executed=True, carrier=html`。所以按证据类过滤,数的是"sink 执行了吗",而不是
+"这一页是否恰好被分层一次"。已改为计数不去过滤证据类。
+
+### 证据
+
+- `tests/test_dom_dynamic_evidence.py` **14 passed**(0.32s,**无浏览器**):
+  锁住三态 + 契约不含 severity + **两个调用点仍走同一定义**(源码断言:
+  都调 `dom_dynamic_evidence(d)`、都读 `_ev["evidence_class"]`、都不硬写
+  `"outcome": "fired"`)——后半段才是会随时间腐化的那半;
+- parity DOM 切片 `test_dom_slice_finding_sets_match` **1 passed**(542.96s);
+- **全量 192 例严格门 PASSED FP0 FN0 ERROR0,0 SKIP**(16m28s)——按 258 定下的规矩,
+  改判定语义必须跑全量,而不是 quick 切片。
+
+### 语义影响(要写在明处)
+
+sink 未观测到执行的行,从 **browser-executed/high** 变成 **browser-refuted/low**。
+severity 不动(仍 `high`),所以"是否检出"不变——192 门 FP0/FN0 是这条的实证。
+
+## Phase 262:控制台 UI 补全——详情条、证据类过滤、AI 叙述、自适应轮询
+
+Phase 260 的控制台当时只有"发起扫描 + 列表"。本轮补齐四件事:
+
+1. **选中任务详情条**:options + `coverage_summary` 覆盖率矩阵卡片(扫了哪些层、哪些没扫);
+2. **证据类过滤** `onlyExecuted`:只看浏览器实证执行过的 finding(Phase 261 之后这个
+   过滤才有意义——`browser-refuted` 现在是一个真实存在的类别);
+3. **AI 叙述按钮**:报告走 `report?ai=1`;
+4. **自适应轮询**:`POLL_FAST`(进行中)/ `POLL_IDLE`(空闲),不再是恒定 4s 打一次。
+
+测试 `tests/test_desktop_shell.py` **19 passed**,新增两例:控制台必须覆盖上述自有面;
+以及**控制台自身不得成为 XSS 载体**(页面里不许出现 `javascript:`)。
