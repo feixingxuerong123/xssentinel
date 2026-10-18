@@ -70,7 +70,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--port", type=int, default=0,
                         help="端口，0 = 自动分配（默认）")
     parser.add_argument("--api-key", default=None,
-                        help="API 密钥；设置后控制台每次请求都需带 X-API-Key")
+                        help="API 密钥；设置后需在控制台右上角的 X-API-Key "
+                             "输入框填入同一密钥")
     parser.add_argument("--db", default=None,
                         help="扫描持久化数据库路径（默认用 API 模块自身位置）")
     parser.add_argument("--backend", default=None,
@@ -102,8 +103,13 @@ def main(argv: list[str] | None = None) -> int:
     url = server.base_url.rstrip("/") + "/"
     print(f"[+] XSSentinel 桌面控制台: {url}")
     if args.api_key:
-        print("[!] 已启用 API 密钥；窗口内请求需在本地代理层注入 "
-              "X-API-Key（当前 UI 不支持，请用 --no-window + 脚本调用）")
+        # Phase 263: the console can carry the key now -- it is entered in
+        # the page (top-right) and attached as X-API-Key by the page's own
+        # fetch wrapper, because embedding it in the HTML would hand it to
+        # anything able to GET / and a cookie would mean editing the API's
+        # auth gate.
+        print("[*] 已启用 API 密钥：打开窗口后把同一个密钥粘到右上角的 "
+              "X-API-Key 输入框（只存在该标签页，不写回服务器）")
 
     if args.print_url_only:
         print(url)

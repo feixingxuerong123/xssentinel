@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import os
 import sys
+from urllib.error import HTTPError
+from urllib.request import Request, urlopen
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -77,6 +79,83 @@ class TestUiAsset:
         resp = handler(ctx=None, match=None, body=None, query=None)
         assert resp.status == 200
         assert "缺失" in resp.body.decode("utf-8", "replace")
+
+
+# ---------------------------------------------------------------------------
+# API key carriage (Phase 263)
+# ---------------------------------------------------------------------------
+class TestApiKeyCarriage:
+    """`--api-key` mode used to leave the console unusable: the page had
+    nowhere to put the credential, so every call came back 401 and the only
+    advice the CLI could give was "use --no-window and script it instead".
+
+    The credential is now entered in the page and attached as a header by
+    the page itself.  Two things are deliberately NOT done, and both are
+    pinned here because either would be the easy way out:
+      * the server never bakes the key into the HTML -- that hands it to
+        anything able to GET /;
+      * it is not swapped for a session cookie -- that means editing the
+        API's auth gate, which is not the console's to change.
+    """
+
+    KEY = "topsecret-key"
+
+    def test_page_has_somewhere_to_put_the_key(self):
+        html = load_ui_html()
+        assert 'id="apiKey"' in html
+        assert 'type="password"' in html
+
+    def test_key_lives_in_sessionstorage_not_localstorage(self):
+        """A credential must not outlive the tab it was typed into."""
+        html = load_ui_html()
+        assert "sessionStorage" in html
+        assert "localStorage" not in html
+
+    def test_every_call_carries_the_header(self):
+        """The invariant that decays: a later edit adding a bare fetch() or a
+        bare window.open(reportUrl(...)) silently drops the key, and in
+        --api-key mode that reads as a 401, not as a warning."""
+        html = load_ui_html()
+        assert "X-API-Key" in html
+        assert "fetch(reportUrl(fmt), {headers: authHeaders()})" in html
+        assert 'window.open(reportUrl(' not in html
+
+    def test_a_401_points_at_the_input(self):
+        """Silence is the failure mode here: without this the user sees
+        "HTTP 401" and no idea where the key goes."""
+        html = load_ui_html()
+        assert "401" in html
+        assert "needKey" in html
+
+    def _server(self, **kw):
+        return desktop_app.build_server(port=0, **kw)
+
+    def test_console_page_never_carries_the_key(self):
+        srv = self._server(api_key=self.KEY)
+        srv.start_in_thread()
+        try:
+            with urlopen(srv.base_url + "/", timeout=15) as r:
+                body = r.read()
+        finally:
+            srv._httpd.shutdown()
+            srv._httpd.server_close()
+        assert self.KEY.encode() not in body
+
+    def test_api_still_rejects_a_keyless_call(self):
+        """...which is the whole reason the page has to send it."""
+        srv = self._server(api_key=self.KEY)
+        srv.start_in_thread()
+        try:
+            with pytest.raises(HTTPError) as ei:
+                urlopen(srv.base_url + "/api/v1/scans", timeout=15)
+            assert ei.value.code == 401
+            req = Request(srv.base_url + "/api/v1/scans",
+                          headers={"X-API-Key": self.KEY})
+            with urlopen(req, timeout=15) as r:
+                assert r.status == 200
+        finally:
+            srv._httpd.shutdown()
+            srv._httpd.server_close()
 
 
 # ---------------------------------------------------------------------------

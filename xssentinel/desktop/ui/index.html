@@ -142,6 +142,10 @@
   .lrow .lbar .failed { background: var(--bad); }
   .lrow .lbar .missing { background: #2c3746; }
   .lrow .lcount { color: var(--dim); font-family: Consolas, monospace; font-size: 11px; }
+
+  /* --- api key --- */
+  header input#apiKey { width: 200px; padding: 4px 6px; font-size: 12px; }
+  input.bad { border-color: var(--bad); }
 </style>
 </head>
 <body>
@@ -149,6 +153,8 @@
   <span class="dot" id="apiDot"></span>
   <h1>XSSentinel 桌面控制台</h1>
   <span class="ver" id="verInfo">…</span>
+  <input id="apiKey" type="password" spellcheck="false" placeholder="X-API-Key"
+         title="若 API 以 --api-key 启动：把密钥粘在这里。只存在本标签页的 sessionStorage，不会写回服务器。">
   <span class="spacer"></span>
   <span class="tick" id="pollInfo">—</span>
   <button class="ghost small" id="refreshBtn">刷新</button>
@@ -288,8 +294,34 @@ function toast(msg, isErr) {
   t.className = "toast show" + (isErr ? " err" : "");
   setTimeout(function () { t.className = "toast"; }, 3200);
 }
+/* ---------- API 密钥（可选） ----------
+   API 的鉴权是逐请求头 `X-API-Key`（见 api/server.py）。控制台由同一个进程伺服，
+   却恰恰是唯一没法"悄悄"带上它的调用方：把密钥写进 HTML，等于把它交给任何能
+   GET / 的本地进程；改成 session cookie，就得动 API 的鉴权门。所以密钥在这里
+   手填，只存本标签页的 sessionStorage，每次请求由 authHeaders() 带上——报告
+   下载和打开也算在内，这正是"有密钥时不能只 window.open() 一个裸 URL"的原因。 */
+var KEY_STORE = "xssentinel.apiKey";
+var apiKey = "";
+try { apiKey = sessionStorage.getItem(KEY_STORE) || ""; } catch (e) { apiKey = ""; }
+function authHeaders(extra) {
+  var h = {}, k;
+  for (k in extra || {}) { h[k] = extra[k]; }
+  if (apiKey) h["X-API-Key"] = apiKey;
+  return h;
+}
+function needKey() {
+  var el = $("apiKey");
+  if (el) { el.className = "bad"; el.focus(); }
+  toast("需要有效的 API 密钥（填在右上角 X-API-Key 里）", true);
+}
 function api(path, opts) {
+  opts = opts || {};
+  opts.headers = authHeaders(opts.headers);
   return fetch(BASE + path, opts).then(function (r) {
+    if (r.status === 401) {
+      needKey();
+      throw new Error("HTTP 401：API 密钥缺失或无效");
+    }
     return r.json().catch(function () { return {}; }).then(function (j) {
       if (!r.ok) throw new Error(j.detail || j.error || ("HTTP " + r.status));
       return j;
@@ -797,13 +829,29 @@ function reportUrl(fmt, ai) {
   if (ai) u += "&ai=" + encodeURIComponent(ai);
   return u;
 }
+function openReport(fmt, ai) {
+  var u = reportUrl(fmt, ai);
+  if (!apiKey) {
+    // 无密钥：直接用真实 URL 打开，可收藏、可刷新。
+    window.open(u, "_blank");
+    return;
+  }
+  // 有密钥：window.open() 带不上自定义请求头，只能取回内容再从 blob 打开。
+  fetch(u, {headers: authHeaders()}).then(function (r) {
+    if (r.status === 401) { needKey(); throw new Error("HTTP 401"); }
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    return r.blob();
+  }).then(function (b) {
+    window.open(URL.createObjectURL(b), "_blank");
+  }).catch(function (e) { toast("报告打开失败:" + e.message, true); });
+}
 $("reportBtn").addEventListener("click", function () {
   if (!selected) return;
-  window.open(reportUrl($("reportFmt").value), "_blank");
+  openReport($("reportFmt").value);
 });
 $("aiBtn").addEventListener("click", function () {
   if (!selected) return;
-  window.open(reportUrl("html", "1"), "_blank");
+  openReport("html", "1");
   if (detail && !detail.has_ai_report) toast("正在生成 AI 叙述（首次较慢）");
 });
 $("dlBtn").addEventListener("click", function () {
@@ -811,7 +859,8 @@ $("dlBtn").addEventListener("click", function () {
   var fmt = $("reportFmt").value;
   var ext = {html: "html", json: "json", sarif: "sarif", csv: "csv",
              junit: "xml", markdown: "md"}[fmt] || fmt;
-  fetch(reportUrl(fmt)).then(function (r) {
+  fetch(reportUrl(fmt), {headers: authHeaders()}).then(function (r) {
+    if (r.status === 401) { needKey(); throw new Error("HTTP 401"); }
     if (!r.ok) throw new Error("HTTP " + r.status);
     return r.blob();
   }).then(function (b) {
@@ -931,6 +980,19 @@ function poll() {
 $("refreshBtn").addEventListener("click", function () { poll(); toast("已刷新"); });
 $("startBtn").addEventListener("click", startScan);
 $("url").addEventListener("keydown", function (e) { if (e.key === "Enter") startScan(); });
+
+/* ---------- API 密钥输入框 ---------- */
+(function () {
+  var el = $("apiKey");
+  if (!el) return;
+  el.value = apiKey;                       // 同标签页上次填过就直接带上
+  el.addEventListener("input", function () {
+    apiKey = el.value.trim();
+    el.className = "";                     // 用户重新输入＝之前那条是错的
+    try { sessionStorage.setItem(KEY_STORE, apiKey); } catch (e) {}
+  });
+  el.addEventListener("change", function () { poll(); });  // 填完立刻重拉，不等下一次轮询
+})();
 
 /* ---------- 初始化 ---------- */
 api("/api/v1/info").then(function (j) {
