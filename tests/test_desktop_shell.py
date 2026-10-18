@@ -39,6 +39,29 @@ class TestUiAsset:
         for fmt in ("html", "json", "sarif", "csv", "junit", "markdown"):
             assert f'value="{fmt}"' in html, fmt
 
+    def test_ui_covers_the_console_surfaces(self):
+        """The console's own surfaces, not just the endpoint list.
+
+        Phase 260: the page grew a selected-task detail strip (options +
+        coverage), an evidence-class filter, an AI-narrative button and
+        adaptive polling.  Each is one string the page cannot work without,
+        so the gate stays cheap and honest.
+        """
+        html = load_ui_html()
+        assert "/api/v1/scans/" in html          # detail / findings / report
+        assert "coverage_summary" in html        # the coverage matrix card
+        assert "ai=" in html                     # report?ai=1 (AI narrative)
+        assert "onlyExecuted" in html            # browser-executed-only filter
+        assert "POLL_FAST" in html and "POLL_IDLE" in html
+
+    def test_ui_is_not_an_xss_carrier(self):
+        """The tool's own output must not become a payload.
+
+        Phase 260 rewrote the page, so this re-states the project's standing
+        rule on it: no ``javascript:`` URL anywhere in the console.
+        """
+        assert "javascript:" not in load_ui_html().lower()
+
     def test_missing_asset_says_so_instead_of_going_blank(self, monkeypatch):
         """A packaging bug must surface as a page that says so, not a blank
         one -- and the route must not raise."""

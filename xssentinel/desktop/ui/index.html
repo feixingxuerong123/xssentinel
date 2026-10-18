@@ -8,7 +8,7 @@
   :root {
     --bg: #0f1419; --panel: #161d26; --panel2: #1c2530; --line: #2a3644;
     --fg: #d7e0ea; --dim: #8b9bab; --acc: #4da3ff; --ok: #3ecf8e;
-    --warn: #ffb454; --bad: #ff6b6b; --chip: #243244;
+    --warn: #ffb454; --bad: #ff6b6b; --info: #7aa2c8; --chip: #243244;
   }
   * { box-sizing: border-box; }
   body {
@@ -24,16 +24,22 @@
   header .spacer { flex: 1; }
   .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); display: inline-block; }
   .dot.off { background: var(--bad); }
-  main { display: grid; grid-template-columns: 340px 1fr; gap: 12px; padding: 12px; height: calc(100vh - 47px); }
+  .tick { color: var(--dim); font-size: 11px; font-family: Consolas, monospace; }
+  main { display: grid; grid-template-columns: 340px 1fr; gap: 12px; padding: 12px;
+         height: calc(100vh - 47px); }
   .col { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+  .col.right { overflow: auto; padding-right: 2px; }
   .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
-  .card h2 { margin: 0 0 10px; font-size: 13px; color: var(--dim); text-transform: uppercase; letter-spacing: .8px; }
+  .card h2 { margin: 0 0 10px; font-size: 13px; color: var(--dim); text-transform: uppercase;
+             letter-spacing: .8px; display: flex; align-items: center; gap: 8px; }
+  .card h2 .spacer { flex: 1; }
   label { display: block; font-size: 12px; color: var(--dim); margin: 8px 0 3px; }
   input, select, textarea {
     width: 100%; background: var(--panel2); color: var(--fg);
     border: 1px solid var(--line); border-radius: 5px; padding: 6px 8px; font: inherit;
   }
   input:focus, select:focus, textarea:focus { outline: none; border-color: var(--acc); }
+  input[type=checkbox] { width: auto; }
   textarea { resize: vertical; min-height: 46px; font-family: Consolas, monospace; font-size: 12px; }
   .row { display: flex; gap: 8px; }
   .row > * { flex: 1; }
@@ -46,35 +52,96 @@
   button:disabled { opacity: .45; cursor: not-allowed; }
   .checks { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
   .checks label { display: flex; align-items: center; gap: 5px; margin: 0; color: var(--fg); font-size: 12px; }
-  .checks input[type=checkbox] { width: auto; }
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
   th { text-align: left; color: var(--dim); font-weight: 500; font-size: 12px;
        padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th.sortable { cursor: pointer; user-select: none; }
+  th.sortable:hover { color: var(--fg); }
+  th .arrow { color: var(--acc); font-size: 10px; }
   td { padding: 6px 8px; border-bottom: 1px solid #1e2733; vertical-align: top; }
   tr.sel td { background: #1d2b3a; }
+  tr.clickable { cursor: pointer; }
+  tr.clickable:hover td { background: #1a2330; }
+  tr.xrow td { background: #131b24; border-bottom: 1px solid var(--line); }
   .scroll { overflow: auto; min-height: 0; }
-  #scanList { max-height: 38vh; }
-  #findings { flex: 1; }
+  #scanList { max-height: 30vh; }
+  #findingRows { max-height: 42vh; }
+  #covEndpoints { max-height: 26vh; }
   .pill { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 11px;
           background: var(--chip); color: var(--dim); white-space: nowrap; }
-  .pill.queued, .pill.running { background: #27405c; color: #9ccbff; }
+  .pill.queued, .pill.pending, .pill.running { background: #27405c; color: #9ccbff; }
   .pill.completed { background: #1e4438; color: var(--ok); }
   .pill.failed, .pill.cancelled { background: #4a2626; color: var(--bad); }
-  .sev-high { color: var(--bad); font-weight: 600; }
+  .sev-high, .sev-critical { color: var(--bad); font-weight: 600; }
   .sev-medium { color: var(--warn); }
-  .sev-low { color: var(--dim); }
+  .sev-low, .sev-info { color: var(--dim); }
   .mono { font-family: Consolas, monospace; font-size: 12px; }
+  .mini { font-size: 11px; }
+  .muted { color: var(--dim); }
   .empty { color: var(--dim); text-align: center; padding: 28px 0; font-size: 13px; }
   .hint { color: var(--dim); font-size: 12px; margin-top: 6px; }
-  .toolbar { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+  .toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
   .toolbar .spacer { flex: 1; }
   a { color: var(--acc); }
   .toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%);
            background: var(--panel2); border: 1px solid var(--line); color: var(--fg);
            padding: 8px 14px; border-radius: 6px; font-size: 13px; opacity: 0;
-           transition: opacity .25s; pointer-events: none; max-width: 70vw; }
+           transition: opacity .25s; pointer-events: none; max-width: 70vw; z-index: 10; }
   .toast.show { opacity: 1; }
   .toast.err { border-color: var(--bad); color: var(--bad); }
+
+  /* --- live / progress --- */
+  .spin { width: 9px; height: 9px; border: 2px solid #33506e; border-top-color: #9ccbff;
+          border-radius: 50%; display: inline-block; animation: sp .7s linear infinite;
+          vertical-align: middle; }
+  @keyframes sp { to { transform: rotate(360deg); } }
+  .strip { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+  .kv { display: flex; gap: 6px; align-items: baseline; }
+  .kv .k { color: var(--dim); font-size: 11px; text-transform: uppercase; letter-spacing: .5px; }
+  .kv .v { font-family: Consolas, monospace; font-size: 12px; }
+  .chip { display: inline-block; padding: 1px 7px; border-radius: 4px; font-size: 11px;
+          background: var(--chip); color: #bed3e8; font-family: Consolas, monospace; }
+  .chip.on { background: #1e4438; color: var(--ok); }
+  .chip.off { background: #33302a; color: var(--warn); }
+  .badge { padding: 1px 6px; border-radius: 4px; font-size: 11px; background: #2b3a55; color: #9ccbff; }
+  .badge.soft { background: var(--chip); color: var(--dim); }
+
+  /* --- severity bar --- */
+  .bar { display: flex; height: 10px; border-radius: 5px; overflow: hidden;
+         background: #1e2733; min-width: 120px; flex: 1; }
+  .bar i { display: block; height: 100%; }
+  .bar .high { background: var(--bad); }
+  .bar .medium { background: var(--warn); }
+  .bar .low { background: #4a5f77; }
+  .bar .info { background: var(--info); }
+  .legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 11px; color: var(--dim); }
+  .legend span b { font-weight: 600; }
+
+  /* --- filters --- */
+  .filters { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center;
+             padding: 8px 0 4px; border-top: 1px solid #1e2733; margin-top: 6px; }
+  .filters label { display: flex; align-items: center; gap: 5px; margin: 0;
+                   color: var(--fg); font-size: 12px; }
+  .filters select { width: auto; padding: 4px 6px; font-size: 12px; }
+  .filters input[type=search] { width: 190px; padding: 4px 8px; font-size: 12px; }
+
+  /* --- payload / detail --- */
+  pre.payload { margin: 6px 0 0; padding: 8px; background: #0c1219; border: 1px solid var(--line);
+                border-radius: 5px; white-space: pre-wrap; word-break: break-all;
+                font-family: Consolas, monospace; font-size: 12px; max-height: 180px; overflow: auto; }
+  .codes { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 6px; }
+
+  /* --- coverage --- */
+  .lbars { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
+  .lrow { display: grid; grid-template-columns: 118px 1fr 128px; gap: 8px; align-items: center;
+          font-size: 12px; }
+  .lrow .lid { font-family: Consolas, monospace; color: #bed3e8; }
+  .lrow .lbar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; background: #1e2733; }
+  .lrow .lbar i { display: block; height: 100%; }
+  .lrow .lbar .ran { background: var(--ok); }
+  .lrow .lbar .failed { background: var(--bad); }
+  .lrow .lbar .missing { background: #2c3746; }
+  .lrow .lcount { color: var(--dim); font-family: Consolas, monospace; font-size: 11px; }
 </style>
 </head>
 <body>
@@ -83,6 +150,7 @@
   <h1>XSSentinel 桌面控制台</h1>
   <span class="ver" id="verInfo">…</span>
   <span class="spacer"></span>
+  <span class="tick" id="pollInfo">—</span>
   <button class="ghost small" id="refreshBtn">刷新</button>
 </header>
 
@@ -138,17 +206,23 @@
     </div>
   </div>
 
-  <!-- 右栏：扫描列表 + 发现 -->
-  <div class="col">
-    <div class="card" style="flex-shrink:0">
-      <h2>扫描任务</h2>
+  <!-- 右栏：任务详情 + 列表 + 发现 + 覆盖率 -->
+  <div class="col right">
+    <div class="card" id="detailCard">
+      <h2>选中任务 <span class="spacer"></span><span id="detailAi"></span></h2>
+      <div id="detailBody" class="strip"><span class="muted mini">未选择任务</span></div>
+    </div>
+
+    <div class="card">
+      <h2>扫描任务 <span class="spacer"></span><span class="muted mini" id="scanSummary"></span></h2>
       <div class="scroll" id="scanList"><div class="empty">还没有扫描任务</div></div>
     </div>
+
     <div class="card" id="findings">
+      <h2>发现 <span class="spacer"></span><span class="mini muted" id="findingCount"></span></h2>
       <div class="toolbar">
-        <h2 style="margin:0">发现</h2>
-        <span class="spacer"></span>
-        <span class="hint" id="findingCount"></span>
+        <div class="bar" id="sevBar"></div>
+        <button class="ghost small" id="aiBtn" disabled title="在 HTML 报告里带上 AI 叙述（?ai=1）">AI 叙述</button>
         <button class="ghost small" id="reportBtn" disabled>打开 HTML 报告</button>
         <select id="reportFmt" style="width:auto;padding:4px 6px;font-size:12px">
           <option value="html">HTML</option><option value="json">JSON</option>
@@ -157,7 +231,28 @@
         </select>
         <button class="ghost small" id="dlBtn" disabled>下载</button>
       </div>
+      <div class="legend" id="sevLegend"></div>
+      <div class="filters">
+        <label title="critical 也归入这一档，按发现严重度过滤">
+          <input type="checkbox" class="sevF" value="high" checked> high/临界</label>
+        <label><input type="checkbox" class="sevF" value="medium" checked> medium</label>
+        <label><input type="checkbox" class="sevF" value="low" checked> low</label>
+        <label><input type="checkbox" class="sevF" value="info" checked> info</label>
+        <label title="只显示证据类为 browser-executed 的发现（真浏览器确认执行的）">
+          <input type="checkbox" id="onlyExecuted"> 仅浏览器已执行</label>
+        <select id="typeF" title="按类型过滤"><option value="">全部类型</option></select>
+        <input type="search" id="textF" placeholder="搜索 参数/上下文/载荷/说明" spellcheck="false">
+        <span class="spacer"></span>
+        <span class="mini muted" id="filteredCount"></span>
+      </div>
       <div class="scroll" id="findingRows"><div class="empty">选择左侧任务查看发现</div></div>
+    </div>
+
+    <div class="card" id="coverageCard">
+      <h2>覆盖率 <span class="spacer"></span><span class="mini muted" id="covGen"></span></h2>
+      <div class="strip" id="covTotals"><span class="muted mini">扫描完成或取消后可看覆盖率矩阵</span></div>
+      <div class="lbars" id="covLayers"></div>
+      <div class="scroll" id="covEndpoints" style="margin-top:10px"></div>
     </div>
   </div>
 </main>
@@ -166,9 +261,20 @@
 <script>
 "use strict";
 var BASE = location.origin;
-var scans = [];        // 任务列表
-var selected = null;   // 选中的 scan id
+var scans = [];            // 任务列表（summary）
+var selected = null;       // 选中的 scan id
+var detail = null;         // 选中任务的 to_detail（含 options / coverage_summary）
+var findings = [];         // 选中任务的发现
 var pollTimer = null;
+var POLL_FAST = 1200, POLL_IDLE = 4000;
+var sortKey = "sev", sortDir = -1;   // 默认：严重度降序
+var expanded = {};                   // finding 行展开状态
+var lastLive = {};                   // 选中任务上一次的 (state, finding_count)
+var lastIdsSig = "";                 // 任务集合签名：变了才重建行
+var lastFindingsSig = null;          // 发现内容签名：不变就不重绘（保住展开态/点击目标）
+var lastTypeSig = null;              // 类型集合签名：不变就不重建类型下拉
+var SEV_ORDER = {critical: 4, high: 3, medium: 2, low: 1, info: 0};
+var allLayers = [];                  // /api/v1/info 的检测层清单
 
 function $(id) { return document.getElementById(id); }
 function esc(s) {
@@ -204,6 +310,39 @@ function parseJsonField(id, what) {
     throw e;
   }
 }
+function isLive(state) {
+  return state === "running" || state === "pending" || state === "queued";
+}
+function fmtDur(sec) {
+  if (sec == null || isNaN(sec) || sec < 0) return "—";
+  sec = Math.round(sec);
+  if (sec < 60) return sec + "s";
+  var m = Math.floor(sec / 60), s = sec % 60;
+  if (m < 60) return m + "m" + (s ? " " + s + "s" : "");
+  return Math.floor(m / 60) + "h" + (m % 60) + "m";
+}
+function jobElapsed(s) {
+  var start = s.started_at ? Date.parse(s.started_at) : null;
+  if (!start) return null;
+  var end = s.finished_at ? Date.parse(s.finished_at) : Date.now();
+  return (end - start) / 1000;
+}
+function copyText(text) {
+  function fallback() {
+    var ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.left = "-9999px";
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand("copy"); } catch (e) { /* ignore */ }
+    document.body.removeChild(ta);
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(function () { toast("已复制"); },
+      function () { fallback(); toast("已复制（回退方式）"); });
+  } else { fallback(); toast("已复制（回退方式）"); }
+}
 
 /* ---------- 启动扫描 ---------- */
 function startScan() {
@@ -230,21 +369,24 @@ function startScan() {
     method: "POST", headers: {"Content-Type": "application/json"},
     body: JSON.stringify(body)
   }).then(function (j) {
-    toast("已创建扫描 " + (j.scan_id || j.id || ""));
+    var id = j.scan_id || j.id;
+    toast("已创建扫描 " + id);
     $("url").value = "";
+    selected = id || selected;      // 自动选中新任务，直接看它跑
     refreshScans();
   }).catch(function (e) {
     toast("创建失败:" + e.message, true);
   }).then(function () { $("startBtn").disabled = false; });
 }
 
-/* ---------- 任务列表 ---------- */
+/* ---------- 任务列表（含实时进度） ---------- */
 function statePill(state) {
   var cls = String(state || "").toLowerCase();
-  return '<span class="pill ' + esc(cls) + '">' + esc(state || "?") + "</span>";
+  var live = isLive(cls) ? '<span class="spin"></span> ' : "";
+  return '<span class="pill ' + esc(cls) + '">' + live + esc(state || "?") + "</span>";
 }
 function refreshScans() {
-  api("/api/v1/scans").then(function (j) {
+  return api("/api/v1/scans").then(function (j) {
     scans = j.scans || j.jobs || [];
     renderScans();
     checkApi(true);
@@ -255,24 +397,81 @@ function refreshScans() {
 }
 function renderScans() {
   var box = $("scanList");
-  if (!scans.length) { box.innerHTML = '<div class="empty">还没有扫描任务</div>'; return; }
-  var html = '<table><thead><tr><th>目标</th><th>状态</th><th>发现</th><th>开始</th><th></th></tr></thead><tbody>';
+  var live = scans.filter(function (s) { return isLive(s.state); }).length;
+  $("scanSummary").textContent = scans.length
+    ? (scans.length + " 个任务" + (live ? " · " + live + " 进行中" : "")) : "";
+  if (!scans.length) {
+    lastIdsSig = "";
+    lastFindingsSig = null;
+    box.innerHTML = '<div class="empty">还没有扫描任务</div>';
+    return;
+  }
+  // 自适应轮询最快要 1.2s 一次：整表重建 innerHTML 会让点击/展开在重建
+  // 瞬间踩空（真浏览器里实测到 "element not found"），也会闪。所以只在
+  // 任务集合本身变化时重建行，否则只按 data-id 找到那一行、改它的单元格。
+  var idsSig = scans.map(function (s) { return s.scan_id || s.id; }).join(",");
+  if (idsSig !== lastIdsSig) { lastIdsSig = idsSig; buildScanRows(); }
+  else { patchScanRows(); }
+}
+function scanCells(s) {
+  var id = s.scan_id || s.id;
+  var liveRow = isLive(s.state);
+  var prog = '<span class="mini mono">' + esc(s.requests_made || 0) + " req</span>";
+  if (liveRow) {
+    prog = '<span class="spin"></span> <span class="mini mono">'
+      + esc(s.requests_made || 0) + " req</span>";
+  }
+  var hi = s.high_severity_count != null && s.high_severity_count > 0
+    ? ' <span class="sev-high mini">' + esc(s.high_severity_count) + "H</span>" : "";
+  return {
+    state: statePill(s.state),
+    prog: prog,
+    findings: esc(s.finding_count != null ? s.finding_count : 0) + hi,
+    elapsed: esc(fmtDur(jobElapsed(s))),
+    live: liveRow,
+    sel: id === selected,
+    id: id
+  };
+}
+function buildScanRows() {
+  var html = '<table><thead><tr><th>目标</th><th>状态</th><th>进度</th><th>发现</th>'
+    + "<th>耗时</th><th></th></tr></thead><tbody>";
   scans.forEach(function (s) {
-    var id = s.scan_id || s.id;
-    var when = (s.created_at || s.started_at || "").replace("T", " ").slice(0, 19);
-    html += '<tr class="' + (id === selected ? "sel" : "") + '" data-id="' + esc(id) + '">'
+    var c = scanCells(s);
+    html += '<tr class="' + (c.sel ? "sel" : "") + '" data-id="' + esc(c.id) + '">'
       + '<td class="mono" style="max-width:190px;overflow:hidden;text-overflow:ellipsis" title="'
-      + esc(s.url || "") + '">' + esc(s.url || "") + "</td>"
-      + "<td>" + statePill(s.state) + "</td>"
-      + "<td>" + esc(s.finding_count != null ? s.finding_count : (s.findings || []).length) + "</td>"
-      + '<td class="mono" style="color:var(--dim)">' + esc(when) + "</td>"
-      + '<td style="white-space:nowrap">'
+      + esc(s.target_url || s.url || "") + '">' + esc(s.target_url || s.url || "") + "</td>"
+      + '<td class="td-state">' + c.state + "</td>"
+      + '<td class="td-prog" style="white-space:nowrap">' + c.prog + "</td>"
+      + '<td class="td-find">' + c.findings + "</td>"
+      + '<td class="td-elapsed mono muted mini" style="white-space:nowrap">'
+      + c.elapsed + "</td>"
+      + '<td class="td-actions" style="white-space:nowrap">'
       + '<button class="ghost small" data-act="view">查看</button> '
-      + '<button class="ghost small" data-act="cancel">取消</button> '
+      + '<button class="ghost small" data-act="cancel"' + (c.live ? "" : " disabled")
+      + ">取消</button> "
       + '<button class="ghost small" data-act="del">删除</button>'
       + "</td></tr>";
   });
-  box.innerHTML = html + "</tbody></table>";
+  $("scanList").innerHTML = html + "</tbody></table>";
+}
+function patchScanRows() {
+  scans.forEach(function (s) {
+    var c = scanCells(s);
+    var tr = $("scanList").querySelector('tr[data-id="' + c.id.replace(/"/g, '\\"') + '"]');
+    if (!tr) return;
+    tr.className = c.sel ? "sel" : "";
+    var st = tr.querySelector(".td-state");
+    if (st) st.innerHTML = c.state;
+    var pr = tr.querySelector(".td-prog");
+    if (pr) pr.innerHTML = c.prog;
+    var fd = tr.querySelector(".td-find");
+    if (fd) fd.innerHTML = c.findings;
+    var el = tr.querySelector(".td-elapsed");
+    if (el) el.textContent = c.elapsed;
+    var cb = tr.querySelector('button[data-act="cancel"]');
+    if (cb) cb.disabled = !c.live;
+  });
 }
 $("scanList").addEventListener("click", function (e) {
   var tr = e.target.closest("tr[data-id]");
@@ -281,8 +480,13 @@ $("scanList").addEventListener("click", function (e) {
   var act = e.target.getAttribute && e.target.getAttribute("data-act");
   if (act === "cancel") { cancelScan(id); return; }
   if (act === "del") { deleteScan(id); return; }
+  if (e.target.tagName === "BUTTON" && act !== "view") return;
   selected = id;
+  expanded = {};
+  lastFindingsSig = null;
+  lastTypeSig = null;
   renderScans();
+  loadDetail();
   loadFindings();
 });
 
@@ -296,65 +500,311 @@ function deleteScan(id) {
   api("/api/v1/scans/" + encodeURIComponent(id), {method: "DELETE"})
     .then(function () {
       toast("已删除");
-      if (selected === id) { selected = null; renderFindingsEmpty(); }
+      if (selected === id) { selected = null; detail = null; renderDetail(); clearFindings("选择左侧任务查看发现"); }
       refreshScans();
     })
     .catch(function (e) { toast("删除失败:" + e.message, true); });
 }
 
+/* ---------- 选中任务详情 ---------- */
+function renderDetail() {
+  var box = $("detailBody");
+  $("detailAi").innerHTML = "";
+  if (!detail) {
+    box.innerHTML = '<span class="muted mini">未选择任务</span>';
+    return;
+  }
+  var d = detail, o = d.options || {};
+  var parts = [];
+  parts.push(statePill(d.state));
+  parts.push('<span class="kv"><span class="k">目标</span><span class="v">'
+    + esc(d.target_url || "") + "</span></span>");
+  parts.push('<span class="kv"><span class="k">耗时</span><span class="v">'
+    + esc(fmtDur(jobElapsed(d))) + "</span></span>");
+  parts.push('<span class="kv"><span class="k">请求</span><span class="v">'
+    + esc(d.requests_made || 0) + "</span></span>");
+  parts.push('<span class="kv"><span class="k">发现</span><span class="v">'
+    + esc(d.finding_count || 0) + " (" + esc(d.high_severity_count || 0)
+    + " high)</span></span>");
+  if (d.waf_name) {
+    parts.push('<span class="kv"><span class="k">WAF</span><span class="v">'
+      + esc(d.waf_name) + "</span></span>");
+  }
+  if (d.error) {
+    parts.push('<span class="kv"><span class="k" style="color:var(--bad)">错误</span>'
+      + '<span class="v sev-high">' + esc(d.error) + "</span></span>");
+  }
+  var optChips = [];
+  function chip(name, on) {
+    optChips.push('<span class="chip ' + (on ? "on" : "off") + '">' + esc(name) + "</span>");
+  }
+  chip("headless " + (o.headless ? "on" : "off"), !!o.headless);
+  chip("crawl " + (o.crawl ? ("d" + (o.crawl_depth == null ? "" : o.crawl_depth)) : "off"), !!o.crawl);
+  chip("dom " + (o.dom_engine || "auto"), (o.dom_engine || "auto") !== "off");
+  chip("threads " + (o.threads == null ? "?" : o.threads), true);
+  if (o.ai_report) chip("ai 请求", true);
+  if (Object.keys(d.params || {}).length) {
+    chip("params " + Object.keys(d.params).length, true);
+  }
+  parts.push('<span class="codes">' + optChips.join(" ") + "</span>");
+  var id = d.scan_id || d.id;
+  if (isLive(d.state)) {
+    parts.push('<button class="ghost small" id="detailCancel" data-id="' + esc(id)
+      + '">取消任务</button>');
+  }
+  box.innerHTML = parts.join("");
+  var cb = $("detailCancel");
+  if (cb) cb.addEventListener("click", function () { cancelScan(this.getAttribute("data-id")); });
+  $("detailAi").innerHTML = d.has_ai_report
+    ? '<span class="badge">AI 叙述已缓存</span>' : "";
+}
+function loadDetail() {
+  if (!selected) { detail = null; renderDetail(); renderCoverage(null); return; }
+  return api("/api/v1/scans/" + encodeURIComponent(selected)).then(function (j) {
+    detail = j;
+    renderDetail();
+    renderCoverage(j.coverage_summary);
+    $("aiBtn").disabled = false;
+  }).catch(function () { /* 轮询期忽略瞬时错误 */ });
+}
+
 /* ---------- 发现 ---------- */
-function renderFindingsEmpty() {
-  $("findingRows").innerHTML = '<div class="empty">选择左侧任务查看发现</div>';
+function clearFindings(msg) {
+  findings = [];
+  lastFindingsSig = null;
+  lastTypeSig = null;
+  $("findingRows").innerHTML = '<div class="empty">' + esc(msg) + "</div>";
   $("findingCount").textContent = "";
+  $("filteredCount").textContent = "";
   $("reportBtn").disabled = true;
+  $("aiBtn").disabled = true;
   $("dlBtn").disabled = true;
+  $("sevBar").innerHTML = "";
+  $("sevLegend").innerHTML = "";
 }
 function loadFindings() {
-  if (!selected) { renderFindingsEmpty(); return; }
-  api("/api/v1/scans/" + encodeURIComponent(selected) + "/findings")
+  if (!selected) { clearFindings("选择左侧任务查看发现"); return; }
+  return api("/api/v1/scans/" + encodeURIComponent(selected) + "/findings")
     .then(function (j) { renderFindings(j.findings || []); })
     .catch(function (e) {
       $("findingRows").innerHTML = '<div class="empty">加载失败:' + esc(e.message) + "</div>";
     });
 }
+function sevCounts(list) {
+  var c = {critical: 0, high: 0, medium: 0, low: 0, info: 0};
+  list.forEach(function (f) {
+    var s = String(f.severity || "low").toLowerCase();
+    if (c[s] == null) c.low++;
+    else c[s]++;
+  });
+  return c;
+}
 function renderFindings(list) {
+  findings = list;
   $("reportBtn").disabled = false;
   $("dlBtn").disabled = false;
-  var counts = {high: 0, medium: 0, low: 0};
+  $("aiBtn").disabled = false;
+  var c = sevCounts(list);
+  var n = list.length || 1;
+  $("sevBar").innerHTML = ["critical", "high", "medium", "low", "info"]
+    .filter(function (k) { return c[k] > 0; })
+    .map(function (k) {
+      return '<i class="' + k + '" style="width:' + (c[k] / n * 100).toFixed(2)
+        + '%" title="' + k + " " + c[k] + '"></i>';
+    }).join("");
+  $("sevLegend").innerHTML = ["critical", "high", "medium", "low", "info"]
+    .filter(function (k) { return c[k] > 0; })
+    .map(function (k) {
+      return '<span><b class="sev-' + k + '">' + c[k] + "</b> " + k + "</span>";
+    }).join("") + '<span class="muted">共 ' + list.length + " 项</span>";
+  $("findingCount").textContent = "";
+  buildTypeFilter(list);
+  // 轮询期间发现是流式进来的：内容没变就不重绘表格（否则展开态会塌、
+  // 鼠标/自动化点击会在重建瞬间踩空 —— 真浏览器里实测到过）。
+  var sig = list.map(function (f) {
+    return [f.type, f.severity, f.confidence, f.param, f.evidence_class,
+            String(f.payload || "").length].join("~");
+  }).join("|");
+  if (sig !== lastFindingsSig) { lastFindingsSig = sig; renderFindingRows(); }
+}
+function buildTypeFilter(list) {
+  var sel = $("typeF");
+  var keep = sel.value;
+  var types = {};
   list.forEach(function (f) {
-    var s = (f.severity || "low").toLowerCase();
-    if (counts[s] != null) counts[s]++;
+    var t = f.type || "(无)";
+    types[t] = (types[t] || 0) + 1;
   });
-  $("findingCount").innerHTML = "共 " + list.length + " 项 · "
-    + '<span class="sev-high">' + counts.high + " high</span> · "
-    + '<span class="sev-medium">' + counts.medium + " medium</span> · "
-    + '<span class="sev-low">' + counts.low + " low</span>";
-  if (!list.length) {
+  var keys = Object.keys(types).sort(function (a, b) { return types[b] - types[a]; });
+  var sig = keys.map(function (t) { return t + ":" + types[t]; }).join(",");
+  if (sig === lastTypeSig) return;          // 类型集合没变就不动 select
+  lastTypeSig = sig;
+  sel.innerHTML = '<option value="">全部类型</option>' + keys.map(function (t) {
+    return '<option value="' + esc(t) + '">' + esc(t) + " (" + types[t] + ")</option>";
+  }).join("");
+  sel.value = keys.indexOf(keep) >= 0 ? keep : "";
+}
+function activeSevs() {
+  var out = [];
+  Array.prototype.forEach.call(document.querySelectorAll(".sevF"), function (el) {
+    if (el.checked) out.push(el.value);
+  });
+  return out;
+}
+function filteredFindings() {
+  var sevs = activeSevs();
+  var onlyExec = $("onlyExecuted").checked;
+  var type = $("typeF").value;
+  var text = $("textF").value.trim().toLowerCase();
+  var rows = findings.filter(function (f) {
+    var s = String(f.severity || "low").toLowerCase();
+    if (sevs.indexOf(s) < 0 && !(s === "critical" && sevs.indexOf("high") >= 0)) return false;
+    if (onlyExec && f.evidence_class !== "browser-executed") return false;
+    if (type && (f.type || "(无)") !== type) return false;
+    if (text) {
+      var hay = [f.param, f.context, f.detail, f.payload, f.type, f.evidence_class,
+                 f.url].join(" ").toLowerCase();
+      if (hay.indexOf(text) < 0) return false;
+    }
+    return true;
+  });
+  rows.sort(function (a, b) {
+    var av, bv;
+    if (sortKey === "sev") {
+      av = SEV_ORDER[String(a.severity || "low").toLowerCase()] || 0;
+      bv = SEV_ORDER[String(b.severity || "low").toLowerCase()] || 0;
+    } else {
+      av = String(a[sortKey] || "").toLowerCase();
+      bv = String(b[sortKey] || "").toLowerCase();
+    }
+    if (av < bv) return -1 * sortDir;
+    if (av > bv) return 1 * sortDir;
+    return String(a.type || "").localeCompare(String(b.type || ""));
+  });
+  return rows;
+}
+function arrow(k) {
+  return sortKey === k ? ' <span class="arrow">' + (sortDir < 0 ? "▼" : "▲") + "</span>" : "";
+}
+function renderFindingRows() {
+  var rows = filteredFindings();
+  $("filteredCount").textContent = findings.length
+    ? ("显示 " + rows.length + " / " + findings.length) : "";
+  if (!findings.length) {
     $("findingRows").innerHTML = '<div class="empty">该任务没有发现</div>';
     return;
   }
-  var html = '<table><thead><tr><th>类型</th><th>严重度</th><th>置信</th>'
-    + "<th>参数</th><th>上下文</th><th>说明</th></tr></thead><tbody>";
-  list.forEach(function (f) {
-    var sev = (f.severity || "low").toLowerCase();
-    html += "<tr><td>" + esc(f.type) + "</td>"
+  if (!rows.length) {
+    $("findingRows").innerHTML = '<div class="empty">当前过滤条件下没有发现</div>';
+    return;
+  }
+  var html = "<table><thead><tr>"
+    + '<th class="sortable" data-sort="type">类型' + arrow("type") + "</th>"
+    + '<th class="sortable" data-sort="sev">严重度' + arrow("sev") + "</th>"
+    + '<th class="sortable" data-sort="confidence">置信' + arrow("confidence") + "</th>"
+    + '<th class="sortable" data-sort="param">参数' + arrow("param") + "</th>"
+    + '<th class="sortable" data-sort="context">上下文' + arrow("context") + "</th>"
+    + '<th class="sortable" data-sort="evidence_class">证据' + arrow("evidence_class") + "</th>"
+    + "<th>说明</th></tr></thead><tbody>";
+  rows.forEach(function (f) {
+    var sev = String(f.severity || "low").toLowerCase();
+    var key = String(f.url || "") + "|" + String(f.param || "") + "|"
+      + String(f.type || "") + "|" + String(f.payload || "").length;
+    var isOpen = !!expanded[key];
+    html += '<tr class="clickable' + (isOpen ? " sel" : "") + '" data-x="' + esc(key) + '">'
+      + "<td>" + esc(f.type) + "</td>"
       + '<td class="sev-' + esc(sev) + '">' + esc(f.severity) + "</td>"
-      + "<td>" + esc(f.confidence) + "</td>"
+      + "<td>" + esc(f.confidence || "-") + "</td>"
       + '<td class="mono">' + esc(f.param || "-") + "</td>"
       + "<td>" + esc(f.context || "-") + "</td>"
-      + '<td style="color:var(--dim);font-size:12px">' + esc((f.detail || "").slice(0, 160)) + "</td></tr>";
+      + '<td class="mini muted">' + esc(f.evidence_class || "-") + "</td>"
+      + '<td style="color:var(--dim);font-size:12px">'
+      + esc((f.detail || "").slice(0, 120)) + "</td></tr>";
+    if (isOpen) html += findingDetailRow(f, key);
   });
   $("findingRows").innerHTML = html + "</tbody></table>";
 }
+function findingDetailRow(f, key) {
+  var h = f.headless || {};
+  var codes = [];
+  codes.push("类型 " + esc(f.type || "-"));
+  if (f.context) codes.push("上下文 " + esc(f.context));
+  if (f.param) codes.push("参数 " + esc(f.param));
+  codes.push("严重度 " + esc(f.severity || "-"));
+  codes.push("置信 " + esc(f.confidence || "-"));
+  if (f.evidence_class) codes.push("证据类 " + esc(f.evidence_class));
+  if (h.outcome) codes.push("浏览器 " + esc(h.outcome) + (h.confirmed ? "(已确认)" : "(未确认)"));
+  if (f.transform && f.transform.length) codes.push("变形 " + esc(f.transform.join("+")));
+  var body = '<div class="codes">' + codes.map(function (c) {
+    return '<span class="chip">' + c + "</span>";
+  }).join("") + '<span class="spacer" style="flex:1"></span>'
+    + '<button class="ghost small" data-copy="' + esc(key) + '">复制载荷</button></div>';
+  if (f.url) {
+    body += '<div class="mini mono muted" style="margin-top:6px">' + esc(f.method || "GET")
+      + " " + esc(f.url) + "</div>";
+  }
+  if (h.detail) {
+    body += '<div class="mini muted" style="margin-top:4px">浏览器判定:' + esc(h.detail) + "</div>";
+  }
+  if (f.detail) {
+    body += '<div class="mini" style="margin-top:4px">' + esc(f.detail) + "</div>";
+  }
+  if (f.payload) {
+    body += "<pre class=\"payload\">" + esc(f.payload) + "</pre>";
+  }
+  if (f.proof && f.proof !== f.payload) {
+    body += '<div class="mini muted" style="margin-top:4px">proof</div>'
+      + '<pre class="payload">' + esc(f.proof) + "</pre>";
+  }
+  return '<tr class="xrow"><td colspan="7">' + body + "</td></tr>";
+}
+$("findingRows").addEventListener("click", function (e) {
+  var copyBtn = e.target.closest("[data-copy]");
+  if (copyBtn) {
+    var k = copyBtn.getAttribute("data-copy");
+    var row = findings.filter(function (f) {
+      return (String(f.url || "") + "|" + String(f.param || "") + "|"
+        + String(f.type || "") + "|" + String(f.payload || "").length) === k;
+    })[0];
+    copyText(row ? (row.payload || "") : "");
+    return;
+  }
+  var head = e.target.closest("th[data-sort]");
+  if (head) {
+    var k2 = head.getAttribute("data-sort");
+    if (sortKey === k2) sortDir = -sortDir; else { sortKey = k2; sortDir = -1; }
+    renderFindingRows();
+    return;
+  }
+  var tr = e.target.closest("tr[data-x]");
+  if (!tr) return;
+  var key = tr.getAttribute("data-x");
+  if (expanded[key]) delete expanded[key]; else expanded[key] = true;
+  renderFindingRows();
+});
+["onlyExecuted", "typeF"].forEach(function (id) {
+  $(id).addEventListener("change", renderFindingRows);
+});
+Array.prototype.forEach.call(document.querySelectorAll(".sevF"), function (el) {
+  el.addEventListener("change", renderFindingRows);
+});
+$("textF").addEventListener("input", renderFindingRows);
 
 /* ---------- 报告 ---------- */
-function reportUrl(fmt) {
-  return BASE + "/api/v1/scans/" + encodeURIComponent(selected)
+function reportUrl(fmt, ai) {
+  var u = BASE + "/api/v1/scans/" + encodeURIComponent(selected)
     + "/report?format=" + encodeURIComponent(fmt || "html");
+  if (ai) u += "&ai=" + encodeURIComponent(ai);
+  return u;
 }
 $("reportBtn").addEventListener("click", function () {
   if (!selected) return;
   window.open(reportUrl($("reportFmt").value), "_blank");
+});
+$("aiBtn").addEventListener("click", function () {
+  if (!selected) return;
+  window.open(reportUrl("html", "1"), "_blank");
+  if (detail && !detail.has_ai_report) toast("正在生成 AI 叙述（首次较慢）");
 });
 $("dlBtn").addEventListener("click", function () {
   if (!selected) return;
@@ -373,28 +823,125 @@ $("dlBtn").addEventListener("click", function () {
   }).catch(function (e) { toast("下载失败:" + e.message, true); });
 });
 
-/* ---------- 状态轮询 ---------- */
+/* ---------- 覆盖率矩阵 ---------- */
+function renderCoverage(cov) {
+  if (!cov || !cov.totals) {
+    $("covTotals").innerHTML = '<span class="muted mini">扫描完成或取消后可看覆盖率矩阵</span>';
+    $("covLayers").innerHTML = "";
+    $("covEndpoints").innerHTML = "";
+    $("covGen").textContent = "";
+    return;
+  }
+  var t = cov.totals;
+  $("covGen").textContent = cov.generated ? ("生成于 " + cov.generated.replace("T", " ")) : "";
+  var kv = [
+    ["端点", t.endpoints], ["参数", t.parameters], ["已反射", t.reflected],
+    ["已确认", t.confirmed], ["请求", t.requests], ["载荷下发", t.payloads_dispatched],
+    ["发现", t.findings]
+  ];
+  var html = kv.map(function (p) {
+    return '<span class="kv"><span class="k">' + esc(p[0]) + '</span><span class="v">'
+      + esc(p[1] == null ? 0 : p[1]) + "</span></span>";
+  }).join("");
+  if (t.endpoints_no_response && t.endpoints_no_response.length) {
+    html += '<span class="chip off">无响应端点 ' + esc(t.endpoints_no_response.length)
+      + "</span>";
+  }
+  if (t.payload_classes && t.payload_classes.length) {
+    html += '<span class="chip">payload 类 ' + esc(t.payload_classes.length) + "</span>";
+  }
+  $("covTotals").innerHTML = html;
+
+  var ran = cov.layer_coverage || {}, failed = cov.layer_failed || {},
+      miss = cov.layer_missing || {};
+  var ids = Object.keys(ran).sort(function (a, b) {
+    return (parseInt(a.replace(/[^0-9]/g, ""), 10) || 0)
+         - (parseInt(b.replace(/[^0-9]/g, ""), 10) || 0);
+  });
+  $("covLayers").innerHTML = ids.map(function (lid) {
+    var r = ran[lid] || 0, f = failed[lid] || 0, m = miss[lid] || 0;
+    var total = r + f + m || 1;
+    function seg(cls, v) {
+      return v ? '<i class="' + cls + '" style="width:' + (v / total * 100).toFixed(1)
+        + '%" title="' + cls + " " + v + '"></i>' : "";
+    }
+    return '<div class="lrow"><span class="lid" title="' + esc(lid) + '">' + esc(lid)
+      + '</span><span class="lbar">' + seg("ran", r) + seg("failed", f) + seg("missing", m)
+      + '</span><span class="lcount">跑 ' + esc(r) + (f ? " · 失败 " + esc(f) : "")
+      + (m ? " · 未跑 " + esc(m) : "") + "</span></div>";
+  }).join("");
+
+  var eps = (cov.endpoints || []).slice().sort(function (a, b) {
+    return (b.findings || 0) - (a.findings || 0) || (b.requests || 0) - (a.requests || 0);
+  });
+  var CAP = 50;
+  var rows = eps.slice(0, CAP).map(function (ep) {
+    var params = ep.params || {};
+    var reflected = Object.keys(params).filter(function (k) {
+      return params[k] && params[k].reflected;
+    }).length;
+    var url = String(ep.url || "");
+    return "<tr><td>" + esc(ep.method || "GET") + "</td>"
+      + '<td class="mono" style="max-width:320px;overflow:hidden;text-overflow:ellipsis" title="'
+      + esc(url) + '">' + esc(url) + "</td>"
+      + '<td class="mono">' + esc(ep.requests || 0) + "</td>"
+      + '<td class="mono">' + esc(Object.keys(params).length) + "</td>"
+      + '<td class="mono">' + esc(reflected) + "</td>"
+      + "<td>" + (ep.findings
+        ? '<span class="sev-high">' + esc(ep.findings) + "</span>" : "0") + "</td></tr>";
+  }).join("");
+  $("covEndpoints").innerHTML = eps.length
+    ? '<table><thead><tr><th>方法</th><th>端点</th><th>请求</th><th>参数</th>'
+      + "<th>已反射</th><th>发现</th></tr></thead><tbody>" + rows + "</tbody></table>"
+      + (eps.length > CAP
+        ? '<div class="hint">按发现数排序，仅显示前 ' + CAP + " / " + eps.length + " 个端点</div>"
+        : "")
+    : '<div class="empty">没有端点记录</div>';
+}
+
+/* ---------- 自适应轮询 ---------- */
 function checkApi(ok) {
   $("apiDot").className = "dot" + (ok ? "" : " off");
 }
 function poll() {
-  api("/api/v1/health").then(function () { checkApi(true); }).catch(function () { checkApi(false); });
-  refreshScans();
-  if (selected) loadFindings();
+  clearTimeout(pollTimer);
+  api("/api/v1/health").then(function () { checkApi(true); })
+    .catch(function () { checkApi(false); });
+  refreshScans().then(function () {
+    var live = scans.some(function (s) { return isLive(s.state); });
+    var mode = scans.length && live ? "fast" : "idle";
+    var sel = scans.filter(function (s) {
+      return (s.scan_id || s.id) === selected;
+    })[0];
+    if (selected) {
+      // 选中任务：跑着的时候每轮都刷（发现是流式产出的），终态只在
+      // state / finding_count 变化时再拉一次，避免空刷。
+      var sig = sel ? (sel.state + "/" + (sel.finding_count || 0)) : "";
+      if (isLive(sel ? sel.state : "") || sig !== lastLive[selected]) {
+        lastLive[selected] = sig;
+        loadDetail();
+        loadFindings();
+      }
+    }
+    var delay = mode === "fast" ? POLL_FAST : POLL_IDLE;
+    $("pollInfo").textContent = (mode === "fast" ? "实时 1.2s" : "空闲 4s");
+    pollTimer = setTimeout(poll, delay);
+  });
 }
-$("refreshBtn").addEventListener("click", poll);
+$("refreshBtn").addEventListener("click", function () { poll(); toast("已刷新"); });
 $("startBtn").addEventListener("click", startScan);
 $("url").addEventListener("keydown", function (e) { if (e.key === "Enter") startScan(); });
 
 /* ---------- 初始化 ---------- */
 api("/api/v1/info").then(function (j) {
-  var layers = (j.layers || j.detection_layers || []).length;
+  allLayers = j.detection_layers || j.layers || [];
   $("verInfo").textContent = "v" + (j.version || "?")
-    + (layers ? " · " + layers + " 个检测层" : "");
+    + (allLayers.length ? " · " + allLayers.length + " 个检测层" : "");
 }).catch(function () { $("verInfo").textContent = "API 不可达"; });
 
-refreshScans();
-pollTimer = setInterval(poll, 4000);
+clearFindings("选择左侧任务查看发现");
+renderCoverage(null);
+poll();
 </script>
 </body>
 </html>
