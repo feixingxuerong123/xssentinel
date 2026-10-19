@@ -27,7 +27,28 @@
   全程 **零非预期 finding**:四条命中是同一个已证实 sink,`api-surface` 正确保持沉默。
   前置条件:`NO_PROXY=127.0.0.1,localhost`(见 Phase 268 的代理假阴性)。
 
-- **同一靶场的召回账:9 条 XSS 挑战,当前扫描模型能确认 2 条(Phase 270)**:
+- **登录后的存储型 DOM 链路:第 7 条挑战确认,召回 3/9(Phase 275)**:`--stored-dom`
+  早就支持 `--login-token` + `--browser-local-storage`,但那条路从没在真实应用上跑过
+  (Phase 274 只走了 HTTP 视图)。实测(OWASP Juice Shop 20.2.0,管理员会话):
+
+  ```
+  --stored-inject /api/Feedbacks  --stored-view /#/administration
+  --stored-param comment --stored-dom
+  --stored-extra rating=5 --stored-extra captchaId=… --stored-extra captcha=…
+  --login-token <JWT> --browser-local-storage token=<JWT> --headless
+  => 1 finding: stored_dom high/high browser-executed
+     sink Element.innerHTML @ #/administration,41 requests,29s
+     payload "<<script>Foo</script>iframe src=\"javascript:alert('xssv_…')\">"
+  ```
+
+  **独立裁决**:同一条存储行用真实 Chromium 打开 `/#/administration` 并监听 dialog,
+  得到 **两次 `alert('xssv_…')`** ⇒ 真执行,不是 taint 误报。服务端 sanitize-html 剥掉了
+  `<img onerror>`/`<svg animate>`/`<script>` 的常见形状,却放过了 `<<script>` 前缀的
+  polyglot —— 这正是"Server-side XSS Protection"要的那条绕行。
+  召回账 2/9 → **3/9**。两条臂这次给出互补答案(JSON 视图 inert、登录 SPA 视图 fired),
+  是"HTTP 臂 + 浏览器臂都要保留"的直接证据。未动判定语义,不触发全量 192 的规矩。
+
+- **同一靶场的召回账:9 条 XSS 挑战,当前扫描模型能确认 3 条(Phase 270 + 275)**:
   上游 `data/static/challenges.yml` 共 **9 条 XSS**,逐条对照(不把"没测"算成"没漏"):
 
   | # | 挑战 | 面 | 状态 |
@@ -38,14 +59,13 @@
   | 4 | Video XSS | 促销视频 URL | 未测(需要另一条上传面先行) |
   | 5 | API-only XSS | 直接打 API 实体 | **当前模型够不着**:需管理员会话 + 写 |
   | 6 | Client-side XSS Protection | 注册用户 → 后台用户列表 | **够不着**:需登录 + 存储流 |
-  | 7 | Server-side XSS Protection | Customer Feedback 评论 | **写链已打通(Phase 274)**:JSON 注入 132 次全落库;执行未成立(载荷在浏览器里 inert) |
+  | 7 | Server-side XSS Protection | Customer Feedback 评论 | **已确认(Phase 275)**:`stored_dom` high/high,登录后 `/#/administration` 的 `Element.innerHTML`,Chromium dialog 实弹两次 |
   | 8 | CSP Bypass | 自家 RegEx 过滤的旧页面 | **够不着**:需登录 + CSP 注入载荷 |
   | 9 | HTTP-Header XSS | `X-Forwarded-For` → 最后登录 IP | **够不着**:需登录 + 自定义头 |
 
-  准确读法:今天的矩阵证明的是**精度与交付链路**(0 条非预期 finding),召回是 **2/9**,
-  不是 5/5。其余 6 条被"认证 + 写 + 二次查看"挡住,不是检测层漏报 ——
-  下一步的真缺口因此很具体:用 `--stored-inject/--stored-view`(或二阶)在真实应用上
-  跑通一条(反馈评论最短),再谈召回率。
+  准确读法:矩阵证明的是**精度与交付链路**(0 条非预期 finding),召回是 **3/9**,
+  不是 5/5。剩余 6 条里 4 条(5/6/8/9)被"认证 + 写 + 二次查看"挡住,1 条(4)依赖另一条
+  上传链,1 条(3)是同 sink 的载荷变体 —— 都不是检测层漏报。
 
 ### Added
 
@@ -59,10 +79,11 @@
   (`comment` + `rating` + `captchaId` + `captcha`,JSON)132 次写入全部 201,库里能看到
   真实载荷 `<iframe src="javascript:alert('xssv_…')">`(服务端 sanitize-html 放行了
   javascript: URL);`L4_stored` 层执行,但 `verify_semantic` 判
-  `url_javascript / no executable node carries the token` ⇒ **0 findings 是正确负结果**,
-  不是漏报——现代浏览器不执行 iframe 的 `javascript:` URL。
-  召回账不变(仍 2/9):这一条从"够不着"变成"写链已打通、执行未成立";下一次该动的是
-  **SPA 后台视图的浏览器会话认证**(先登录再让 `--stored-dom` 渲染),而不是载荷语料。
+  `url_javascript / no executable node carries the token` ⇒ **HTTP 视图 0 findings 是正确
+  负结果**——JSON 文本本身不是可执行文档。
+  **Phase 275 修正了这条的范围**:同一个落库载荷,在登录后的 `/#/administration` SPA 视图里
+  被浏览器臂判为 `stored_dom` high/high,并用真实 Chromium 的 dialog 监听复现了两次
+  `alert('xssv_…')`。该轮缺的不是载荷,是**已登录的浏览器视图**。
   环境记一笔:本机 `python -m xsssentinel` 在子进程里偶发 `No module named xsssentinel`
   (同 cwd/env 下 `-c "import xssentinel"` 正常),改用
   `-c "from xssentinel.__main__ import main; sys.exit(main())"` 后稳定;与产品无关。
