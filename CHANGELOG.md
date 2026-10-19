@@ -27,6 +27,26 @@
   全程 **零非预期 finding**:四条命中是同一个已证实 sink,`api-surface` 正确保持沉默。
   前置条件:`NO_PROXY=127.0.0.1,localhost`(见 Phase 268 的代理假阴性)。
 
+- **同一靶场的召回账:9 条 XSS 挑战,当前扫描模型能确认 2 条(Phase 270)**:
+  上游 `data/static/challenges.yml` 共 **9 条 XSS**,逐条对照(不把"没测"算成"没漏"):
+
+  | # | 挑战 | 面 | 状态 |
+  |---|---|---|---|
+  | 1 | DOM XSS | `#/search?q=` | **已确认**(browser-executed) |
+  | 2 | Reflected XSS | `#/track-result?id=` | **已确认**(browser-executed) |
+  | 3 | Bonus Payload | 同 #1 的输入框,换载荷 | sink 已覆盖;该载荷变体未单独测 |
+  | 4 | Video XSS | 促销视频 URL | 未测(需要另一条上传面先行) |
+  | 5 | API-only XSS | 直接打 API 实体 | **当前模型够不着**:需管理员会话 + 写 |
+  | 6 | Client-side XSS Protection | 注册用户 → 后台用户列表 | **够不着**:需登录 + 存储流 |
+  | 7 | Server-side XSS Protection | Customer Feedback 评论 | **够不着**:需写 + 后台查看 |
+  | 8 | CSP Bypass | 自家 RegEx 过滤的旧页面 | **够不着**:需登录 + CSP 注入载荷 |
+  | 9 | HTTP-Header XSS | `X-Forwarded-For` → 最后登录 IP | **够不着**:需登录 + 自定义头 |
+
+  准确读法:今天的矩阵证明的是**精度与交付链路**(0 条非预期 finding),召回是 **2/9**,
+  不是 5/5。其余 6 条被"认证 + 写 + 二次查看"挡住,不是检测层漏报 ——
+  下一步的真缺口因此很具体:用 `--stored-inject/--stored-view`(或二阶)在真实应用上
+  跑通一条(反馈评论最短),再谈召回率。
+
 ### Added
 
 - **SPA hash 路由发现(Phase 209)**:`js_miner.spa_query_params()` /
