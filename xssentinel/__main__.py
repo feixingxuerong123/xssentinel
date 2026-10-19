@@ -597,6 +597,26 @@ def build_parser():
                         metavar="'NAME: VALUE'",
                         help="Static auth header, e.g. 'X-API-Key: abc123' "
                              "or 'Authorization: Bearer eyJ...'")
+    g_auth.add_argument("--login-json", dest="login_json",
+                        action="store_true",
+                        help="POST --login-user/--login-pass as a JSON "
+                             "document and read the token from the response "
+                             "(Juice Shop: POST /rest/user/login -> "
+                             "authentication.token). The token is applied as "
+                             "'Authorization: Bearer' and, on --stored-relogin,"
+                             " re-seeded into the browser's localStorage.")
+    g_auth.add_argument("--login-token-path", dest="login_token_path",
+                        default="authentication.token",
+                        help="Dotted path to the token inside the JSON login "
+                             "response (default authentication.token).")
+    g_auth.add_argument("--stored-relogin", dest="stored_relogin",
+                        action="store_true",
+                        help="Re-run the configured login AFTER each stored "
+                             "injection and before the browser renders the "
+                             "view. For views that serve a value snapshotted "
+                             "into the session at login time (Juice Shop's "
+                             "last-login IP lives in the JWT). Requires "
+                             "--login-json with --login-url/--login-user.")
     g_auth.add_argument("--login-token", default=None, metavar="TOKEN",
                         help="Bearer/API token sent as "
                              "'Authorization: Bearer <token>'")

@@ -136,32 +136,55 @@ def _do_login(requester, args) -> "SessionManager | None":
 
     try:
         if args.login_url and args.login_user:
-            # Form login. Use the richer login_form when markers are given
-            # (otherwise fall back to the legacy csrf helper).
-            print(f"[*] Logging in at {args.login_url} ...")
-            creds = {args.login_field_user: args.login_user,
-                     args.login_field_pass: args.login_pass or ""}
-            marker = getattr(args, "login_success_marker", None)
-            fail_marker = getattr(args, "login_failure_marker", None)
-            if marker or fail_marker:
-                ok = mgr.login_form(args.login_url, creds, method="POST",
-                                    success_marker=marker,
-                                    failure_marker=fail_marker)
-            else:
-                ok = login_with_csrf(
+            if getattr(args, "login_json", False):
+                # Phase 278: JSON login (token in the body, not a cookie).
+                from .core.session import login_json as _login_json
+                print(f"[*] JSON login at {args.login_url} ...")
+                _hdrs, _store, _tok = _login_json(
                     requester, args.login_url, args.login_user,
                     args.login_pass or "",
-                    username_field=args.login_field_user,
-                    password_field=args.login_field_pass,
-                    csrf_field=args.login_csrf_field)
+                    user_field=args.login_field_user,
+                    pass_field=args.login_field_pass,
+                    token_path=getattr(args, "login_token_path",
+                                       "authentication.token"))
+                ok = bool(_hdrs)
                 if ok:
                     mgr.logged_in = True
                     mgr.login_time = time.time()
-                    mgr._login_url = args.login_url
-                    mgr._login_data = creds
-                    mgr._login_method = "POST"
-            print("[+] Login succeeded (session cookie captured)" if ok
-                  else "[!] Login failed -- continuing without auth")
+                    mgr.auth_header_names.add("Authorization")
+                    try:
+                        requester.session.headers.update(_hdrs)
+                    except Exception:
+                        pass
+                print("[+] JSON login token captured" if ok
+                      else "[!] JSON login failed -- no token in response")
+            else:
+                # Form login. Use the richer login_form when markers are given
+                # (otherwise fall back to the legacy csrf helper).
+                print(f"[*] Logging in at {args.login_url} ...")
+                creds = {args.login_field_user: args.login_user,
+                         args.login_field_pass: args.login_pass or ""}
+                marker = getattr(args, "login_success_marker", None)
+                fail_marker = getattr(args, "login_failure_marker", None)
+                if marker or fail_marker:
+                    ok = mgr.login_form(args.login_url, creds, method="POST",
+                                        success_marker=marker,
+                                        failure_marker=fail_marker)
+                else:
+                    ok = login_with_csrf(
+                        requester, args.login_url, args.login_user,
+                        args.login_pass or "",
+                        username_field=args.login_field_user,
+                        password_field=args.login_field_pass,
+                        csrf_field=args.login_csrf_field)
+                    if ok:
+                        mgr.logged_in = True
+                        mgr.login_time = time.time()
+                        mgr._login_url = args.login_url
+                        mgr._login_data = creds
+                        mgr._login_method = "POST"
+                print("[+] Login succeeded (session cookie captured)" if ok
+                      else "[!] Login failed -- continuing without auth")
 
         elif getattr(args, "login_basic", None):
             if ":" not in args.login_basic:
@@ -664,6 +687,26 @@ def _run_scan(args, url: str, requester, oob, progress, checkpoint,
             # client-side, so verification happens in the real browser.
             # Phase 152b: companion fields for write APIs that demand
             # password/csrf/captcha alongside the payload field.
+            # Phase 278: --stored-relogin re-runs the JSON login after every
+            # write, so views that serve a value snapshotted at login time
+            # (Juice Shop's last-login IP lives in the JWT) can render it.
+            relogin = None
+            if (getattr(args, "stored_relogin", False)
+                    and getattr(args, "login_json", False)
+                    and args.login_url and args.login_user):
+                _url, _usr = args.login_url, args.login_user
+                _pwd = args.login_pass or ""
+                _uf = args.login_field_user
+                _pf = args.login_field_pass
+                _tp = getattr(args, "login_token_path",
+                              "authentication.token")
+
+                def relogin():
+                    from .core.session import login_json as _lj
+                    return _lj(requester, _url, _usr, _pwd,
+                               user_field=_uf, pass_field=_pf,
+                               token_path=_tp)
+
             scanner.scan_stored_dom(args.stored_inject,
                                     view_url=args.stored_view,
                                     param=args.stored_param,
@@ -671,6 +714,7 @@ def _run_scan(args, url: str, requester, oob, progress, checkpoint,
                                                    "POST"),
                                     header_param=getattr(args, "stored_header",
                                                          None),
+                                    relogin=relogin,
                                     extra_fields=extras)
         else:
             scanner.scan_stored(args.stored_inject, view_url=args.stored_view,

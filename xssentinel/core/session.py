@@ -529,3 +529,38 @@ def login_with_csrf(requester, login_url: str,
         return ok
     except Exception:
         return False
+
+
+def login_json(requester, url: str, user: str, password: str,
+               user_field: str = "username",
+               pass_field: str = "password",
+               token_path: str = "authentication.token"):
+    """Phase 278: log in against a JSON API and pull out the session token.
+
+    Form login (``login_form`` / ``login_with_csrf``) captures a Set-Cookie;
+    a JSON login returns a token in the body instead (Juice Shop:
+    ``{"authentication": {"token": "eyJ..."}}``).  The token has to reach
+    BOTH the HTTP session (``Authorization``) and the browser's
+    localStorage (SPA route guards read it there), so this returns both
+    shapes rather than mutating a SessionManager.
+
+    Returns ``(headers, storage, token)``; ``({}, {}, None)`` when the
+    response carries no token at ``token_path``.
+    """
+    try:
+        resp = requester.post(url, json={user_field: user,
+                                         pass_field: password})
+    except Exception:
+        return {}, {}, None
+    try:
+        data = resp.json()
+    except Exception:
+        return {}, {}, None
+    node = data
+    for part in token_path.split("."):
+        if not isinstance(node, dict) or part not in node:
+            return {}, {}, None
+        node = node[part]
+    if not isinstance(node, str) or not node:
+        return {}, {}, None
+    return {"Authorization": "Bearer " + node}, {"token": node}, node

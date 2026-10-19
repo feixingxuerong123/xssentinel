@@ -383,7 +383,8 @@ class StoredBlindMixin:
                         param: str = "q", json_body: bool = False,
                         extra_fields: dict | None = None,
                         method: str = "POST",
-                        header_param: str | None = None):
+                        header_param: str | None = None,
+                        relogin=None):
         """Phase 152: stored XSS verified by the REAL BROWSER (SPA shape).
 
         ``scan_stored`` verifies persistence by looking for the token in the
@@ -480,6 +481,30 @@ class StoredBlindMixin:
                         continue
             if not stored:
                 continue
+            if relogin is not None:
+                # Phase 278: some views render a value that was SNAPSHOTTED
+                # into the session at login time.  Juice Shop's
+                # last-login-ip is exactly that: saveLoginIp writes the DB,
+                # but whoami (and therefore the profile page) serves the JWT
+                # payload minted at login.  Without a fresh login after the
+                # write, the view provably cannot show the payload and the
+                # scan reports a false zero.
+                try:
+                    new_headers, new_storage, _tok = relogin()
+                    if new_headers:
+                        self.auth_headers.update(new_headers)
+                        _sess = getattr(self.req, "session", None)
+                        if _sess is not None:
+                            _sess.headers.update(new_headers)
+                    if new_storage:
+                        self.auth_local_storage.update(new_storage)
+                    if new_headers or new_storage:
+                        engine.auth_headers = dict(self.auth_headers)
+                        engine.auth_local_storage = dict(
+                            self.auth_local_storage)
+                except Exception as e:
+                    _log.warning("stored-dom: re-login failed (%s); the view "
+                                 "renders with the pre-write session", e)
             if hasattr(self.req, "invalidate"):
                 self.req.invalidate(view_url)
             try:

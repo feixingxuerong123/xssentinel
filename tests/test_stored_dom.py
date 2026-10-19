@@ -68,6 +68,10 @@ class _Host(StoredBlindMixin):
         self.max_payloads = 5
         self.max_transforms = 3
         self.coverage = _FakeCoverage()
+        # Phase 278: --stored-relogin updates these before the render.
+        self.auth_headers: dict = {}
+        self.auth_cookies: list = []
+        self.auth_local_storage: dict = {}
 
     def _add(self, finding):
         self.findings.append(finding)
@@ -216,3 +220,34 @@ def test_header_param_sends_the_payload_in_a_header():
 
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__, "-v"]))
+
+
+def test_relogin_refreshes_auth_before_the_render():
+    """Phase 278: a view that serves a value snapshotted at login time
+    (Juice Shop's last-login IP lives in the JWT) can only render the
+    payload after a fresh login.  The callback must update both the HTTP
+    session headers and the browser's localStorage before engine.analyze."""
+    host = _Host(_FakeEngine([]))
+    seen: dict = {}
+
+    def relogin():
+        seen["called"] = True
+        return {"Authorization": "Bearer NEW"}, {"token": "NEW"}, "NEW"
+
+    host.scan_stored_dom("http://t/rest/saveLoginIp", view_url="http://t/view",
+                         method="GET", header_param="True-Client-IP",
+                         relogin=relogin)
+    assert seen.get("called"), "re-login was never performed"
+    assert host.auth_headers["Authorization"] == "Bearer NEW"
+    assert host.auth_local_storage["token"] == "NEW"
+
+
+def test_relogin_failure_does_not_kill_the_render():
+    host = _Host(_FakeEngine([]))
+
+    def relogin():
+        raise RuntimeError("login endpoint down")
+
+    ok = host.scan_stored_dom("http://t/write", view_url="http://t/view",
+                              relogin=relogin)
+    assert ok is False          # no hit, but the run completed

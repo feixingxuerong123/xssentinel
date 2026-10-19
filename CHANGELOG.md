@@ -69,7 +69,7 @@
   是否像 Phase 265 对 `dom_dynamic` 那样拆成 `stored_sink_reachability`,属于判定语义改动,
   要跑全量 192 并有明确决策,本轮**不做**,只把观测写下来。
 
-- **同一靶场的召回账:9 条 XSS 挑战,当前扫描模型能确认 4 条(Phase 270/275/276)**:
+- **同一靶场的召回账:9 条 XSS 挑战,当前扫描模型能确认 5 条(Phase 270/275/276/278)**:
   上游 `data/static/challenges.yml` 共 **9 条 XSS**,逐条对照(不把"没测"算成"没漏"):
 
   | # | 挑战 | 面 | 状态 |
@@ -82,14 +82,33 @@
   | 6 | Client-side XSS Protection | 注册用户 → 后台用户列表 | **已确认(Phase 276)**:`POST /api/Users` 的 email 原样落库;管理员页真实弹窗(手工 `<iframe src=javascript:alert(2)>@juice-sh.op`),扫描器的 `<<script>` 载荷只到 sink 不执行 |
   | 7 | Server-side XSS Protection | Customer Feedback 评论 | **已确认(Phase 275)**:`stored_dom` high/high,登录后 `/#/administration` 的 `Element.innerHTML`,Chromium dialog 实弹两次 |
   | 8 | CSP Bypass | 自家 RegEx 过滤的旧页面 | **够不着**:需登录 + CSP 注入载荷 |
-  | 9 | HTTP-Header XSS | `True-Client-IP` → 最后登录 IP | **写链已打通(Phase 277)**:头载荷落库成功;视图需**重新登录**(JWT 快照),扫描器尚未做会话刷新 |
+  | 9 | HTTP-Header XSS | `True-Client-IP` → 最后登录 IP | **已确认(Phase 278)**:`--stored-header` + `--stored-relogin` 后报出 `stored_dom` high/high;扫描器自己的载荷仍是转义文本(无弹窗),应用侧换载荷可实弹 |
 
-  准确读法:矩阵证明的是**精度与交付链路**(0 条非预期 finding),召回是 **4/9**,
-  不是 5/5。剩余 5 条里 2 条(5/8)被"认证 + 写 + 二次查看"挡住,1 条(9)写链已通
-  但缺"写入后重新认证",1 条(4)依赖另一条上传链,1 条(3)是同 sink 的载荷变体 ——
-  都不是检测层漏报。
+  准确读法:矩阵证明的是**精度与交付链路**(0 条非预期 finding),召回是 **5/9**,
+  不是 5/5。剩余 4 条里 2 条(5/8)被"认证 + 写 + 二次查看"挡住,1 条(4)依赖另一条
+  上传链,1 条(3)是同 sink 的载荷变体 —— 都不是检测层漏报。
+  另注意 #6/#9 的扫描器自载荷是"sink 到达"而非"执行"(Phase 276/278 两次独立实测),
+  证据等级要不要拆分属判定语义,未在本轮动。
 
 ### Added
+
+- **`--login-json` / `--stored-relogin`:写入后重新登录,让"快照式视图"渲染新值(Phase 278)**:
+  Phase 277 量出 `True-Client-IP` 的载荷能落库但视图不渲染,根因是 **JWT 在登录时把
+  `lastLoginIp` 快照进去了**,`whoami` 返回旧值。补上三个开关:`--login-json`
+  (凭据以 JSON 发送,从 `--login-token-path` 默认 `authentication.token` 取 token)、
+  `--stored-relogin`(每次注入后重跑登录,把新 token 同时刷进 HTTP session 的
+  `Authorization`、`auth_headers` 与浏览器的 localStorage,再渲染视图)。
+  实现:`core/session.login_json()`(返回 headers/storage/token 三态)+
+  `scan_stored_dom(relogin=...)`。
+  **真实靶场实测(OWASP Juice Shop 20.2.0)**:重登录前该 token 在页面里**根本不存在**;
+  重登录后 `stored_dom high/high`、sink `Element.innerHTML` @ `/#/privacy-security/last-login-ip`、
+  40 请求 —— **视图侧闭环了**。
+  诚实记账:扫描器自己的载荷(`<<script>Foo</script>iframe …`)在 DOM 里仍是**转义文本**,
+  独立 Chromium dialog 监听 `dialogs []`;同端点换 `<iframe src="javascript:alert(123)">`
+  则 `dialogs ['123']` ⇒ 应用侧成立、扫描器这条仍是"sink 到达"而非"执行"
+  (与 Phase 276 同一条 caveat)。召回账记 **5/9**(检测到面),载荷执行问题另行决策。
+  测试 20 passed(新增 5:login_json 三点 + relogin 接线两条);未改判定语义,
+  按规矩补跑 64 例 strict 切片回归。
 
 - **`--stored-header` / `--stored-method`:存储注入能写请求头、能发 GET(Phase 277)**:
   又两个"能力早就存在、CLI 没接"的真空档。`scan_stored` 只会把载荷放进 body/query,
