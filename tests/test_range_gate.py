@@ -30,7 +30,8 @@ import pytest
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
-from range_gate import evidence_gaps, failing_rows  # noqa: E402
+from range_gate import (evidence_gaps, failing_rows,  # noqa: E402
+                        invoke_with_retries, unanswered)
 
 
 # ---------------------------------------------------------------------------
@@ -75,6 +76,59 @@ def test_evidence_gap_rules(case, row, expect_gap):
 
 
 # ---------------------------------------------------------------------------
+# retry policy (mirrors benchmark.runner._evaluate_with_retries)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("report,err,expect", [
+    (None, "timeout after 180s", True),      # no report came back
+    ({"requests": 0}, "", True),             # clean report, scanner never spoke
+    ({"requests": 0}, "exit=1", True),
+    ({"requests": 12}, "", False),           # a real answer, even if wrong
+    ({"requests": 12, "findings": []}, "", False),
+])
+def test_unanswered_shapes(report, err, expect):
+    assert unanswered(report, err) is expect
+
+
+def test_retry_recovers_a_wedged_scan():
+    calls = []
+
+    def invoke():
+        calls.append(1)
+        if len(calls) == 1:
+            return None, 1.0, "timeout after 180s"
+        return {"requests": 7}, 2.0, ""
+
+    report, elapsed, err, attempts = invoke_with_retries(invoke, retries=1)
+    assert (report or {}).get("requests") == 7
+    assert attempts == 1 and len(calls) == 2
+
+
+def test_retry_never_invents_a_report():
+    calls = []
+
+    def invoke():
+        calls.append(1)
+        return None, 1.0, "timeout after 180s"
+
+    report, elapsed, err, attempts = invoke_with_retries(invoke, retries=1)
+    assert report is None and err
+    assert attempts == 1 and len(calls) == 2, (
+        "one retry, then the row stays ERROR -- an unfinished scan is not a TN")
+
+
+def test_clean_scan_is_not_retried():
+    calls = []
+
+    def invoke():
+        calls.append(1)
+        return {"requests": 9}, 1.0, ""
+
+    report, elapsed, err, attempts = invoke_with_retries(invoke, retries=1)
+    assert attempts == 0 and len(calls) == 1
+
+
+# ---------------------------------------------------------------------------
 # the call sites (function bodies do not rot, call sites do)
 # ---------------------------------------------------------------------------
 
@@ -92,10 +146,21 @@ def _calls_in_main(rel_path: str) -> set[str]:
 
 @pytest.mark.parametrize("runner", ["range3/runner.py",
                                     "range4/runner.py",
-                                    "range5/runner.py"])
+                                    "range5/runner.py",
+                                    "range6/runner.py"])
 def test_every_runner_calls_the_shared_verdict_rule(runner):
     assert "failing_rows" in _calls_in_main(runner), (
         f"{runner} went back to hand-rolling its FN/FP/ERROR filter")
+
+
+@pytest.mark.parametrize("runner", ["range3/runner.py",
+                                    "range4/runner.py",
+                                    "range5/runner.py",
+                                    "range6/runner.py"])
+def test_every_runner_retries_unanswered_scans(runner):
+    assert "invoke_with_retries" in _calls_in_main(runner), (
+        f"{runner} calls the scanner directly again -- a wedged scan would "
+        f"be scored on its first (empty) answer")
 
 
 @pytest.mark.parametrize("runner", ["range4/runner.py", "range5/runner.py"])

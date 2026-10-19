@@ -55,3 +55,43 @@ def evidence_gaps(rows: list[dict],
         if r.get("verdict") == "TP" and not r.get("confirmed"):
             gaps.append((r.get("engine", "?"), r.get("case_id", "?")))
     return gaps
+
+
+#: One retry, not the benchmark's two: a range case can burn 180s per
+#: attempt, so two retries turn a wedged box into a nine-minute red wall
+#: per case.  The shape this catches is the one Phase 219 recorded --
+#: process alive, zero connections, retry green -- and it either clears on
+#: the next attempt or the box is not usable for measuring anything.
+_RANGE_RETRIES = 1
+
+
+def unanswered(report, err: str) -> bool:
+    """True when a row carries no information about the scanner at all.
+
+    Two shapes, same as ``benchmark.runner._unanswered``: the harness got
+    no report back, or the report is clean but the scanner never spoke
+    (``requests == 0`` -- the connection died inside the scan).  A clean
+    report with real requests is an answer, even when it is wrong.
+    """
+    if err and report is None:
+        return True
+    if report is not None and not (report.get("requests") or 0):
+        return True
+    return False
+
+
+def invoke_with_retries(invoke, *args, retries: int = _RANGE_RETRIES,
+                        **kwargs):
+    """Call a runner's ``_invoke_scanner`` until it answers, or give up.
+
+    Returns ``(report, elapsed, err, attempts)`` where ``attempts`` counts
+    EXTRA runs.  The verdict is never retried away: a scan that still has
+    no report after the retry stays ERROR, because an unfinished scan is
+    not evidence of a correct non-detection (Phase 176n).
+    """
+    report, elapsed, err = invoke(*args, **kwargs)
+    attempts = 0
+    while attempts < retries and unanswered(report, err):
+        attempts += 1
+        report, elapsed, err = invoke(*args, **kwargs)
+    return report, elapsed, err, attempts

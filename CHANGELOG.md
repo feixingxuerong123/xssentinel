@@ -36,6 +36,23 @@
 
 ### Fixed
 
+- **四个靶场 runner 都没有"楔死重试",本机一进楔死窗口就整面变红(Phase 269)**:
+  无代理复测时 range4 跑成 **8m58s / 2 个 ERROR**、range6 **3m44s / 1 个 ERROR**
+  (每次卡住的用例还都不同),range5 却 49s 全绿 —— 同一个提交、同一台机器。
+  `benchmark/runner.py` 从 Phase 69 起就有 `_evaluate_with_retries`(Phase 176n 又把
+  触发条件从 "verdict==FN" 改成"这行没有信息"),四个靶场 runner 却一直单跑一次。
+  照同一语义补进 `range_gate.py`:`invoke_with_retries` 只重试**没有回答**的行
+  (无 report,或 `requests==0`),**绝不把结论重试掉** —— 两次都没有报告仍然是 ERROR,
+  因为"没跑完"不是"正确地没发现"。重试次数落进行的 `retries` 字段并打印
+  `(retried Nx)`,`recovered` 与 `clean first time` 保持可区分。只给 1 次而不是基准的
+  2 次:靶场单例超时是 180s,两次重试会把一个楔死 case 变成九分钟的红墙。
+  测试 33 例(新增 7):`unanswered` 五态、一次超时后恢复、两次都超时仍 ERROR、
+  干净报告不重试、**AST 断言四个 runner 的 main 都调用它**、以及 range3 `main()` 的
+  端到端重试(`retries==1` 且 exit 0)。
+  诚实记账:本轮两次复跑 `retries` 全是 **0** —— 机器恰好没楔死,所以 range6 回到
+  1m01、range4 sync 回到 1m52 **不能记在重试头上**;重试本身由确定性假实现验证。
+  另:关掉代理并不让这些靶场变快或变慢,楔死的成因是负载,不是代理。
+
 - **外部效度复测被本机出口代理污染,差一步记成产品缺陷(Phase 268)**:shell 里
   `HTTP(S)_PROXY=http://127.0.0.1:4958` 时,扫描器取 Juice Shop 的 bundle 第一次正常
   (`main.js` 1.21 MB),随后 `polyfills.js`/`scripts.js` 拿回的都是 **9608 字节的

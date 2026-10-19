@@ -36,7 +36,8 @@ sys.path.insert(0, str(ROOT / "benchmark"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import requests  # noqa: E402
-from range_gate import evidence_gaps, failing_rows  # noqa: E402
+from range_gate import (evidence_gaps, failing_rows,  # noqa: E402
+                        invoke_with_retries)
 
 from server import run_server, SESSION_COOKIE, VALID_SESSION  # noqa: E402
 
@@ -258,8 +259,8 @@ def main() -> int:
             # JSON body cases ride --data directly; give the URL no query.
             if case.get("json_body"):
                 url = f"{base}{case['path']}"
-            report, elapsed, err = _invoke_scanner(
-                url, timeout=args.timeout, max_payloads=mp,
+            report, elapsed, err, attempts = invoke_with_retries(
+                _invoke_scanner, url, timeout=args.timeout, max_payloads=mp,
                 max_transforms=mt, extra_args=extra, engine=eng)
             if err and report is None:
                 verdict = "ERROR"
@@ -279,13 +280,16 @@ def main() -> int:
             # carry a fired outcome -- see range_gate.evidence_gaps.
             confirmed = sum(1 for d in detail if d["headless_outcome"] == "fired")
             mark = "" if verdict in ("TP", "TN") else "   <-- " + verdict
+            if attempts:
+                mark += f"   (retried {attempts}x)"
             if verdict == "ERROR":
                 mark += f" err={err[:80]!r}"
             print(f"  [{eng:5}] {case['id']:22} {verdict:5} "
                   f"findings={n:2} {elapsed:5.1f}s{mark}")
             rows.append({"engine": eng, "case_id": case["id"],
                          "verdict": verdict, "findings": n,
-                         "confirmed": confirmed, "findings_detail": detail,
+                         "confirmed": confirmed, "retries": attempts,
+                         "findings_detail": detail,
                          "error": err[:200], "elapsed": round(elapsed, 1)})
         tp = counts["TP"]
         print(f"  => TP{tp} FP{counts['FP']} TN{counts['TN']} "

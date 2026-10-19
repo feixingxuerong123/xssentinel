@@ -79,7 +79,7 @@ def runner_mod():
 
 
 def _drive(mod, monkeypatch, tmp_path, score_hook=None, error_path=None,
-           browser_fired=True):
+           error_once=False, browser_fired=True):
     """Call main() with the network/CLI boundary faked out.
 
     What is NOT faked: the manifest read, the start-URL/extra-args builders,
@@ -87,19 +87,25 @@ def _drive(mod, monkeypatch, tmp_path, score_hook=None, error_path=None,
     code.  That is the part the gate lives in.
 
     `browser_fired=False` is the dead-Chromium shape: findings exist, none
-    of them carries a `fired` outcome.
+    of them carries a `fired` outcome.  `error_once=True` is the wedge
+    shape: the first attempt on that URL dies, the retry answers.
     """
     monkeypatch.setattr(mod, "start_range", lambda *a, **k: (18702, 0.0))
     monkeypatch.setattr(mod, "login", lambda base: "r3_session=test")
+    seen = {"wedged": 0}
 
     def fake_invoke(url, timeout=60, max_payloads=10, max_transforms=6,
                     extra_args=None, engine="sync"):
         if error_path and error_path in url:
-            return None, 0.1, "timeout after 1s"
+            if not error_once or seen["wedged"] == 0:
+                seen["wedged"] += 1
+                return None, 0.1, "timeout after 1s"
         finding = {"type": "reflected", "severity": "high"}
         if browser_fired:
             finding["headless"] = {"outcome": "fired"}
-        return {"findings": [finding]}, 0.1, ""
+        # `requests` must be non-zero: a clean report that issued no request
+        # is the "scanner never spoke" shape and is retried by design.
+        return {"findings": [finding], "requests": 3}, 0.1, ""
 
     monkeypatch.setattr(mod, "_invoke_scanner", fake_invoke)
     if score_hook is not None:
@@ -168,3 +174,23 @@ def test_gate_fails_when_the_headless_case_has_no_browser_evidence(
     payload = json.loads(out.read_text(encoding="utf-8"))
     utf7 = [r for r in payload["rows"] if r["case_id"] == "r3-pos-utf7"]
     assert utf7 and all(r["confirmed"] == 0 for r in utf7)
+
+
+def test_a_wedged_first_attempt_is_retried_and_recorded(runner_mod,
+                                                        monkeypatch,
+                                                        tmp_path):
+    """Phase 269 wiring: the retry must be reachable from main(), not just
+    from range_gate's unit tests.  One timeout, then an answer -> exit 0,
+    and the row says retries=1 so "recovered" stays distinguishable from
+    "clean first time" (benchmark.runner's Phase 176n rule)."""
+    def perfect(report, case):
+        return "TN" if case["gt"] == "safe" else "TP"
+
+    rc, out = _drive(runner_mod, monkeypatch, tmp_path, score_hook=perfect,
+                     error_path="/search", error_once=True)
+    assert rc == 0, "a recovered wedge must not leave the gate red"
+    payload = json.loads(out.read_text(encoding="utf-8"))
+    row = [r for r in payload["rows"]
+           if r["case_id"] == "r3-pos-q-raw" and r["engine"] == "sync"][0]
+    assert row["verdict"] == "TP"
+    assert row["retries"] == 1

@@ -34,6 +34,8 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 sys.path.insert(0, str(ROOT))
 
+from range_gate import failing_rows, invoke_with_retries  # noqa: E402
+
 
 def _load_module(name: str, path: Path):
     spec = importlib.util.spec_from_file_location(name, path)
@@ -135,8 +137,8 @@ def main() -> int:
         counts = {"TP": 0, "FP": 0, "TN": 0, "FN": 0, "ERROR": 0}
         for case in manifest["cases"]:
             url = f"{base}{case['path']}?{case['param']}=xssentinel"
-            report, elapsed, err = _invoke_scanner(
-                url, timeout=args.timeout, max_payloads=8,
+            report, elapsed, err, attempts = invoke_with_retries(
+                _invoke_scanner, url, timeout=args.timeout, max_payloads=8,
                 max_transforms=4, engine=eng)
             verdict = "ERROR" if (err and report is None) else score(report, case)
             counts[verdict] += 1
@@ -145,6 +147,8 @@ def main() -> int:
                       for f in (report or {}).get("findings", [])]
             n = len(detail)
             mark = "" if verdict in ("TP", "TN") else f"   <-- {verdict} {err[:60]!r}"
+            if attempts:
+                mark += f"   (retried {attempts}x)"
             print(f"  [{eng:5}] {case['id']:24} {verdict:5} "
                   f"findings={n:2} {elapsed:5.1f}s{mark}")
             for d in detail:
@@ -152,6 +156,7 @@ def main() -> int:
             all_rows.append({"engine": eng, "case_id": case["id"],
                              "verdict": verdict, "findings": n,
                              "elapsed_s": round(elapsed, 1),
+                             "retries": attempts,
                              "findings_detail": detail, "error": err[:200]})
         print(f"  => TP{counts['TP']} FP{counts['FP']} TN{counts['TN']} "
               f"FN{counts['FN']} ERR{counts['ERROR']}")
@@ -171,12 +176,12 @@ def main() -> int:
                               encoding="utf-8")
     print(f"\n[*] written -> {args.out}")
 
-    bad = [(r["engine"], r["case_id"], r["verdict"], r["error"])
-           for r in all_rows if r["verdict"] in ("FN", "FP", "ERROR")]
+    bad = failing_rows(all_rows)
     if bad:
         print("\n[!] RANGE6 GATE FAILED (TP/TN required on every case):")
-        for eng, cid, verdict, err in bad:
-            print(f"    - [{eng}] {cid}: {verdict} {err[:120]}")
+        for r in bad:
+            print(f"    - [{r['engine']}] {r['case_id']}: "
+                  f"{r['verdict']} {r['error'][:120]}")
         return 1
     print("[*] Range6 gate: every case scored as ground truth requires")
     return 0

@@ -25,7 +25,8 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import requests  # noqa: E402
-from range_gate import evidence_gaps, failing_rows  # noqa: E402
+from range_gate import (evidence_gaps, failing_rows,  # noqa: E402
+                        invoke_with_retries)
 from server import run_server  # noqa: E402
 
 
@@ -113,8 +114,8 @@ def main() -> int:
         counts = {"TP": 0, "FP": 0, "TN": 0, "FN": 0, "ERROR": 0}
         for case in manifest["cases"]:
             url = f"{base}{case['path']}?{case['param']}=xssentinel"
-            report, elapsed, err = _invoke_scanner(
-                url, timeout=args.timeout, max_payloads=8,
+            report, elapsed, err, attempts = invoke_with_retries(
+                _invoke_scanner, url, timeout=args.timeout, max_payloads=8,
                 max_transforms=4, engine=eng)
             verdict = "ERROR" if (err and report is None) else score(report, case)
             counts[verdict] += 1
@@ -134,6 +135,8 @@ def main() -> int:
             # browser-confirmed is a weaker claim than one that fired.
             confirmed = sum(1 for d in detail if d["headless_outcome"] == "fired")
             mark = "" if verdict in ("TP", "TN") else f"   <-- {verdict} {err[:60]!r}"
+            if attempts:
+                mark += f"   (retried {attempts}x)"
             print(f"  [{eng:5}] {case['id']:20} {verdict:5} "
                   f"findings={n:2} {elapsed:5.1f}s{mark}")
             if top:
@@ -141,6 +144,7 @@ def main() -> int:
             all_rows.append({"engine": eng, "case_id": case["id"],
                              "verdict": verdict, "findings": n,
                              "confirmed": confirmed, "elapsed_s": round(elapsed, 1),
+                             "retries": attempts,
                              "findings_detail": detail, "error": err[:200]})
         print(f"  => TP{counts['TP']} FP{counts['FP']} TN{counts['TN']} "
               f"FN{counts['FN']} ERR{counts['ERROR']}")
