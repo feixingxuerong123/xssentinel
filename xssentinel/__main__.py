@@ -523,6 +523,14 @@ def build_parser():
     g_bs.add_argument("--stored-view", default=None,
                       help="Stored-XSS view URL")
     g_bs.add_argument("--stored-param", default="q")
+    g_bs.add_argument("--stored-json", dest="stored_json",
+                      action="store_true",
+                      help="Send the stored injection as a JSON document "
+                           "({\"<param>\": payload, ...}) instead of a form "
+                           "body. For write APIs that only parse "
+                           "application/json (POST /api/Feedbacks, "
+                           "/api/Reviews, ...). Pair with a view URL that "
+                           "can read the value back; --stored-dom implies it.")
     g_bs.add_argument("--stored-dom", dest="stored_dom", action="store_true",
                       help="Verify the stored payload by RENDERING the view "
                            "page in the real browser instead of matching the "

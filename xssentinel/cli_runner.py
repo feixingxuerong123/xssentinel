@@ -649,16 +649,21 @@ def _run_scan(args, url: str, requester, oob, progress, checkpoint,
                          e, exc_info=args.verbose)
 
     if args.stored_inject:
+        # Phase 274: companion fields for write APIs that demand
+        # password/rating/captcha/csrf alongside the payload field.  Parsed
+        # once, because BOTH stored paths need them -- the HTTP path used to
+        # silently drop --stored-extra, so a captcha-gated JSON API could
+        # only be driven through --stored-dom.
+        extras: dict = {}
+        for pair in (getattr(args, "stored_extra", None) or []):
+            if "=" in pair:
+                k, v = pair.split("=", 1)
+                extras[k.strip()] = v.strip()
         if getattr(args, "stored_dom", False):
             # Phase 152: SPA shape -- the view page renders the stored value
             # client-side, so verification happens in the real browser.
             # Phase 152b: companion fields for write APIs that demand
             # password/csrf/captcha alongside the payload field.
-            extras: dict = {}
-            for pair in (getattr(args, "stored_extra", None) or []):
-                if "=" in pair:
-                    k, v = pair.split("=", 1)
-                    extras[k.strip()] = v.strip()
             scanner.scan_stored_dom(args.stored_inject,
                                     view_url=args.stored_view,
                                     param=args.stored_param,
@@ -667,7 +672,9 @@ def _run_scan(args, url: str, requester, oob, progress, checkpoint,
             scanner.scan_stored(args.stored_inject, view_url=args.stored_view,
                                 param=args.stored_param,
                                 fresh_session=getattr(
-                                    args, "stored_fresh_session", False))
+                                    args, "stored_fresh_session", False),
+                                data_json=getattr(args, "stored_json", False),
+                                extra_fields=extras)
 
     if args.second_order_inject:
         viewers = None

@@ -38,7 +38,7 @@
   | 4 | Video XSS | 促销视频 URL | 未测(需要另一条上传面先行) |
   | 5 | API-only XSS | 直接打 API 实体 | **当前模型够不着**:需管理员会话 + 写 |
   | 6 | Client-side XSS Protection | 注册用户 → 后台用户列表 | **够不着**:需登录 + 存储流 |
-  | 7 | Server-side XSS Protection | Customer Feedback 评论 | **够不着**:需写 + 后台查看 |
+  | 7 | Server-side XSS Protection | Customer Feedback 评论 | **写链已打通(Phase 274)**:JSON 注入 132 次全落库;执行未成立(载荷在浏览器里 inert) |
   | 8 | CSP Bypass | 自家 RegEx 过滤的旧页面 | **够不着**:需登录 + CSP 注入载荷 |
   | 9 | HTTP-Header XSS | `X-Forwarded-For` → 最后登录 IP | **够不着**:需登录 + 自定义头 |
 
@@ -48,6 +48,24 @@
   跑通一条(反馈评论最短),再谈召回率。
 
 ### Added
+
+- **`--stored-json`:HTTP 存储路径能发 JSON 体与伴生字段(Phase 274)**:`scan_stored(data_json=...)`
+  从 Phase 241 就在,`--stored-extra` 从 Phase 152b 就在——但 CLI 两个都没接:前者没有开关,
+  后者只在 `--stored-dom` 分支里解析。于是"JSON 写入 + JSON 视图"的真实接口只能靠
+  `--stored-dom` 表达,而那会强制走浏览器渲染。现在 `--stored-json` 直接落
+  `data_json=True`,`--stored-extra` 在两条存储路径上都生效:伴生字段与载荷进同一个文档,
+  载荷始终占 `--stored-param`(不会被 extras 覆盖)。3 例纯逻辑测试锁线格式。
+  **真实靶场实测(OWASP Juice Shop 20.2.0)**:`POST /api/Feedbacks`
+  (`comment` + `rating` + `captchaId` + `captcha`,JSON)132 次写入全部 201,库里能看到
+  真实载荷 `<iframe src="javascript:alert('xssv_…')">`(服务端 sanitize-html 放行了
+  javascript: URL);`L4_stored` 层执行,但 `verify_semantic` 判
+  `url_javascript / no executable node carries the token` ⇒ **0 findings 是正确负结果**,
+  不是漏报——现代浏览器不执行 iframe 的 `javascript:` URL。
+  召回账不变(仍 2/9):这一条从"够不着"变成"写链已打通、执行未成立";下一次该动的是
+  **SPA 后台视图的浏览器会话认证**(先登录再让 `--stored-dom` 渲染),而不是载荷语料。
+  环境记一笔:本机 `python -m xsssentinel` 在子进程里偶发 `No module named xsssentinel`
+  (同 cwd/env 下 `-c "import xssentinel"` 正常),改用
+  `-c "from xssentinel.__main__ import main; sys.exit(main())"` 后稳定;与产品无关。
 
 - **SPA hash 路由发现(Phase 209)**:`js_miner.spa_query_params()` /
   `hash_route_urls()` 从应用自己的 bundle 里配对

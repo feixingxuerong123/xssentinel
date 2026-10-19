@@ -46,9 +46,16 @@ class StoredBlindMixin:
                     req: Requester | None = None,
                     fresh_session: bool = False,
                     data_json: bool = False,
-                    extra_view_urls: list | None = None):
+                    extra_view_urls: list | None = None,
+                    extra_fields: dict | None = None):
         """Inject a payload, then re-fetch a 'view' page to detect persisted
         (stored) XSS. The view page must render previously stored entries.
+
+        Phase 274: ``extra_fields`` are companion fields the write endpoint
+        demands (rating, captchaId, csrf, ...) and ride along in BOTH the
+        form and the JSON body; the payload always wins on ``param``.  The
+        DOM path had this since Phase 152b, the HTTP path did not -- which
+        made a JSON write API reachable only through ``--stored-dom``.
 
         Phase 46 (pentest-readiness): the previous implementation always
         re-fetched the view page with the SAME authenticated session, and
@@ -142,12 +149,14 @@ class StoredBlindMixin:
                         # Phase 241: data_json sends the injection as a JSON
                         # body, matching the encoding the page itself used
                         # for this field (an observed SPA write face).
+                        # Phase 274: companion fields ride along in both
+                        # encodings; the payload always wins on `param`.
+                        body = dict(extra_fields or {})
+                        body[param] = variant
                         if data_json:
-                            req.request(method, inject_url,
-                                        json={param: variant})
+                            req.request(method, inject_url, json=body)
                         else:
-                            req.request(method, inject_url,
-                                        data={param: variant})
+                            req.request(method, inject_url, data=body)
                     else:
                         req.request(method, inject_url, params={param: variant})
                     injected.append((variant, token, tset))
