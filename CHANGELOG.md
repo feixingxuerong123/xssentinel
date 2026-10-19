@@ -36,6 +36,23 @@
 
 ### Fixed
 
+- **外部效度复测被本机出口代理污染,差一步记成产品缺陷(Phase 268)**:shell 里
+  `HTTP(S)_PROXY=http://127.0.0.1:4958` 时,扫描器取 Juice Shop 的 bundle 第一次正常
+  (`main.js` 1.21 MB),随后 `polyfills.js`/`scripts.js` 拿回的都是 **9608 字节的
+  index.html**,于是 `_js_hash_routes` 返回 **0 条**,`-u <root> -c` 得到 0 findings。
+  这条链路看起来完全像"SPA 路由发现失效",实际是**测量通道被代理改写**。
+  同一条链路加 `NO_PROXY=127.0.0.1,localhost`(以 `--crawl-depth 1` 取证,避开 depth 2 的
+  楔死):三个 bundle 全部正常、**5 条 hash 路由**
+  (`#/search`、`#/login`、`#/address/select`、`#/track-result`、`#/chatbot`)、
+  **1 条 `dom_dynamic` high/high browser-executed @ `#/track-result?id=xss`**
+  (22 端点,77s,`headless.outcome=fired`)。结论:外部效度成立,先前那个 0 是假阴性。
+  驱动同步修两处:`XS_JUICE_BUNDLE` 可指向任意完整的 20.2.0 树(仓库自带副本的
+  `build/`+`node_modules/` 已被 2026-10 的工作区清空移除);缺 `build/` 时 **1 秒内**
+  报出原因,而不是健康轮询 90 秒后只说 "never became healthy"。docstring 写入
+  NO_PROXY 要求与本次实测数字。
+  附一条诚实记账:无代理的 `--crawl-depth 2` 跑 25 分钟仍 0 连接(Phase 219 记过的
+  同形楔死),已停止,改用 depth 1 取证;它不是产品结论,也不当作通过。
+
 - **靶场门禁看不见"浏览器到底跑没跑"(Phase 267,与 266 同族)**:range4/range5 每个正例都
   打印 `browser-confirmed=N`,门禁却只检查 TP/FP/TN/FN。实测:把
   `PLAYWRIGHT_BROWSERS_PATH` 指向空目录(等价于没装 Chromium),两个正例仍是 **TP**、

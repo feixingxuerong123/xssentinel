@@ -22,6 +22,15 @@ Usage::
 
 Results land in dev/_js_out/.  Nothing here loosens a judgement: the
 driver only starts a target, invokes the product, and reads its report.
+
+Environment note (measured 2026-10-19).  The scan subprocess inherits the
+caller's proxy settings.  On a box where HTTP(S)_PROXY points at an
+egress proxy, loopback asset fetches get corrupted: the first bundle
+fetched fine (main.js, 1.21 MB), while polyfills.js and scripts.js came
+back as 9608 bytes of index.html, and SPA route mining returned **zero**
+routes.  The same command with NO_PROXY=127.0.0.1,localhost returned the
+three real bundles and five hash routes.  Export NO_PROXY for local runs
+before drawing any conclusion about the target.
 """
 from __future__ import annotations
 
@@ -37,7 +46,13 @@ from urllib.parse import quote
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
-BUNDLE = os.path.join(HERE, "_juiceshop", "app", "juice-shop_20.2.0")
+#: The repo's own copy of the target.  The 2026-10 workspace wipe left
+#: data/ and logs/ in place but removed build/ and node_modules/, so a
+#: missing build is an ENVIRONMENT fact, not a target fact: say so instead
+#: of health-polling 90s and reporting "never became healthy".
+BUNDLE = os.environ.get(
+    "XS_JUICE_BUNDLE",
+    os.path.join(HERE, "_juiceshop", "app", "juice-shop_20.2.0"))
 OUT = os.path.join(HERE, "_js_out")
 PORT = int(os.environ.get("XS_JUICE_PORT", "18900"))
 BASE = f"http://127.0.0.1:{PORT}"
@@ -81,6 +96,13 @@ def serve(action: str = "start") -> int:
     if action == "status":
         print(f"healthy={healthy(timeout=3)} base={BASE}")
         return 0
+    app_js = os.path.join(BUNDLE, "build", "app.js")
+    if not os.path.exists(app_js):
+        print(f"[!] no built target at {app_js}")
+        print("    the 2026-10 workspace wipe removed build/ and node_modules/")
+        print("    from the repo's copy; set XS_JUICE_BUNDLE to an intact")
+        print("    20.2.0 tree (source checkout with build/ + node_modules/).")
+        return 1
     exe = node_bin()
     os.makedirs(OUT, exist_ok=True)
     logf = open(os.path.join(OUT, "juiceshop.log"), "ab", buffering=0)
