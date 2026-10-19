@@ -47,7 +47,8 @@ class StoredBlindMixin:
                     fresh_session: bool = False,
                     data_json: bool = False,
                     extra_view_urls: list | None = None,
-                    extra_fields: dict | None = None):
+                    extra_fields: dict | None = None,
+                    header_param: str | None = None):
         """Inject a payload, then re-fetch a 'view' page to detect persisted
         (stored) XSS. The view page must render previously stored entries.
 
@@ -56,6 +57,13 @@ class StoredBlindMixin:
         form and the JSON body; the payload always wins on ``param``.  The
         DOM path had this since Phase 152b, the HTTP path did not -- which
         made a JSON write API reachable only through ``--stored-dom``.
+
+        Phase 277: ``header_param`` moves the payload into a REQUEST HEADER
+        (name given, value = the marker-carrying payload).  Header-borne
+        writes exist in the wild -- Juice Shop persists ``True-Client-IP``
+        into the user's last-login IP -- and neither a body nor a query can
+        express them, so the stored layer was structurally blind to that
+        input surface.
 
         Phase 46 (pentest-readiness): the previous implementation always
         re-fetched the view page with the SAME authenticated session, and
@@ -145,7 +153,22 @@ class StoredBlindMixin:
                     continue
                 seen_variants.add(key)
                 try:
-                    if method.upper() == "POST":
+                    if header_param:
+                        # Phase 277: header-borne writes.  Some endpoints take
+                        # the attacker string from a request header
+                        # (True-Client-IP, X-Forwarded-For, Referer, ...) and
+                        # persist it for a later view -- the payload cannot
+                        # ride in a body or query there.  Companion fields have
+                        # no meaning in a header write, so they are sent as the
+                        # body only when --stored-extra was used.
+                        hdrs = {header_param: variant}
+                        extras_body = dict(extra_fields or {})
+                        if method.upper() == "POST" and extras_body:
+                            req.request(method, inject_url, data=extras_body,
+                                        headers=hdrs)
+                        else:
+                            req.request(method, inject_url, headers=hdrs)
+                    elif method.upper() == "POST":
                         # Phase 241: data_json sends the injection as a JSON
                         # body, matching the encoding the page itself used
                         # for this field (an observed SPA write face).
@@ -358,7 +381,9 @@ class StoredBlindMixin:
 
     def scan_stored_dom(self, inject_url: str, view_url: str | None = None,
                         param: str = "q", json_body: bool = False,
-                        extra_fields: dict | None = None):
+                        extra_fields: dict | None = None,
+                        method: str = "POST",
+                        header_param: str | None = None):
         """Phase 152: stored XSS verified by the REAL BROWSER (SPA shape).
 
         ``scan_stored`` verifies persistence by looking for the token in the
@@ -394,8 +419,9 @@ class StoredBlindMixin:
                        "verify %s", inject_url)
             return False
         self.coverage.touch_layer(
-            inject_url, "L4_stored_dom", "POST",
-            detail=f"inject->{view_url} param='{param}' "
+            inject_url, "L4_stored_dom", method,
+            detail=f"inject->{view_url} "
+                   f"{('header:' + header_param) if header_param else 'param=' + repr(param)} "
                    f"({'json' if json_body else 'form+json'})")
 
         bases: list = []
@@ -420,18 +446,38 @@ class StoredBlindMixin:
             # always rides in ``param``; companions are constant per scan.
             body: dict = dict(extra_fields or {})
             body[param] = variant
-            for enc in encodings:
+            if header_param:
+                # Phase 277: header-borne write.  One shape only -- the
+                # form/JSON split is meaningless when the attacker string
+                # rides in a header (Juice Shop: GET /rest/saveLoginIp with
+                # True-Client-IP persisted into the user's last-login IP).
+                hdrs = {header_param: variant}
+                extras_body = dict(extra_fields or {})
                 try:
-                    if enc == "json":
-                        req2 = self.req.request("POST", inject_url,
-                                                json=body)
+                    if method.upper() == "POST" and extras_body:
+                        req2 = self.req.request(method, inject_url,
+                                                data=extras_body,
+                                                headers=hdrs)
                     else:
-                        req2 = self.req.request("POST", inject_url,
-                                                data=body)
+                        req2 = self.req.request(method, inject_url,
+                                                headers=hdrs)
                     self._bump()
-                    stored = stored or (req2 is not None)
+                    stored = req2 is not None
                 except Exception:
-                    continue
+                    stored = False
+            else:
+                for enc in encodings:
+                    try:
+                        if enc == "json":
+                            req2 = self.req.request(method, inject_url,
+                                                    json=body)
+                        else:
+                            req2 = self.req.request(method, inject_url,
+                                                    data=body)
+                        self._bump()
+                        stored = stored or (req2 is not None)
+                    except Exception:
+                        continue
             if not stored:
                 continue
             if hasattr(self.req, "invalidate"):

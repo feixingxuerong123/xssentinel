@@ -667,14 +667,21 @@ def _run_scan(args, url: str, requester, oob, progress, checkpoint,
             scanner.scan_stored_dom(args.stored_inject,
                                     view_url=args.stored_view,
                                     param=args.stored_param,
+                                    method=getattr(args, "stored_method",
+                                                   "POST"),
+                                    header_param=getattr(args, "stored_header",
+                                                         None),
                                     extra_fields=extras)
         else:
             scanner.scan_stored(args.stored_inject, view_url=args.stored_view,
                                 param=args.stored_param,
+                                method=getattr(args, "stored_method", "POST"),
                                 fresh_session=getattr(
                                     args, "stored_fresh_session", False),
                                 data_json=getattr(args, "stored_json", False),
-                                extra_fields=extras)
+                                extra_fields=extras,
+                                header_param=getattr(args, "stored_header",
+                                                     None))
 
     if args.second_order_inject:
         viewers = None

@@ -523,6 +523,11 @@ def build_parser():
     g_bs.add_argument("--stored-view", default=None,
                       help="Stored-XSS view URL")
     g_bs.add_argument("--stored-param", default="q")
+    g_bs.add_argument("--stored-method", dest="stored_method", default="POST",
+                      choices=["GET", "POST"],
+                      help="HTTP method for the stored injection (default "
+                           "POST). GET writes exist: Juice Shop persists the "
+                           "True-Client-IP header via GET /rest/saveLoginIp.")
     g_bs.add_argument("--stored-json", dest="stored_json",
                       action="store_true",
                       help="Send the stored injection as a JSON document "
@@ -531,6 +536,14 @@ def build_parser():
                            "application/json (POST /api/Feedbacks, "
                            "/api/Reviews, ...). Pair with a view URL that "
                            "can read the value back; --stored-dom implies it.")
+    g_bs.add_argument("--stored-header", dest="stored_header", default=None,
+                      metavar="NAME",
+                      help="Send the stored payload in this REQUEST HEADER "
+                           "instead of the body or query (True-Client-IP, "
+                           "X-Forwarded-For, Referer, ...). For endpoints "
+                           "that persist a header value; --stored-param is "
+                           "then ignored and companion --stored-extra fields "
+                           "still ride in a POST body.")
     g_bs.add_argument("--stored-dom", dest="stored_dom", action="store_true",
                       help="Verify the stored payload by RENDERING the view "
                            "page in the real browser instead of matching the "

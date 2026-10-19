@@ -29,9 +29,10 @@ class _RecordingReq:
         self.calls: list[dict] = []
         self.gets: list[str] = []
 
-    def request(self, method, url, params=None, data=None, json=None, **kw):
-        self.calls.append({"method": method, "url": url,
-                           "data": data, "json": json})
+    def request(self, method, url, params=None, data=None, json=None,
+                headers=None, **kw):
+        self.calls.append({"method": method, "url": url, "params": params,
+                           "data": data, "json": json, "headers": headers})
         return _Resp()
 
     def get(self, url, cache_get: bool = True, **kw):
@@ -110,3 +111,32 @@ def test_companion_field_cannot_overwrite_the_payload():
                      extra_fields={"comment": "OVERWRITE"})
     body = _posts(host)[0]["json"]
     assert body["comment"] != "OVERWRITE"
+
+
+def test_header_param_puts_the_payload_in_the_header():
+    """Phase 277: header-borne writes (Juice Shop persists True-Client-IP
+    into the user's last-login IP on a GET).  The payload cannot ride in a
+    body or a query there."""
+    host = _Host()
+    host.scan_stored("http://t/rest/saveLoginIp", view_url="http://t/view",
+                     method="GET", param="ignored",
+                     header_param="True-Client-IP")
+    calls = host.req.calls
+    assert calls, "nothing was submitted"
+    for c in calls:
+        assert c["method"] == "GET"
+        assert c["params"] is None, "the payload must not leak into the query"
+        assert c["headers"] and "True-Client-IP" in c["headers"]
+        assert c["headers"]["True-Client-IP"], "header value is empty"
+
+
+def test_header_param_keeps_extras_in_a_post_body():
+    host = _Host()
+    host.scan_stored("http://t/write", view_url="http://t/view",
+                     param="comment", header_param="X-Attack",
+                     extra_fields={"csrf": "abc"})
+    posts = _posts(host)
+    assert posts
+    for p in posts:
+        assert p["headers"]["X-Attack"]
+        assert p["data"]["csrf"] == "abc"

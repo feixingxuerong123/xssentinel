@@ -82,13 +82,29 @@
   | 6 | Client-side XSS Protection | 注册用户 → 后台用户列表 | **已确认(Phase 276)**:`POST /api/Users` 的 email 原样落库;管理员页真实弹窗(手工 `<iframe src=javascript:alert(2)>@juice-sh.op`),扫描器的 `<<script>` 载荷只到 sink 不执行 |
   | 7 | Server-side XSS Protection | Customer Feedback 评论 | **已确认(Phase 275)**:`stored_dom` high/high,登录后 `/#/administration` 的 `Element.innerHTML`,Chromium dialog 实弹两次 |
   | 8 | CSP Bypass | 自家 RegEx 过滤的旧页面 | **够不着**:需登录 + CSP 注入载荷 |
-  | 9 | HTTP-Header XSS | `X-Forwarded-For` → 最后登录 IP | **够不着**:需登录 + 自定义头 |
+  | 9 | HTTP-Header XSS | `True-Client-IP` → 最后登录 IP | **写链已打通(Phase 277)**:头载荷落库成功;视图需**重新登录**(JWT 快照),扫描器尚未做会话刷新 |
 
   准确读法:矩阵证明的是**精度与交付链路**(0 条非预期 finding),召回是 **4/9**,
-  不是 5/5。剩余 5 条里 3 条(5/8/9)被"认证 + 写 + 二次查看"挡住,1 条(4)依赖另一条
-  上传链,1 条(3)是同 sink 的载荷变体 —— 都不是检测层漏报。
+  不是 5/5。剩余 5 条里 2 条(5/8)被"认证 + 写 + 二次查看"挡住,1 条(9)写链已通
+  但缺"写入后重新认证",1 条(4)依赖另一条上传链,1 条(3)是同 sink 的载荷变体 ——
+  都不是检测层漏报。
 
 ### Added
+
+- **`--stored-header` / `--stored-method`:存储注入能写请求头、能发 GET(Phase 277)**:
+  又两个"能力早就存在、CLI 没接"的真空档。`scan_stored` 只会把载荷放进 body/query,
+  `scan_stored_dom` 还硬编码 POST 且完全忽略 `--stored-header`——所以
+  `GET /rest/saveLoginIp` + `True-Client-IP` 这种**头写入**表面根本表达不了。
+  现在两条路径都支持:`--stored-header NAME` 把载荷放进请求头(伴生字段仍进 POST body),
+  `--stored-method GET|POST` 控制写入方法。测试 13 passed(新增 3:请求头、GET 不泄漏到
+  query、DOM 路径不再忽略头参数)。
+  **真实靶场实测(OWASP Juice Shop 20.2.0)**:`lastLoginIp` 被写成
+  `<svg/onload=alert('xssv_c6db15af')>` —— 写入确实发生;但扫描仍 0 findings,
+  原因是 **JWT 在登录时就把 `lastLoginIp` 快照进去了**,`whoami` 返回旧值,
+  视图页不会渲染新写入的内容。手工补一次重新登录后,同一页面立即
+  `dialogs ['123']`、DOM 里 `<dd><small><iframe src="javascript:alert(123)"></small></iframe></small></dd>`
+  ⇒ 第 9 条(HTTP-Header XSS)在应用侧成立,扫描器缺的是**写入后重新认证**,
+  不是写入能力。召回账仍 4/9,但 #9 的阻塞点从"头写不了"精确到"会话不刷新"。
 
 - **`--stored-json`:HTTP 存储路径能发 JSON 体与伴生字段(Phase 274)**:`scan_stored(data_json=...)`
   从 Phase 241 就在,`--stored-extra` 从 Phase 152b 就在——但 CLI 两个都没接:前者没有开关,

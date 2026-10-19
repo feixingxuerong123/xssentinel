@@ -53,7 +53,7 @@ class _RecordingReq:
     def request(self, method, url, params=None, data=None, json=None,
                 files=None, headers=None):
         self.calls.append({"method": method, "url": url, "data": data,
-                           "json": json})
+                           "json": json, "headers": headers})
         return object()  # truthy response stand-in
 
 
@@ -194,6 +194,24 @@ def test_extra_fields_ride_along_in_both_encodings():
         assert body["email"].startswith("<")  # payload field intact
     # the payload field must be the only marker-carrying field
     assert eng.calls and eng.calls[0][1] in posts[1]["json"]["email"]
+
+
+def test_header_param_sends_the_payload_in_a_header():
+    """Phase 277: header-borne writes (Juice Shop persists True-Client-IP
+    into the user's last-login IP via GET /rest/saveLoginIp).  The payload
+    cannot ride in a body or a query there, and this path used to ignore
+    --stored-header entirely."""
+    host = _Host(_FakeEngine([]))
+    ok = host.scan_stored_dom("http://t/rest/saveLoginIp",
+                              view_url="http://t/view",
+                              method="GET", header_param="True-Client-IP")
+    assert ok is False           # no browser hit -> no finding
+    subs = [c for c in host.req.calls if c["method"] == "GET"]
+    assert subs, "nothing was submitted"
+    for c in subs:
+        assert c["headers"] and c["headers"]["True-Client-IP"]
+        assert c["data"] is None and c["json"] is None, (
+            "a header write must not also leak the payload into the body")
 
 
 if __name__ == "__main__":
