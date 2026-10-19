@@ -471,6 +471,10 @@ def build_sarif(findings: list, target: str, meta: dict) -> str:
         "second_order":         "XSSENTINEL-XSS-SECOND-ORDER",
         "dom":                  "XSSENTINEL-XSS-DOM",
         "dom_dynamic":          "XSSENTINEL-XSS-DOM-DYNAMIC",
+        # Phase 265: delivery-only DOM evidence is not a confirmed XSS, so it
+        # gets its own rule id -- collapsing it into the DOM-XSS rule would
+        # make code-scanning triage read a reachability hint as an error.
+        "dom_sink_reachability": "XSSENTINEL-DOM-SINK-REACHABILITY",
         # Phase 207: stored_dom was emitted by scanner_stored.py but missing
         # here, so SARIF consumers collapsed it into the generic
         # XSSENTINEL-XSS rule -- a stored, browser-confirmed finding was
@@ -517,6 +521,7 @@ def build_sarif(findings: list, target: str, meta: dict) -> str:
         "second_order":         "Second-Order XSS",
         "dom":                  "DOM-based XSS (static heuristic)",
         "dom_dynamic":          "DOM-based XSS (real-browser confirmed)",
+        "dom_sink_reachability": "DOM sink reachability (execution not observed)",
         "stored_dom":           "Stored DOM-based XSS (browser-confirmed)",
         "blind":                "Blind XSS (OOB-confirmed)",
         "scenario":             "Scenario XSS (multi-step flow)",
@@ -895,6 +900,8 @@ _INTEROP_TYPE_NAME = {
     "second_order": "Second-order cross-site scripting",
     "dom": "Cross-site scripting (DOM-based)",
     "dom_dynamic": "Cross-site scripting (DOM-based, browser-confirmed)",
+    "dom_sink_reachability": "DOM sink reachability (delivery evidence only; "
+                              "execution not observed)",
     "stored_dom": "Stored cross-site scripting (DOM-based, browser-confirmed)",
     "blind": "Blind cross-site scripting (out-of-band)",
     "scenario": "Multi-step scenario cross-site scripting",

@@ -69,6 +69,22 @@
   是否像 Phase 265 对 `dom_dynamic` 那样拆成 `stored_sink_reachability`,属于判定语义改动,
   要跑全量 192 并有明确决策,本轮**不做**,只把观测写下来。
 
+- **Phase 279 尝试拆分 `stored_dom` 证据等级,已回退(全量门禁变红)**:照 Phase 265 对
+  `dom_dynamic` 的做法,把"到达 sink 未观测到执行"从 `stored_dom`/high 拆成
+  `stored_sink_reachability`/low(无 proof),并接进 report/SARIF/建议/合规/PoC/控制台。
+  **全量 192 双引擎门禁结果**:async **FP0 FN0 ERROR0(182 例)**,sync **FN=2**
+  (pos-stored-02 / pos-stored-03)。
+  根因量到一半:`scan_stored_dom` **只取 3 个载荷、且第一个命中就返回**,语料顺序是
+  `<<script>…iframe`(不可执行)→ `<script>`(innerHTML 内不执行)→ `<svg/onload>`,
+  真正会执行的 `<img src=x onerror=…>` 排在**第 4**;引擎对这三个都回 `executed=False`,
+  于是两个真漏洞页被降级成"投递线索" ⇒ FN。把候选放宽到 8 个后仍未在本轮内拿到执行证据。
+  **处理:整体回退**(不交红门禁),判定语义保持原状;两条可选路径留给决策:
+  ① 探测持续到出现执行证据(改探测策略,不动判定);② 拆分并把 `stored_sink_reachability`
+  计入这两个 benchmark 用例的 `finding_types`(改基准口径,意味"低提示也算检出")。
+  教训也留一笔:回退时用 `git checkout HEAD -- <file>` 会**连带抹掉该文件里别人的未提交
+  WIP**(本次抹掉了 Phase 265 在 findings/report/poc/validation/compliance/fix_advice/
+  控制台 六处的 `dom_sink_reachability` 接线),已逐项按原文恢复,41 例测试全绿。
+
 - **同一靶场的召回账:9 条 XSS 挑战,当前扫描模型能确认 5 条(Phase 270/275/276/278)**:
   上游 `data/static/challenges.yml` 共 **9 条 XSS**,逐条对照(不把"没测"算成"没漏"):
 

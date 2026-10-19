@@ -83,7 +83,8 @@ _VALID_SEVERITIES: frozenset[str] = frozenset(
     {"high", "medium", "low", "info"})
 
 _VALID_TYPES: frozenset[str] = frozenset({
-    "reflected", "stored", "dom", "dom_dynamic", "blind", "mutation_xss",
+    "reflected", "stored", "dom", "dom_dynamic", "dom_sink_reachability",
+    "blind", "mutation_xss",
     "dom_clobber", "template_ssti_angularjs", "template_ssti_vue",
     "template_ssti_svelte", "template_ssti_ember", "template_ssti",
     "jsonp_xss", "csp_bypass", "polyglot_reflection", "postmessage_xss",

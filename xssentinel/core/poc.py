@@ -89,6 +89,11 @@ def build_poc(finding, csrf_fields: dict | None = None,
     param = d.get("param")
     ftype = d.get("type")
     payload = d.get("payload") or ""
+    if ftype == "dom_sink_reachability":
+        # Delivery-only DOM evidence has no observed execution.  Fabricating
+        # an active exploit here would turn a low reachability hint into a
+        # PoC that claims more than the browser measured.
+        return {"curl": "", "url": "", "html": ""}
     if ftype in _MARKER_TYPES:
         poc_payload = DOM_POC_PAYLOAD
     else:

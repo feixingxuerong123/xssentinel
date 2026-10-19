@@ -34,6 +34,14 @@ EVIDENCE_NO_BROWSER = "browser-unavailable"
 # can state it without hand-typing the string the helper would return.
 EVIDENCE_BROWSER_EXECUTED = "browser-executed"
 
+# Phase 265: source->sink reachability without observed execution is a
+# DIFFERENT finding class, not a high XSS whose confidence was lowered.
+# Keeping it as `dom_dynamic/high` made the canonical safe pattern
+# (sanitize()->innerHTML) a false positive on the range6 safe twin; the
+# honest object is a low-severity reachability hint that the report can
+# still show.  See dom_dynamic_finding().
+DOM_DELIVERY_TYPE = "dom_sink_reachability"
+
 # What a captured secret is replaced with in a finding, a PoC and a stored job.
 REDACTED = "<redacted-credential>"
 
@@ -157,6 +165,33 @@ def dom_dynamic_evidence(d: dict) -> dict:
                                         d.get("detail", ""))
     return {"headless": h, "evidence_class": cls,
             "confidence": conf, "detail": detail}
+
+
+def dom_dynamic_finding(d: dict) -> dict:
+    """Phase 265: choose the FINDING CLASS for one engine row.
+
+    This is the only place that decides type/severity/proof, so the two
+    engines cannot drift back to hand-kept emit contracts.  The distinction
+    is measured, not stylistic:
+
+      * ``executed=True`` -> ``dom_dynamic`` / high, with the sink snippet as
+        proof.  A real browser's page code fired the carrier.
+      * ``executed=False`` -> ``dom_sink_reachability`` / low, with **no**
+        proof.  The source reached the sink but no execution was observed.
+        Emitting it as high ``dom_dynamic`` made the canonical safe pattern
+        (``DOMPurify.sanitize()->innerHTML``) a false positive; emitting no
+        proof keeps the Phase 218 cap meaningful and stops a bare probe
+        marker from masquerading as execution evidence.
+
+    The low class is still exported (report/SARIF/UI), not dropped: it is a
+    lead a human can verify, and "not observed" is not "impossible".
+    """
+    ev = dom_dynamic_evidence(d)
+    if ev["evidence_class"] == EVIDENCE_BROWSER_EXECUTED:
+        return {"type": "dom_dynamic", "severity": "high",
+                "proof": d.get("snippet") or None, **ev}
+    return {"type": DOM_DELIVERY_TYPE, "severity": "low",
+            "proof": None, **ev}
 
 
 def extract_replay_token(payload: str) -> str | None:

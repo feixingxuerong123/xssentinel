@@ -64,6 +64,16 @@
         "Enable Trusted Types to make this class of bug unexploitable."
       ]
     },
+    "dom_sink_reachability": {
+      "headline": "Verify whether this DOM sink can actually execute attacker input.",
+      "detail": "The scanner observed attacker-controlled data reaching a DOM sink, but its browser replay did NOT observe execution. This is delivery evidence, not proof of absence: a sanitizer, CSP, or a missing trigger may be blocking it. Reproduce manually with an executable payload. If execution is confirmed, fix it as DOM XSS (textContent / DOMPurify before innerHTML); if not, treat the row as a triage lead rather than a finding.",
+      "code_example": "// Step 1: prove execution manually with an executable payload.\n// Step 2: if it fires, replace the sink://nelement.textContent = userInput;                 // plain text\n// or\nelement.innerHTML = DOMPurify.sanitize(userInput); // sanitized HTML\n",
+      "primary_cwe": "CWE-79",
+      "also_consider": [
+        "Check whether a CSP or Trusted Types policy is the reason the probe did not execute.",
+        "Do not mark this as fixed/confirmed from this row alone; the engine did not observe execution."
+      ]
+    },
     "blind": {
       "headline": "Encode on output in EVERY render path, including admin panels.",
       "detail": "Blind XSS fires later, in a context the scanner cannot see (admin dashboard, support ticket view, log viewer). The fix is the same as stored XSS -- encode at every output point -- but you must audit render paths you don't normally test: admin UI, PDF export, email templates, log viewers.",
