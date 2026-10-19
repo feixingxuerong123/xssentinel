@@ -76,6 +76,23 @@ jobs:
       - name: Range #2 accuracy drill (must be 100% / 100%)
         run: python tests/run_range2.py
 
+      # Range #3: an APPLICATION, not a fixture matrix -- SQLite state, a
+      # real login session, mixed content types, base64/JWT carriers.  The
+      # gate semantics match range4/5/6 (FN/FP/ERROR => exit 1); the two
+      # cases the manifest declares sync-only score SKIP, which is recorded
+      # in the JSON but does not fail the job.  Until this step existed the
+      # runner returned 0 unconditionally, so the range most likely to rot
+      # (state, sessions, carriers) was the one no push ever ran.
+      - name: "Range #3 application drill (sessions + state + carriers, 100%/100% required)"
+        run: python range3/runner.py --engine both --timeout 120 --out range3/results_ci.json
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: range3-results
+          path: range3/results_ci.json
+          if-no-files-found: ignore
+
       # Range #4: real React 18 / Vue 3 bundles (vendored), client-side
       # sinks only -- the framework escapes or it does not.  Ground truth
       # is authored from framework semantics, and the -safe twins are

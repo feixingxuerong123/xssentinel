@@ -10,6 +10,11 @@ server owns a port only after a real probe request answers.
 
 Usage:
     python range3/runner.py [--engine sync|async|both] [--timeout 90]
+
+Gate semantics (same standard as range4/5/6): every case must score TP or
+TN; FN/FP/ERROR => exit 1.  SKIP is not a failure -- it is a case the
+manifest declares sync-only (stored, second-order), recorded rather than
+silently dropped.
 """
 from __future__ import annotations
 
@@ -236,6 +241,7 @@ def main() -> int:
                           .read_text(encoding="utf-8"))
     engines = ["sync", "async"] if args.engine == "both" else [args.engine]
     rows = []
+    summary: dict[str, dict[str, int]] = {}
     for eng in engines:
         print(f"\n=== engine={eng} ===")
         counts = {"TP": 0, "FP": 0, "TN": 0, "FN": 0, "SKIP": 0, "ERROR": 0}
@@ -270,11 +276,32 @@ def main() -> int:
         tp = counts["TP"]
         print(f"  => TP{tp} FP{counts['FP']} TN{counts['TN']} "
               f"FN{counts['FN']} SKIP{counts['SKIP']} ERR{counts['ERROR']}")
+        summary[eng] = counts
 
     if args.output:
+        payload = {
+            "meta": {"range": "range3",
+                     "generated": time.strftime("%Y-%m-%d %H:%M:%S"),
+                     "engines": engines, "max_payloads": mp,
+                     "max_transforms": mt, "per_case_timeout": args.timeout},
+            "counts": summary,
+            "rows": rows,
+        }
         Path(args.output).write_text(
-            json.dumps({"rows": rows}, indent=1), encoding="utf-8")
+            json.dumps(payload, ensure_ascii=False, indent=1), encoding="utf-8")
         print(f"\n[+] wrote {args.output}")
+
+    # A gate, not a report.  SKIP stays out of the bad list on purpose:
+    # those two cases are declared sync-only in the manifest, so counting
+    # them as failures would make an honest declaration look like a defect.
+    bad = [(r["engine"], r["case_id"], r["verdict"], r.get("error", ""))
+           for r in rows if r["verdict"] in ("FN", "FP", "ERROR")]
+    if bad:
+        print("\n[!] RANGE3 GATE FAILED (TP/TN required on every scored case):")
+        for eng, cid, verdict, err in bad:
+            print(f"    - [{eng}] {cid}: {verdict} {err[:120]}")
+        return 1
+    print("[*] Range3 gate: every case scored as ground truth requires")
     return 0
 
 

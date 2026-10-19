@@ -36,6 +36,19 @@
 
 ### Fixed
 
+- **range3 的 runner 永远返回 0,所以它从没被当成门禁(Phase 266)**:`main()` 打完
+  TP/FP/TN/FN 表就 `return 0`,无论有没有 FN/FP/ERROR —— 这正是它出现在 Phase 223
+  的"每道靶场都跑了"表格里、却没有任何 CI 步骤跑它的原因:**能跑不等于能拦**。
+  现在与 range4/5/6 同一口径(FN/FP/ERROR ⇒ exit 1);manifest 声明的两例 sync-only
+  (`r3-pos-stored`、`r3-pos-so2`)记 SKIP,不计失败——诚实声明不该被算成缺陷。
+  挂进 CI(tests job,Range #2 与 #4 之间),产物 `range3/results_ci.json` 留档。
+  新增 `tests/test_range3_gate.py` 5 例锁退出码契约:全绿 ⇒ 0、FN ⇒ 1、FP ⇒ 1、
+  ERROR ⇒ 1,并显式断言 async 的 2 个 SKIP 不让门变红。HEAD(`4c53a4a`)实测
+  sync TP20/FP0/TN6/FN0 · async TP18/FP0/TN6/FN0/SKIP2,**exit 0**。
+  测试按路径加载 runner 后还原 `sys.path` 与 `sys.modules["server"]`:它插自己的
+  目录到 `sys.path[0]` 是当脚本跑时的正确行为,但在整套 pytest 里会把
+  `range3/server.py` 留成全局 `server`,污染之后收集的每个测试。
+
 - **SVG 向量不再把兄弟 `<script>` 算成 SVG XSS(Phase 251,真 FP)**:`/fuzz/render`
   的 FP 臂抓到 2 例——反射已死(转义后)而页面带 `<svg>`+`<script>`(script 在
   `<svg>` 闭合**之后**)时,`svg_xss_svg_script` 照报 medium/high。根因在语料
