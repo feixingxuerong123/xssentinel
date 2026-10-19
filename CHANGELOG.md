@@ -48,7 +48,28 @@
   召回账 2/9 → **3/9**。两条臂这次给出互补答案(JSON 视图 inert、登录 SPA 视图 fired),
   是"HTTP 臂 + 浏览器臂都要保留"的直接证据。未动判定语义,不触发全量 192 的规矩。
 
-- **同一靶场的召回账:9 条 XSS 挑战,当前扫描模型能确认 3 条(Phase 270 + 275)**:
+- **第 6 条确认,但扫描器那条载荷只到 sink 不到执行(Phase 276)**:同一套登录后
+  浏览器链路换成注册接口:
+
+  ```
+  --stored-inject /api/Users --stored-param email --stored-json
+  --stored-extra password=Passw0rd! --stored-extra passwordRepeat=Passw0rd!
+  --stored-view /#/administration --stored-dom
+  --login-token <JWT> --browser-local-storage token=<JWT> --headless
+  => 1 finding: stored_dom high/high, sink Element.innerHTML, 41 requests, 32s
+  ```
+
+  **独立取证把这条件拆开了**。管理员页 DOM 里,扫描器 token 的实际形状是
+  `<span class="error">&lt;<script>Foo</script>iframe src="javascript:alert('xssv_…')"&gt;</span>`:
+  首字符被转义,`<script>` 是 innerHTML 插入的节点(**不会执行**,HTML 规范),所以它的
+  token 没有任何弹窗。但同一页面用 `<iframe src="javascript:alert(2)">@juice-sh.op`
+  注册的账号**真的弹了 `alert(2)`** ⇒ 端点确实可利用(挑战 #6 成立),
+  而扫描器那条 finding 的证据等级是"到达 sink",不是"执行"。
+  **记账**:`stored_dom` 的 `browser-executed` 目前把"到达 sink"和"弹窗执行"算成同一类;
+  是否像 Phase 265 对 `dom_dynamic` 那样拆成 `stored_sink_reachability`,属于判定语义改动,
+  要跑全量 192 并有明确决策,本轮**不做**,只把观测写下来。
+
+- **同一靶场的召回账:9 条 XSS 挑战,当前扫描模型能确认 4 条(Phase 270/275/276)**:
   上游 `data/static/challenges.yml` 共 **9 条 XSS**,逐条对照(不把"没测"算成"没漏"):
 
   | # | 挑战 | 面 | 状态 |
@@ -58,13 +79,13 @@
   | 3 | Bonus Payload | 同 #1 的输入框,换载荷 | sink 已覆盖;该载荷变体未单独测 |
   | 4 | Video XSS | 促销视频 URL | 未测(需要另一条上传面先行) |
   | 5 | API-only XSS | 直接打 API 实体 | **当前模型够不着**:需管理员会话 + 写 |
-  | 6 | Client-side XSS Protection | 注册用户 → 后台用户列表 | **够不着**:需登录 + 存储流 |
+  | 6 | Client-side XSS Protection | 注册用户 → 后台用户列表 | **已确认(Phase 276)**:`POST /api/Users` 的 email 原样落库;管理员页真实弹窗(手工 `<iframe src=javascript:alert(2)>@juice-sh.op`),扫描器的 `<<script>` 载荷只到 sink 不执行 |
   | 7 | Server-side XSS Protection | Customer Feedback 评论 | **已确认(Phase 275)**:`stored_dom` high/high,登录后 `/#/administration` 的 `Element.innerHTML`,Chromium dialog 实弹两次 |
   | 8 | CSP Bypass | 自家 RegEx 过滤的旧页面 | **够不着**:需登录 + CSP 注入载荷 |
   | 9 | HTTP-Header XSS | `X-Forwarded-For` → 最后登录 IP | **够不着**:需登录 + 自定义头 |
 
-  准确读法:矩阵证明的是**精度与交付链路**(0 条非预期 finding),召回是 **3/9**,
-  不是 5/5。剩余 6 条里 4 条(5/6/8/9)被"认证 + 写 + 二次查看"挡住,1 条(4)依赖另一条
+  准确读法:矩阵证明的是**精度与交付链路**(0 条非预期 finding),召回是 **4/9**,
+  不是 5/5。剩余 5 条里 3 条(5/8/9)被"认证 + 写 + 二次查看"挡住,1 条(4)依赖另一条
   上传链,1 条(3)是同 sink 的载荷变体 —— 都不是检测层漏报。
 
 ### Added
