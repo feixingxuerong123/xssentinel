@@ -5,6 +5,28 @@
 
 ## [Unreleased]
 
+### Verified
+
+- **第三方靶场(OWASP Juice Shop 20.2.0)五行矩阵全测(Phase 270,无出口代理)**:目标是官方
+  20.2.0 树(`build/` + `node_modules/`,Node 22),ground truth 来自应用自身的 Angular
+  路由与上游 `challenges.yml`,每行都走真实 CLI。同一目标、同一提交:
+
+  | 行 | 命令要点 | findings | 请求 | 用时 |
+  |---|---|---|---|---|
+  | oneshot(交付目标) | `-u <root> -c --crawl-depth 1 --headless` | **1** `dom_dynamic` high/high browser-executed @ `#/track-result?id=xss` | 826 | 77s |
+  | discover | `-u <root> -c --discover --headless` | **1** 同一 sink | 10,685 | 1059.7s |
+  | dom-route | `-u <root>/#/search?q=apple` | **1** @ `#/search` | 39 | 12.0s |
+  | dom-route-result | `-u <root>/#/search-result?q=apple` | **1** | 39 | 12.9s |
+  | api-surface | `-u <root>/rest/products/search?q=apple` | **0**(该端点不是 XSS 面) | 53 | 2.4s |
+
+  **能力与可发现性分开记账**:handed-route 行 12 秒命中;爬取行 77 秒也命中,说明路由矿机
+  在真实 bundle 上确实工作(5 条 hash 路由)。`discover` 用 **13 倍请求、13 倍时间**换来
+  同一结论 —— 该行目前是负收益,除非目标是"证明能自己找路"。
+  交付目标行用 `--crawl-depth 1` 取证:深度 2 在本机 25 分钟 0 连接(楔死,Phase 219/269
+  同形),不是产品结论。`discover` 跑完靶进程被 V8 OOM 打死(Phase 165 同形),属靶场容量。
+  全程 **零非预期 finding**:四条命中是同一个已证实 sink,`api-surface` 正确保持沉默。
+  前置条件:`NO_PROXY=127.0.0.1,localhost`(见 Phase 268 的代理假阴性)。
+
 ### Added
 
 - **SPA hash 路由发现(Phase 209)**:`js_miner.spa_query_params()` /
