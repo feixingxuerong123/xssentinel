@@ -36,6 +36,7 @@ sys.path.insert(0, str(ROOT / "benchmark"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import requests  # noqa: E402
+from range_gate import evidence_gaps, failing_rows  # noqa: E402
 
 from server import run_server, SESSION_COOKIE, VALID_SESSION  # noqa: E402
 
@@ -239,6 +240,7 @@ def main() -> int:
 
     manifest = json.loads((Path(__file__).parent / "manifest.json")
                           .read_text(encoding="utf-8"))
+    cases_by_id = {c["id"]: c for c in manifest["cases"]}
     engines = ["sync", "async"] if args.engine == "both" else [args.engine]
     rows = []
     summary: dict[str, dict[str, int]] = {}
@@ -265,6 +267,17 @@ def main() -> int:
                 verdict = score(report, case)
             counts[verdict] += 1
             n = len((report or {}).get("findings", []))
+            detail = []
+            for f in (report or {}).get("findings", []):
+                hl = f.get("headless") or {}
+                detail.append({"type": f.get("type"),
+                               "severity": f.get("severity"),
+                               "context": f.get("context"),
+                               "headless_outcome": hl.get("outcome")})
+            # r3-pos-utf7 declares headless=true (semantic verification sees
+            # inert text where a browser decodes markup), so its TP has to
+            # carry a fired outcome -- see range_gate.evidence_gaps.
+            confirmed = sum(1 for d in detail if d["headless_outcome"] == "fired")
             mark = "" if verdict in ("TP", "TN") else "   <-- " + verdict
             if verdict == "ERROR":
                 mark += f" err={err[:80]!r}"
@@ -272,6 +285,7 @@ def main() -> int:
                   f"findings={n:2} {elapsed:5.1f}s{mark}")
             rows.append({"engine": eng, "case_id": case["id"],
                          "verdict": verdict, "findings": n,
+                         "confirmed": confirmed, "findings_detail": detail,
                          "error": err[:200], "elapsed": round(elapsed, 1)})
         tp = counts["TP"]
         print(f"  => TP{tp} FP{counts['FP']} TN{counts['TN']} "
@@ -294,12 +308,21 @@ def main() -> int:
     # A gate, not a report.  SKIP stays out of the bad list on purpose:
     # those two cases are declared sync-only in the manifest, so counting
     # them as failures would make an honest declaration look like a defect.
-    bad = [(r["engine"], r["case_id"], r["verdict"], r.get("error", ""))
-           for r in rows if r["verdict"] in ("FN", "FP", "ERROR")]
+    bad = failing_rows(rows)
     if bad:
         print("\n[!] RANGE3 GATE FAILED (TP/TN required on every scored case):")
-        for eng, cid, verdict, err in bad:
-            print(f"    - [{eng}] {cid}: {verdict} {err[:120]}")
+        for r in bad:
+            print(f"    - [{r['engine']}] {r['case_id']}: "
+                  f"{r['verdict']} {r.get('error', '')[:120]}")
+        return 1
+    # Only one case declares headless=true (r3-pos-utf7); if it scores TP
+    # with nothing fired in a browser, the range would be claiming a
+    # browser-verified result it does not have.
+    gaps = evidence_gaps(rows, cases_by_id)
+    if gaps:
+        print("\n[!] RANGE3 GATE FAILED (positive without browser evidence):")
+        for eng, cid in gaps:
+            print(f"    - [{eng}] {cid}: TP but no finding fired in the browser")
         return 1
     print("[*] Range3 gate: every case scored as ground truth requires")
     return 0

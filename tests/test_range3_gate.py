@@ -78,12 +78,16 @@ def runner_mod():
         sys.path[:] = saved_path
 
 
-def _drive(mod, monkeypatch, tmp_path, score_hook=None, error_path=None):
+def _drive(mod, monkeypatch, tmp_path, score_hook=None, error_path=None,
+           browser_fired=True):
     """Call main() with the network/CLI boundary faked out.
 
     What is NOT faked: the manifest read, the start-URL/extra-args builders,
     the per-engine loop, the SKIP rule, the row collection and the exit
     code.  That is the part the gate lives in.
+
+    `browser_fired=False` is the dead-Chromium shape: findings exist, none
+    of them carries a `fired` outcome.
     """
     monkeypatch.setattr(mod, "start_range", lambda *a, **k: (18702, 0.0))
     monkeypatch.setattr(mod, "login", lambda base: "r3_session=test")
@@ -92,7 +96,10 @@ def _drive(mod, monkeypatch, tmp_path, score_hook=None, error_path=None):
                     extra_args=None, engine="sync"):
         if error_path and error_path in url:
             return None, 0.1, "timeout after 1s"
-        return {"findings": []}, 0.1, ""
+        finding = {"type": "reflected", "severity": "high"}
+        if browser_fired:
+            finding["headless"] = {"outcome": "fired"}
+        return {"findings": [finding]}, 0.1, ""
 
     monkeypatch.setattr(mod, "_invoke_scanner", fake_invoke)
     if score_hook is not None:
@@ -144,3 +151,20 @@ def test_gate_fails_on_error(runner_mod, monkeypatch, tmp_path):
     rc, _ = _drive(runner_mod, monkeypatch, tmp_path, score_hook=perfect,
                    error_path="/search")
     assert rc == 1, "a scanner timeout is not a pass"
+
+
+def test_gate_fails_when_the_headless_case_has_no_browser_evidence(
+        runner_mod, monkeypatch, tmp_path):
+    """r3-pos-utf7 declares headless=true.  A TP built from findings that
+    never fired is the shape a dead Chromium produces -- the same hole
+    measured on range4 (PLAYWRIGHT_BROWSERS_PATH -> empty dir, TP with
+    browser-confirmed=0, gate exit 0)."""
+    def perfect(report, case):
+        return "TN" if case["gt"] == "safe" else "TP"
+
+    rc, out = _drive(runner_mod, monkeypatch, tmp_path, score_hook=perfect,
+                     browser_fired=False)
+    assert rc == 1, "a browser-gated positive with no fired outcome must fail"
+    payload = json.loads(out.read_text(encoding="utf-8"))
+    utf7 = [r for r in payload["rows"] if r["case_id"] == "r3-pos-utf7"]
+    assert utf7 and all(r["confirmed"] == 0 for r in utf7)

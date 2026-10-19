@@ -36,6 +36,23 @@
 
 ### Fixed
 
+- **靶场门禁看不见"浏览器到底跑没跑"(Phase 267,与 266 同族)**:range4/range5 每个正例都
+  打印 `browser-confirmed=N`,门禁却只检查 TP/FP/TN/FN。实测:把
+  `PLAYWRIGHT_BROWSERS_PATH` 指向空目录(等价于没装 Chromium),两个正例仍是 **TP**、
+  `browser-confirmed=0`、`headless.outcome=errored`,门禁照打 "every case scored as
+  ground truth requires"、**exit 0** —— 靶场存在的唯一理由(真实浏览器执行)整场没发生,
+  而门是绿的。修法:规则收进 `range_gate.py` 单一实现(`failing_rows` + `evidence_gaps`),
+  range3/4/5 三个 runner 调用;manifest 声明 `headless: true` 的正例必须至少有一条
+  `fired`,否则 exit 1。**同一实验修复后 exit 1**;正常面:range5 双引擎 exit 0、
+  range4 sync 单独 exit 0(`browser-confirmed=12`)、range3 async exit 0
+  (`r3-pos-utf7` confirmed=11)。range3 的 utf7 用例同样声明 headless,一并纳入
+  (它此前根本不记录 confirmed)。测试 `tests/test_range_gate.py` 13 例(含
+  **AST 调用点断言**——函数体不会腐化,main 会不会继续调它才会)+
+  `tests/test_range3_gate.py` 6 例("无浏览器证据 ⇒ 红")。
+  诚实记账:本轮在负载高的机器上跑到过环境性超时(range4 sync 一个正例 180s、
+  range3 async 每次一个不同负例 120s),单独复跑均 exit 0,不是本改动的行为;
+  门禁把超时报成 ERROR 而不是 pass,正是它该做的。
+
 - **range3 的 runner 永远返回 0,所以它从没被当成门禁(Phase 266)**:`main()` 打完
   TP/FP/TN/FN 表就 `return 0`,无论有没有 FN/FP/ERROR —— 这正是它出现在 Phase 223
   的"每道靶场都跑了"表格里、却没有任何 CI 步骤跑它的原因:**能跑不等于能拦**。

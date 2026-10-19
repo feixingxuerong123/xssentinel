@@ -22,6 +22,7 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import requests  # noqa: E402
+from range_gate import evidence_gaps, failing_rows  # noqa: E402
 from server import run_server  # noqa: E402
 
 
@@ -101,6 +102,7 @@ def main() -> int:
 
     manifest = json.loads((Path(__file__).parent / "manifest.json")
                           .read_text(encoding="utf-8"))
+    cases_by_id = {c["id"]: c for c in manifest["cases"]}
     engines = ["sync", "async"] if args.engine == "both" else [args.engine]
     all_rows = []
     summary: dict[str, dict[str, int]] = {}
@@ -154,14 +156,22 @@ def main() -> int:
                               encoding="utf-8")
     print(f"\n[*] written -> {args.out}")
 
-    bad = [(r["engine"], r["case_id"], r["verdict"], r["error"])
-           for r in all_rows if r["verdict"] in ("FN", "FP", "ERROR")]
+    bad = failing_rows(all_rows)
     if bad:
         print("\n[!] RANGE5 GATE FAILED (TP/TN required on every case):")
-        for eng, cid, verdict, err in bad:
-            print(f"    - [{eng}] {cid}: {verdict} {err[:120]}")
+        for r in bad:
+            print(f"    - [{r['engine']}] {r['case_id']}: "
+                  f"{r['verdict']} {r['error'][:120]}")
         return 1
-    print("[*] Range5 gate: every case scored as ground truth requires")
+    # The Lit range's claim is browser execution, not a static match: a TP
+    # whose findings never fired is a dead browser, and must not pass.
+    gaps = evidence_gaps(all_rows, cases_by_id)
+    if gaps:
+        print("\n[!] RANGE5 GATE FAILED (positive without browser evidence):")
+        for eng, cid in gaps:
+            print(f"    - [{eng}] {cid}: TP but no finding fired in the browser")
+        return 1
+    print("[*] Range5 gate: every case scored, every positive browser-confirmed")
     return 0
 
 

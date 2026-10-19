@@ -25,6 +25,7 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import requests  # noqa: E402
+from range_gate import evidence_gaps, failing_rows  # noqa: E402
 from server import run_server  # noqa: E402
 
 
@@ -103,6 +104,7 @@ def main() -> int:
 
     manifest = json.loads((Path(__file__).parent / "manifest.json")
                           .read_text(encoding="utf-8"))
+    cases_by_id = {c["id"]: c for c in manifest["cases"]}
     engines = ["sync", "async"] if args.engine == "both" else [args.engine]
     all_rows = []
     summary: dict[str, dict[str, int]] = {}
@@ -160,14 +162,24 @@ def main() -> int:
 
     # Same standard as the Range2 drill (tests/run_range2.py): this is a
     # gate, not a report.  100%/100% or the job fails.
-    bad = [(r["engine"], r["case_id"], r["verdict"], r["error"])
-           for r in all_rows if r["verdict"] in ("FN", "FP", "ERROR")]
+    bad = failing_rows(all_rows)
     if bad:
         print("\n[!] RANGE4 GATE FAILED (TP/TN required on every case):")
-        for eng, cid, verdict, err in bad:
-            print(f"    - [{eng}] {cid}: {verdict} {err[:120]}")
+        for r in bad:
+            print(f"    - [{r['engine']}] {r['case_id']}: "
+                  f"{r['verdict']} {r['error'][:120]}")
         return 1
-    print("[*] Range4 gate: every case scored as ground truth requires")
+    # And the range's actual claim: every positive was observed executing
+    # in a real browser.  A TP with confirmed=0 is what a dead Chromium
+    # looks like (measured: PLAYWRIGHT_BROWSERS_PATH -> empty dir), so it
+    # fails the gate instead of passing as a weaker TP.
+    gaps = evidence_gaps(all_rows, cases_by_id)
+    if gaps:
+        print("\n[!] RANGE4 GATE FAILED (positive without browser evidence):")
+        for eng, cid in gaps:
+            print(f"    - [{eng}] {cid}: TP but no finding fired in the browser")
+        return 1
+    print("[*] Range4 gate: every case scored, every positive browser-confirmed")
     return 0
 
 
