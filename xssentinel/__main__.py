@@ -531,6 +531,14 @@ def build_parser():
                            "PUT/PATCH are REST update writes (Juice Shop's "
                            "API-only XSS is PUT /api/Products/:id) and carry "
                            "their payload in the body exactly like POST.")
+    g_bs.add_argument("--stored-view-click", dest="stored_view_click",
+                      default=None, metavar="SELECTOR",
+                      help="After the browser loads --stored-view, click "
+                           "this CSS selector before observing sinks. For "
+                           "views that render the stored value only after an "
+                           "interaction (a product-details dialog, a drawer, "
+                           "an accordion row). The click runs once, right "
+                           "after the first navigation.")
     g_bs.add_argument("--stored-json", dest="stored_json",
                       action="store_true",
                       help="Send the stored injection as a JSON document "

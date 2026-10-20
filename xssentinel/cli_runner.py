@@ -715,6 +715,8 @@ def _run_scan(args, url: str, requester, oob, progress, checkpoint,
                                     header_param=getattr(args, "stored_header",
                                                          None),
                                     relogin=relogin,
+                                    view_click=getattr(
+                                        args, "stored_view_click", None),
                                     extra_fields=extras)
         else:
             scanner.scan_stored(args.stored_inject, view_url=args.stored_view,

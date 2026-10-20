@@ -409,7 +409,8 @@ class StoredBlindMixin:
                         extra_fields: dict | None = None,
                         method: str = "POST",
                         header_param: str | None = None,
-                        relogin=None):
+                        relogin=None,
+                        view_click: str | None = None):
         """Phase 152: stored XSS verified by the REAL BROWSER (SPA shape).
 
         ``scan_stored`` verifies persistence by looking for the token in the
@@ -548,7 +549,8 @@ class StoredBlindMixin:
                 # used to be invisible here (dalfox/nuclei waitdialog
                 # semantics).
                 hits = engine.analyze(view_url, marker=token,
-                                      dialog_token=token)
+                                      dialog_token=token,
+                                      click_selector=view_click)
             except Exception as e:
                 _log.debug("stored-dom: browser analyze failed (%s)", e,
                            exc_info=self.verbose)

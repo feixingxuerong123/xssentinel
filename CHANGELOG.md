@@ -118,6 +118,21 @@
   URL 式 `--stored-view` 表达不了”**。可行方向:把存储型验证接进已有的场景 DSL(多步流),
   或给 `--stored-view` 加“打开后点击选择器”的可选动作。
 
+- **Phase 282:`--stored-view-click`(打开视图后点一下),以及一个新发现的归因问题**:
+  给 `--stored-view` 加可选动作 `--stored-view-click SELECTOR`:浏览器加载视图后、观测 sink 前,
+  点**第一个**匹配元素(对话框/抽屉/手风琴都属"渲染在一次点击之后"的形状)。
+  `DynamicDomAnalyzer.analyze` 新增 `click_selector`(默认 None,行为不变);测试 46 passed。
+  **第 5 条复测仍没拿下,且暴露出比"点不到"更严重的问题**:
+  ① 该页有 consent 遮罩(`cdk-overlay-backdrop … intercepts pointer events`),首卡点击被拦;
+  ② **归因不干净**——`scan_stored_dom` 把同一个 token 同时当"存储载荷 marker"和引擎 URL 探针的
+  marker,而 `_probes()` 会把 marker 注入 `location.hash/search/href/cookie/referrer/window.name/
+  postMessage`。视图页只要把任一 URL 源反射进 sink,token 就到 sink 了,**这条 hit 可能整个来自
+  URL 反射,与存储载荷无关**。回放也支持这个解释:把 finding 的载荷原样写回,页面上根本看不到那个
+  token(点击前/后都不在 DOM,dialogs 为空)。
+  **处理**:`--stored-view-click` 保留(能力成立、已测),第 5 条标**未确认**,修法记录在案:
+  给引擎加"探针 marker ≠ 存储 marker"(存储路径传两个 token)。本轮最值钱的发现不是"点不到",
+  是**同名 marker 让两种来源无法分辨**。
+
 - **同一靶场的召回账:9 条 XSS 挑战,当前扫描模型能确认 5 条(Phase 270/275/276/278)**:
   上游 `data/static/challenges.yml` 共 **9 条 XSS**,逐条对照(不把"没测"算成"没漏"):
 
@@ -127,7 +142,7 @@
   | 2 | Reflected XSS | `#/track-result?id=` | **已确认**(browser-executed) |
   | 3 | Bonus Payload | 同 #1 的输入框,换载荷 | sink 已覆盖;该载荷变体未单独测 |
   | 4 | Video XSS | 促销视频 URL | 未测(需要另一条上传面先行) |
-  | 5 | API-only XSS | `PUT /api/Products/:id` → 产品详情对话框 | **写链已打通(Phase 281)**:PUT + Bearer 管理员可原样写入 description;但渲染面是**点击卡片才开的对话框**,`--stored-view` 是 URL 视图,表达不了“先点再渲染” |
+  | 5 | API-only XSS | `PUT /api/Products/:id` → 产品详情对话框 | **未确认(Phase 282)**:`--stored-view-click` 已接线、可点首个匹配;但该页 consent 遮罩拦住的点击,且发现**stored 命中可能来自 URL 反射**（引用同一个 marker）——归因水静前不算命中 |
   | 6 | Client-side XSS Protection | 注册用户 → 后台用户列表 | **已确认(Phase 276 → 280 升级)**:`POST /api/Users` 的 email 原样落库;Phase 280 探测修复后扫描器自己的载荷 `<img src=x onerror=alert('xssv_…')>` 在管理员页**实弹**(独立 Chromium `dialogs ['xssv_fc4e81fa']`),不再是“只到 sink” |
   | 7 | Server-side XSS Protection | Customer Feedback 评论 | **已确认(Phase 275)**:`stored_dom` high/high,登录后 `/#/administration` 的 `Element.innerHTML`,Chromium dialog 实弹两次 |
   | 8 | CSP Bypass | 自家 RegEx 过滤的旧页面 | **够不着**:需登录 + CSP 注入载荷 |

@@ -26,18 +26,24 @@ from xssentinel.core import payloads as payloads_mod
 
 
 HIT = [{"sink": "Element.innerHTML", "snippet": "<li>...xssv_tok...</li>"}]
+# Phase 282: a dialog hit means the stored payload EXECUTED (the dialog
+# carried the probe token); a bare sink hit means it only reached a sink.
+DIALOG_HIT = [{"sink": "dialog", "snippet": "alert('xssv_tok')"}]
 
 
 class _FakeEngine:
     def __init__(self, hits):
         self._hits = hits
         self.calls = []
+        self.clicks = []
 
     def available(self):
         return True
 
-    def analyze(self, url, marker=None, dialog_token=None):
+    def analyze(self, url, marker=None, dialog_token=None,
+                click_selector=None):
         self.calls.append((url, marker, dialog_token))
+        self.clicks.append(click_selector)
         return list(self._hits)
 
 
@@ -131,7 +137,8 @@ class _ExecutesOnSecondProbe:
     def available(self):
         return True
 
-    def analyze(self, url, marker=None, dialog_token=None):
+    def analyze(self, url, marker=None, dialog_token=None,
+                click_selector=None):
         self.n += 1
         if self.n == 1:
             return list(HIT)          # delivery only
@@ -151,6 +158,28 @@ def test_probe_continues_until_a_payload_executes():
     assert f["severity"] == "high"
     assert f["headless"]["outcome"] == "fired"
     assert f["proof"] is not None
+
+
+def test_view_click_is_forwarded_to_the_engine():
+    """Phase 282: a view that renders the stored value only after a click
+    (Juice Shop's product-details dialog) is unreachable from a URL view,
+    so the click has to reach the engine as the selector the operator
+    asked for."""
+    eng = _FakeEngine(DIALOG_HIT)
+    host = _Host(eng)
+    ok = host.scan_stored_dom("http://t/api/Products/1",
+                              view_url="http://t/search", param="description",
+                              method="PUT", view_click="mat-card")
+    assert ok is True
+    assert eng.clicks == ["mat-card"], eng.clicks
+
+
+def test_view_click_defaults_to_none():
+    eng = _FakeEngine(DIALOG_HIT)
+    host = _Host(eng)
+    host.scan_stored_dom("http://t/write", view_url="http://t/view",
+                         param="comment")
+    assert eng.clicks == [None]
 
 
 def test_no_browser_hit_means_no_finding():
