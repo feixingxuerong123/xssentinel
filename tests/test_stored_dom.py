@@ -107,11 +107,50 @@ def test_hit_emits_stored_dom_and_submits_form_plus_json():
     assert proof["token"] in eng.calls[0][1]
     # Both encodings were submitted with the same token-carrying variant.
     submissions = [c for c in host.req.calls if c["method"] == "POST"]
-    assert len(submissions) == 2
+    # Phase 280: a delivery-only answer no longer ends the probe, so every
+    # base is submitted (_STORED_DOM_PROBE_BASES x 2 encodings).
+    from xssentinel.core.scanner_stored import _STORED_DOM_PROBE_BASES
+    assert len(submissions) == _STORED_DOM_PROBE_BASES * 2
     assert submissions[0]["data"] == {"comment": submissions[0]["data"]["comment"]}
     assert submissions[1]["json"] is not None
     assert proof["token"] in submissions[0]["data"]["comment"]
     assert proof["token"] in submissions[1]["json"]["comment"]
+
+
+class _ExecutesOnSecondProbe:
+    """Phase 280: the first probe only reaches the sink, the second fires.
+
+    The corpus puts three inert-through-innerHTML shapes before
+    `<img src=x onerror=...>`, so stopping at the first hit reports the
+    inert payload and never asks the one that executes.
+    """
+
+    def __init__(self):
+        self.n = 0
+
+    def available(self):
+        return True
+
+    def analyze(self, url, marker=None, dialog_token=None):
+        self.n += 1
+        if self.n == 1:
+            return list(HIT)          # delivery only
+        return [{"sink": "dialog", "snippet": f"alert('{marker}')"}]
+
+
+def test_probe_continues_until_a_payload_executes():
+    eng = _ExecutesOnSecondProbe()
+    host = _Host(eng)
+    ok = host.scan_stored_dom("http://t/write", view_url="http://t/view",
+                              param="comment")
+    assert ok is True
+    assert eng.n >= 2, "the probe stopped on the delivery-only answer"
+    f = host.findings[0].data
+    # the reported row is the one that EXECUTED, not the first delivery
+    assert f["type"] == "stored_dom"
+    assert f["severity"] == "high"
+    assert f["headless"]["outcome"] == "fired"
+    assert f["proof"] is not None
 
 
 def test_no_browser_hit_means_no_finding():
@@ -190,7 +229,8 @@ def test_extra_fields_ride_along_in_both_encodings():
                               param="email", extra_fields=extras)
     assert ok is True
     posts = [c for c in host.req.calls if c["method"] == "POST"]
-    assert len(posts) == 2
+    from xssentinel.core.scanner_stored import _STORED_DOM_PROBE_BASES
+    assert len(posts) == _STORED_DOM_PROBE_BASES * 2
     for sub in posts:
         body = sub["json"] if sub["json"] is not None else sub["data"]
         assert body["password"] == "Xss-T3st!"

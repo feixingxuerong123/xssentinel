@@ -38,6 +38,27 @@ _TOKEN_RE = re.compile(r"xssv_[0-9a-f]{8}")
 
 
 
+# Phase 280: how many stored-DOM base payloads to try before giving up on
+# finding one that EXECUTES.  See the probe loop in scan_stored_dom.
+_STORED_DOM_PROBE_BASES = 6
+
+
+def _stored_dom_executable_first(base: dict) -> int:
+    """0 for payloads that can fire from innerHTML, 1 for the rest.
+
+    An inline event handler (`<img src=x onerror=...>`, `<svg/onload=...>`,
+    `<details open ontoggle=...>`) creates a live element and fires.  A
+    `<script>` inserted via innerHTML does NOT execute (HTML spec), and
+    neither does the `<<script>...iframe` polyglot, whose leading `<` is
+    escaped by most renderers.  Probing the inert shapes first is how a
+    real execution got missed.
+    """
+    pl = (base.get("payload") or "")
+    if pl.lstrip().lower().startswith("<script"):
+        return 1
+    return 0 if re.search(r"\bon[a-z]+\s*=", pl, re.I) else 1
+
+
 class StoredBlindMixin:
     """L4 stored + L5 blind/OOB detection methods."""
 
@@ -429,11 +450,20 @@ class StoredBlindMixin:
         for ctx_name in ("html_element", "svg_context"):
             for base in payloads.by_context(ctx_name):
                 bases.append(base)
-                if len(bases) >= 3:
+                if len(bases) >= _STORED_DOM_PROBE_BASES:
                     break
-            if len(bases) >= 3:
+            if len(bases) >= _STORED_DOM_PROBE_BASES:
                 break
+        # Phase 280: order the probe so the shapes that EXECUTE through
+        # innerHTML come first.  Corpus order puts the inert
+        # `<<script>...iframe` polyglot and `<script>` first; an inline
+        # event handler (`<img src=x onerror=...>`, `<svg/onload=...>`) is
+        # what actually fires there.  Reordering means a vulnerable view is
+        # confirmed on the FIRST probe instead of the fourth, which is what
+        # keeps the safe twins inside the harness's per-case timeout.
+        bases = sorted(bases, key=_stored_dom_executable_first)
         encodings = ("json",) if json_body else ("form", "json")
+        delivery = None
         for base in bases:
             token = "xssv_" + secrets.token_hex(4)
             variant = verifier.mark(base["payload"], token)
@@ -522,6 +552,24 @@ class StoredBlindMixin:
             if hits:
                 sinks = ", ".join(sorted({h.get("sink", "") for h in hits
                                           if isinstance(h, dict)})[:3])
+                # Phase 280: EXECUTION, not "a hit", is what ends the probe.
+                # The corpus order puts three inert-through-innerHTML shapes
+                # first and `<img src=x onerror=...>` (a shape that fires)
+                # fourth; returning on the first hit stopped the probe on a
+                # payload that cannot execute and never asked one that can.
+                # Measured on benchmark pos-stored-02/03 (a real innerHTML
+                # sink that stayed unreported once delivery-only rows were
+                # graded honestly).
+                executed = any(
+                    isinstance(h, dict) and (h.get("sink") == "dialog"
+                                             or h.get("executed") is True)
+                    for h in hits)
+                if not executed:
+                    # Remember the first delivery-only answer as a fallback
+                    # and keep probing the remaining bases.
+                    if delivery is None:
+                        delivery = (variant, token, hits, sinks)
+                    continue
                 if not explicit_view and view_url == inject_url:
                     confidence = "medium"
                     note = ("same-session self-view: persistence for other "
@@ -565,6 +613,41 @@ class StoredBlindMixin:
                                            for h in hits[:3]]},
                 }))
                 return True
+        if delivery is not None:
+            # Every probe reached a sink and none fired.  Report the FIRST
+            # one: a delivered-but-unexecuted stored payload is still a lead,
+            # and dropping it would hide the sink entirely.  Same class as an
+            # executed row (the Phase 279 split was reverted) -- only the
+            # probe depth changed here.
+            variant, token, hits, sinks = delivery
+            if not explicit_view and view_url == inject_url:
+                confidence = "medium"
+                note = ("same-session self-view: persistence for other "
+                        "viewers is NOT proven -- re-run with an "
+                        "explicit --stored-view")
+            else:
+                confidence = "high"
+                note = "view page rendered the stored payload in a real browser"
+            _h = {"available": True, "confirmed": True, "outcome": "fired",
+                  "detail": f"dom engine: marker reached sink(s) {sinks}"}
+            _cls, _conf, _det = _grade_evidence(_h, confidence, (
+                f"stored payload rendered client-side and "
+                f"reached executable sink(s) [{sinks}] on "
+                f"{view_url} ({note})"))
+            self._add(Finding(**{
+                "url": inject_url, "method": "POST", "param": param,
+                "type": "stored_dom", "context": "stored_dom_view",
+                "payload": variant, "transform": [],
+                "severity": "high", "confidence": confidence,
+                "detail": _det,
+                "evidence_class": _cls,
+                "headless": _h,
+                "proof": {"view_url": view_url, "token": token,
+                          "sinks": sinks,
+                          "snippets": [str(h.get("snippet", ""))[:200]
+                                       for h in hits[:3]]},
+            }))
+            return True
         return False
 
     # -- L4 second-order XSS (inject A, discover B by crawling) -------------

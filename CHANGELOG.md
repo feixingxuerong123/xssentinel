@@ -85,6 +85,21 @@
   WIP**(本次抹掉了 Phase 265 在 findings/report/poc/validation/compliance/fix_advice/
   控制台 六处的 `dom_sink_reachability` 接线),已逐项按原文恢复,41 例测试全绿。
 
+- **Phase 280:存储型 DOM 探测改为"探测到执行为止",不动判定语义(回到路径 ①)**:
+  Phase 279 回退后照路径 ① 修**探测策略**,finding 类型/等级一律不变:
+  ① 命中不再是终止条件——`executed`(引擎自己的字段)/`sink == "dialog"` 才是;投递型命中
+  只记下第一个作兜底,继续试后面的载荷。
+  ② 候选面从 3 放宽到 **6**(`_STORED_DOM_PROBE_BASES`)。
+  ③ 候选面**按可执行性重排**:带行内事件处理器(`<img src=x onerror=…>`、`<svg/onload=…>`
+  `<details open ontoggle=…>`)排前面,`<script>` 与 `<<script>…iframe` polyglot 排后面
+  —— 前者进 innerHTML 会真的建元素并触发,后者按规范不执行,而语料顺序偏偏把惰性形状放最前。
+  **实测**:st02 由"只报惰性 polyglot"变成报 `<img src=x onerror=alert('xssv_…')>`,
+  sinks `Element.innerHTML, dialog`,dialog 真把 token 带出来;单例耗时 32–35s(harness 每例
+  预算 60s)。**全量 192 双引擎门禁**:sync **FP0 FN0 ERROR0 / 192 scored / 0 SKIP**;
+  async **FP0 FN0 ERROR0 / 182 scored / 10 SKIP**(那 10 条存储型用例本就是 sync-only)。
+  测试 `tests/test_stored_dom.py` 11 例(新增"探测不终止于投递型命中"
+  与"执行证据落在第 N 个载荷上也要报那个载荷")。
+
 - **同一靶场的召回账:9 条 XSS 挑战,当前扫描模型能确认 5 条(Phase 270/275/276/278)**:
   上游 `data/static/challenges.yml` 共 **9 条 XSS**,逐条对照(不把"没测"算成"没漏"):
 
