@@ -532,12 +532,14 @@ def build_parser():
                            "API-only XSS is PUT /api/Products/:id) and carry "
                            "their payload in the body exactly like POST.")
     g_bs.add_argument("--stored-view-click", dest="stored_view_click",
-                      default=None, metavar="SELECTOR",
+                      action="append", default=None, metavar="SELECTOR",
                       help="After the browser loads --stored-view, click "
                            "this CSS selector before observing sinks. For "
                            "views that render the stored value only after an "
                            "interaction (a product-details dialog, a drawer, "
-                           "an accordion row). The click runs once, right "
+                           "an accordion row). Repeat the flag to click a "
+                           "SEQUENCE (e.g. 'Next page' twice for a paginated "
+                           "table). Each click runs once, right "
                            "after the first navigation.")
     g_bs.add_argument("--stored-json", dest="stored_json",
                       action="store_true",

@@ -1798,7 +1798,7 @@ class DynamicDomAnalyzer:
 
     def analyze(self, url: str, marker: str | None = None,
                 dialog_token: str | None = None,
-                click_selector: str | None = None,
+                click_selector: str | list | None = None,
                 url_probes: bool = True) -> list:
         """Render ``url`` in the instrumented browser and report sink hits.
 
@@ -1931,20 +1931,45 @@ class DynamicDomAnalyzer:
                             page.wait_for_timeout(_DOM_SETTLE_MS)
                             if click_selector and not clicked:
                                 clicked = True
-                                try:
-                                    # Phase 282: click the FIRST match.  A
-                                    # selector like `mat-card` matches every
-                                    # result card, and Playwright's strict
-                                    # mode then refuses the click outright --
-                                    # the view never opens and the stored
-                                    # value is never rendered.  Measured on
-                                    # Juice Shop's search page (15 cards).
-                                    page.locator(click_selector).first.click(
-                                        timeout=5000)
-                                    page.wait_for_timeout(_DOM_SETTLE_MS)
-                                except Exception:
-                                    _log.debug("dom: view click %r failed",
-                                               click_selector)
+                                # Phase 284: a LIST of selectors is clicked
+                                # IN ORDER.  Paginated views need this: a
+                                # stored row that is not on the first page is
+                                # invisible, and "Next page" must be clicked
+                                # N times to reach it (measured on Juice
+                                # Shop's admin feedback table, 10 rows/page).
+                                selectors = (click_selector
+                                             if isinstance(click_selector, list)
+                                             else [click_selector])
+                                for sel in selectors:
+                                    try:
+                                        # Phase 282: click the FIRST match.  A
+                                        # selector like `mat-card` matches
+                                        # every result card, and Playwright's
+                                        # strict mode then refuses the click
+                                        # outright -- the view never opens and
+                                        # the stored value is never rendered.
+                                        # Measured on Juice Shop's search page
+                                        # (15 cards).
+                                        page.locator(sel).first.click(
+                                            timeout=5000)
+                                        page.wait_for_timeout(_DOM_SETTLE_MS)
+                                    except Exception:
+                                        # Phase 284: a click that cannot be
+                                        # performed (a consent overlay makes
+                                        # Playwright's actionability check
+                                        # time out -- measured on the search
+                                        # page, #5, and on the admin feedback
+                                        # table, #7) is reported and the
+                                        # remaining selectors are skipped.
+                                        # Deliberately NOT fallen back to
+                                        # dispatch_event: that would make the
+                                        # click "succeed" without the app
+                                        # ever seeing the interaction, and a
+                                        # silent fake success is worse than a
+                                        # visible miss.
+                                        _log.debug("dom: view click %r failed",
+                                                   sel)
+                                        break
                         elif probe["kind"] == "cookie":
                             page.context.add_cookies(
                                 [{"name": "__xss__", "value": marker,
