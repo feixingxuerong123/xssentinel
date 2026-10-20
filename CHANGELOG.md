@@ -164,14 +164,14 @@
   | 4 | Video XSS | 促销视频 URL | 未测(需要另一条上传面先行) |
   | 5 | API-only XSS | `PUT /api/Products/:id` → 产品详情对话框 | **仍未确认(Phase 283)**:URL 探针已关闭，假命中消失；余下的阻塞是该页 consent 遮罩拦住点击（对话框打不开）——属于目标交互，非检测能力 |
   | 6 | Client-side XSS Protection | 注册用户 → 后台用户列表 | **已确认(Phase 276 → 280 升级)**:`POST /api/Users` 的 email 原样落库;Phase 280 探测修复后扫描器自己的载荷 `<img src=x onerror=alert('xssv_…')>` 在管理员页**实弹**(独立 Chromium `dialogs ['xssv_fc4e81fa']`),不再是“只到 sink” |
-  | 7 | Server-side XSS Protection | Customer Feedback 评论 | **⚠️ 已确认(Phase 275)→ 当前不可复现(Phase 283 后复核)**:应用侧仍可利用(手工 iframe 在管理员页实弹 `dialogs ['1']`),但扫描器写入的行落在反馈表**第 3 页**(表是 1–10 of 21),`--stored-view-click` 点"末页"后 marker 仍不在 DOM ⇒ 0 finding。Phase 275 的确认是在**空库**(新行就在首页)+ URL 探针开启下取得 |
+  | 7 | Server-side XSS Protection | Customer Feedback 评论 | **❌ 不可复现(Phase 283/284 复核)**:写入成功(API 里 33 条含 marker),但管理员 feedback 表只渲染 **≤10 行且 "Next page" 禁用** ⇒ 我们的行**从未进入 DOM**;翻页与点同意都无效(同意按钮点击超时)。Phase 275 那条命中**高度可能是 URL 探针贡献**(Phase 283 已关闭该行为) |
   | 8 | CSP Bypass | 自家 RegEx 过滤的旧页面 | **够不着**:需登录 + CSP 注入载荷 |
   | 9 | HTTP-Header XSS | `True-Client-IP` → 最后登录 IP | **已确认(Phase 278 → 280 升级)**:`--stored-header` + `--stored-relogin` 写入后,Phase 280 让扫描器自己的载荷 `<svg/onload=alert('xssv_…')>` 在最后登录 IP 页**实弹**(独立 Chromium `dialogs ['xssv_45f68b71']`);此前(Phase 278)它只到 sink |
 
   准确读法:矩阵证明的是**精度与交付链路**(0 条非预期 finding);**当前可复现的召回是
-  4/9**(#1/#2/#6/#9),#7 是"曾经确认、当前不可复现"(见该行)。剩余 5 条里
-  2 条(5/7)是被目标/视图条件挡住(点击、分页),1 条(8)需登录 + CSP 载荷,
-  1 条(4)依赖另一条上传链,1 条(3)是同 sink 的载荷变体 —— 都不是检测层漏报。
+  4/9**(#1/#2/#6/#9),#7 已落到"不可复现:该视图不渲染扫描器写入的行"(见该行)。
+  剩余 5 条里 #5 是被目标交互挡住(consent 遮罩),#8 需登录 + CSP 载荷,
+  #4 依赖另一条上传链,#3 是同 sink 的载荷变体 —— 都不是检测层漏报。
   #6/#9 在 Phase 280 后已由扫描器自己的载荷**实弹**(独立 Chromium dialog 复现),
   不再是"sink 到达"级别。
   **⚠️ 已确认的行要周期性重测**:#7 这次就是 Phase 283 关掉 URL 探针后复核出来的——
