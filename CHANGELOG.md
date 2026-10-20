@@ -99,6 +99,11 @@
   async **FP0 FN0 ERROR0 / 182 scored / 10 SKIP**(那 10 条存储型用例本就是 sync-only)。
   测试 `tests/test_stored_dom.py` 11 例(新增"探测不终止于投递型命中"
   与"执行证据落在第 N 个载荷上也要报那个载荷")。
+  **真实靶场复测(Juice Shop 20.2.0)顺带解决了 Phase 276/278 留下的两条 caveat**:
+  同一套链路重跑,#6 报 `<img src=x onerror=alert('xssv_fc4e81fa')>`、#9 报
+  `<svg/onload=alert('xssv_45f68b71')>`,两者都用独立 Chromium 监听到了**自己的 token**。
+  即"扫描器载荷只到 sink"从来不是判定问题,是**探测问题**——修探测即可,不需要放宽判定,
+  这也是 Phase 279 的拆分最终没有必要的直接证据。
 
 - **同一靶场的召回账:9 条 XSS 挑战,当前扫描模型能确认 5 条(Phase 270/275/276/278)**:
   上游 `data/static/challenges.yml` 共 **9 条 XSS**,逐条对照(不把"没测"算成"没漏"):
@@ -110,10 +115,10 @@
   | 3 | Bonus Payload | 同 #1 的输入框,换载荷 | sink 已覆盖;该载荷变体未单独测 |
   | 4 | Video XSS | 促销视频 URL | 未测(需要另一条上传面先行) |
   | 5 | API-only XSS | 直接打 API 实体 | **当前模型够不着**:需管理员会话 + 写 |
-  | 6 | Client-side XSS Protection | 注册用户 → 后台用户列表 | **已确认(Phase 276)**:`POST /api/Users` 的 email 原样落库;管理员页真实弹窗(手工 `<iframe src=javascript:alert(2)>@juice-sh.op`),扫描器的 `<<script>` 载荷只到 sink 不执行 |
+  | 6 | Client-side XSS Protection | 注册用户 → 后台用户列表 | **已确认(Phase 276 → 280 升级)**:`POST /api/Users` 的 email 原样落库;Phase 280 探测修复后扫描器自己的载荷 `<img src=x onerror=alert('xssv_…')>` 在管理员页**实弹**(独立 Chromium `dialogs ['xssv_fc4e81fa']`),不再是“只到 sink” |
   | 7 | Server-side XSS Protection | Customer Feedback 评论 | **已确认(Phase 275)**:`stored_dom` high/high,登录后 `/#/administration` 的 `Element.innerHTML`,Chromium dialog 实弹两次 |
   | 8 | CSP Bypass | 自家 RegEx 过滤的旧页面 | **够不着**:需登录 + CSP 注入载荷 |
-  | 9 | HTTP-Header XSS | `True-Client-IP` → 最后登录 IP | **已确认(Phase 278)**:`--stored-header` + `--stored-relogin` 后报出 `stored_dom` high/high;扫描器自己的载荷仍是转义文本(无弹窗),应用侧换载荷可实弹 |
+  | 9 | HTTP-Header XSS | `True-Client-IP` → 最后登录 IP | **已确认(Phase 278 → 280 升级)**:`--stored-header` + `--stored-relogin` 写入后,Phase 280 让扫描器自己的载荷 `<svg/onload=alert('xssv_…')>` 在最后登录 IP 页**实弹**(独立 Chromium `dialogs ['xssv_45f68b71']`);此前(Phase 278)它只到 sink |
 
   准确读法:矩阵证明的是**精度与交付链路**(0 条非预期 finding),召回是 **5/9**,
   不是 5/5。剩余 4 条里 2 条(5/8)被"认证 + 写 + 二次查看"挡住,1 条(4)依赖另一条
