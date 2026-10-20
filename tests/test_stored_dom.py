@@ -36,14 +36,17 @@ class _FakeEngine:
         self._hits = hits
         self.calls = []
         self.clicks = []
+        self.url_probes = []
 
     def available(self):
         return True
 
     def analyze(self, url, marker=None, dialog_token=None,
-                click_selector=None):
+                click_selector=None,
+                url_probes=True):
         self.calls.append((url, marker, dialog_token))
         self.clicks.append(click_selector)
+        self.url_probes.append(url_probes)
         return list(self._hits)
 
 
@@ -138,7 +141,8 @@ class _ExecutesOnSecondProbe:
         return True
 
     def analyze(self, url, marker=None, dialog_token=None,
-                click_selector=None):
+                click_selector=None,
+                url_probes=True):
         self.n += 1
         if self.n == 1:
             return list(HIT)          # delivery only
@@ -172,6 +176,25 @@ def test_view_click_is_forwarded_to_the_engine():
                               method="PUT", view_click="mat-card")
     assert ok is True
     assert eng.clicks == ["mat-card"], eng.clicks
+
+
+def test_stored_verification_does_not_push_the_marker_into_url_sources():
+    """Phase 283: the stored path used to share ONE token with the engine's
+    URL probes, so a view page reflecting location.hash or a query parameter
+    delivered that token to a sink and the hit was attributed to the stored
+    payload.  Measured on Juice Shop's API-only XSS: replaying the finding's
+    own payload showed the token never reaching the page."""
+    eng = _FakeEngine(DIALOG_HIT)
+    host = _Host(eng)
+    ok = host.scan_stored_dom("http://t/api/Products/1",
+                              view_url="http://t/search", param="description",
+                              method="PUT", view_click="mat-card")
+    assert ok is True
+    assert eng.url_probes == [False], (
+        "stored verification must not run the engine's URL-source probes")
+    # the marker the engine is told to watch is still the stored token, so a
+    # hit can only have come from the page's own data
+    assert eng.calls[0][1].startswith("xssv_")
 
 
 def test_view_click_defaults_to_none():

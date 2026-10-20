@@ -550,7 +550,8 @@ class StoredBlindMixin:
                 # semantics).
                 hits = engine.analyze(view_url, marker=token,
                                       dialog_token=token,
-                                      click_selector=view_click)
+                                      click_selector=view_click,
+                                      url_probes=False)
             except Exception as e:
                 _log.debug("stored-dom: browser analyze failed (%s)", e,
                            exc_info=self.verbose)

@@ -133,6 +133,17 @@
   给引擎加"探针 marker ≠ 存储 marker"(存储路径传两个 token)。本轮最值钱的发现不是"点不到",
   是**同名 marker 让两种来源无法分辨**。
 
+- **Phase 283:关闭存储路径的 URL 探针,消掉"假 stored 命中"(归因修复)**:
+  `DynamicDomAnalyzer.analyze` 新增 `url_probes: bool = True`;`scan_stored_dom` 传
+  `url_probes=False`——命中本身已经在页面数据里,引擎只做一次纯导航 + 交互分发,
+  不再把 marker 推进 `location.hash/search/href`、cookie、referrer、window.name、postMessage。
+  **修复效果(同一套链路复测)**:#5 API-only 的 `stored_dom` high **消失了**
+  (Phase 282 里那条确实来自 URL 反射);#9 HTTP-Header **照旧报出**
+  `<svg/onload=alert('xssv_be1ca9a9')>`——真存储命中不受影响。
+  **全量 192 门禁**:sync **FP0 FN0 ERROR0 / 192 / 0 SKIP**(基准的存储型用例未受影响)。
+  还要回头复核 Phase 275/276/280 那几条:它们当年的命中里**可能混有 URL 探针贡献**,
+  需要在新行为下重测才算数。
+
 - **同一靶场的召回账:9 条 XSS 挑战,当前扫描模型能确认 5 条(Phase 270/275/276/278)**:
   上游 `data/static/challenges.yml` 共 **9 条 XSS**,逐条对照(不把"没测"算成"没漏"):
 
@@ -142,7 +153,7 @@
   | 2 | Reflected XSS | `#/track-result?id=` | **已确认**(browser-executed) |
   | 3 | Bonus Payload | 同 #1 的输入框,换载荷 | sink 已覆盖;该载荷变体未单独测 |
   | 4 | Video XSS | 促销视频 URL | 未测(需要另一条上传面先行) |
-  | 5 | API-only XSS | `PUT /api/Products/:id` → 产品详情对话框 | **未确认(Phase 282)**:`--stored-view-click` 已接线、可点首个匹配;但该页 consent 遮罩拦住的点击,且发现**stored 命中可能来自 URL 反射**（引用同一个 marker）——归因水静前不算命中 |
+  | 5 | API-only XSS | `PUT /api/Products/:id` → 产品详情对话框 | **仍未确认(Phase 283)**:URL 探针已关闭，假命中消失；余下的阻塞是该页 consent 遮罩拦住点击（对话框打不开）——属于目标交互，非检测能力 |
   | 6 | Client-side XSS Protection | 注册用户 → 后台用户列表 | **已确认(Phase 276 → 280 升级)**:`POST /api/Users` 的 email 原样落库;Phase 280 探测修复后扫描器自己的载荷 `<img src=x onerror=alert('xssv_…')>` 在管理员页**实弹**(独立 Chromium `dialogs ['xssv_fc4e81fa']`),不再是“只到 sink” |
   | 7 | Server-side XSS Protection | Customer Feedback 评论 | **已确认(Phase 275)**:`stored_dom` high/high,登录后 `/#/administration` 的 `Element.innerHTML`,Chromium dialog 实弹两次 |
   | 8 | CSP Bypass | 自家 RegEx 过滤的旧页面 | **够不着**:需登录 + CSP 注入载荷 |

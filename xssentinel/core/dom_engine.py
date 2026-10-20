@@ -1798,7 +1798,8 @@ class DynamicDomAnalyzer:
 
     def analyze(self, url: str, marker: str | None = None,
                 dialog_token: str | None = None,
-                click_selector: str | None = None) -> list:
+                click_selector: str | None = None,
+                url_probes: bool = True) -> list:
         """Render ``url`` in the instrumented browser and report sink hits.
 
         ``dialog_token`` (Phase 194, stored-XSS closure): when set, a
@@ -1811,6 +1812,12 @@ class DynamicDomAnalyzer:
         source probes a page simply displaying the marker
         (``alert(location.hash)``) is not XSS, and claiming it would be an
         over-claim -- hence opt-in, never on by default.
+
+        ``url_probes`` (Phase 283): set False when the CALLER already put the
+        marker into the page (stored-XSS verification).  The engine then makes
+        one plain navigation instead of pushing the marker into every URL
+        source, so a hit can only have come from the page's own data -- the
+        stored payload -- rather than from a reflected URL parameter.
         """
         if not self.available():
             return []
@@ -1882,7 +1889,21 @@ class DynamicDomAnalyzer:
                 # an accordion row).  The click runs once, right after the
                 # first navigation, so later probes observe the open state.
                 clicked = False
-                for probe in self._probes(url, marker):
+                # Phase 283: the caller already put the marker in the page
+                # (stored verification) -- do not ALSO push it into every URL
+                # source.  Sharing one token with _probes() meant a view page
+                # reflecting location.hash or a query parameter delivered that
+                # token to a sink and the hit was attributed to the STORED
+                # payload.  Measured on Juice Shop's API-only XSS: replaying
+                # the finding's own payload showed the token never reaching
+                # the page at all.  One plain navigation plus the interaction
+                # dispatch is all a stored verification needs.
+                if url_probes:
+                    probes = self._probes(url, marker)
+                else:
+                    probes = [{"kind": "goto", "url": url,
+                               "source": "stored_view"}]
+                for probe in probes:
                     if time.monotonic() > deadline:
                         _log.debug(
                             "dom: probe budget %.0fs spent for %s -- stopping "
