@@ -144,7 +144,7 @@
   还要回头复核 Phase 275/276/280 那几条:它们当年的命中里**可能混有 URL 探针贡献**,
   需要在新行为下重测才算数。
 
-- **同一靶场的召回账:9 条 XSS 挑战,当前扫描模型能确认 5 条(Phase 270/275/276/278)**:
+- **同一靶场的召回账:9 条 XSS 挑战,当前可复现 4 条 + 1 条曾确认但已不可复现(Phase 270/275/276/278,283 后复核)**:
   上游 `data/static/challenges.yml` 共 **9 条 XSS**,逐条对照(不把"没测"算成"没漏"):
 
   | # | 挑战 | 面 | 状态 |
@@ -155,15 +155,19 @@
   | 4 | Video XSS | 促销视频 URL | 未测(需要另一条上传面先行) |
   | 5 | API-only XSS | `PUT /api/Products/:id` → 产品详情对话框 | **仍未确认(Phase 283)**:URL 探针已关闭，假命中消失；余下的阻塞是该页 consent 遮罩拦住点击（对话框打不开）——属于目标交互，非检测能力 |
   | 6 | Client-side XSS Protection | 注册用户 → 后台用户列表 | **已确认(Phase 276 → 280 升级)**:`POST /api/Users` 的 email 原样落库;Phase 280 探测修复后扫描器自己的载荷 `<img src=x onerror=alert('xssv_…')>` 在管理员页**实弹**(独立 Chromium `dialogs ['xssv_fc4e81fa']`),不再是“只到 sink” |
-  | 7 | Server-side XSS Protection | Customer Feedback 评论 | **已确认(Phase 275)**:`stored_dom` high/high,登录后 `/#/administration` 的 `Element.innerHTML`,Chromium dialog 实弹两次 |
+  | 7 | Server-side XSS Protection | Customer Feedback 评论 | **⚠️ 已确认(Phase 275)→ 当前不可复现(Phase 283 后复核)**:应用侧仍可利用(手工 iframe 在管理员页实弹 `dialogs ['1']`),但扫描器写入的行落在反馈表**第 3 页**(表是 1–10 of 21),`--stored-view-click` 点"末页"后 marker 仍不在 DOM ⇒ 0 finding。Phase 275 的确认是在**空库**(新行就在首页)+ URL 探针开启下取得 |
   | 8 | CSP Bypass | 自家 RegEx 过滤的旧页面 | **够不着**:需登录 + CSP 注入载荷 |
   | 9 | HTTP-Header XSS | `True-Client-IP` → 最后登录 IP | **已确认(Phase 278 → 280 升级)**:`--stored-header` + `--stored-relogin` 写入后,Phase 280 让扫描器自己的载荷 `<svg/onload=alert('xssv_…')>` 在最后登录 IP 页**实弹**(独立 Chromium `dialogs ['xssv_45f68b71']`);此前(Phase 278)它只到 sink |
 
-  准确读法:矩阵证明的是**精度与交付链路**(0 条非预期 finding),召回是 **5/9**,
-  不是 5/5。剩余 4 条里 2 条(5/8)被"认证 + 写 + 二次查看"挡住,1 条(4)依赖另一条
-  上传链,1 条(3)是同 sink 的载荷变体 —— 都不是检测层漏报。
-  另注意 #6/#9 的扫描器自载荷是"sink 到达"而非"执行"(Phase 276/278 两次独立实测),
-  证据等级要不要拆分属判定语义,未在本轮动。
+  准确读法:矩阵证明的是**精度与交付链路**(0 条非预期 finding);**当前可复现的召回是
+  4/9**(#1/#2/#6/#9),#7 是"曾经确认、当前不可复现"(见该行)。剩余 5 条里
+  2 条(5/7)是被目标/视图条件挡住(点击、分页),1 条(8)需登录 + CSP 载荷,
+  1 条(4)依赖另一条上传链,1 条(3)是同 sink 的载荷变体 —— 都不是检测层漏报。
+  #6/#9 在 Phase 280 后已由扫描器自己的载荷**实弹**(独立 Chromium dialog 复现),
+  不再是"sink 到达"级别。
+  **⚠️ 已确认的行要周期性重测**:#7 这次就是 Phase 283 关掉 URL 探针后复核出来的——
+  一个"已确认"如果只在某种目标状态(空库)或某种引擎行为(探针开着)下成立,
+  它就该被标注,而不是一直留在"已确认"栏里。
 
 ### Added
 
