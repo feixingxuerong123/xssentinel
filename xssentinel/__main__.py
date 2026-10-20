@@ -524,10 +524,13 @@ def build_parser():
                       help="Stored-XSS view URL")
     g_bs.add_argument("--stored-param", default="q")
     g_bs.add_argument("--stored-method", dest="stored_method", default="POST",
-                      choices=["GET", "POST"],
+                      choices=["GET", "POST", "PUT", "PATCH"],
                       help="HTTP method for the stored injection (default "
                            "POST). GET writes exist: Juice Shop persists the "
-                           "True-Client-IP header via GET /rest/saveLoginIp.")
+                           "True-Client-IP header via GET /rest/saveLoginIp. "
+                           "PUT/PATCH are REST update writes (Juice Shop's "
+                           "API-only XSS is PUT /api/Products/:id) and carry "
+                           "their payload in the body exactly like POST.")
     g_bs.add_argument("--stored-json", dest="stored_json",
                       action="store_true",
                       help="Send the stored injection as a JSON document "

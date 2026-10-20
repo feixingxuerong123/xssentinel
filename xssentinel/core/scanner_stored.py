@@ -189,12 +189,16 @@ class StoredBlindMixin:
                                         headers=hdrs)
                         else:
                             req.request(method, inject_url, headers=hdrs)
-                    elif method.upper() == "POST":
+                    elif method.upper() != "GET":
                         # Phase 241: data_json sends the injection as a JSON
                         # body, matching the encoding the page itself used
                         # for this field (an observed SPA write face).
                         # Phase 274: companion fields ride along in both
                         # encodings; the payload always wins on `param`.
+                        # Phase 281: any non-GET method carries a body --
+                        # PUT/PATCH are REST update writes, and sending their
+                        # payload as a query param (the old `else` branch)
+                        # could never reach a JSON/form body parser.
                         body = dict(extra_fields or {})
                         body[param] = variant
                         if data_json:

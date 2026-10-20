@@ -113,6 +113,31 @@ def test_companion_field_cannot_overwrite_the_payload():
     assert body["comment"] != "OVERWRITE"
 
 
+def test_non_get_methods_carry_the_payload_in_the_body():
+    """Phase 281: PUT/PATCH are REST update writes (Juice Shop's API-only
+    XSS is PUT /api/Products/:id).  They used to fall into the query-param
+    branch, which a JSON/form body parser never sees."""
+    for m in ("PUT", "PATCH"):
+        host = _Host()
+        host.scan_stored("http://t/api/Products/1", view_url="http://t/view",
+                         method=m, param="description", data_json=True,
+                         extra_fields={"price": 1})
+        subs = [c for c in host.req.calls if c["method"] == m]
+        assert subs, f"{m}: nothing submitted"
+        for p in subs:
+            assert p["json"]["price"] == 1
+            assert p["json"]["description"] != ""
+
+
+def test_get_still_uses_the_query():
+    host = _Host()
+    host.scan_stored("http://t/rest/saveLoginIp", view_url="http://t/view",
+                     method="GET", param="ip")
+    for c in host.req.calls:
+        assert c["method"] == "GET"
+        assert c["params"] and c["params"]["ip"]
+
+
 def test_header_param_puts_the_payload_in_the_header():
     """Phase 277: header-borne writes (Juice Shop persists True-Client-IP
     into the user's last-login IP on a GET).  The payload cannot ride in a

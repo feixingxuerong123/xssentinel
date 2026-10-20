@@ -105,6 +105,19 @@
   即"扫描器载荷只到 sink"从来不是判定问题,是**探测问题**——修探测即可,不需要放宽判定,
   这也是 Phase 279 的拆分最终没有必要的直接证据。
 
+- **Phase 281:存储注入支持 PUT/PATCH(非 GET 方法都带 body)**:`--stored-method` 的
+  choices 只有 GET/POST,而存储层把 PUT/PATCH 当成“非 POST”走 query 参数分支——REST 更新写入
+  的载荷永远到不了 body 解析器(Juice Shop 的 API-only XSS 正是 `PUT /api/Products/:id`)。
+  现在 choices 放开到 GET/POST/PUT/PATCH,层里改成“非 GET 即带 body”。测试 44 passed。
+  **第 5 条实测(OWASP Juice Shop 20.2.0)**:`PUT /api/Products/1` + Bearer 管理员 ⇒ 200,
+  `description` 原样落库(`<iframe src="javascript:alert(1)">` 读回原样);但渲染面是
+  **点击产品卡片才开的详情对话框**,搜索页只渲染 name 且**已转义**
+  (`alt="&lt;img src=x onerror=...&gt;"`),description 根本不进搜索页 DOM
+  ⇒ 独立 Chromium 打开 `/#/search?q=…` 零弹窗、payload 不在 DOM。
+  **结论:第 5 条的阻塞点从“需管理员会话 + 写”精确到“写入已通,但渲染面需要一次点击交互,
+  URL 式 `--stored-view` 表达不了”**。可行方向:把存储型验证接进已有的场景 DSL(多步流),
+  或给 `--stored-view` 加“打开后点击选择器”的可选动作。
+
 - **同一靶场的召回账:9 条 XSS 挑战,当前扫描模型能确认 5 条(Phase 270/275/276/278)**:
   上游 `data/static/challenges.yml` 共 **9 条 XSS**,逐条对照(不把"没测"算成"没漏"):
 
@@ -114,7 +127,7 @@
   | 2 | Reflected XSS | `#/track-result?id=` | **已确认**(browser-executed) |
   | 3 | Bonus Payload | 同 #1 的输入框,换载荷 | sink 已覆盖;该载荷变体未单独测 |
   | 4 | Video XSS | 促销视频 URL | 未测(需要另一条上传面先行) |
-  | 5 | API-only XSS | 直接打 API 实体 | **当前模型够不着**:需管理员会话 + 写 |
+  | 5 | API-only XSS | `PUT /api/Products/:id` → 产品详情对话框 | **写链已打通(Phase 281)**:PUT + Bearer 管理员可原样写入 description;但渲染面是**点击卡片才开的对话框**,`--stored-view` 是 URL 视图,表达不了“先点再渲染” |
   | 6 | Client-side XSS Protection | 注册用户 → 后台用户列表 | **已确认(Phase 276 → 280 升级)**:`POST /api/Users` 的 email 原样落库;Phase 280 探测修复后扫描器自己的载荷 `<img src=x onerror=alert('xssv_…')>` 在管理员页**实弹**(独立 Chromium `dialogs ['xssv_fc4e81fa']`),不再是“只到 sink” |
   | 7 | Server-side XSS Protection | Customer Feedback 评论 | **已确认(Phase 275)**:`stored_dom` high/high,登录后 `/#/administration` 的 `Element.innerHTML`,Chromium dialog 实弹两次 |
   | 8 | CSP Bypass | 自家 RegEx 过滤的旧页面 | **够不着**:需登录 + CSP 注入载荷 |
