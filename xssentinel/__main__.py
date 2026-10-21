@@ -569,6 +569,24 @@ def build_parser():
                       help="Companion POST field the write endpoint demands "
                            "(password, csrf, captcha, ...); repeatable. "
                            "The payload always rides in --stored-param.")
+    g_bs.add_argument("--stored-archive-entry", dest="stored_archive_entry",
+                      default=None, metavar="PATH",
+                      help="Switch the stored write carrier to an ARCHIVE "
+                           "(zip-slip): the payload becomes the bytes of a "
+                           "file inside an in-memory zip, and this PATH is "
+                           "the zip's single entry name verbatim -- e.g. "
+                           "../../app/views/promo.pug for an upload endpoint "
+                           "that extracts archives without sanitising entry "
+                           "names. The traversal lives only in the entry "
+                           "name; the multipart filename stays clean. "
+                           "Requires --stored-dom (the browser arm confirms "
+                           "execution) and is opt-in because overwriting is "
+                           "REPLACE semantics -- back up the target file "
+                           "first.")
+    g_bs.add_argument("--stored-file-field", dest="stored_file_field",
+                      default="file", metavar="NAME",
+                      help="Multipart field name for --stored-archive-entry "
+                           "(default: file).")
     # Second-order XSS (Phase 21-4): inject at A, crawl to discover B.
     g_bs.add_argument("--second-order-inject", default=None,
                       help="Second-order XSS inject URL (inject A, crawl B)")

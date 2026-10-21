@@ -1606,6 +1606,51 @@
       "context": "html_element",
       "difficulty": "hard",
       "note": "Phase 110 safe twin: same filename echo, HTML-escaped"
+    }
+    ,
+    {
+      "id": "pos-upload-02",
+      "path": "/r/up-zip",
+      "view_path": "/r/up-zip/view",
+      "param": "file",
+      "stored_file_field": "file",
+      "method": "POST",
+      "mode": "upload_zip_slip",
+      "view_mode": "zip_slip_view",
+      "stored_dom": true,
+      "stored_archive_entry": "../assets/promo_subtitle.vtt",
+      "ground_truth": "vulnerable",
+      "finding_types": [
+        "stored_dom"
+      ],
+      "context": "html_element",
+      "difficulty": "hard",
+      "engines": [
+        "sync"
+      ],
+      "note": "Phase 288: zip-slip upload (OWASP Juice Shop challenge #4 shape, measured live 2026-10-21). The app extracts the uploaded archive without sanitising entry names, so the ../assets/promo_subtitle.vtt entry overwrites a file the promotion view inlines into <script id=\"subtitle\">; the payload is the file bytes and a </script> breakout executes. Driven by --stored-archive-entry; the browser arm confirms via the dialog channel. Sync-only by design (scan_stored_dom has no async counterpart)."
+    },
+    {
+      "id": "neg-upload-02",
+      "path": "/s/up-zip",
+      "view_path": "/s/up-zip/view",
+      "param": "file",
+      "stored_file_field": "file",
+      "method": "POST",
+      "mode": "upload_zip_slip_safe",
+      "view_mode": "zip_slip_view",
+      "stored_dom": true,
+      "stored_archive_entry": "../assets/promo_subtitle.vtt",
+      "ground_truth": "safe",
+      "finding_types": [
+        "stored_dom"
+      ],
+      "context": "html_element",
+      "difficulty": "hard",
+      "engines": [
+        "sync"
+      ],
+      "note": "Phase 288 safe twin: the extractor reduces entry names to their basename, so the traversal never leaves the upload dir and the view inlines the pristine .vtt. Identical view page and identical payload -- the ONLY variable is the extractor sanitisation."
     },
     {
       "id": "pos-redirect-01",

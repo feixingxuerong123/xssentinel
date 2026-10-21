@@ -682,6 +682,15 @@ def _run_scan(args, url: str, requester, oob, progress, checkpoint,
             if "=" in pair:
                 k, v = pair.split("=", 1)
                 extras[k.strip()] = v.strip()
+        archive_entry = getattr(args, "stored_archive_entry", None)
+        if archive_entry and not getattr(args, "stored_dom", False):
+            # Phase 288: the archive carrier only exists on the browser arm
+            # (execution is what it proves); the HTTP text arm would at most
+            # show the file was inlined.  Warn instead of silently ignoring
+            # the flag -- a silently ignored write flag reads as "no finding".
+            _log.warning("--stored-archive-entry requires --stored-dom; "
+                         "the archive write was not performed")
+            archive_entry = None
         if getattr(args, "stored_dom", False):
             # Phase 152: SPA shape -- the view page renders the stored value
             # client-side, so verification happens in the real browser.
@@ -690,6 +699,9 @@ def _run_scan(args, url: str, requester, oob, progress, checkpoint,
             # Phase 278: --stored-relogin re-runs the JSON login after every
             # write, so views that serve a value snapshotted at login time
             # (Juice Shop's last-login IP lives in the JWT) can render it.
+            # Phase 288: --stored-archive-entry switches the write carrier
+            # to a zip-slip archive (payload = file bytes, traversal in the
+            # entry name).
             relogin = None
             if (getattr(args, "stored_relogin", False)
                     and getattr(args, "login_json", False)
@@ -717,7 +729,11 @@ def _run_scan(args, url: str, requester, oob, progress, checkpoint,
                                     relogin=relogin,
                                     view_click=getattr(
                                         args, "stored_view_click", None),
-                                    extra_fields=extras)
+                                    extra_fields=extras,
+                                    archive_entry=archive_entry,
+                                    file_field=getattr(args,
+                                                       "stored_file_field",
+                                                       None) or "file")
         else:
             scanner.scan_stored(args.stored_inject, view_url=args.stored_view,
                                 param=args.stored_param,

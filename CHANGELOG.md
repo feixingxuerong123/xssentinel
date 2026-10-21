@@ -178,6 +178,35 @@
   一个"已确认"如果只在某种目标状态(空库)或某种引擎行为(探针开着)下成立,
   它就该被标注,而不是一直留在"已确认"栏里。
 
+- **Phase 288:归档遍历写入载体(zip-slip)—— Juice Shop #4 从"依赖另一条上传面"到扫描器自载荷实弹,召回 5/9 → 6/9**:
+  机理(实测,`dev/_p287_row4.py` + 独立 Chromium 单变量 A/B):`POST /file-upload`
+  (multipart,免认证)的提取器不 sanitize 条目名 ⇒ zip 内 `../../` 条目可覆写磁盘文件;
+  `/promotion` 把 promo .vtt **内联**进 `<script id="subtitle">`,文件内容里的
+  `</script>` breakout 即执行。扫描器侧断点定位:上传探针(Phase 48/90)只发单文件、
+  从不发归档 ⇒ **写原语缺失**;观测臂(stored-DOM 浏览器臂 + Phase 194 dialog 通道)
+  已具备。上传端点自动发现(BP-1)与盲猜遍历目标(BP-3)按项目惯例**不做**——
+  写入类原语保持操作者声明(opt-in),与 `--stored-*` 家族一致。
+  落法:`scan_stored_dom` 增归档载体(`--stored-archive-entry PATH` +
+  `--stored-file-field NAME`,**仅 sync**——该方法本无 async 对偶,manifest 存储型用例
+  本就是 `engines:["sync"]``),zip 内存构建、multipart 文件名干净(遍历只在条目名里,
+  **不存在 requests 对 `../` 的百分号编码问题**)、首探针为 `</script>` breakout 形状
+  (模块常量,**不进语料**——Phase 285 教训:语料插入扰动共享探测预算)、伴生字段仍走
+  `--stored-extra`;flag 缺 `--stored-dom` 时**告警不静默**(async 模式下
+  `--stored-dom` 本就在 sync-only 警告列表里,两条路径都诚实)。
+  基准锁定:服务端新 mode 三件套(不收 sanitize 的提取器 / 剥路径的安全孪生 /
+  把目标文件内联进 `<script>` 的**共享视图**=单变量),manifest +2 例
+  (`pos-upload-02` / `neg-upload-02`,矩阵 192 → 194),runner 增
+  `stored_archive_entry` 字段翻译。
+  证据:单测 `tests/test_stored_archive_write.py` 6/6;e2e 正例 `stored_dom` high/high
+  browser-executed(dialog)、负例 0 findings、**反证**(去掉 flag 同一命令)0 findings;
+  **全量 194 例门禁 FP0 FN0 ERROR0 / 0 SKIP**(`benchmark_20261021_185204.json`,
+  含 pos-upload-02 TP / neg-upload-02 TN);**真实目标复现**:`stored_dom` high/high
+  browser-executed,`proof.sinks=dialog`、
+  `proof.archive_entry=../../frontend/dist/frontend/assets/public/videos/owasp_promo.vtt`,
+  测后 vtt 按 sha256 还原并复验 byte-identical。
+  **台账 #4 行**相应由"未测"改"已确认(Phase 288)"、可复现召回 6/9;该行修订随台账
+  所有者的下一次提交(台账区当前是他人未提交 WIP,不代为改动)。
+
 ### Added
 
 - **`--login-json` / `--stored-relogin`:写入后重新登录,让"快照式视图"渲染新值(Phase 278)**:

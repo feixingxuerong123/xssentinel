@@ -130,6 +130,14 @@ def _case_extra_args(base_url: str, case: dict) -> list | None:
         # can never be stored).
         for k, v in dict(case["stored_extra"]).items():
             extra += ["--stored-extra", f"{k}={v}"]
+    if case.get("stored_archive_entry"):
+        # Phase 288: zip-slip write carrier -- the payload becomes the
+        # bytes of a file inside an in-memory zip whose single entry is
+        # this PATH verbatim (traversal included).
+        extra += ["--stored-archive-entry", str(case["stored_archive_entry"])]
+        if case.get("stored_file_field"):
+            extra += ["--stored-file-field",
+                      str(case["stored_file_field"])]
     # Phase 126: second-order cases drive the dedicated CLI flow -- inject at
     # A, then verify the EXPLICIT viewer B (no crawling, so the case is
     # deterministic).  The scanner still runs its normal scan of A; the

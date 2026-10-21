@@ -12,10 +12,13 @@ from __future__ import annotations
 
 import base64
 import html
+import io
 import json
 import os
+import posixpath
 import re
 import sys
+import zipfile
 from html.parser import HTMLParser   # Phase 124: parser-aware resource unfurl
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs, unquote, quote
@@ -759,14 +762,18 @@ _STORE: dict = {}
 VIEW_TO_INJECT: dict = {}
 
 
-def _parse_multipart_parts(content_type: str, body: bytes):
-    """Return [(name, value, filename_or_None)] for a multipart body."""
-    boundary = None
+def _multipart_boundary(content_type: str):
+    """Extract the boundary token from a multipart Content-Type (or None)."""
     for part in (content_type or "").split(";"):
         part = part.strip()
         if part.startswith("boundary="):
-            boundary = part.split("=", 1)[1].strip().strip('"')
-            break
+            return part.split("=", 1)[1].strip().strip('"')
+    return None
+
+
+def _parse_multipart_parts(content_type: str, body: bytes):
+    """Return [(name, value, filename_or_None)] for a multipart body."""
+    boundary = _multipart_boundary(content_type)
     if not boundary or not body:
         return []
     try:
@@ -791,6 +798,42 @@ def _parse_multipart_parts(content_type: str, body: bytes):
         except Exception:
             value = ""
         out.append((name, value, fname))
+    return out
+
+
+def _parse_multipart_files_raw(content_type: str,
+                               body: bytes) -> dict:
+    """Return {field: (filename, raw_bytes)} for a multipart body.
+
+    Phase 288: the zip-slip probe uploads a real ARCHIVE (binary).  The
+    text-oriented _parse_post_body decodes every part as utf-8 with
+    "replace", which corrupts zip bytes, so the archive modes need the
+    raw payload.  Only called when the route's mode asks for it.
+    """
+    boundary = _multipart_boundary(content_type)
+    if not boundary or not body:
+        return {}
+    try:
+        msg = _email.message_from_bytes(
+            b"MIME-Version: 1.0\r\n"
+            b"Content-Type: multipart/form-data; boundary="
+            + boundary.encode("utf-8", "replace") + b"\r\n\r\n" + body)
+    except Exception:
+        return {}
+    out: dict = {}
+    for part in msg.walk():
+        if part.is_multipart():
+            continue
+        name = part.get_param("name", header="content-disposition")
+        fname = part.get_filename()
+        if not name or not fname:
+            continue
+        try:
+            payload = part.get_payload(decode=True)
+        except Exception:
+            payload = None
+        if isinstance(payload, bytes):
+            out[name] = (fname, payload)
     return out
 
 
@@ -856,6 +899,95 @@ def m_upload_echo_escaped(v: str, ctx: dict) -> tuple:
     """Safe twin: same echo, HTML-escaped."""
     fname = (ctx.get("files") or {}).get(ctx.get("field") or "", "")
     return _page(f"<div>Uploaded file: {html.escape(fname, quote=True)}</div>")
+
+
+# ---------------------------------------------------------------------------
+# Phase 288: zip-slip upload (the OWASP Juice Shop challenge #4 shape)
+#
+# The app extracts an uploaded archive WITHOUT sanitising entry names, so a
+# "../" entry overwrites a file outside the upload directory.  The view page
+# then inlines that file's bytes into a <script id="subtitle"> block -- a
+# file that contains "</script><script>alert(...)</script>" breaks out and
+# executes.  Measured on the live target (dev/_p287_row4.py): the promo
+# .vtt is overwritten via a zip entry named
+# "../../frontend/dist/frontend/assets/public/videos/owasp_promo.vtt" and
+# /promotion inlines it verbatim.
+#
+# The virtual "disk" is keyed by (inject_path, virtual_path) so the pos/neg
+# twins cannot poison each other in a shared server process (same discipline
+# as _STORE keying by inject path).
+_SLIP_FS: dict = {}
+_SLIP_UPLOAD_DIR = "uploads/"
+_SLIP_ASSET = "assets/promo_subtitle.vtt"
+_SLIP_PRISTINE_VTT = ("WEBVTT\n\n00:00:01.000 --> 00:00:03.000\n"
+                      "OWASP Juice Shop promotion")
+
+
+def _slip_store(ctx: dict, entry_name: str, content: bytes,
+                sanitize: bool) -> None:
+    """Extract one zip entry into the virtual disk.
+
+    ``sanitize=False`` (vulnerable): resolve the entry against the upload
+    dir with normpath semantics -- "../assets/promo_subtitle.vtt" lands on
+    the asset, exactly like a naive extractor.
+    ``sanitize=True`` (safe twin): keep only the basename, so the entry can
+    never leave the upload dir.  The ONLY difference between the twins.
+    """
+    if sanitize:
+        resolved = posixpath.normpath(
+            _SLIP_UPLOAD_DIR + posixpath.basename(entry_name))
+    else:
+        resolved = posixpath.normpath(
+            posixpath.join(_SLIP_UPLOAD_DIR, entry_name))
+    _SLIP_FS[(ctx.get("path") or "", resolved)] = content
+
+
+def _slip_upload(v: str, ctx: dict, sanitize: bool) -> tuple:
+    field = ctx.get("field") or "file"
+    raw = (ctx.get("raw_files") or {}).get(field)
+    if raw is None:
+        return _page("<div>No archive in the upload</div>")
+    _fname, blob = raw
+    try:
+        with zipfile.ZipFile(io.BytesIO(blob)) as z:
+            for entry in z.infolist():
+                if entry.is_dir():
+                    continue
+                _slip_store(ctx, entry.filename, z.read(entry), sanitize)
+    except zipfile.BadZipFile:
+        return _page("<div>Not a zip</div>")
+    return _page("<div>Upload complete</div>")
+
+
+def m_upload_zip_slip(v: str, ctx: dict) -> tuple:
+    """Vulnerable: extract archive entries WITHOUT sanitising names."""
+    return _slip_upload(v, ctx, sanitize=False)
+
+
+def m_upload_zip_slip_safe(v: str, ctx: dict) -> tuple:
+    """Safe twin: entry names reduced to their basename on extraction."""
+    return _slip_upload(v, ctx, sanitize=True)
+
+
+def m_zip_slip_view(v: str, ctx: dict) -> tuple:
+    """Render the promotion page with the target file inlined verbatim.
+
+    The single view for BOTH twins: the only variable is what the write
+    side did with the archive (see the two extractors above).  A pristine
+    .vtt is inert inside <script type="text/vtt">; an overwritten one that
+    carries a </script> breakout executes.  Shared view = single-variable
+    A/B by construction.
+    """
+    inject_path = VIEW_TO_INJECT.get(ctx.get("path") or "", "")
+    content = _SLIP_FS.get((inject_path, _SLIP_ASSET),
+                           _SLIP_PRISTINE_VTT.encode("utf-8"))
+    text = content.decode("utf-8", "replace")
+    return _page_raw(f"""<!DOCTYPE html><html><body>
+<article><h5>Promotion Video</h5>
+<video controls="controls"><source src="./video" type="video/mp4"></video>
+</article>
+<script id="subtitle" type="text/vtt">{text}</script>
+</body></html>""")
 
 
 def m_json_echo(v: str, ctx: dict) -> tuple:
@@ -1004,6 +1136,12 @@ POST_MODES: dict = {
     "stored_api_view_safe": m_stored_api_view_safe,
     "upload_echo": m_upload_echo,
     "upload_echo_escaped": m_upload_echo_escaped,
+    # Phase 288: zip-slip archive upload (Juice Shop challenge #4 shape).
+    # The view route is registered in this table on purpose -- do_GET
+    # falls back to POST_MODES, which is how stored_view works too.
+    "upload_zip_slip": m_upload_zip_slip,
+    "upload_zip_slip_safe": m_upload_zip_slip_safe,
+    "zip_slip_view": m_zip_slip_view,
     "json_echo": m_json_echo,
     # Phase 176g: the only pair whose response is REAL application/json.  All
     # the other JSON-shaped handlers go through _page() and are text/html.
@@ -2450,6 +2588,12 @@ class BenchmarkHandler(BaseHTTPRequestHandler):
         length = int(self.headers.get("Content-Length") or 0)
         body = self.rfile.read(length) if length > 0 else b""
         fields, files = _parse_post_body(self.headers.get("Content-Type"), body)
+        # Phase 288: archive modes need the uploaded file's RAW bytes (a zip
+        # is binary; _parse_post_body decodes parts as utf-8 text).
+        raw_files = _parse_multipart_files_raw(
+            self.headers.get("Content-Type"), body) \
+            if "multipart" in (self.headers.get("Content-Type") or "").lower() \
+            else {}
         field = case.get("param", "q")
         value = fields.get(field, files.get(field, ""))
         context = {
@@ -2457,6 +2601,7 @@ class BenchmarkHandler(BaseHTTPRequestHandler):
             "path": path,
             "fields": fields,
             "files": files,
+            "raw_files": raw_files,
             "field": case.get("upload_field") or field,
             # Phase 122: query dict for handlers that need BOTH locations
             # (position-shift: WAF guards the body, the query is the gap).
