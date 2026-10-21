@@ -231,6 +231,34 @@
   台账 #5 行随之改"已确认(Phase 289)",可复现召回 **7/9**
   (#1/#2/#4/#5/#6/#8/#9;余 #3 变体读数在并行会话手里、#7 属目标视图不渲染)。
 
+- **Phase 290:async 引擎接上覆盖记账——此前每份 `--async` 报告的 coverage 全是 0**:
+  量到的三层断点:① `AsyncScanner` **根本没有 CoverageTracker**(sync 自 Phase 20-3 就有);
+  ② 报告由**同步 Scanner shim** 组装,shim 自带一个空 tracker 且从未拷贝 async 的;
+  ③ 58 个 sync 子层的 `touch_layer` 全落进 shim 的**内存 `_NullCoverage`**(Phase 63 的
+  可运行占位),永远到不了报告。⇒ 一个刚产出 4 条 finding 的 async 扫描,报告写着
+  "0 端点 / 0% 层 / 0 请求"(与 Phase 267「门禁看不见浏览器跑没跑」同族的**静默零仪表**)。
+  落法:AsyncScanner 持真 tracker;shim 的 facade **委托**给它(保留 `touched` 供测试,
+  签名改 `*a/**kw` 原样转发——窄签名曾把 `record_param(method=…)` 的 TypeError 喂进层的
+  except,静默停掉整个 header/path 层,3 个测试因此变红);async 原生层补规范 ID
+  (`L3_dom_static`/`L6_dom_dynamic`/`L7_csp`/`L7_jsonp`/`L7_cors`/`L7_xsleak`/
+  `L9_upload_filename`/`L5_blind_oob`/`L1_reflected`/`L7_csp_nonce`/`L7_csp_gadget`/`L2_hpp`),
+  `_touch_coverage` 对 `__new__` 构造的测试替身容错;finding 计数只走 `_add_finding`
+  单一入口(facade 不转发,否则双计 7 对 4);请求计数**归因到当前端点**
+  (模块级 `_set_current_scan_url`,path/error 层把载荷注入 URL 本身,按探针 URL 记会凭空
+  多出 17 个端点行);session 边界 + 线程卸载的 sync Requester 两条通路都计数
+  (后者用实例方法包装,`Requester.get/post` 不经过 `request`,逐 verb 包才全)。
+  **实测(两页夹具,双引擎对照)**:async 4 findings / 3 端点 / 4 finding 计数 / 28 层,
+  sync 4 / 3 / 4 / 27——端点与 finding 计数**逐项对齐**;请求数 async 计**全部传输请求**
+  (168),sync 计层站点(83),两者语义不同、未强拉齐(如实记录,不在同一字段上假装可比)。
+  **改坏过三处、都由测试/对照抓回**:① 计数包装写成 `async def` 破坏了 aiohttp
+  `async with session.get(...)`(async 4 findings → **0**);② `isinstance(session,
+  ClientSession)` 的 `_transport_is_real` 判定被包装类破坏 ⇒ 同步层降级离线
+  (header/path 2 findings → 0);③ `Finding` 只有 `.data` 没有 `.url/.method`,
+  `_add_finding` 的记账一直在 AttributeError 里静默为 0。新增
+  `tests/test_async_coverage.py` 5 例;async 套件 **123 passed**(唯一失败
+  `test_async_budget::…confirming_endpoint` 在干净 HEAD 上同样失败,预存非本轮)。
+  边界:请求数字两引擎语义不同;`_NullCoverage.record_finding` 故意不转发。
+
 ### Added
 
 - **`--login-json` / `--stored-relogin`:写入后重新登录,让"快照式视图"渲染新值(Phase 278)**:

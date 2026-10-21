@@ -41,6 +41,19 @@ class AsyncDetectionLayersMixin:
     pre-split file.
     """
 
+    def _touch_coverage(self, url, layer_id, method="GET", detail=""):
+        """Phase 290: coverage touch that tolerates __new__-built scanners.
+
+        Several tests construct AsyncScanner via ``__new__`` (no init) and
+        drive a single layer; they have no tracker, and a bare
+        ``self.coverage.touch_layer`` raised AttributeError inside the
+        layer (measured: 3 async tests failed).  Same getattr discipline
+        the rest of the code uses for those test doubles.
+        """
+        cov = getattr(self, "coverage", None)
+        if cov is not None:
+            cov.touch_layer(url, layer_id, method, detail)
+
     def _drop_skip_params(self, params, data):
         """Phase 185: strip operator --skip-param names from a request pair.
 
@@ -160,6 +173,11 @@ class AsyncDetectionLayersMixin:
         re-attaches params before this call (scanner.py:479-486); the guard
         below is copied from there, including the GET-only condition.
         """
+        # Phase 290: coverage parity (the sync layer touches the
+        # same id at its entry; without this the async report
+        # listed the layer as never having run).
+        self._touch_coverage(url, "L3_dom_static", method)
+        self._touch_coverage(url, "L6_dom_dynamic", method)
         try:
             from . import dom as dom_mod
             static_results = await asyncio.to_thread(
@@ -459,7 +477,8 @@ class AsyncDetectionLayersMixin:
                          exc_info=self.verbose)
 
     async def _scan_csp_async(self, url: str, resp_headers: dict,
-                              html: str = ""
+                              html: str = "",
+                              method: str = "GET"
                               ) -> AsyncIterator[Finding]:
         """L6 CSP analysis (runs in thread) -- sync _scan_csp parity.
 
@@ -477,6 +496,10 @@ class AsyncDetectionLayersMixin:
         bypassable CSP.  Mirror the sync layer: read report.bypassable /
         report.weak and emit the same medium csp_bypass finding.
         """
+        # Phase 290: coverage parity (the sync layer touches the
+        # same id at its entry; without this the async report
+        # listed the layer as never having run).
+        self._touch_coverage(url, "L7_csp", method)
         try:
             from . import csp as csp_mod
             # Same policy resolution as sync `_scan_csp`: the browser acts on
@@ -519,6 +542,10 @@ class AsyncDetectionLayersMixin:
         GET did not reflect).  Runs whenever advanced_layers is on, exactly
         like the sync L7 CORS layer.
         """
+        # Phase 290: coverage parity (the sync layer touches the
+        # same id at its entry; without this the async report
+        # listed the layer as never having run).
+        self._touch_coverage(url, "L7_cors", method)
         checked = getattr(self, "_cors_checked", None)
         if checked is None:
             checked = set()
@@ -572,7 +599,8 @@ class AsyncDetectionLayersMixin:
             )
             return  # one finding per origin is enough
 
-    async def _scan_xsleak_audit_async(self, url: str, resp_headers: dict
+    async def _scan_xsleak_audit_async(self, url: str, resp_headers: dict,
+                                       method: str = "GET"
                                        ) -> AsyncIterator[Finding]:
         """Phase 54: XS-Leaks surface audit -- sync _scan_xsleak_audit parity.
 
@@ -582,6 +610,10 @@ class AsyncDetectionLayersMixin:
         """
         if not self.xsleak_audit:
             return
+        # Phase 290: coverage parity (the sync layer touches the
+        # same id at its entry; without this the async report
+        # listed the layer as never having run).
+        self._touch_coverage(url, "L7_xsleak", method)
         checked = getattr(self, "_xsleak_audited", None)
         if checked is None:
             checked = set()
@@ -628,6 +660,12 @@ class AsyncDetectionLayersMixin:
         from urllib.parse import urljoin
         if not self.upload_fields:
             return
+        # Phase 290: coverage parity (the sync layer touches the
+        # same id at its entry; without this the async report
+        # listed the layer as never having run).
+        self._touch_coverage(
+            url, "L9_upload_filename",
+            getattr(self, "_upload_method", "POST"))
         for field in self.upload_fields:
             marker = f"{_stem_marker('xssup_')}{field}_{secrets.token_hex(2)}"
             for filename in _name_candidates(marker):
@@ -835,6 +873,10 @@ class AsyncDetectionLayersMixin:
             import aiohttp  # type: ignore
         except ImportError:
             return
+        # Phase 290: coverage parity (the sync layer touches the
+        # same id at its entry; without this the async report
+        # listed the layer as never having run).
+        self._touch_coverage(url, "L7_jsonp", method)
         # Build a query string carrying the existing params so the JSONP
         # endpoint sees the same context the reflection layer saw.
         for cb_name in _JSONP_CALLBACK_NAMES:
@@ -904,6 +946,10 @@ class AsyncDetectionLayersMixin:
         try:
             if not self.oob:
                 return
+            # Phase 290: coverage parity (the sync layer touches the
+            # same id at its entry; without this the async report
+            # listed the layer as never having run).
+            self._touch_coverage(url, "L5_blind_oob", method)
             if self._semaphore is None:
                 self._semaphore = asyncio.Semaphore(self.max_concurrent)
             blind_bases = payloads_mod.by_context("blind_oob")

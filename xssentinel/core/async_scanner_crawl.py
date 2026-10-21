@@ -136,7 +136,56 @@ class AsyncCrawlMixin:
             if not getattr(self, "_sync_layers_online", False):
                 req.session = _OfflineSession()
             self._sync_requester = req
+        self._count_sync_requests(req, getattr(self, "coverage", None))
         return req
+
+    @staticmethod
+    def _count_sync_requests(req, cov) -> None:
+        """Phase 290: count the thread-offloaded sync layers' probes.
+
+        Those layers hold this sync Requester, not the aiohttp session, so
+        the session-boundary counter never sees them.  Measured on the
+        parity fixture: async's coverage claimed 4 requests for a scan that
+        made ~90.  The sync layer modules issue every probe through
+        ``req.get/post/request`` (nothing reaches ``req.session``
+        directly -- verified by grep), so wrapping the instance methods
+        closes the gap without touching the Requester class.
+
+        Instance-level assignment of closures over the BOUND methods works
+        because these are plain callables, not descriptors.
+        """
+        if cov is None or getattr(req, "_coverage_counted", False):
+            return
+        try:
+            def _counted_url(orig, verb):
+                def _f(url, *a, **kw):
+                    try:
+                        from .async_scanner import _attributed_url
+                        cov.record_request(_attributed_url(url), verb)
+                    except Exception:
+                        pass
+                    return orig(url, *a, **kw)
+                return _f
+
+            def _counted_req(orig):
+                def _f(method, url, *a, **kw):
+                    try:
+                        from .async_scanner import _attributed_url
+                        cov.record_request(_attributed_url(url),
+                                           str(method).upper())
+                    except Exception:
+                        pass
+                    return orig(method, url, *a, **kw)
+                return _f
+
+            for _verb in ("get", "post", "put", "patch", "delete", "head"):
+                _orig = getattr(req, _verb, None)
+                if _orig is not None:
+                    setattr(req, _verb, _counted_url(_orig, _verb.upper()))
+            req.request = _counted_req(req.request)
+            req._coverage_counted = True
+        except Exception:
+            pass  # the instrument must never break the scan
 
     async def _crawl_mine_endpoints(self, text: str, url: str, depth: int,
                                     findings: list | None = None
@@ -312,18 +361,30 @@ class AsyncCrawlMixin:
         so a per-endpoint call is structurally unreachable after the seed's
         run -- wiring it would be a decorative call that can never fire.
         """
-        async for finding in self._scan_dom_async(url, text, method, params):
-            yield finding
-        async for finding in self._scan_advanced_page(url, text, params):
-            yield finding
-        async for finding in self._scan_csp_async(url, resp_headers, text):
-            yield finding
-        async for finding in self._scan_request_layers(
-                url, method, params, data or {}):
-            yield finding
-        async for finding in self._scan_jsonp_async(
-                url, method, params, data or {}):
-            yield finding
+        # Phase 290: the WHOLE bundle's requests are attributed to THIS
+        # page, not to whatever the seed scan set -- the path/error layers
+        # otherwise invent endpoint rows from their probe urls.  The
+        # try/finally spans every sub-layer on purpose: resetting after the
+        # first loop left the request layers counting against nothing.
+        from .async_scanner import _set_current_scan_url
+        _set_current_scan_url(url)
+        try:
+            async for finding in self._scan_dom_async(url, text, method,
+                                                      params):
+                yield finding
+            async for finding in self._scan_advanced_page(url, text, params):
+                yield finding
+            async for finding in self._scan_csp_async(url, resp_headers,
+                                                      text, method):
+                yield finding
+            async for finding in self._scan_request_layers(
+                    url, method, params, data or {}):
+                yield finding
+            async for finding in self._scan_jsonp_async(
+                    url, method, params, data or {}):
+                yield finding
+        finally:
+            _set_current_scan_url(None)
 
     async def _crawl_and_scan(self, session, start_url: str,
                               start_text: str) -> AsyncIterator[Finding]:

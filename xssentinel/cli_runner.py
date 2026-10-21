@@ -980,6 +980,13 @@ def _run_async_scan(args, url: str, oob, progress, checkpoint,
     except Exception:
         pass
     shim.waf_name = getattr(asc, "waf_name", None)
+    # Phase 290: the shim was built with its OWN empty CoverageTracker, so
+    # every --async report's coverage section read all zeros no matter what
+    # the scan did.  Hand the async engine's real tracker over -- the async
+    # scanner fills it at the session boundary (requests), the finding
+    # choke point, and per layer.  (Both async entry points build a shim.)
+    if getattr(asc, "coverage", None) is not None:
+        shim.coverage = asc.coverage
     # Phase 98b: bridge the ASYNC session's credentials into the shim's
     # requester.  attach_pocs reads self.req.session.{cookies,headers} --
     # on a fresh Scanner(requester=None) both were EMPTY, so the PoC
@@ -1212,6 +1219,13 @@ def _run_async_batch(args, urls: list[str], requester, oob, progress,
         shim.findings = list(asc.findings[lo:hi])
         shim.requests_made = requests_before.get(orig_url, 0)
         shim.waf_name = getattr(asc, "waf_name", None)
+    # Phase 290: the shim was built with its OWN empty CoverageTracker, so
+    # every --async report's coverage section read all zeros no matter what
+    # the scan did.  Hand the async engine's real tracker over -- the async
+    # scanner fills it at the session boundary (requests), the finding
+    # choke point, and per layer.  (Both async entry points build a shim.)
+    if getattr(asc, "coverage", None) is not None:
+        shim.coverage = asc.coverage
         # Phase 98b: same credential bridge as the single-URL async path
         # (attach_pocs reads the shim's session, which was empty).
         try:

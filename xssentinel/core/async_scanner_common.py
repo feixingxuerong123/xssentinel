@@ -260,31 +260,65 @@ class _AsyncScannerShim(AdvancedLayerMixin, CrawlMixin):
     """
 
     class _NullCoverage:
-        """Stand-in for scanner.coverage (the async scanner has none)."""
+        """Coverage facade for the sync modules run through the shim.
 
-        def __init__(self):
+        Phase 63 gave this a memory-only stand-in so the 58 sync sub-layer
+        ``scanner.coverage.touch_layer(...)`` call sites could run at all;
+        Phase 290 points it at the async scanner's REAL tracker so those
+        same calls finally reach the report.  ``touched`` stays: tests and
+        debugging inspect it to prove a layer ran, and the delegation is
+        additive on top of it.
+
+        Every method takes ``*a, **kw`` on purpose: the sync layer sites
+        call ``record_param(url, param, in_body=..., method=...,
+        context=..., confirmed=...)`` and friends, and a narrow facade
+        raised TypeError into the layer's own try/except -- which silently
+        disabled whole layers (measured: header_xss/path_xss tests went to
+        0 findings).  Forwarding verbatim keeps the facade shape-agnostic.
+        """
+
+        def __init__(self, real=None):
             self.touched: list[tuple] = []
+            self._real = real
 
-        def touch_layer(self, url, layer_id, method="GET", detail=""):
+        def touch_layer(self, url, layer_id, *a, **kw):
+            method = a[0] if a else kw.get("method", "GET")
+            detail = a[1] if len(a) > 1 else kw.get("detail", "")
             self.touched.append((url, layer_id, method, detail))
+            if self._real is not None:
+                self._real.touch_layer(url, layer_id, *a, **kw)
 
-        def record_layer(self, url, layer_id, status="ran", detail=""):
+        def record_layer(self, url, layer_id, *a, **kw):
+            status = kw.get("status", a[0] if a else "ran")
+            detail = kw.get("detail", a[1] if len(a) > 1 else "")
             self.touched.append((url, layer_id, status, detail))
+            if self._real is not None:
+                self._real.record_layer(url, layer_id, *a, **kw)
 
-        def record_request(self, url, method="GET"):
-            pass
+        def record_request(self, url, method="GET", *a, **kw):
+            if self._real is not None:
+                self._real.record_request(url, method, *a, **kw)
 
-        def record_param(self, url, param, in_body=False):
-            pass
+        def record_param(self, url, param, *a, **kw):
+            if self._real is not None:
+                self._real.record_param(url, param, *a, **kw)
 
-        def record_finding(self, url, method="GET"):
+        def record_finding(self, url, method="GET", *a, **kw):
+            # Deliberately NOT forwarded: the async engine counts findings
+            # at its own choke point (AsyncScanner._add_finding), and the
+            # sync sub-layers also call record_finding for the same rows --
+            # forwarding both double-counted (measured: 7 counted for 4
+            # findings).  Sync keeps its layer-site semantics; async uses
+            # the choke point, which is exact.
             pass
 
         def start_endpoint(self, url, method="GET", crawled=False):
-            pass
+            if self._real is not None:
+                self._real.start_endpoint(url, method, crawled)
 
         def end_endpoint(self, url, method="GET"):
-            pass
+            if self._real is not None:
+                self._real.end_endpoint(url, method)
 
     def __init__(self, async_scanner: AsyncScanner):
         self._async = async_scanner
@@ -293,7 +327,10 @@ class _AsyncScannerShim(AdvancedLayerMixin, CrawlMixin):
         self.findings = self._findings  # alias for advanced_layers
         self.waf_name = async_scanner.waf_name
         self.requests_made = 0
-        self.coverage = _AsyncScannerShim._NullCoverage()
+        # Phase 290: delegate to the scanner's real tracker when it has
+        # one (always, for AsyncScanner; a bare test double may not).
+        self.coverage = _AsyncScannerShim._NullCoverage(
+            real=getattr(async_scanner, "coverage", None))
         # Page layers also reach for the requester (GraphQL / cookie
         # tossing follow-up probes).  Default None; callers that run
         # request-driven page layers must set a real one.

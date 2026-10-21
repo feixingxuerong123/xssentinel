@@ -34,6 +34,7 @@ from urllib.parse import urljoin, urlparse
 from .scanner import Finding, json_leaf_paths, _set_json_leaf
 from .requester import JsonBody
 from . import context as ctx
+from . import coverage as cov_mod
 from . import verifier
 from . import waf as wafmod
 from . import bypass as bypass_mod
@@ -99,6 +100,90 @@ from .stealth import (marker as _stem_marker, HeaderRotator as _HeaderRotator, P
                       jitter_interval, load_proxies as _load_proxies)
 
 
+# Phase 290: which endpoint the scan is currently working on.  Request
+# counting must attribute to THIS url, not to the probe url -- the path /
+# error-page layers inject payloads into the URL itself, so counting by
+# probe url invented 17 extra endpoint rows in the report (measured on the
+# parity fixture: 20 rows for 3 real endpoints).  Set by _scan_raw (seed)
+# and by the crawl's page-layer bundle (crawled pages); the layers that
+# self-record pass the scan url themselves.
+_current_scan_url: str | None = None
+
+
+def _set_current_scan_url(url: str | None) -> None:
+    global _current_scan_url
+    _current_scan_url = url
+
+
+def _attributed_url(probe_url) -> str:
+    """The endpoint a request should be counted against."""
+    return _current_scan_url or str(probe_url)
+
+
+class _CountingSession:
+    """Phase 290: aiohttp session wrapper that counts every request.
+
+    Async issues its traffic through ~21 scattered ``session.get/post/
+    request`` sites across three files; counting at each site would be
+    mechanical and easy to miss one.  The wrapper counts the four verbs
+    explicitly and delegates everything else (``close``, ``cookie_jar``,
+    ``headers``, the context-manager protocol, ...) untouched via
+    ``__getattr__``, so no call site can tell the difference.
+
+    The count feeds ``CoverageTracker.record_request`` -- the same tracker
+    the sync engine has filled since Phase 20-3.  Before this, an --async
+    report claimed "0 requests" while the scan was making hundreds.
+    """
+
+    def __init__(self, session, coverage):
+        self._session = session
+        self._coverage = coverage
+
+    def _count(self, method: str, url) -> None:
+        try:
+            self._coverage.record_request(_attributed_url(url), method)
+        except Exception:
+            pass  # the instrument must never break the scan
+
+    # NB: these are PLAIN methods on purpose.  aiohttp's verb methods return
+    # a _RequestContextManager, which is BOTH awaitable and an async context
+    # manager; call sites use both spellings (``await session.get(...)`` and
+    # ``async with session.get(...)``).  An ``async def`` wrapper would
+    # return a coroutine, breaking every ``async with`` site -- measured:
+    # async dropped from 4 findings to 0 on the parity fixture.  Counting
+    # then returning the original call's object keeps both spellings intact.
+    def request(self, method, url, **kw):
+        self._count(method.upper(), url)
+        return self._session.request(method, url, **kw)
+
+    def get(self, url, **kw):
+        self._count("GET", url)
+        return self._session.get(url, **kw)
+
+    def post(self, url, **kw):
+        self._count("POST", url)
+        return self._session.post(url, **kw)
+
+    def put(self, url, **kw):
+        self._count("PUT", url)
+        return self._session.put(url, **kw)
+
+    def patch(self, url, **kw):
+        self._count("PATCH", url)
+        return self._session.patch(url, **kw)
+
+    def delete(self, url, **kw):
+        self._count("DELETE", url)
+        return self._session.delete(url, **kw)
+
+    def head(self, url, **kw):
+        self._count("HEAD", url)
+        return self._session.head(url, **kw)
+
+    def __getattr__(self, name):
+        return getattr(self._session, name)
+
+
 
 
 class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
@@ -154,6 +239,14 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
         self.skip_params = {str(p).strip().lower()
                             for p in (skip_params or ()) if str(p).strip()}
         self.headless_concurrency = max(1, int(headless_concurrency or 1))
+        # Phase 290: the coverage tracker the sync engine has had since
+        # Phase 20-3.  Without it every --async report's coverage section
+        # read "0 endpoints / 0% layers / 0 requests" for a scan that had
+        # just produced findings -- a silently zeroed instrument, the same
+        # bug family as the Phase 267 range gate that passed with the
+        # browser never having run.  The tracker is thread-safe (its own
+        # lock), which matters because the layers run via to_thread.
+        self.coverage = cov_mod.CoverageTracker()
         self.max_concurrent = max_concurrent
         self.per_host_delay = per_host_delay
         # Phase 93: default jitter 0.0 (was 0.1).  Unlike the sync engine,
@@ -468,6 +561,9 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
 
         params = params or {}
         data = data or {}
+        # Phase 290: every request issued below is attributed to THIS
+        # endpoint (see _attributed_url); the crawl overrides it per page.
+        _set_current_scan_url(url)
 
         # Phase 142: hidden-parameter mining used to run HERE, before the
         # baseline.  It is the most request-hungry step in the scan, so at a
@@ -489,6 +585,13 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
                                              connector=connector,
                                              **self._session_kwargs(url)
                                              ) as session:
+                # Phase 290: count every request the scan makes.  Async
+                # issues its traffic through ~21 scattered aiohttp call
+                # sites (session.get/post/request across three files), so
+                # the count is taken once here, at the session boundary,
+                # rather than at each site.  Everything else delegates
+                # untouched.
+                session = _CountingSession(session, self.coverage)
                 # Phase 200: a real aiohttp transport is now active, so the
                 # thread-offloaded sync layers (L7 advanced params, crawl
                 # mining, transport layers) may use their sync Requester.
@@ -519,8 +622,15 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
                 # ClientSession is a class from the genuine module; a stub is
                 # a stand-in, and type(session).__module__ names the package
                 # that defined it.
+                # Phase 290: ask about the UNDERLYING aiohttp session --
+                # _transport_is_real does an isinstance check, and the
+                # counting wrapper is not a ClientSession.  Judging the
+                # wrapper made every thread-offloaded sync layer believe
+                # the transport was a stub, so they degraded to
+                # _OfflineSession and produced zero findings (measured:
+                # the header/path XSS test went from 2 findings to 0).
                 self._sync_layers_online = self._transport_is_real(
-                    aiohttp, session)
+                    aiohttp, getattr(session, "_session", session))
                 # 1) Baseline: get the page for reflection + DOM + advanced.
                 try:
                     async with self._semaphore:
@@ -634,7 +744,7 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
                 # L6 CSP analysis.
                 if self.advanced_layers:
                     page_tasks.append(("L6_csp", self._scan_csp_async(
-                        url, resp_headers, text)))
+                        url, resp_headers, text, method)))
 
                 # L6 JSONP callback detection.
                 if self.advanced_layers:
@@ -648,7 +758,7 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
                         session, url, method)))
                 if self.advanced_layers and self.xsleak_audit:
                     page_tasks.append(("L7_xsleaks", self._scan_xsleak_audit_async(
-                        url, resp_headers)))
+                        url, resp_headers, method)))
 
                 # Phase 58/63: multipart upload-filename probing parity (sync
                 # Phase 48) -- body-carrying endpoints without a JSON carrier
@@ -715,12 +825,17 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
             async for finding in self.collect_oob_async():
                 await self._add_finding(finding)
                 yield finding
+        _set_current_scan_url(None)
 
     async def _scan_reflected(self, session, url: str, method: str,
                               params: dict, data: dict,
                               baseline_text: str
                               ) -> AsyncIterator[Finding]:
         """L1 reflected XSS: probe each parameter with context-aware payloads."""
+        # Phase 290: sync parity -- scanner.py's L1 site touches coverage
+        # once per endpoint and record_param per name.  Without this an
+        # --async report's layer matrix showed L1 as "never ran".
+        self._touch_coverage(url, "L1_reflected", method)
         # Phase 47: JSON-carrier mode -- body params are the LEAF paths of
         # the document (sync scan_endpoint parity), so nested API bodies get
         # full payload coverage in async mode too.  The old code only ever
@@ -750,6 +865,13 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
         sink: list = []
         tasks = []
         for param, is_body in param_items:
+            # Phase 290: the per-parameter row the sync engine records
+            # (scanner.py's record_param call sites).  Kept next to the
+            # probe that actually sends the payload.
+            _cov = getattr(self, "coverage", None)
+            if _cov is not None:
+                _cov.record_param(url, param, in_body=is_body,
+                                  method=method)
             tasks.append(asyncio.create_task(_drain_agen(
                 self._probe_param(session, url, method, param, params, data,
                                   is_body, baseline_text), sink,
@@ -901,17 +1023,23 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
         # step (scanner.py:656) carries the same guard, and the block is
         # only reached on an unconfirmed param anyway.
         if not param_confirmed and csp_hdr:
+            # Phase 290: the per-param tail stages touch coverage at their
+            # call sites (method is in scope here; the mixin functions do
+            # not carry it).  Sync records these at the same points.
+            self._touch_coverage(url, "L7_csp_nonce", method)
             async for _f in self._probe_csp_nonce(
                     session, url, method, param, params, data, is_body,
                     marker, context, csp_hdr, probe_text, text,
                     resp_headers):
                 yield _f
+            self._touch_coverage(url, "L7_csp_gadget", method)
             async for _f in self._probe_csp_gadget(
                     session, url, method, param, params, data, is_body,
                     context, csp_hdr):
                 yield _f
 
         if self.waf_name and not param_confirmed:
+            self._touch_coverage(url, "L2_hpp", method)
             async for _f in self._probe_hpp(
                     session, url, method, param, params, data, is_body,
                     context, cands):
@@ -1025,6 +1153,18 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
 
     async def _add_finding(self, finding: Finding) -> None:
         """Thread-safe append to the findings list."""
+        # Phase 290: every finding flows through here (page tasks, crawl,
+        # OOB collect), so this is the one choke point that keeps the
+        # tracker's per-endpoint finding count honest.  Finding carries its
+        # payload in ``.data`` -- it has NO .url/.method attributes, and
+        # reaching for them here raised AttributeError into the except, so
+        # the counter stayed silently at zero until the unit test caught it.
+        try:
+            _d = getattr(finding, "data", None) or {}
+            self.coverage.record_finding(_d.get("url") or "",
+                                         _d.get("method") or "GET")
+        except Exception:
+            pass
         async with self._get_lock():
             self.findings.append(finding)
 
