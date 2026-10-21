@@ -63,7 +63,12 @@ _WAF_SIGNATURES: list[tuple[str, "re.Pattern[str]", str]] = [
 
     # --- F5 ---
     ("F5 BIG-IP ASM",
-     re.compile(r"bigipserver|ts01|tsa|BIGipServer|f5ip|"
+     # Phase 291: the bare ``tsa`` alternative matched ordinary front-end
+     # text -- ``const tsa = ...`` / ``computeTsA(...)`` classified a clean
+     # app as F5, which then generated evasion variants the target never
+     # needed.  Emitted only as a cookie/header fingerprint; the TS0-prefix
+     # rule already covers ``ts01...`` case-insensitively.
+     re.compile(r"bigipserver|ts01|bigipserverpool|f5ip|"
                 r"webshields|TS0[0-9a-f]+", re.I), "any"),
     ("F5 ASM",
      re.compile(r"the requested url was rejected|F5 ASM", re.I), "body"),
@@ -95,7 +100,12 @@ _WAF_SIGNATURES: list[tuple[str, "re.Pattern[str]", str]] = [
 
     # --- Cisco / Juniper / Sophos ---
     ("Cisco ACE",
-     re.compile(r"cisco|ace-|cisco_ace", re.I), "any"),
+     # Phase 291: ``ace-`` matched CSS custom properties (``--mat-sys-on-
+     # surface-variant``, ``interface-header``, ``space-around``), so every
+     # Angular/Material page looked like a Cisco ACE target.  The anchor
+     # keeps a real ``ACE-...`` cookie/header while refusing hyphenated
+     # prose.
+     re.compile(r"cisco|cisco_ace|\bace-", re.I), "any"),
     ("Juniper WebApp Secure",
      re.compile(r"juniper|jroute|jsessionid_jws", re.I), "any"),
     ("Sophos UTM",

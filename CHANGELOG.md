@@ -259,6 +259,23 @@
   `test_async_budget::…confirming_endpoint` 在干净 HEAD 上同样失败,预存非本轮)。
   边界:请求数字两引擎语义不同;`_NullCoverage.record_finding` 故意不转发。
 
+- **Phase 291:WAF 指纹误检——CSS 里的 `surface-variant` 被当成 Cisco ACE,`const tsa` 被当成 F5**:
+  Known limitations 第 5 条("Juice Shop 被判 Generic/Unknown WAF / Cisco ACE")本轮量到
+  根因,不是泛泛的"误检":① Cisco ACE 规则的 `ace-` 命中了 Angular/Material 的 CSS
+  自定义属性 `--mat-sys-on-surface-variant`(及 `interface-header`/`space-around`
+  这类连字符类名);② F5 BIG-IP ASM 规则里的**裸 `tsa`** 命中 `const tsa = …` /
+  `computeTsA(…)`——该 token 全仓库无任何依据(无文档、无测试),大概率是笔误。
+  ⇒ 任何普通前端页面都可能被判成"在 WAF 后面",于是扫描器为一个**不存在的 WAF**
+  生成 evasion 变体(白烧预算),报告也误导操作者去调 WAF 绕过。
+  修法:两条规则收紧——Cisco 用 `\bace-` 锚定(保留真 `ACE-…` cookie/头,拒绝连字符
+  散文),F5 去掉裸 `tsa`(真指纹 `BIGipServer`/`TS0…`/`f5ip`/`webshields` 都在;
+  `ts01` 本就被 `TS0[0-9a-f]+` 以 re.I 覆盖)。
+  证据:合成分片——CSS 变量/类名/JS 标识符 → `waf=None`(修前分别为 Cisco ACE /
+  Cisco ACE / F5);真 `ACE-abc=1` cookie / `BIGipServerpool_80` / `TS01a1b2c3`
+  / 正文含 "Cisco" → 仍正确命中。Juice Shop 实例(无 WAF)修后 `waf=None`。
+  测试 +6(`tests/test_waf_detect_block_hints.py::TestFingerprintSpecificity`),
+  WAF 单测 16 passed。全量门禁另跑(见提交信息)。
+
 ### Added
 
 - **`--login-json` / `--stored-relogin`:写入后重新登录,让"快照式视图"渲染新值(Phase 278)**:

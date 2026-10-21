@@ -73,5 +73,46 @@ class TestBlockHintsAreBodySignals(unittest.TestCase):
         self.assertFalse(d["blocked"])
 
 
+class TestFingerprintSpecificity(unittest.TestCase):
+    """Phase 291: body fingerprints must not fire on ordinary front-end text.
+
+    Measured on OWASP Juice Shop 20.2.0 (no WAF): its Angular/Material CSS
+    contains ``--mat-sys-on-surface-variant`` and the page carries class
+    names like ``interface-header`` / ``space-around``.  The old Cisco ACE
+    rule matched ``ace-`` inside those words, and the old F5 rule matched
+    the bare token ``tsa`` inside ``const tsa = ...``.  Either hit makes
+    the scanner generate WAF-evasion variants a clean target never needs
+    and tells the operator they are behind a WAF that is not there.
+    """
+
+    def test_css_custom_properties_are_not_cisco_ace(self):
+        r = _R(200, {"Server": "x"},
+               "<style>--mat-sys-on-surface-variant:#e0e2ec</style>")
+        self.assertIsNone(wafmod.detect(r)["waf"])
+
+    def test_hyphenated_class_names_are_not_cisco_ace(self):
+        r = _R(200, {"Server": "x"},
+               '<div class="interface-header space-around">')
+        self.assertIsNone(wafmod.detect(r)["waf"])
+
+    def test_js_identifier_tsa_is_not_f5(self):
+        r = _R(200, {"Server": "x"},
+               "const tsa = computeTsA(x); let bitsa = 1;")
+        self.assertIsNone(wafmod.detect(r)["waf"])
+
+    def test_real_ace_cookie_still_fingerprints(self):
+        r = _R(200, {"Set-Cookie": "ACE-abc=1"}, "<html>ok</html>")
+        self.assertEqual(wafmod.detect(r)["waf"], "Cisco ACE")
+
+    def test_real_f5_cookies_still_fingerprint(self):
+        for cookie in ("BIGipServerpool_80=xyz", "TS01a1b2c3=abc"):
+            r = _R(200, {"Set-Cookie": cookie}, "<html>ok</html>")
+            self.assertEqual(wafmod.detect(r)["waf"], "F5 BIG-IP ASM", cookie)
+
+    def test_vendor_name_in_body_still_fingerprints(self):
+        r = _R(200, {"Server": "x"}, "Blocked by Cisco security")
+        self.assertEqual(wafmod.detect(r)["waf"], "Cisco ACE")
+
+
 if __name__ == "__main__":
     unittest.main()
