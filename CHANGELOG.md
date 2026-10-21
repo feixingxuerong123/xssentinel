@@ -335,6 +335,10 @@
   原样放进测试,断言它会在 ≥10 个样本上误触发(证明这张网真能抓住旧问题,而不是
   恒真的空断言)。`tests/test_waf_benign_corpus.py` 4 例;与 294 合计 22 passed。
 
+- **Phase 296(docs):Known limitations ⑤ 关闭** —— 291(指纹)/294(blocked 证据)/
+  295(良性语料网)三轮 + 本轮 8 面复测后,⑤ 从"部分解决"改为**已解决**,复测口径
+  (哪些面、期望值)写进条目本身,不再留"待复测"这种无判据的尾巴。
+
 ### Added
 
 - **`--login-json` / `--stored-relogin`:写入后重新登录,让"快照式视图"渲染新值(Phase 278)**:
@@ -667,11 +671,15 @@
   爬到的非 fragment 端点现在跑全套页面层,与 sync 对齐。实测:同一"首页→DOM sink 页"
   爬取夹具上,双引擎产出**逐项相同**的 4 条 finding(含 evidence_class)。
 
-- **[部分解决 · Phase 291] 真实靶上的 WAF 误检**:`Cisco ACE` 的裸 `ace-` 命中
-  Material CSS(`--mat-sys-on-surface-variant`,`interface-header`);F5 的裸 `tsa`
-  命中 JS 标识符 `const tsa`。两条规则已收紧并加 6 例正负断言;Juice Shop 索引页
-  实测 `waf=None`。`Generic/Unknown WAF` 未在索引页复现;完整重测(多相信封 + 错误面
-  样本上的 `waf` 分布)因靶机当时不可用推迟,**待复测**。
+- **[已解决 · Phase 291/294/295] 真实靶上的 WAF 误检**:两条指纹规则(裸 `ace-`、
+  裸 `tsa`)在 291 收紧;294 又量到更严重的一层——`_BLOCK_BODY_HINTS` 里的**厂商名与
+  主题词**(`cloudflare`/`waf`/`firewall`/`request id`/中文 `攻击`/`防火墙`…)与过宽的
+  状态码集合(401/404/400/500/502)会把普通页面判成"被拦",而 `blocked` 会**丢弃载荷**
+  ⇒ 静默 FN(CF 前置站的**放行** 200 响应也在其中)。
+  **复测**:Juice Shop 8 个面(索引/搜索/API/401/404/未知路由/注入查询)全部
+  `waf=None`、`blocked=False`、无 hint 命中;`Generic/Unknown` 未再出现;
+  benchmark `pos-waf-01` 仍检出、`neg-waf-01` 仍无;295 的 20 样本良性语料网
+  (含变异对照)持续守护这条边界。
 
 - **[开放] 真实靶场上浏览器爬取宽度不稳定**(实测同命令 18 / 22 / 70 / 70 / 70 / 74 端点)。
 
