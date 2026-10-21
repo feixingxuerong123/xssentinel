@@ -87,6 +87,10 @@ def page_index() -> str:
         ("Thread (safe)", "/thread-safe"),
         ("Profile", "/profile#bio"),
         ("Profile (safe)", "/profile-safe#bio"),
+        ("Preview", "/preview?name=ada"),
+        ("Preview (safe)", "/preview-safe?name=ada"),
+        ("Admin", "/admin"),
+        ("Admin (safe)", "/admin-safe"),
     ]
     body = "<ul>" + "".join(
         f'<li><a href="{u}">{_esc(t)}</a></li>' for t, u in links) + "</ul>"
@@ -121,6 +125,38 @@ def page_profile(safe: bool) -> str:
     return ("<html><body><h2>Profile</h2><div id=out>bio</div>"
             "<script>var h = decodeURIComponent("
             "(location.hash||'').slice(1));" + sink + "</script></body></html>")
+
+
+def page_preview(name: str, safe: bool) -> str:
+    """A <script type=application/json> config block the page then renders.
+
+    Distinct from the /widget face: the payload sits inside a JSON string
+    inside a script element, so BOTH the element close and the JSON string
+    are in play.  The safe twin escapes '<' the way a JSON encoder does
+    (\u003c), which is what a real app would emit.
+    """
+    if safe:
+        # NOT \u003c: that is a JSON escape, and JSON.parse turns it back
+        # into '<' right before the innerHTML assignment -- measured, the
+        # "safe" twin still executed the breakout payload, so the scanner
+        # reported a browser-confirmed high on it (a range bug, not a
+        # scanner bug).  The sink is innerHTML, so escape for HTML.
+        name = _esc(name or "")
+    return ("<html><body><div id=p>x</div>"
+            '<script type="application/json" id=cfg>{"name":"'
+            + (name or "") +
+            '"}</script><script>'
+            "var o = JSON.parse(document.getElementById('cfg').textContent);"
+            "document.getElementById('p').innerHTML = o.name;"
+            "</script></body></html>")
+
+
+def page_admin(kind: str, safe: bool) -> str:
+    """Second-order view: the value was stored by a DIFFERENT endpoint."""
+    items = "".join(
+        f"<div class=nm>{_esc(t) if safe else t}</div>"
+        for t in _comments(kind))
+    return PAGE.format(title="Admin", body=items or "<p>no profile</p>")
 
 
 def page_thread(kind: str, safe: bool) -> str:
@@ -160,6 +196,7 @@ class Handler(BaseHTTPRequestHandler):
         q = parse_qs(u.query)
         val = (q.get("q") or [""])[0]
         cfg = (q.get("cfg") or [""])[0]
+        name = (q.get("name") or [""])[0]
         routes = {
             "/": lambda: self._send(200, page_index()),
             "/search": lambda: self._send(200, page_search(val, False)),
@@ -168,6 +205,10 @@ class Handler(BaseHTTPRequestHandler):
             "/widget-safe": lambda: self._send(200, page_widget(cfg, True)),
             "/thread": lambda: self._send(200, page_thread("raw", False)),
             "/thread-safe": lambda: self._send(200, page_thread("safe", True)),
+            "/preview": lambda: self._send(200, page_preview(name, False)),
+            "/preview-safe": lambda: self._send(200, page_preview(name, True)),
+            "/admin": lambda: self._send(200, page_admin("profile", False)),
+            "/admin-safe": lambda: self._send(200, page_admin("profile_safe", True)),
             "/profile": lambda: self._send(200, page_profile(False)),
             "/profile-safe": lambda: self._send(200, page_profile(True)),
         }
@@ -182,7 +223,8 @@ class Handler(BaseHTTPRequestHandler):
         n = int(self.headers.get("Content-Length") or 0)
         raw = self.rfile.read(n).decode("utf-8", "replace")
         form = parse_qs(raw)
-        text = (form.get("text") or form.get("comment") or [""])[0]
+        text = (form.get("text") or form.get("comment")
+                or form.get("name") or [""])[0]
         if u.path == "/comment":
             _add_comment("raw", text)
             self._redirect("/thread")
@@ -190,6 +232,14 @@ class Handler(BaseHTTPRequestHandler):
         if u.path == "/comment-safe":
             _add_comment("safe", text)
             self._redirect("/thread-safe")
+            return
+        if u.path == "/settings":
+            _add_comment("profile", text)
+            self._redirect("/admin")
+            return
+        if u.path == "/settings-safe":
+            _add_comment("profile_safe", text)
+            self._redirect("/admin-safe")
             return
         self._send(404, PAGE.format(title="404", body="not found"))
 

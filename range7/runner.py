@@ -84,16 +84,27 @@ def _invoke_scanner(url: str, timeout: int, max_payloads: int,
     return report, elapsed, err
 
 
+#: Finding families that are HARDENING ADVICE, not XSS evidence.  range3/4/6
+#: already exclude csp_* hygiene notes for this reason; range7's pages also
+#: draw Trusted Types notes (the JSON/preview faces assign innerHTML), and a
+#: "no Trusted Types policy" advisory is a recommendation about the page, not
+#: proof that our input reached a sink.  Counting it would make every page
+#: that uses innerHTML a false positive.  Stated explicitly so the exclusion
+#: is a decision, not a way to make numbers look better.
+ADVISORY_PREFIXES = ("csp_", "trusted_types_")
+
+
 def score(report: dict | None, case: dict) -> str:
+    def is_evidence(f: dict) -> bool:
+        if f.get("severity") not in ("high", "medium", "critical"):
+            return False
+        t = str(f.get("type", ""))
+        return not t.startswith(ADVISORY_PREFIXES)
+
     fs = (report or {}).get("findings", [])
     if case["gt"] == "safe":
-        bad = [f for f in fs
-               if f.get("severity") in ("high", "medium", "critical")
-               and not str(f.get("type", "")).startswith("csp_")]
-        return "FP" if bad else "TN"
-    hits = [f for f in fs
-            if f.get("severity") in ("high", "medium", "critical")]
-    return "TP" if hits else "FN"
+        return "FP" if [f for f in fs if is_evidence(f)] else "TN"
+    return "TP" if [f for f in fs if is_evidence(f)] else "FN"
 
 
 def main() -> int:

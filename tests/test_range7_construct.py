@@ -107,3 +107,24 @@ def test_dom_faces_differ_only_in_the_sink(base):
     assert "textContent" in safe and "innerHTML" not in safe
     # both must decode the fragment -- Phase 265: Chromium percent-encodes
     assert "decodeURIComponent" in raw and "decodeURIComponent" in safe
+
+
+def test_json_config_block_face(base):
+    payload = "</script><svg onload=alert(1)>"
+    q = urllib.parse.quote(payload)
+    _, raw = _get(base, f"/preview?name={q}")
+    assert payload in raw, "vulnerable JSON block must allow closing the element"
+    _, safe = _get(base, f"/preview-safe?name={q}")
+    assert payload not in safe
+    assert "\\u003c/script" in safe, "safe twin must JSON-escape '<'"
+
+
+def test_second_order_face(base):
+    _post(base, "/settings", MARK)
+    _post(base, "/settings-safe", MARK)
+    _, raw = _get(base, "/admin")
+    assert MARK in raw, "second-order view must render the stored bytes"
+    _, safe = _get(base, "/admin-safe")
+    assert MARK not in safe
+    assert "&lt;svg" in safe
+    assert "nm" in safe, "an empty admin page would make the TN fiction"

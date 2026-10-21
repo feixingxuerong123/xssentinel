@@ -418,6 +418,27 @@
   边界:range7 尚未接入 CI(`.github/workflows/ci.yml` 目前在并行会话的未提交改动里,
   不动它);`results.json` 已入库,可直接与后续轮次对比。
 
+- **Phase 303:range7 扩到 12 用例(JSON 配置块 + 二跳),并先抓出自己两个构造错误** ——
+  新增两个形态:`<script type=application/json>` 配置块 → `innerHTML`;以及**二跳**
+  (POST `/settings` 存 → 另一个页面 `/admin` 渲染),各带安全双胞胎。
+  **新增面第一跑就暴露两处"靶场自身的错"**(扫描器都是对的):
+  ① `preview-safe` 用 `\u003c` 转义 `<` —— 字节上看着安全,但 `JSON.parse` 会把它还原
+  成 `<`,紧接着就是 `innerHTML` ⇒ **页面仍然执行**,扫描器给出**带浏览器证据的 high**,
+  被记成 FP。教训:**按 sink 转义,不按载体转义**。
+  ② `/settings` 的 POST 只读 `text`/`comment`,没读 `name` ⇒ 注入被静默丢弃、视图为空,
+  被记成 FN。
+  两处都修,并把**构造效度升级为浏览器双向实测**:`tests/test_range7_construct_browser.py`
+  用 Chromium 断言 **vulnerable 面必须执行、safe 面必须不执行**(12 例)。途中还修了探针
+  自身的两个空断言:① `__x()` 写的是 **pathname** 不是 `'1'`(`_read_hit` 恒 False);
+  ② `/widget` 面的可利用点是**关闭 script 元素**而非引号越狱(引号已被转义)。
+  **评分口径**:`range7/runner.py` 显式排除**建议型 finding 族**(`csp_*`、`trusted_types_*`)
+  —— 与 range3/4/6 已有的 `csp_*` 惯例一致:"没有 Trusted Types 策略"是关于页面的加固建议,
+  不是"我们的输入进了 sink"的证据;不排除的话任何用 innerHTML 的页面都会变 FP。
+  终局:**sync TP6/FP0/TN6/FN0(12/12)**,async **TP4/FP0/TN4/SKIP4**(存储与二跳按声明仅 sync)。
+  边界:同前(CI 未接);`test_range7_construct_browser.py` 需要 Playwright,缺失时由既有
+  conftest 规则处理;浏览器夹具用**独立线程 + 任务队列**,避免 Phase 200 的 loop 卡死
+  污染后续测试(曾 12/12 全 skip)。
+
 - **Phase 302:range7 抓到的 context 分歧已修——"一个字段一个含义",两引擎对齐** ——
   async 的 finding 构造里是 `context=v.get("context") or context`:**验证器观察到的
   sink 覆盖了分类得到的反射上下文**,于是同一反射 sync 报 `html_attribute_dq`、

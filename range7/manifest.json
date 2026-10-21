@@ -23,6 +23,20 @@
    "note": "decodeURIComponent(location.hash) -> innerHTML"},
   {"id": "r7-neg-dom", "gt": "safe", "path": "/profile-safe", "param": "",
    "headless": true,
-   "note": "same source, textContent"}
+   "note": "same source, textContent"},
+  {"id": "r7-pos-json", "gt": "vulnerable", "path": "/preview", "param": "name",
+   "headless": true,
+   "note": "<script type=application/json> config block -> innerHTML; the payload must close the script element"},
+  {"id": "r7-neg-json", "gt": "safe", "path": "/preview-safe", "param": "name",
+   "headless": true,
+   "note": "same block, '<' emitted as \\u003c the way a JSON encoder does"},
+  {"id": "r7-pos-second", "gt": "vulnerable", "path": "/settings", "param": "name",
+   "method": "POST", "stored_inject": "/settings", "stored_view": "/admin",
+   "stored_param": "name", "engines": ["sync"],
+   "note": "second-order: stored by /settings, rendered raw on a DIFFERENT page (/admin)"},
+  {"id": "r7-neg-second", "gt": "safe", "path": "/settings-safe", "param": "name",
+   "method": "POST", "stored_inject": "/settings-safe", "stored_view": "/admin-safe",
+   "stored_param": "name", "engines": ["sync"],
+   "note": "same flow, escaped on the admin view"}
  ]
 }
