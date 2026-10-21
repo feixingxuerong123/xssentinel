@@ -399,6 +399,25 @@
   边界:家族→宿主是**尽力映射**(40 家族 vs 20 宿主),不做全矩阵;跳过与无哨兵的
   条目在产物里列明,不假装已判。
 
+- **Phase 301:range7——独立技术栈的第四类靶场,首跑双引擎全绿,并抓到一处 context 字段分歧**:
+  现有 range3–6 与 194 例基准都在本仓库内写就,扫描器可能悄悄拟合自己的靶场。range7
+  刻意在**每一处表层**都不同:纯标准库 `http.server` + SQLite、表格布局、无框架;
+  四个注入面各带"按构造安全"的双胞胎——引号属性值、`<script>` 配置行、存储评论线程、
+  hash 路由 DOM sink(先 `decodeURIComponent`,Phase 265 的教训)。构造效度先做:
+  `tests/test_range7_construct.py` 对**服务端字节**断言(vulnerable 面必须原样回显、
+  safe 面必须转义/`\x3c` 编码、stored 面必须真有内容、两个 profile 只因 sink 不同)。
+  **首跑**:sync **TP4/FP0/TN4/FN0**,async **TP3/FP0/TN3/SKIP2(存储用例仅 sync)**;
+  `r7-pos-dom` 的阳性有浏览器执行证据(fired),门禁同 range4 标准(任何 FN/FP/ERROR
+  或"阳性无浏览器证据"即失败)。
+  **顺带量到一处字段语义分歧**:`r7-pos-attr` 上 sync 的 finding 报
+  `context=html_attribute_dq`(反射分类上下文),async 报 `context=script_block`
+  ——因为 async 用**验证器观察到的**上下文覆盖了分类结果(`context=v.get("context") or context`)。
+  两者都是 TP,但同一字段在两引擎含义不同。**未在本轮修改**:需要决定"哪个定义对"
+  (mXSS 场景里验证器上下文更有信息量),倾向**新增 `sink_context` 并列报告**而非替换;
+  另立一轮。
+  边界:range7 尚未接入 CI(`.github/workflows/ci.yml` 目前在并行会话的未提交改动里,
+  不动它);`results.json` 已入库,可直接与后续轮次对比。
+
 ### Added
 
 - **`--login-json` / `--stored-relogin`:写入后重新登录,让"快照式视图"渲染新值(Phase 278)**:

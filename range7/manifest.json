@@ -1,0 +1,28 @@
+{
+ "range": "range7",
+ "note": "Independent legacy-CMS range: Python stdlib + SQLite, no framework. Four injection faces (quoted attribute, <script> config string, stored comment thread, hash-routed DOM sink) each with a twin that is safe by construction. Written OUTSIDE the benchmark harness so a scanner fitted to that harness shows up here.",
+ "cases": [
+  {"id": "r7-pos-attr", "gt": "vulnerable", "path": "/search", "param": "q",
+   "note": "value=\"...\" attribute value, served raw"},
+  {"id": "r7-neg-attr", "gt": "safe", "path": "/search-safe", "param": "q",
+   "note": "same sink, html.escape(quote=True) on the way out"},
+  {"id": "r7-pos-script", "gt": "vulnerable", "path": "/widget", "param": "cfg",
+   "note": "var cfg = \"...\"; JS string delimiters escaped, '<' not -> </script> breakout"},
+  {"id": "r7-neg-script", "gt": "safe", "path": "/widget-safe", "param": "cfg",
+   "note": "same, '<' rendered as \\x3c so the element cannot be closed"},
+  {"id": "r7-pos-stored", "gt": "vulnerable", "path": "/comment", "param": "text",
+   "method": "POST", "stored_inject": "/comment", "stored_view": "/thread",
+   "stored_param": "text", "engines": ["sync"],
+   "note": "comment stored in SQLite and rendered raw on /thread"},
+  {"id": "r7-neg-stored", "gt": "safe", "path": "/comment-safe", "param": "text",
+   "method": "POST", "stored_inject": "/comment-safe", "stored_view": "/thread-safe",
+   "stored_param": "text", "engines": ["sync"],
+   "note": "same store, escaped on render"},
+  {"id": "r7-pos-dom", "gt": "vulnerable", "path": "/profile", "param": "",
+   "headless": true,
+   "note": "decodeURIComponent(location.hash) -> innerHTML"},
+  {"id": "r7-neg-dom", "gt": "safe", "path": "/profile-safe", "param": "",
+   "headless": true,
+   "note": "same source, textContent"}
+ ]
+}
