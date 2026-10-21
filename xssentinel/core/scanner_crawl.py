@@ -132,6 +132,14 @@ class CrawlMixin:
         # `_merge_endpoints` keys on (url, method, param names), so the
         # Playwright-missing fallback (which returns _crawl's own list) is
         # unaffected.
+        # Phase 293: publish which crawl engine actually ran.  A fallback
+        # to the static BFS used to be invisible in the artifact; the
+        # report now says `crawl_engine: static-fallback` plus the reason.
+        self.crawl_engine_used = getattr(crawler, "engine_used", "spa")
+        self.crawl_fallback_reason = getattr(crawler, "fallback_reason", None)
+        if self.crawl_fallback_reason:
+            _log.warning("crawl engine degraded: %s (%s)",
+                         self.crawl_engine_used, self.crawl_fallback_reason)
         return spa_mod._merge_endpoints(
             found, self._js_hash_routes(start_url))
 

@@ -415,6 +415,12 @@ def build_json(findings: list, target: str, meta: dict) -> str:
         "scope_dropped": meta.get("scope_dropped"),
         "scope_dropped_count": meta.get("scope_dropped_count"),
         "waf": meta.get("waf"),
+        # Phase 293: which crawl engine actually ran ("spa" or
+        # "static-fallback") and why a fallback fired.  The endpoint count
+        # alone cannot tell a full browser crawl from a degraded one
+        # (measured: 70-74 vs 18-22 endpoints for the same command).
+        "crawl_engine": meta.get("crawl_engine"),
+        "crawl_fallback_reason": meta.get("crawl_fallback_reason"),
         "findings": [f.data if hasattr(f, "data") else f for f in findings],
     }
     # Phase 20-3: include coverage data when a tracker is supplied.

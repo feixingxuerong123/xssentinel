@@ -283,6 +283,26 @@
   ⑤(WAF 误检)**Cisco ACE 已修**(Phase 291),`Generic/Unknown` 待靶机可用时复测;
   ⑥(爬取宽度不稳定)**仍开放**。逐条状态与新判据见下方"Known limitations"节。
 
+- **Phase 293:爬取宽度"双峰"的真相——loop 卡死后静默回退静态 BFS;修成"可修复 + 必可见"**:
+  Known limitations ⑥(同命令 18 / 22 / 70 / 70 / 70 / 74 端点)本轮量到机制:
+  **双峰 = 两种引擎**。浏览器爬取正常时 ≈70-74 端点;dom_engine 的**共享 sync 浏览器**
+  一旦在进程里跑过(留下运行中的 asyncio loop),爬虫自己的 `sync_playwright()` 就报
+  "Sync API inside the asyncio loop"→ 爬取中止 → **静默回退**静态 BFS(≈18-22)。
+  直接复现:共享浏览器活着 → **0 端点 / 0.0s**;`shutdown_thread_browser()` 后 →
+  **13 端点 / 30.5s**。
+  修法两层:① **可修复**——识别 loop 卡死特征,先 `shutdown_thread_browser()` 再
+  **重试一次**(实测:同一场景从"0 端点 + 回退"变成"13 端点、engine=spa、未回退");
+  ② **必可见**——三条回退分支(Playwright 不可用 / 导入失败 / 爬取中止)不再只打
+  verbose print,一律 `_log.warning`,并把 `engine_used`(`spa`/`static`/`static-fallback`)
+  与 `fallback_reason` 写进报告(`crawl_engine` / `crawl_fallback_reason`)。
+  **report.build_json 是固定 schema**——新键必须显式加进 `out`,否则 `meta` 里有也被丢弃
+  (本轮实际踩到:字段"没出现"被误读成"没写入")。
+  测试:新增 `tests/test_crawl_fallback_visibility.py` 5 例;既有
+  `test_spa_crawler_fallback.py` 的 abort 断言从"捕获 stdout print"升级为"捕获
+  warning 日志 + engine/reason 状态";爬取/SPA 整组 **104 passed / 9 skipped**。
+  边界:HTML 报告的头部暂未展示该字段(JSON 已含);`Generic/Unknown` 复测与
+  爬取宽度的**残余方差**(页面预算 8s 截断)属另项。
+
 ### Added
 
 - **`--login-json` / `--stored-relogin`:写入后重新登录,让"快照式视图"渲染新值(Phase 278)**:

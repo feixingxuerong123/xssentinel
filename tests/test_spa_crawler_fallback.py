@@ -141,15 +141,28 @@ class TestMergeEndpoints:
 
 # --- the fallback message is loud, not silent ------------------------------
 
-def test_abort_is_reported_even_though_it_recovers(capsys, monkeypatch):
-    """Silent degradation is the actual defect; recovery must be visible."""
+def test_abort_is_reported_even_though_it_recovers(caplog, monkeypatch):
+    """Silent degradation is the actual defect; recovery must be visible.
+
+    Phase 293 upgraded the channel: the abort used to be a verbose-only
+    ``print``, which made a degraded crawl indistinguishable from a normal
+    one in the artifact.  It is now an unconditional ``_log.warning`` (plus
+    ``engine_used`` / ``fallback_reason`` for the report), so this pins the
+    LOG record rather than stdout.
+    """
+    import logging
     _fake_start(monkeypatch, RuntimeError(LOOP_MSG))
-    out = _crawler(verbose=True).crawl(
-        "http://h/app",
-        fallback_crawler=lambda u: [("http://h/s", "GET", {}, {})])
-    printed = capsys.readouterr().out
-    assert "crawl aborted" in printed
-    assert "falling back" in printed
+    with caplog.at_level(logging.WARNING, logger="xssentinel"):
+        c = _crawler(verbose=True)
+        out = c.crawl(
+            "http://h/app",
+            fallback_crawler=lambda u: [("http://h/s", "GET", {}, {})])
+    text = "\n".join(r.getMessage() for r in caplog.records)
+    assert "browser crawl aborted" in text
+    assert "falling back" in text
+    assert c.engine_used == "static-fallback"
+    assert c.fallback_reason and c.fallback_reason.startswith(
+        "browser-crawl-aborted:")
     assert out, "recovery still has to return endpoints"
 
 

@@ -36,11 +36,37 @@ HTML parsing (XSStrike, Dalfox) or a separate licensed browser engine
 """
 from __future__ import annotations
 
+import logging
 import re
 import time
 from collections import deque
 from typing import Callable
 from urllib.parse import urlparse, urljoin, parse_qsl
+
+_log = logging.getLogger("xssentinel")
+
+
+_WEDGE_MARKERS = (
+    "inside the asyncio loop",
+    "running event loop",
+    "asyncio.run() cannot be called",
+    "Cannot run the event loop",
+)
+
+
+def _looks_like_loop_wedge(exc: BaseException) -> bool:
+    """Phase 293: is this the repairable 'sync API inside a running loop'?
+
+    dom_engine's SHARED sync browser leaves the thread's asyncio loop
+    running after any DOM analysis.  A crawl in the same thread then fails
+    with Playwright's "It looks like you are using Playwright Sync API
+    inside the asyncio loop" -- measured: 0 endpoints in 0.0s with the
+    shared browser alive, 13 endpoints in 30.5s after
+    ``shutdown_thread_browser()``.  That is repairable: shut the shared
+    browser down and retry once.
+    """
+    msg = str(exc)
+    return any(m in msg for m in _WEDGE_MARKERS)
 
 # --------------------------------------------------------------------------
 # Availability probe -- mirrors dom_engine.DynamicDomAnalyzer.available()
@@ -192,6 +218,15 @@ class SpaCrawler:
         # Bump callback -- wired by Scanner._crawl_spa() so the parent
         # scanner's requests_made counter stays accurate.
         self._bump: Callable[[], None] = lambda: None
+        # Phase 293: a degraded crawl must SAY so.  Before this the
+        # browser crawl could abort (loop wedge / launch failure) and the
+        # static fallback's much smaller endpoint set still read as a
+        # normal crawl: measured on Juice Shop, 18-22 endpoints from the
+        # fallback vs 70-74 from the real browser crawl for the same
+        # command.  `engine_used` and `fallback_reason` reach the report.
+        self.engine_used: str = "spa"
+        self.fallback_reason: str | None = None
+        self._retried_wedge = False
 
     @staticmethod
     def available() -> bool:
@@ -209,18 +244,26 @@ class SpaCrawler:
         proceeds with BS4-based static discovery.
         """
         if not self.available():
+            self.engine_used = "static-fallback"
+            self.fallback_reason = "playwright-unavailable"
             if fallback_crawler is not None:
-                if self.verbose:
-                    print("[spa] Playwright unavailable; "
-                          "falling back to static BS4 crawler")
+                # Phase 293: this used to be a verbose-only print -- a
+                # degraded crawl read exactly like a normal one.
+                _log.warning("spa crawl: Playwright unavailable; falling "
+                             "back to the static BS4 crawler (the endpoint "
+                             "count will be much smaller)")
                 return fallback_crawler(start_url)
-            if self.verbose:
-                print("[spa] Playwright unavailable and no fallback given")
+            _log.warning("spa crawl: Playwright unavailable and no fallback "
+                         "given; returning no endpoints")
             return []
 
         try:
             from playwright.sync_api import sync_playwright
-        except Exception:
+        except Exception as e:
+            self.engine_used = "static-fallback"
+            self.fallback_reason = f"playwright-import-failed: {type(e).__name__}"
+            _log.warning("spa crawl: Playwright import failed (%s); falling "
+                         "back to the static BS4 crawler", e)
             if fallback_crawler is not None:
                 return fallback_crawler(start_url)
             return []
@@ -429,16 +472,44 @@ class SpaCrawler:
             # no loop-free thread.  Partial browser endpoints are kept
             # only when the fallback is unavailable, so a caller that passed
             # no fallback does not lose what was already discovered.
-            if self.verbose:
-                print(f"[spa] crawl aborted: {e}")
+            # Phase 293: the loop wedge is REPAIRABLE.  dom_engine's shared
+            # sync browser leaves the thread's asyncio loop running; this
+            # crawl then dies on entry.  Measured: 0 endpoints in 0.0s with
+            # the shared browser alive, 13 endpoints in 30.5s after
+            # shutdown_thread_browser().  Shut it down and retry ONCE
+            # before degrading -- the fallback's endpoint set is a fraction
+            # of the browser crawl's (18-22 vs 70-74 on Juice Shop).
+            if not self._retried_wedge and _looks_like_loop_wedge(e):
+                self._retried_wedge = True
+                self.fallback_reason = None
+                _log.warning(
+                    "spa crawl: sync-browser loop wedge (%s); shutting the "
+                    "shared browser down and retrying the crawl once",
+                    type(e).__name__)
+                try:
+                    from .dom_engine import shutdown_thread_browser
+                    shutdown_thread_browser()
+                except Exception as se:  # noqa: BLE001
+                    _log.debug("spa crawl: shutdown_thread_browser failed: %s",
+                               se)
+                return self.crawl(start_url, fallback_crawler=fallback_crawler)
+            # A degraded crawl must not read like a normal one: name the
+            # engine that actually ran and why the browser path did not.
+            self.engine_used = "static-fallback"
+            self.fallback_reason = (
+                f"browser-crawl-aborted: {type(e).__name__}: {str(e)[:120]}")
+            _log.warning(
+                "spa crawl: browser crawl aborted (%s: %s); falling back to "
+                "the static BS4 crawler -- %d endpoints were already "
+                "discovered", type(e).__name__, str(e)[:120], len(endpoints))
             if fallback_crawler is not None:
-                if self.verbose:
-                    print("[spa] falling back to the static BS4 crawler")
                 fallback = fallback_crawler(start_url)
                 return fallback if not endpoints else _merge_endpoints(
                     endpoints, fallback)
             return endpoints
 
+        self.engine_used = "spa"
+        self.fallback_reason = None
         if self.verbose:
             print(f"[spa] crawled {pages_crawled if 'pages_crawled' in dir() else '?'} pages, "
                   f"discovered {len(endpoints)} endpoints "

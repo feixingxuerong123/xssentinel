@@ -244,6 +244,10 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
         # builder picks it up via ``scanner.coverage``.  Layer/param/payload
         # events are recorded from each detection method below.
         self.coverage = cov_mod.CoverageTracker()
+        # Phase 293: which crawler actually ran (set by _crawl_spa) --
+        # "spa" or "static-fallback"; plus why the fallback fired.
+        self.crawl_engine_used: str | None = None
+        self.crawl_fallback_reason: str | None = None
         # Phase 41: declarative multi-step scenarios (Nuclei-inspired).
         # Param-level, reflection-independent (stored write endpoints often
         # never echo); loaded once, executed per matching param in
@@ -325,6 +329,9 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
             if engine in ("auto", "spa"):
                 endpoints.extend(self._crawl_spa(url))
             else:
+                # Phase 293: an explicitly static crawl is labelled too, so
+                # the report never leaves "which engine ran?" unanswered.
+                self.crawl_engine_used = "static"
                 endpoints.extend(self._crawl(url))
             # Phase 32: signature-level endpoint dedup (DalFox-style).
             # Crawl output like /search?q=1, /search?q=2, ... shares one

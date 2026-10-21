@@ -1372,6 +1372,11 @@ def _write_report(scanner, target_url, output_path, fmt, meta=None):
     meta.setdefault("responses_truncated",
                     getattr(req, "truncated_responses", None))
     meta.setdefault("waf", scanner.waf_name)
+    # Phase 293: a degraded crawl is named in the artifact, not hidden.
+    meta.setdefault("crawl_engine",
+                    getattr(scanner, "crawl_engine_used", None))
+    meta.setdefault("crawl_fallback_reason",
+                    getattr(scanner, "crawl_fallback_reason", None))
     # Phase 20-3: attach coverage tracker so HTML/JSON reports include
     # the scan-coverage section (which layers/params/payloads ran).
     if getattr(scanner, "coverage", None) is not None:
