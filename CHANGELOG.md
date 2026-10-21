@@ -375,6 +375,30 @@
   **这是验证债,不是当前检出缺陷**(门禁 194/194 绿);是否扩 oracle 由成本决定:
   按"168 载荷 × 其本上下文"补测约 168 格,按全矩阵补则 ~3360 格。
 
+- **Phase 300:补 168 格 oracle——抓到沙箱 3 个真误判(1 个 FN 源 + 1 个 FP 源)** ——
+  按 299 的结论补测"默认会发出但从未被判过"的载荷:`benchmark/oracle_default_sent.py`
+  对每个家族取最合适的 HTML 宿主(映射表显式),Chromium 双 sink(parser/innerHTML),
+  产出 `benchmark/results/oracle_default_sent.json`(160 格,8 条因宿主无法建模而**列出跳过**,
+  7 条载荷无 `alert(1)` 形式无法挂哨兵——都如实记账)。
+  **结果:MISSED=4 → 0、OVER=1 → 0**,三轮修复:
+  ① **`--!>` 是合法注释结束符**(WHATWG comment-end-bang)。tokenizer 只认 `-->`,
+  `<!--` + `--!><svg/onload=...>` 被当成一个注释 → 越狱载荷判 inert,浏览器实际执行
+  (html_comment 家族 ×2)。**这是 FN 源**。
+  ② **`onerror="__x()//"` 能编译**。`_js_parses(wrapped=True)` 拼的是
+  `function __h(){ __x()// }`,`//` 把闭合括号注释掉 → 误判语法错误。而
+  `alert(1)//` 是**语料里最常见的收尾写法之一**(markdown + html5_new 家族,双 sink)。
+  **这也是 FN 源**。修法:包装时闭合括号单独一行(浏览器编译事件处理器时正文尾部本就有换行)。
+  ③ **MathML 命名空间的 `<script>` 不执行**。浏览器实测:`<math><script>` 与
+  `<math><annotation encoding=text/html><script>` 都 inert,`<svg><script>` 执行,
+  `<annotation-xml encoding=text/html>`(集成点)执行。沙箱不看命名空间 → 把
+  `<math><annotation …><script>` 判 live。**这是 FP 源**。
+  测试:新增 `tests/test_sandbox_phase300.py`(6 例,三处修复 + 反例)与
+  `tests/test_oracle_default_sent.py`(对账网:MISSED/OVER 必须为 0,且断言产物非空;
+  含"无反例即失败"的空断言防护)。sandbox/mxss/verifier/context 组 **178 passed**,
+  主 oracle 对账 `test_sandbox_fidelity.py` **8 passed**。
+  边界:家族→宿主是**尽力映射**(40 家族 vs 20 宿主),不做全矩阵;跳过与无哨兵的
+  条目在产物里列明,不假装已判。
+
 ### Added
 
 - **`--login-json` / `--stored-relogin`:写入后重新登录,让"快照式视图"渲染新值(Phase 278)**:

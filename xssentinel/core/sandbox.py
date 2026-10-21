@@ -918,7 +918,13 @@ def _js_parses(body: str, wrapped: bool = False) -> Optional[bool]:
     """
     if _esprima is None or len(body) > 20000:
         return None
-    src = f"function __h(){{ {body} }}" if wrapped else body
+    # Phase 300: the wrapped form puts the closing brace on its OWN line.
+    # `onerror="__x()//"` is a classic corpus shape and Chromium compiles it
+    # (the line comment ends at the newline the handler wrapper has), but
+    # `function __h(){ __x()// }` comments out the brace and reads as a
+    # syntax error -- measured: 3 of 153 oracle cells (markdown + html5_new
+    # families, both arms) were called inert while the browser executed them.
+    src = f"function __h(){{\n{body}\n}}" if wrapped else body
     try:
         _esprima.parseScript(src, tolerant=False)
     except Exception:
@@ -1160,6 +1166,17 @@ def find_live_nodes(root: Node, token: str = "", *,
                                      "srcdoc value carries no live node",
                               "el": el})
         if name == "script":
+            # Phase 300: namespace decides.  A <script> in the MathML
+            # namespace never executes (measured in Chromium:
+            # <math><script>__x()</script></math> and the same inside
+            # <annotation encoding=text/html> are both inert, while
+            # <svg><script> executes).  Without this check the corpus
+            # payload <math><annotation encoding=text/html><script>...</...
+            # was claimed live -- one over-claim among the default-sent
+            # cells.  annotation-xml[encoding=text/html] IS an integration
+            # point, so its children parse as HTML and keep executing.
+            if el.ns == "mathml":
+                continue
             body = "".join(c.name for c in el.children if c.kind == "text")
             if not token or token in body:
                 cands.append(_script_candidate(el, body, token, sink,

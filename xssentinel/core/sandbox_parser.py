@@ -972,14 +972,24 @@ class _Parser:
 
             if nxt == "!":
                 if s[self.i:self.i + 4] == "<!--":
+                    # Phase 300: `--!>` ends a comment too (comment-end-bang
+                    # state, WHATWG 13.2.5.43).  Recognising only `-->` left
+                    # `<!--` + `--!><svg/onload=...>` as one comment, so the
+                    # breakout payload read as "no executable node carries the
+                    # token" while Chromium executed it (2 oracle cells,
+                    # html_comment family).
                     end = s.find("-->", self.i + 4)
+                    bang = s.find("--!>", self.i + 4)
+                    term_len = 3
+                    if bang >= 0 and (end < 0 or bang < end):
+                        end, term_len = bang, 4
                     if end < 0:
                         self.current().append(_comment(s[self.i + 4:]))
                         self.notes.append(
                             "unterminated comment swallowed the remainder")
                         return Doc(self.root, self.notes)
                     self.current().append(_comment(s[self.i + 4:end]))
-                    self.i = end + 3
+                    self.i = end + term_len
                     continue
                 if s[self.i:self.i + 9].upper() == "<![CDATA[":
                     if self.in_foreign():
