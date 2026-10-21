@@ -114,5 +114,76 @@ class TestFingerprintSpecificity(unittest.TestCase):
         self.assertEqual(wafmod.detect(r)["waf"], "Cisco ACE")
 
 
+class TestBlockEvidencePrecision(unittest.TestCase):
+    """Phase 294: "blocked" must mean "this request was refused".
+
+    The old hint list carried vendor names and topic words, so it fired on
+    ordinary content.  Measured false positives that each DISCARD the
+    payloads the target actually let through (the Phase 122 silent-FN
+    family):
+
+      * every Cloudflare-fronted site's allowed 200 response -- Cloudflare
+        injects a Ray-ID comment, and "cloudflare" was a hint;
+      * a JS variable named ``waf``, the word "wafer", a marketing page
+        about firewalls, a support page mentioning "request ID", a
+        security dashboard reading "malicious requests blocked";
+      * a Chinese security article containing 攻击 / 防火墙 / 安全策略.
+
+    And the status path counted 401/404/400/500/502 as blocked whenever a
+    vendor header was present, i.e. every missing or auth-gated endpoint
+    behind a CDN.
+
+    Refusal PHRASES still block; vendor NAMES no longer do.
+    """
+
+    CF = {"Server": "cloudflare", "CF-RAY": "7c1f2e3a4b5c6d7e-SJC"}
+
+    def test_allowed_200_behind_cloudflare_is_not_blocked(self):
+        # the benchmark's own allowed-waf shape, and every real CF site
+        r = _R(200, dict(self.CF),
+               "<!-- Cloudflare Ray ID: 7c1f2e3a --><div>apple</div>")
+        d = wafmod.detect(r)
+        self.assertEqual(d["waf"], "Cloudflare")
+        self.assertFalse(d["blocked"])
+
+    def test_missing_or_auth_gated_behind_cdn_is_not_blocked(self):
+        for status in (404, 401, 400, 500, 502):
+            r = _R(status, dict(self.CF), "nope")
+            self.assertFalse(wafmod.detect(r)["blocked"],
+                             f"HTTP {status} + vendor header must not block")
+
+    def test_topic_words_are_not_block_evidence(self):
+        for body in ("const wafEnabled = false;",
+                     '<div class="waf-banner">',
+                     "Our wafer products",
+                     "<h1>What is a WAF?</h1>",
+                     "Request ID: 8f3a-22c1",
+                     "Include your request ID when contacting support.",
+                     "Next-gen firewall appliances",
+                     "malicious requests blocked this week: 12",
+                     "Our security policy covers cookies."):
+            self.assertFalse(wafmod.detect(_R(200, {"Server": "x"}, body))["blocked"],
+                             body)
+
+    def test_chinese_topic_words_are_not_block_evidence(self):
+        # 攻击 / 防火墙 appear in any security article; only refusals count.
+        self.assertFalse(wafmod.detect(
+            _R(200, {"Server": "x"}, "常见攻击面与防火墙配置"))["blocked"])
+
+    def test_refusal_phrases_still_block(self):
+        for body in ("Request blocked by policy", "Access Denied",
+                     "访问被拒绝", "you have been blocked"):
+            d = wafmod.detect(_R(200, {"Server": "x"}, body))
+            self.assertTrue(d["blocked"], body)
+            self.assertEqual(d["waf"], "Generic/Unknown WAF")
+
+    def test_vendor_block_page_still_blocks_via_status(self):
+        r = _R(403, dict(self.CF),
+               "Attention Required! Sorry, you have been blocked")
+        d = wafmod.detect(r)
+        self.assertTrue(d["blocked"])
+        self.assertEqual(d["waf"], "Cloudflare")
+
+
 if __name__ == "__main__":
     unittest.main()

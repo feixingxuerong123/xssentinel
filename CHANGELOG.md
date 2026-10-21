@@ -303,6 +303,29 @@
   边界:HTML 报告的头部暂未展示该字段(JSON 已含);`Generic/Unknown` 复测与
   爬取宽度的**残余方差**(页面预算 8s 截断)属另项。
 
+- **Phase 294:"blocked" 的证据精度——厂商名/主题词不再等于"被拦",这是静默 FN 源**:
+  量 Known limitations ⑤ 尾巴时发现比"WAF 误检"严重得多的问题:`_BLOCK_BODY_HINTS`
+  里混着**厂商名与主题词**(`waf`/`cloudflare`/`cf-ray`/`akamai`/`firewall`/
+  `security policy`/`malicious`/`request id`/`rule id`/`protected by`,以及中文的
+  `攻击`/`防火墙`/`安全策略`、日文 `ファイアウォール`、`pare-feu`/`Firewall`…)。
+  而 `blocked=True` 会让 `_try_payload` **丢弃载荷**(Phase 122 记过的同族静默 FN)。
+  实测:JS 变量 `wafEnabled`、CSS 类 `waf-banner`、单词 `wafer`、"What is a WAF?"、
+  错误页 "Request ID: …"、营销页 "Next-gen firewall"、安全看板
+  "malicious requests blocked this week"、中文安全文章 "攻击面与防火墙配置" ——
+  **全部判 blocked**;更糟的是 **Cloudflare 前置站点的放行 200 响应**(CF 会注入
+  Ray-ID 注释)也被判拦 ⇒ 真实世界所有 CF 站点的载荷被成批丢弃。
+  状态路径同样过宽:`_BLOCK_STATUS` 含 401/404/400/500/502,只要带厂商头就把
+  "缺页/要认证/源站崩"当"被拦"。
+  修法:hint 表只留**拒绝类短语**(request blocked / access denied / blocked by /
+  attention required / 访问被拒绝 …),厂商名归指纹(1-3 轮已用),不再当拦截证据;
+  `_BLOCK_STATUS` 收窄为 {403,406,419,429,444,451,493,503,999}(401/404/400/500/502
+  移出)。真拦网页(403+CF block page、200+"Request blocked by policy"、中文
+  "访问被拒绝")仍判拦。
+  证据:17 例矩阵全过(10 个良性样本全 `blocked=False`、CF 放行页 `waf=Cloudflare`
+  但 `blocked=False`、404/401+CF 头不拦、4 个真拦网页仍拦);benchmark 端到端
+  **pos-waf-01 仍 1 条 reflected**(naive WAF 升级绕过照常)、**neg-waf-01 仍 0 条**。
+  测试 +6(`TestBlockEvidencePrecision`),WAF 单测 22 passed;全量门禁另跑。
+
 ### Added
 
 - **`--login-json` / `--stored-relogin`:写入后重新登录,让"快照式视图"渲染新值(Phase 278)**:
