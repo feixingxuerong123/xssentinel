@@ -339,6 +339,13 @@
   295(良性语料网)三轮 + 本轮 8 面复测后,⑤ 从"部分解决"改为**已解决**,复测口径
   (哪些面、期望值)写进条目本身,不再留"待复测"这种无判据的尾巴。
 
+- **Phase 297:降级爬取进 HTML 报告——JSON 有字段不代表人看得见** —— 293 把
+  `crawl_engine`/`crawl_fallback_reason` 写进了 JSON,但 HTML 交付物只字未提;
+  而"降级爬取"直接改变"0 findings"的含义(浏览器 70-74 端点 vs 静态回退 18-22)。
+  现在:降级时页面顶部出 `DEGRADED CRAWL` 横幅(含引擎与原因,并明示覆盖不完整);
+  健康爬取在 meta 行显示 `Crawl: spa`;没开爬取则什么都不显示。
+  测试 +3(健康/降级/无爬取三态),`test_crawl_fallback_visibility.py` 8 passed。
+
 ### Added
 
 - **`--login-json` / `--stored-relogin`:写入后重新登录,让"快照式视图"渲染新值(Phase 278)**:

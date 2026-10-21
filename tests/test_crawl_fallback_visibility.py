@@ -120,3 +120,32 @@ def test_scanner_publishes_the_engine_state():
     assert sc.crawl_engine_used is None
     # the attribute pair the report reads must exist on every Scanner
     assert hasattr(sc, "crawl_fallback_reason")
+
+
+# --- Phase 297: the human deliverable must say it too ---------------------
+
+def _html(meta):
+    from xssentinel.core.report import build_html
+    base = {"generated": "2026-10-21 22:00", "requests": 1,
+            "scan_status": "completed"}
+    return build_html([], "http://t/", {**base, **meta})
+
+
+def test_html_names_a_degraded_crawl():
+    h = _html({"crawl_engine": "static-fallback",
+               "crawl_fallback_reason": "browser-crawl-aborted: Error: loop"})
+    assert "DEGRADED CRAWL" in h
+    assert "static-fallback" in h
+    assert "partial" in h
+
+
+def test_html_prints_the_engine_when_healthy():
+    h = _html({"crawl_engine": "spa"})
+    assert "Crawl: spa" in h
+    assert "DEGRADED CRAWL" not in h
+
+
+def test_html_says_nothing_when_no_crawl_ran():
+    h = _html({})
+    assert "Crawl:" not in h
+    assert "DEGRADED CRAWL" not in h

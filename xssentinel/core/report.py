@@ -76,6 +76,18 @@ def build_html(findings: list, target: str, meta: dict) -> str:
             f'<div class="banner"><b>BOUNDED READ: {_trunc} response(s) exceeded '
             '--max-response-bytes, so only their leading bytes were examined. '
             'A reflection past that point was not testable in this run.</b></div>')
+    # Phase 297: a degraded crawl changes what "0 findings" means.  The
+    # browser path discovers 70-74 endpoints on a real SPA; the static BFS
+    # fallback 18-22.  Until this banner existed the JSON had the field
+    # (Phase 293) but the human deliverable said nothing.
+    _cfr = meta.get("crawl_fallback_reason")
+    _ceng = meta.get("crawl_engine")
+    _crawl_meta = (f" · Crawl: {_esc(_ceng)}" if _ceng else "")
+    if _cfr:
+        status_banners += (
+            f'<div class="banner banner-crit"><b>DEGRADED CRAWL: {_esc(_ceng or "static-fallback")} '
+            f'({_esc(_cfr)}). The endpoint set came from the static BFS and is '
+            'much smaller than a full browser crawl -- treat the coverage as partial.</b></div>')
     # Phase 20-3: coverage section (when a coverage tracker is supplied).
     coverage_section = ""
     cov = meta.get("coverage")
@@ -345,7 +357,7 @@ def build_html(findings: list, target: str, meta: dict) -> str:
 <body>
 <header><h1>{BRAND_SVG}XSSentinel &mdash; XSS Detection Report</h1>
 <div class="head-tools">{theme_toggle_button()}</div>
-<div class="meta">Target: {_esc(target)} · Generated: {_esc(meta.get('generated'))} · Requests: {_esc(meta.get('requests'))} · WAF: {_esc(meta.get('waf') or 'none detected')} · Status: {_esc(_st)}</div>
+<div class="meta">Target: {_esc(target)} · Generated: {_esc(meta.get('generated'))} · Requests: {_esc(meta.get('requests'))} · WAF: {_esc(meta.get('waf') or 'none detected')} · Status: {_esc(_st)}{_crawl_meta}</div>
 </header>
 {status_banners}
 <div class="summary">
