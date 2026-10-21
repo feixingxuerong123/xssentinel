@@ -418,6 +418,21 @@
   边界:range7 尚未接入 CI(`.github/workflows/ci.yml` 目前在并行会话的未提交改动里,
   不动它);`results.json` 已入库,可直接与后续轮次对比。
 
+- **Phase 302:range7 抓到的 context 分歧已修——"一个字段一个含义",两引擎对齐** ——
+  async 的 finding 构造里是 `context=v.get("context") or context`:**验证器观察到的
+  sink 覆盖了分类得到的反射上下文**,于是同一反射 sync 报 `html_attribute_dq`、
+  async 报 `script_block`(都是 TP,但字段含义随引擎变)。落法:**`context` 一律回到
+  分类上下文(与 sync 同义)**,验证器那份**新增 `sink_context` 并列呈现**(8 处构造点),
+  HTML 报告的 Context 列在两者不一致时追加 `→ <sink>`(一致时不显示,普通行零变化)。
+  这两个字段**不参与载荷选择**(选择用的是局部变量 `context`),所以只改报告、不动检测。
+  实测:range7 `r7-pos-attr` 现两引擎**都报 `html_attribute_dq`**,async 另带
+  `sink_context=script_block`。
+  测试:`tests/test_range7_parity.py` 4 例(双引擎 context 必须一致 / async 必须带
+  独立 sink 值 / 报告只在不一致时显示);async 套件 123 passed(唯一失败
+  `test_async_budget::…confirming_endpoint` 为已核实预存失败)。
+  边界:`.github/workflows/ci.yml` 仍在并行会话手里,range7 暂未挂 CI;本轮改动经
+  全量门禁复核。
+
 ### Added
 
 - **`--login-json` / `--stored-relogin`:写入后重新登录,让"快照式视图"渲染新值(Phase 278)**:

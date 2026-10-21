@@ -124,7 +124,15 @@ class AsyncDetectionLayersMixin:
                 idx = text.find(marker)
                 yield Finding(
                     url=url, method=method, param=param,
-                    context=v.get("context") or context,
+                    # Phase 302: `context` stays the CLASSIFIED
+                    # reflection context (what sync reports); the
+                    # verifier's own view goes to `sink_context`.
+                    # They disagree on purpose: a payload that
+                    # closes an attribute and lands in a script
+                    # block has an attribute reflection context
+                    # AND a script-block sink.
+                    context=context,
+                    sink_context=v.get("context").get("context"),
                     payload=enc,
                     severity=_non_html_grade(resp_headers)[0],
                     evidence=text[max(0, idx - 30):idx + len(marker) + 30],
@@ -1191,7 +1199,8 @@ class AsyncDetectionLayersMixin:
         _idx = _ntext.find(_ntok)
         yield Finding(
             url=url, method=method, param=param,
-            context=_nv.get("context") or context,
+            context=context,
+            sink_context=_nv.get("context").get("context"),
             payload=_npay,
             severity=_non_html_grade(resp_headers)[0],
             evidence=_ntext[max(0, _idx - 30):_idx + len(_ntok) + 30],
@@ -1294,7 +1303,8 @@ class AsyncDetectionLayersMixin:
             _gidx = _gtext.find(_gtok)
             yield Finding(
                 url=url, method=method, param=param,
-                context=_gv.get("context") or context,
+                context=context,
+                sink_context=_gv.get("context").get("context"),
                 payload=_gpay,
                 severity=_non_html_grade(_ghdrs)[0],
                 evidence=_gtext[max(0, _gidx - 30):
@@ -1373,7 +1383,8 @@ class AsyncDetectionLayersMixin:
             _hidx = _htext.find(_htok)
             yield Finding(
                 url=url, method=method, param=param,
-                context=_hv.get("context") or context,
+                context=context,
+                sink_context=_hv.get("context").get("context"),
                 payload=_hpay,
                 severity="high",
                 evidence=_htext[max(0, _hidx - 30):
@@ -1627,7 +1638,8 @@ class AsyncDetectionLayersMixin:
                                    else _non_html_grade(resp_headers))
                     yield Finding(
                         url=url, method=method, param=param,
-                        context=v.get("context") or context,
+                        context=context,
+                        sink_context=v.get("context").get("context"),
                         payload=variant,
                         severity=_sev,
                         evidence=text[max(0, text.find(marker)-30):
@@ -1710,7 +1722,8 @@ class AsyncDetectionLayersMixin:
                                 else _non_html_grade(resp_headers))
                             yield Finding(
                                 url=url, method=method, param=param,
-                                context=v.get("context") or context,
+                                context=context,
+                                sink_context=v.get("context").get("context"),
                                 payload=variant,
                                 severity=_sev,
                                 evidence=text[max(0, idx - 30):
@@ -1762,7 +1775,8 @@ class AsyncDetectionLayersMixin:
                     idx = text.find(marker)
                     yield Finding(
                         url=url, method=method, param=param,
-                        context=v.get("context") or context,
+                        context=context,
+                        sink_context=v.get("context").get("context"),
                         payload=marked,
                         severity=_non_html_grade(resp_headers)[0],
                         evidence=text[max(0, idx - 30):idx + len(marker) + 30],
@@ -1825,7 +1839,8 @@ class AsyncDetectionLayersMixin:
                         param_confirmed = True
                         yield Finding(
                             url=url, method=method, param=param,
-                            context=v.get("context") or context,
+                            context=context,
+                            sink_context=v.get("context").get("context"),
                             payload=variant,
                             severity=_non_html_grade(resp_headers)[0],
                             evidence=text[max(0, idx - 30):

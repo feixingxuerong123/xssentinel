@@ -13,6 +13,23 @@ from .report_theme import (BRAND_SVG, base_css, interactive_js,
 _log = get_logger("report")
 
 
+def _sink_suffix(d: dict) -> str:
+    """Phase 302: show the sink the verifier observed, when it differs.
+
+    `context` is where the payload LANDS (the reflection context);
+    `sink_context` is what the verifier saw the payload PRODUCE.  A payload
+    that closes an attribute and opens a script block has both, and an
+    operator reading only `context` loses the second fact.  Empty when the
+    two agree, so ordinary rows do not change.
+    """
+    sink = (d.get("sink_context") or "").strip()
+    ctx = (d.get("context") or "").strip()
+    if not sink or sink == ctx:
+        return ""
+    return (f' <span class="sink" title="sink the verifier observed">'
+            f'&#8594; {_esc(sink)}</span>')
+
+
 def _esc(s) -> str:
     return html.escape(str(s)) if s is not None else ""
 
@@ -266,7 +283,7 @@ def build_html(findings: list, target: str, meta: dict) -> str:
           <td>{_esc(d.get('url'))}</td>
           <td>{_esc(d.get('method'))}</td>
           <td>{_esc(d.get('param'))}</td>
-          <td>{_esc(d.get('context'))}</td>
+          <td>{_esc(d.get('context'))}{_sink_suffix(d)}</td>
           <td>{payload_cell or '&mdash;'}</td>
           <td>{_esc(','.join(d.get('transform') or []))}</td>
           <td class="sev-cell" data-val="{_SEV_RANK.get(sev, 9)}">{sev_cell}</td>
