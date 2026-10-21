@@ -1377,6 +1377,7 @@ def _write_report(scanner, target_url, output_path, fmt, meta=None):
                     getattr(scanner, "crawl_engine_used", None))
     meta.setdefault("crawl_fallback_reason",
                     getattr(scanner, "crawl_fallback_reason", None))
+    meta.setdefault("crawl_stats", getattr(scanner, "crawl_stats", None))
     # Phase 20-3: attach coverage tracker so HTML/JSON reports include
     # the scan-coverage section (which layers/params/payloads ran).
     if getattr(scanner, "coverage", None) is not None:

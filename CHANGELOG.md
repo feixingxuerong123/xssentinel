@@ -346,6 +346,19 @@
   健康爬取在 meta 行显示 `Crawl: spa`;没开爬取则什么都不显示。
   测试 +3(健康/降级/无爬取三态),`test_crawl_fallback_visibility.py` 8 passed。
 
+- **Phase 298:爬取宽度的第三个静默——"为什么停在这里"进报告** —— 293 修了
+  "哪个引擎跑的",但**同引擎内**宽度仍可能不同,因为爬取有三种静默收尾:① 撞
+  `max_total_pages` 时队列里剩下的页面**直接丢弃**;② 每页 8s 预算到点未达
+  networkidle → 链提取可能不完整(`except: pass` 吞掉);③ `goto` 失败 → 跳过
+  (仅 verbose print)。现在三者都计数并进报告:`crawl_stats`
+  (`pages_crawled` / `pages_goto_failed` / `pages_budget_truncated` /
+  `pages_dropped_by_cap` / `max_total_pages` / `per_page_budget_s`),JSON 与 HTML
+  meta 行同时呈现(HTML: `Crawl: spa (12 pages, 1 failed, 3 truncated, 40 dropped (cap 50))`)。
+  测试 +5(`tests/test_crawl_stats.py`,fake-Playwright 驱动真实爬取循环:撞帽丢弃/
+  预算截断/goto 失败/干净爬取零问题/HTML 后缀);爬取+SPA 整组 **121 passed**。
+  边界:Juice Shop 本轮不可用(并行会话的靶机崩溃),**同引擎宽度方差的真实靶复测
+  仍待靶机恢复**;本轮交付的是"下一次可直接从报告读出原因"的能力。
+
 ### Added
 
 - **`--login-json` / `--stored-relogin`:写入后重新登录,让"快照式视图"渲染新值(Phase 278)**:

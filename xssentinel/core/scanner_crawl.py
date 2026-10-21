@@ -136,6 +136,7 @@ class CrawlMixin:
         # to the static BFS used to be invisible in the artifact; the
         # report now says `crawl_engine: static-fallback` plus the reason.
         self.crawl_engine_used = getattr(crawler, "engine_used", "spa")
+        self.crawl_stats = dict(getattr(crawler, "stats", {}) or {})
         self.crawl_fallback_reason = getattr(crawler, "fallback_reason", None)
         if self.crawl_fallback_reason:
             _log.warning("crawl engine degraded: %s (%s)",

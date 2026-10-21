@@ -226,6 +226,8 @@ class SpaCrawler:
         # command.  `engine_used` and `fallback_reason` reach the report.
         self.engine_used: str = "spa"
         self.fallback_reason: str | None = None
+        # Phase 298: crawl-width accounting (why it ended where it did).
+        self.stats: dict = {}
         self._retried_wedge = False
 
     @staticmethod
@@ -337,6 +339,16 @@ class SpaCrawler:
 
                 queue: deque = deque([(start_url, 0)])
                 pages_crawled = 0
+                # Phase 298: why the crawl stopped is as important as how
+                # far it got.  Three endings used to be silent (verbose
+                # print only): the max_total_pages cap dropped whatever was
+                # still queued, the per-page budget gave up before network
+                # idle (partial link extraction), and a failed goto skipped
+                # the page outright.  "18 vs 74 endpoints" needs these
+                # numbers to be answerable from the artifact.
+                pages_failed = 0
+                pages_truncated = 0
+                dropped_by_cap = 0
 
                 while queue and pages_crawled < self.max_total_pages:
                     url, depth = queue.popleft()
@@ -361,11 +373,14 @@ class SpaCrawler:
                             page.wait_for_load_state("networkidle",
                                                      timeout=remaining)
                         except Exception:
-                            pass
+                            # Hydration did not settle inside the per-page
+                            # budget: link extraction below may be partial.
+                            pages_truncated += 1
                         self.requests_made += 1
                         self._bump()
                         pages_crawled += 1
                     except Exception as e:
+                        pages_failed += 1
                         if self.verbose:
                             print(f"[spa] goto failed for {url}: {e}")
                         # Phase 200 follow-up: a goto that raises leaves
@@ -508,6 +523,17 @@ class SpaCrawler:
                     endpoints, fallback)
             return endpoints
 
+        # Phase 298: whatever is still queued when the cap stopped the loop
+        # was never visited -- the artifact must say how many.
+        dropped_by_cap = len(queue) if pages_crawled >= self.max_total_pages else 0
+        self.stats = {
+            "pages_crawled": pages_crawled,
+            "pages_goto_failed": pages_failed,
+            "pages_budget_truncated": pages_truncated,
+            "pages_dropped_by_cap": dropped_by_cap,
+            "max_total_pages": self.max_total_pages,
+            "per_page_budget_s": self.per_page_budget_s,
+        }
         self.engine_used = "spa"
         self.fallback_reason = None
         if self.verbose:

@@ -248,6 +248,8 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
         # "spa" or "static-fallback"; plus why the fallback fired.
         self.crawl_engine_used: str | None = None
         self.crawl_fallback_reason: str | None = None
+        # Phase 298: pages crawled / failed / budget-truncated / cap-dropped.
+        self.crawl_stats: dict = {}
         # Phase 41: declarative multi-step scenarios (Nuclei-inspired).
         # Param-level, reflection-independent (stored write endpoints often
         # never echo); loaded once, executed per matching param in

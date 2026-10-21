@@ -82,7 +82,21 @@ def build_html(findings: list, target: str, meta: dict) -> str:
     # (Phase 293) but the human deliverable said nothing.
     _cfr = meta.get("crawl_fallback_reason")
     _ceng = meta.get("crawl_engine")
-    _crawl_meta = (f" · Crawl: {_esc(_ceng)}" if _ceng else "")
+    _cs = meta.get("crawl_stats") or {}
+    _crawl_meta = ""
+    if _ceng:
+        _crawl_meta = f" · Crawl: {_esc(_ceng)}"
+        if _cs:
+            _bits = [f"{_cs.get('pages_crawled', 0)} pages"]
+            if _cs.get("pages_goto_failed"):
+                _bits.append(f"{_cs['pages_goto_failed']} failed")
+            if _cs.get("pages_budget_truncated"):
+                _bits.append(f"{_cs['pages_budget_truncated']} truncated")
+            if _cs.get("pages_dropped_by_cap"):
+                _bits.append(
+                    f"{_cs['pages_dropped_by_cap']} dropped "
+                    f"(cap {_cs.get('max_total_pages')})")
+            _crawl_meta += " (" + ", ".join(_bits) + ")"
     if _cfr:
         status_banners += (
             f'<div class="banner banner-crit"><b>DEGRADED CRAWL: {_esc(_ceng or "static-fallback")} '
@@ -433,6 +447,9 @@ def build_json(findings: list, target: str, meta: dict) -> str:
         # (measured: 70-74 vs 18-22 endpoints for the same command).
         "crawl_engine": meta.get("crawl_engine"),
         "crawl_fallback_reason": meta.get("crawl_fallback_reason"),
+        # Phase 298: how the crawl ended (pages crawled / failed /
+        # budget-truncated / dropped by the page cap).
+        "crawl_stats": meta.get("crawl_stats"),
         "findings": [f.data if hasattr(f, "data") else f for f in findings],
     }
     # Phase 20-3: include coverage data when a tracker is supplied.
