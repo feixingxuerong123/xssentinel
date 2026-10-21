@@ -359,6 +359,22 @@
   边界:Juice Shop 本轮不可用(并行会话的靶机崩溃),**同引擎宽度方差的真实靶复测
   仍待靶机恢复**;本轮交付的是"下一次可直接从报告读出原因"的能力。
 
+- **Phase 299(测量):载荷语料审计 + blocked 丢载荷的账(结论:后者无需改)** ——
+  ① **blocked 丢载荷**:量得 `_try_payload` 在 blocked 时是 `continue`(换下一个
+  变形),**不是整批丢弃**;benchmark `pos-waf-01` 实测 9 次尝试中 4 次被拦,阶梯仍
+  拿到 finding;无 WAF 对照 `pos-elem-01` 9 次 0 拦截。⇒ Phase 122 的病根是"放行被
+  误判成拦截"(294 已修),此条**无代码可改**,记录在案。
+  ② **语料 vs oracle 覆盖**:`payloads` 共 **2827** 条(分上下文 1192 条、40 个上下文
+  + 36 polyglots);`python -m benchmark.corpus_gap` 报 825 条 token-覆盖、**2002 条
+  含从未被判过的 token**(冷门 HTML5/SVG/MathML: `<span ontransitioncancel>`、
+  `<address onbeforematch>`、`<dom-module>`、`<mfrac>` 等)。
+  更关键的切片:**默认会发出的 427 条(40 上下文 × 前 14)里 168 条(39%)带未判
+  token**——即这批载荷的沙箱裁定没有 Chromium 对照。按上下文:interaction_events/
+  portswigger_events/html5_new 全部未判,math_context 12/14、data_uri 12/14、
+  script_gadget 11/14、error_page 10/12、framework_react 10/14、header_reflection 9/14。
+  **这是验证债,不是当前检出缺陷**(门禁 194/194 绿);是否扩 oracle 由成本决定:
+  按"168 载荷 × 其本上下文"补测约 168 格,按全矩阵补则 ~3360 格。
+
 ### Added
 
 - **`--login-json` / `--stored-relogin`:写入后重新登录,让"快照式视图"渲染新值(Phase 278)**:
