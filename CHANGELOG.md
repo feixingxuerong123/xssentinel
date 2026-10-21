@@ -326,6 +326,15 @@
   **pos-waf-01 仍 1 条 reflected**(naive WAF 升级绕过照常)、**neg-waf-01 仍 0 条**。
   测试 +6(`TestBlockEvidencePrecision`),WAF 单测 22 passed;全量门禁另跑。
 
+- **Phase 295:WAF 规则的"良性语料回归网"** —— 291/294 两轮修的是**同一个形态**
+  (规则在普通文本上误触发),而且都是手工逐个量出来的。补一张 20 样本的良性语料表
+  (Material CSS 变量、Tailwind 类名、`const tsa`/`wafEnabled` 标识符、中/日/法
+  安全文章、带 Request-ID 的错误页、安全看板、防火墙营销页、隐私政策、JSON/GraphQL
+  响应、CF Ray-ID 注释、CDN 页脚),断言:**任何样本都不得 `blocked`**(FN 关键属性)、
+  **不含厂商名的样本不得指纹出厂商**。并带**变异对照**:把 Phase 294 之前的 hint 表
+  原样放进测试,断言它会在 ≥10 个样本上误触发(证明这张网真能抓住旧问题,而不是
+  恒真的空断言)。`tests/test_waf_benign_corpus.py` 4 例;与 294 合计 22 passed。
+
 ### Added
 
 - **`--login-json` / `--stored-relogin`:写入后重新登录,让"快照式视图"渲染新值(Phase 278)**:
