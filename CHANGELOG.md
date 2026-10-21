@@ -207,6 +207,30 @@
   **台账 #4 行**相应由"未测"改"已确认(Phase 288)"、可复现召回 6/9;该行修订随台账
   所有者的下一次提交(台账区当前是他人未提交 WIP,不代为改动)。
 
+- **Phase 289:第 5 条(API-only XSS)确认,零新检测代码——UI 态门闩用 `-b` cookie 播种绕过,召回 6/9 → 7/9**:
+  Phase 281–284 把 #5 的阻塞记作"consent 遮罩拦住点击"。本轮把机制钉死:遮罩不是
+  cookie 同意横幅,是 Juice Shop 的 **Welcome 引导对话框**(`mat-dialog-container`
+  + `.cdk-overlay-backdrop-showing`,关闭按钮 `.close-dialog`);点掉它写 cookie
+  `welcomebanner_status=dismiss` 且跨加载持久化。而 `-b/--cookie` **本来就进
+  requester jar、并经 auth_state 播种进浏览器臂**(Phase 150 的机制,只是没人往这个
+  方向用过)——操作者知识就是输入,扫描器负责把它变成执行证据,与 `--stored-*` 家族
+  同一哲学。完整配方(全部既有开关,无一行新检测代码):
+  `-b welcomebanner_status=dismiss` + `--login-json --login-field-user email`
+  (该端点要 `email`,默认 `username` 会让登录静默失败)+
+  `--stored-inject POST /api/Products --stored-json --stored-param description
+  --stored-extra name=<唯一名>` + `--stored-view "#/search?q=<唯一名>"` +
+  `--stored-view-click mat-card` + `--stored-dom`。
+  实测:`stored_dom` high/high browser-executed、`proof.sinks=Element.innerHTML`、
+  载荷 `<svg/onload=alert('xssv_…')>`(详情对话框由 `[innerHTML]` 渲染;
+  Phase 283 关掉 URL 探针后归因干净)。代码侧只做一件事:把 main.py 里
+  "jar → 浏览器 cookie dicts"的内联推导式抽成 `_jar_cookie_dicts()(原不可测),
+  3 个新单测锁住"操作者 cookie 与登录 cookie 同车进浏览器、且形状过 Phase 174 的
+  url-vs-path 规则"(tests/test_auth_cookie_dicts.py)。
+  **教训**:"目标交互挡住"的结论要先问"这是目标特性,还是操作者知识没喂进去"——
+  Welcome 对话框有 dismiss cookie,`-b` 早就能表达它。
+  台账 #5 行随之改"已确认(Phase 289)",可复现召回 **7/9**
+  (#1/#2/#4/#5/#6/#8/#9;余 #3 变体读数在并行会话手里、#7 属目标视图不渲染)。
+
 ### Added
 
 - **`--login-json` / `--stored-relogin`:写入后重新登录,让"快照式视图"渲染新值(Phase 278)**:

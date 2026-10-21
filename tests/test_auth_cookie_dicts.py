@@ -105,3 +105,73 @@ class TestPlaywrightAcceptsTheShape:
                 assert "url or path" in str(ei.value), str(ei.value)
             finally:
                 b.close()
+
+
+# ---------------------------------------------------------------------------
+# Phase 289: the operator `-b/--cookie` jar -> browser dicts path
+#
+# The #5 close (Juice Shop API-only XSS) depends on this exact path: the
+# welcome dialog that intercepts the product-card click is suppressed by
+# the cookie `welcomebanner_status=dismiss`, seeded via `-b`.  The
+# conversion itself was an inline comprehension in __main__ (untestable);
+# it is now `_jar_cookie_dicts`, and these tests pin both halves -- the
+# conversion AND that its output survives the engine's url-vs-path rule.
+# ---------------------------------------------------------------------------
+
+class _FakeCookie:
+    def __init__(self, name, value, domain=None, path="/"):
+        self.name, self.value = name, value
+        self.domain, self.path = domain, path
+
+
+class _FakeJar:
+    def __init__(self, cookies):
+        self.cookies = cookies
+
+
+def test_operator_cookie_reaches_the_browser_dicts():
+    """A domainless `-b` cookie becomes a Playwright-valid dict (url form,
+    no path) -- the shape _auth_cookie_dicts is documented to want."""
+    from xssentinel.__main__ import _jar_cookie_dicts
+    jar = _FakeJar([_FakeCookie("welcomebanner_status", "dismiss")])
+    dicts = _jar_cookie_dicts(jar)
+    assert dicts == [{"name": "welcomebanner_status", "value": "dismiss",
+                      "domain": None, "path": "/"}]
+    engine_dicts = _auth_cookie_dicts(dicts, URL)
+    assert engine_dicts == [{"name": "welcomebanner_status",
+                             "value": "dismiss",
+                             "url": "http://127.0.0.1:3000"}]
+    assert "path" not in engine_dicts[0], engine_dicts
+
+
+def test_jar_conversion_handles_session_and_operator_cookies_together():
+    """Login cookies (domain-bearing) and operator cookies (domainless)
+    ride in the same jar and must ALL reach the browser -- the login half
+    is what keeps authenticated sinks visible (Phase 173/174), the
+    operator half is what suppresses UI-state gates (Phase 289)."""
+    from xssentinel.__main__ import _jar_cookie_dicts
+    jar = _FakeJar([
+        _FakeCookie("token", "jwt", domain="127.0.0.1", path="/"),
+        _FakeCookie("welcomebanner_status", "dismiss"),
+        _FakeCookie("blank", ""),                      # value=None -> ""
+    ])
+    dicts = _jar_cookie_dicts(jar)
+    assert len(dicts) == 3
+    assert dicts[2] == {"name": "blank", "value": "",
+                        "domain": None, "path": "/"}
+    engine_dicts = _auth_cookie_dicts(dicts, URL)
+    names = sorted(d["name"] for d in engine_dicts)
+    assert names == ["blank", "token", "welcomebanner_status"]
+    by_name = {d["name"]: d for d in engine_dicts}
+    assert by_name["token"]["domain"] == "127.0.0.1"      # domain form
+    assert "url" not in by_name["token"]
+    # domainless cookies get the ORIGIN (scheme://netloc), not the full
+    # URL with its route -- _auth_cookie_dicts strips the path/hash.
+    origin = "http://127.0.0.1:3000"
+    assert by_name["welcomebanner_status"]["url"] == origin  # url form
+    assert "domain" not in by_name["welcomebanner_status"]
+
+
+def test_jar_conversion_none_session_is_empty():
+    from xssentinel.__main__ import _jar_cookie_dicts
+    assert _jar_cookie_dicts(None) == []

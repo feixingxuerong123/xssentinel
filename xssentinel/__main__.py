@@ -93,6 +93,36 @@ def _parse_kv(s: str) -> dict:
     return out
 
 
+def _jar_cookie_dicts(session) -> list[dict]:
+    """Requester-jar cookies as the dicts the browser arm wants (Phase 289).
+
+    The jar holds the operator's ``-b/--cookie`` entries AND form-login
+    session cookies -- both belong in the real browser, not just in the
+    HTTP layer.  The operator-cookie half is easy to forget: it is how a
+    UI-state gate gets suppressed without any scanner code knowing the
+    gate exists.  Measured on Juice Shop's API-only XSS challenge (#5):
+    the product-details dialog that renders the stored description only
+    opens on a card click, and a first-visit WELCOME dialog
+    (``mat-dialog-container`` + ``.cdk-overlay-backdrop``) intercepts
+    every pointer event on the search page -- so the click times out and
+    the sink is invisible.  Dismissing the welcome dialog sets the
+    cookie ``welcomebanner_status=dismiss``, and seeding that cookie via
+    ``-b`` makes the click land: #5 then confirms as ``stored_dom``
+    high/high browser-executed.  Same shape as ``--browser-local-storage``
+    for SPA route guards (Phase 150) -- one more piece of operator
+    knowledge the scanner turns into execution evidence.
+
+    Shape note: the dicts keep ``domain``/``path`` as the jar has them;
+    ``dom_engine._auth_cookie_dicts`` resolves the url-vs-path rule
+    (Phase 174: they are mutually exclusive for Playwright).
+    """
+    if session is None:
+        return []
+    return [{"name": c.name, "value": c.value or "",
+             "domain": c.domain or None, "path": c.path or "/"}
+            for c in session.cookies]
+
+
 def build_parser():
     ap = argparse.ArgumentParser(
         prog="xssentinel",
@@ -1343,9 +1373,7 @@ def main(argv=None):
         _hdrs = {}
         if session_mgr is not None:
             _hdrs, _ = session_mgr.auth_browser_state()
-        _ckies = [{"name": c.name, "value": c.value or "",
-                   "domain": c.domain or None, "path": c.path or "/"}
-                  for c in _req_session.cookies] if _req_session else []
+        _ckies = _jar_cookie_dicts(_req_session)
         _ls = {}
         for _kv in (getattr(args, "browser_local_storage", None) or []):
             _k, _, _v = _kv.partition("=")
