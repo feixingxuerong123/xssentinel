@@ -276,6 +276,13 @@
   测试 +6(`tests/test_waf_detect_block_hints.py::TestFingerprintSpecificity`),
   WAF 单测 16 passed。全量门禁另跑(见提交信息)。
 
+- **Phase 292(docs):Known limitations 五条按实测清算** —— ①②("两条通用证据规则")
+  **已由 Phase 218 解决**(`cap_unverified_severity`,双引擎最终出口);③(DOM 参数名)
+  **部分解决**(带参/hash 路由现在有 `param=q@hash`,无参页面 `None` 是诚实的);
+  ④(async 爬取页层)**已由 Phase 214–216 解决**,Phase 290 双引擎逐项对照复核;
+  ⑤(WAF 误检)**Cisco ACE 已修**(Phase 291),`Generic/Unknown` 待靶机可用时复测;
+  ⑥(爬取宽度不稳定)**仍开放**。逐条状态与新判据见下方"Known limitations"节。
+
 ### Added
 
 - **`--login-json` / `--stored-relogin`:写入后重新登录,让"快照式视图"渲染新值(Phase 278)**:
@@ -589,22 +596,32 @@
 
 ### Known limitations
 
-- **`docs/OPTIMIZATION.md` 1.5 的三类病因已各自改掉,但两条一般规则没立**(Phase 210b):
-  ① 静态层一律 `proof=None` —— "不可核对的高危"应当被门拒绝,这需要跨**全部**静态层的
-  证据形状门;② "无浏览器证据 + 无 proof ⇒ 至多 medium" 的**通用**降档规则,需要自己的
-  对照矩阵与全量矩阵复测。本轮按每种错各自的证据改了各自那一处,没有合并成一条通用规则。
+- **[已解决 · Phase 218] 两条通用证据规则已立**:`docs/OPTIMIZATION.md` 1.5 的两条一般规则
+  落地为 `findings.cap_unverified_severity()` —— "无浏览器证据(browser-executed / OOB /
+  headless confirmed)、且无可核对 proof 的 `high`/`critical` 降为 `medium`"。
+  **severity-only**:confidence 不动,评分分母不动(medium 仍算检出)。
+  接线在双引擎的**最终出口**(sync `_add`;async `scan()` 的 yield 前、headless 复核之后),
+  就地修改同一对象。驻留 population 是静态分析提示(trusted_types / policy_bypass 族),
+  两引擎对称(Phase 217)。
+  **未采用"硬拒绝"**:把不可核对的高危直接丢弃会把已检出的行变成 FN(评分口径里
+  medium 算检出、丢弃不算),降档已消除"不可核对的高危",故按测量结论选降档。
 
-- **DOM finding 不带参数名(本轮量到,未修)**:真实靶上 browser-executed 的
-  `dom_dynamic` 是 `param=None`,报告参数列因此为空,`verify_fix` 的重放只能走
-  `params["_"]` 兜底载体,修的人看不出该改哪个键。
-  **注意这不是"缺一条 curl"**:fragment 投递服务端永远收不到,`curl` 反而是误导,
-  PoC 里自动导航的 HTML 才是正确且可执行的重放(它已在)。缺的是**键名**。
+- **[部分解决] DOM finding 的参数名**:真实靶上 browser-executed 的 `dom_dynamic`
+  现在带 `param=q@hash`(Juice Shop 20.2.0,Phase 288/289 实测);**无参页面**的
+  DOM sink 仍是 `param=None` —— 那种页面没有参数可命名,None 是诚实的。
+  前提不变:fragment 投递服务端永远收不到,PoC 里自动导航的 HTML 才是正确重放。
 
-- async 爬到的**非** fragment 端点仍只跑反射层(sync 对每个爬到端点跑全套页面层);
-  见 `docs/OPTIMIZATION.md` 2.1.1。
-- 真实靶场上浏览器爬取宽度不稳定(实测同命令 18 / 22 / 70 / 70 / 70 / 74 端点),
-  以及 WAF 误检(Juice Shop 被判 `Generic/Unknown WAF` / `Cisco ACE`)未动 ——
-  后者属判定面,需单独测量。
+- **[已解决 · Phase 214–216;Phase 290 实测复核] async 爬取页面的层覆盖**:
+  爬到的非 fragment 端点现在跑全套页面层,与 sync 对齐。实测:同一"首页→DOM sink 页"
+  爬取夹具上,双引擎产出**逐项相同**的 4 条 finding(含 evidence_class)。
+
+- **[部分解决 · Phase 291] 真实靶上的 WAF 误检**:`Cisco ACE` 的裸 `ace-` 命中
+  Material CSS(`--mat-sys-on-surface-variant`,`interface-header`);F5 的裸 `tsa`
+  命中 JS 标识符 `const tsa`。两条规则已收紧并加 6 例正负断言;Juice Shop 索引页
+  实测 `waf=None`。`Generic/Unknown WAF` 未在索引页复现;完整重测(多相信封 + 错误面
+  样本上的 `waf` 分布)因靶机当时不可用推迟,**待复测**。
+
+- **[开放] 真实靶场上浏览器爬取宽度不稳定**(实测同命令 18 / 22 / 70 / 70 / 70 / 74 端点)。
 
 ## [1.1.0] - 2026-10-09
 
