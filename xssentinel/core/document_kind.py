@@ -39,6 +39,24 @@ SCRIPT_MEDIA_TYPES = frozenset({
 #: ... and the extensions we trust when no header spoke up.
 SCRIPT_SUFFIXES = (".js", ".mjs", ".cjs")
 
+#: Media types where a reflected value is DATA, not a rendering context.
+#: HTML markup in these cannot execute in a browser tab.  Script (JS) and
+#: XML media types are deliberately absent: a JSONP callback is code the
+#: browser executes, and an XML document is rendered by the XML parser
+#: (XSSMaze `callback-level1` and `ctype-level1` are real positives that
+#: are only reachable through those two media types).
+DATA_ONLY_MEDIA_TYPES = frozenset({
+    "application/json", "text/json", "text/plain",
+})
+
+
+def is_data_only_media_type(content_type: str) -> bool:
+    """True for media types that carry data only (JSON, plain text)."""
+    media = (content_type or "").split(";")[0].strip().lower()
+    if not media:
+        return False
+    return media in DATA_ONLY_MEDIA_TYPES or media.endswith("+json")
+
 
 def is_script_document(url: str, content_type: str = "") -> bool:
     """True when the scanned document is a JavaScript resource.

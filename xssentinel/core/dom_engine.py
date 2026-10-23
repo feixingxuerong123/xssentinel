@@ -436,6 +436,29 @@ def _init_script(marker: str) -> str:
     return oSAN.apply(this, arguments);
   };
 
+  // setHTMLUnsafe parses attacker HTML with no sanitizer, on the element or a
+  // shadow root (XSSMaze `htmlunsafe/level1|5` deliver through the fragment and
+  // decodeURIComponent into it).  Chromium fires <img onerror> inserted this
+  // way.  Document.parseHTMLUnsafe is the detached-tree form: it is delivery
+  // evidence only -- the tree executes when the caller appends it (level4/6).
+  ['Element','ShadowRoot'].forEach(function(ctor){
+    var C = window[ctor];
+    if (C && C.prototype && C.prototype.setHTMLUnsafe){
+      var oSU = C.prototype.setHTMLUnsafe;
+      C.prototype.setHTMLUnsafe = function(html){
+        if (has(html)) hit(ctor + '.setHTMLUnsafe', html);
+        return oSU.apply(this, arguments);
+      };
+    }
+  });
+  if (window.Document && Document.parseHTMLUnsafe){
+    var oDPU = Document.parseHTMLUnsafe;
+    Document.parseHTMLUnsafe = function(html){
+      if (has(html)) hit('Document.parseHTMLUnsafe', html);
+      return oDPU.apply(this, arguments);
+    };
+  }
+
   // jQuery sinks (may load after this script)
   function wrapJQ(){
     if (window.jQuery && window.jQuery.fn){

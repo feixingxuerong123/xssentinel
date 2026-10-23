@@ -33,6 +33,8 @@ evidence the browser has to give (``verify_headless``), not this module.
 """
 from __future__ import annotations
 
+import re
+
 # Each entry: (framework, probe_payload, expected_rendered_value, confirm_payload)
 # - probe_payload: the template expression to inject.
 # - expected_rendered_value: what the framework produces when it compiles
@@ -150,9 +152,28 @@ def detect_rendered(response_text: str, expected_value: str,
     """
     if not response_text or not expected_value:
         return False
-    if control_text is not None and expected_value in control_text:
+    if control_text is not None and _standalone(expected_value, control_text):
         return False
-    return expected_value in response_text
+    return _standalone(expected_value, response_text)
+
+
+def _standalone(value: str, text: str) -> bool:
+    """``value`` occurs as its own token, not inside a longer hex/number run.
+
+    A bare substring test was defeated by a 32-hex nonce that happened to
+    contain ``49`` (measured 2026-10-22 on XSSMaze `nonce-level2`: the
+    client group emitted a **critical** `template_ssti_angularjs` because
+    the probe response's nonce held ``49`` while the control request drew a
+    different nonce; the confirm payload was then reflected verbatim).  A
+    templated result appears as its own value (``<div>49</div>``,
+    ``49px``); a coincidental one is part of a hex blob (``ab49cd``) or a
+    line number (``route.js:149:13``).  Hex boundaries reject both measured
+    shapes without rejecting a rendered number followed by a unit letter.
+    """
+    if not value:
+        return False
+    return re.search(r"(?<![0-9A-Fa-f])" + re.escape(value)
+                     + r"(?![0-9A-Fa-f])", text) is not None
 
 
 def detect_unrendered(response_text: str, probe: str) -> bool:

@@ -598,7 +598,7 @@
       "finding_types": [
         "dom_dynamic"
       ],
-      "note": "location.hash -> innerHTML. Phase 161: declares dom_dynamic so this case can only be credited by the REAL BROWSER. Measured before: removing every DOM-family finding still left it TP via a trusted_types_taint_flow note, so a dead browser engine was invisible to the benchmark."
+      "note": "location.hash -> innerHTML. Phase 161: declares dom_dynamic so this case can only be credited by the REAL BROWSER. Measured before: removing every DOM-family finding still left it TP via a trusted_types_taint_flow note, so a dead browser engine was invisible to the benchmark. Phase 265: the fixture now decodeURIComponent()s the fragment -- Chromium percent-encodes '<' in location.hash, so the old page received '%3Cimg...' as text and was not exploitable; the previous high was the engine's self-alert."
     },
     {
       "id": "pos-dom-02",
@@ -640,7 +640,7 @@
       "finding_types": [
         "dom_dynamic"
       ],
-      "note": "location.hash -> document.write. Phase 161: declares dom_dynamic (the browser is the only layer that proves it; a Trusted Types note used to credit it as well)."
+      "note": "location.hash -> document.write. Phase 161: declares dom_dynamic (the browser is the only layer that proves it; a Trusted Types note used to credit it as well). Phase 265: the fixture decodes the fragment before document.write; without that, Chromium's percent-encoded hash was inert text (the old high was the engine's self-alert)."
     },
     {
       "id": "pos-dom-05",
@@ -655,7 +655,7 @@
         "dom_dynamic",
         "dom"
       ],
-      "note": "location.hash -> jQuery .html(). Phase 161: the page loads jQuery from code.jquery.com, so with no egress the library never arrives and the browser cannot run .html() -- requiring dom_dynamic here would make the case depend on the network. It therefore requires DOM-FAMILY evidence (dynamic confirmation OR the L3 static DOM hint) instead of the SRI/Trusted-Types collateral that used to credit it."
+      "note": "location.hash -> jQuery .html(). Phase 161: the page loads jQuery from code.jquery.com, so with no egress the library never arrives and the browser cannot run .html() -- requiring dom_dynamic here would make the case depend on the network. It therefore requires DOM-FAMILY evidence (dynamic confirmation OR the L3 static DOM hint) instead of the SRI/Trusted-Types collateral that used to credit it. Phase 265: serve the repository's vendored jQuery at /vendor/jquery.min.js and decode the fragment; the case now executes offline instead of depending on a CDN or a static hint."
     },
     {
       "id": "pos-dom-06",
@@ -1177,14 +1177,14 @@
       "note": "json.dumps object value"
     },
     {
-      "id": "pos-jsonct-01",
+      "id": "neg-jsonct-raw-01",
       "path": "/r/jsonct01",
       "param": "q",
       "mode": "jsonct_raw",
-      "ground_truth": "vulnerable",
+      "ground_truth": "safe",
       "context": "script_string_dq",
       "difficulty": "medium",
-      "note": "Phase 176g: the only case whose response is REAL application/json. Every other JSON-ish handler returns through _page(), which forces text/html -- so a reflection in those is in an HTML context and genuinely exploitable, and scanner.py's Phase 32 content-type branch had never been exercised by any case (layer coverage is not branch coverage). Markup in a JSON body does not run in a browser tab, so this case locks the ENGINE'S OWN choice: keep the finding for the record, drop it to low confidence. It asserts 'reported at low confidence', not 'exploitable'.",
+      "note": "Phase 176g contract, SUPERSEDED 2026-10-22 (user decision: data-only reflections are not findings). This case used to lock 'keep the low finding for the record'; it now locks SILENCE: markup in application/json cannot execute in a browser tab, and XSSMaze's json/plain controls proved the low finding is noise. Script (application/javascript) and XML media types remain reportable -- callback-level1 and ctype-level1 are real positives. The Phase 32 branch is still exercised (now the suppression branch); the parity gate's incident-2 mutation still distinguishes async high from sync silence. Renamed from pos-jsonct-01 so the id no longer claims a vulnerability.",
       "finding_types": [
         "reflected"
       ]
@@ -2280,6 +2280,7 @@
       "method": "POST",
       "mode": "so2_write",
       "second_order_view_path": "/r/so2view01",
+      "engines": ["sync"],
       "ground_truth": "vulnerable",
       "finding_types": [
         "second_order"
@@ -2295,6 +2296,7 @@
       "method": "POST",
       "mode": "so2_write_escaped",
       "second_order_view_path": "/s/so2view01",
+      "engines": ["sync"],
       "ground_truth": "safe",
       "finding_types": [
         "second_order"
@@ -2311,6 +2313,7 @@
       "mode": "sc_write",
       "scenario_file": "benchmark/scenarios/bench_comment.json",
       "scenario_view_path": "/r/scview01",
+      "engines": ["sync"],
       "ground_truth": "vulnerable",
       "finding_types": [
         "scenario"
@@ -2327,6 +2330,7 @@
       "mode": "sc_write_escaped",
       "scenario_file": "benchmark/scenarios/bench_comment.json",
       "scenario_view_path": "/s/scview01",
+      "engines": ["sync"],
       "ground_truth": "safe",
       "finding_types": [
         "scenario"

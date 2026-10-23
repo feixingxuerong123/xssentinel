@@ -5,7 +5,9 @@ injects `<script>`, CSP can block execution.  But CSP is frequently
 misconfigured in ways that leave script gadgets open:
 
   * `script-src 'unsafe-inline'` -> inline scripts run (CSP useless).
-  * `script-src 'unsafe-eval'`   -> eval(), Function(), setTimeout(str) run.
+  * `script-src 'unsafe-eval'`   -> eval(), Function(), setTimeout(str) run
+    *inside scripts that already execute*; on its own it is NOT an inline
+    bypass (Phase 278: the old entry claimed otherwise and caused FPs).
   * `script-src cdn.cloudflare.com` -> JSONP / Angular gadgets on that CDN.
   * `script-src *.google.com`     -> google.com hosts JSONP endpoints.
   * Whitelisted CDNs hosting known script gadgets (Angular, Prototype,
@@ -275,6 +277,48 @@ def blocks_family(pol: dict | None, family: str) -> bool:
                for p in (pol or {}).get("enforcing", []) if p)
 
 
+_SCRIPT_SRC_RE = re.compile(r"<script\b[^>]*\bsrc\s*=", re.I)
+
+
+def script_execution_blocked(headers: dict | None = None,
+                             html: str | None = None) -> bool:
+    """True only when NO script on this page can execute under its CSP.
+
+    This is the premise that makes a page-feature finding unsupportable:
+    when every script route the page actually carries is blocked, a
+    mutation/postMessage/WebSocket/clobber claim has no execution channel.
+    Measured on XSSMaze `csp-bypass-level3` / `cspbypass-level3` /
+    `csp-bypass-level4` (inline-only pages whose policies carry no
+    `'unsafe-inline'`, no nonce/hash, no external script and no bypass).
+
+    Conservative by construction — anything that could still execute makes
+    this False:
+      * no enforcing policy at all;
+      * any ``<script src=...>`` element (its URL may be allowed);
+      * a nonce/hash source in either family (the page's own scripts may
+        carry it; only inline injection is blocked);
+      * ``analyze()`` reports a bypass (wildcard / gadget / inline).
+    """
+    pol = policies(headers, html)
+    enforcing = [p for p in pol.get("enforcing", []) if p]
+    if not enforcing:
+        return False
+    if _SCRIPT_SRC_RE.search(html or ""):
+        return False
+    for header in enforcing:
+        directives = parse_csp(header)
+        for family in ("elem", "attr"):
+            if family_allows_inline(directives, family):
+                return False
+            if _NONCE_OR_HASH_RE.search(
+                    " ".join(family_sources(directives, family))):
+                return False
+        rep = analyze(header)
+        if rep.bypassable or rep.bypasses:
+            return False
+    return True
+
+
 # ---------------------------------------------------------------------------
 # CSP3 delivery families: which directive actually governs a payload
 # ---------------------------------------------------------------------------
@@ -383,7 +427,8 @@ def analyze(csp_header: str) -> CSPReport:
                 rep.weak.append("CSP restricts no scripts -> inline scripts run")
         else:
             inline_payload = "<img src=x onerror=alert(1)>"
-            inline_reason = ("'unsafe-inline' allows event-handler attributes")
+            inline_reason = ("'unsafe-inline' allows on* event-handler "
+                             "attributes")
             rep.weak.append(
                 f"{governing_directive(rep.directives, 'attr')} "
                 "'unsafe-inline' -> on* handlers run; <script> elements do not")
@@ -394,13 +439,29 @@ def analyze(csp_header: str) -> CSPReport:
             "reason": inline_reason,
         })
     if "'unsafe-eval'" in script_src:
-        rep.weak.append("script-src 'unsafe-eval' -> eval/Function run")
-        rep.bypassable = True
-        rep.bypasses.append({
-            "type": "eval",
-            "payload": "<script>eval('alert(1)')</script>",
-            "reason": "'unsafe-eval' allows eval() and new Function()",
-        })
+        # Phase 278 (was XSSMaze `csp-bypass-level3` / `cspbypass-level3`
+        # false positives): 'unsafe-eval' is NOT an inline bypass and must
+        # not produce a bypass entry.
+        #
+        # The old entry claimed the payload
+        # ``<script>eval('alert(1)')</script>`` and set ``bypassable=True``.
+        # That payload is an inline ``<script>`` element: every policy that
+        # carries ``'unsafe-eval'`` *instead of* ``'unsafe-inline'`` blocks
+        # it -- and ``family_allows_inline()`` above already answered that
+        # question per family.  ``'unsafe-eval'`` only widens what an
+        # ALREADY-EXECUTING script may call (eval / new Function); it does
+        # not authorize inline ``<script>`` elements or ``on*`` attributes.
+        # Whether such a sink exists is a property of the page, not of the
+        # header, so static header analysis cannot support the claim.
+        #
+        # Consumers that read ``rep.bypassable`` therefore correctly treat
+        # an eval-only policy as ``is_strict_inline() == True`` (inline is
+        # genuinely blocked).  No bypass entry is produced, so ``bypasses``
+        # stays empty and ``best_bypass()`` returns None.
+        rep.weak.append(
+            "script-src 'unsafe-eval' -> eval()/new Function() run inside "
+            "scripts that already execute; it does NOT authorize inline "
+            "<script> elements or on* handlers")
 
     # Check for whitelisted CDN/script gadget hosts
     for source in script_src:
@@ -664,7 +725,7 @@ def is_strict_inline(csp_header: str) -> bool:
     """
     rep = analyze(csp_header or "")
     if not rep.directives or rep.bypassable:
-        return False          # inline / eval / gadget / wildcard route works
+        return False          # inline / gadget / wildcard route works
     if not (family_sources(rep.directives, "elem")
             or family_sources(rep.directives, "attr")):
         return False          # nothing restricts scripts -- not "strict"
@@ -680,8 +741,10 @@ def best_bypass(csp_header: str) -> dict | None:
     rep = analyze(csp_header)
     if not rep.bypasses:
         return None
-    # Prefer inline > eval > wildcard > script_gadget (simplest to exploit).
-    for t in ("inline", "eval", "wildcard", "script_gadget"):
+    # Prefer inline > wildcard > script_gadget (simplest to exploit).  There
+    # is no "eval" slot: Phase 278 removed the only producer of that type
+    # (an eval-only policy now yields ``bypassable=False`` and no entries).
+    for t in ("inline", "wildcard", "script_gadget"):
         for b in rep.bypasses:
             if b["type"] == t:
                 return b

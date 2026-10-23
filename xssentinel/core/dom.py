@@ -31,6 +31,7 @@ SOURCES = [
 # Sinks: writing data into an executable context.
 SINKS = [
     r"\.innerHTML", r"\.outerHTML", r"\.insertAdjacentHTML",
+    r"\.setHTMLUnsafe\s*\(", r"parseHTMLUnsafe\s*\(",
     r"document\.write(?:ln)?", r"\.src\s*=", r"\.href\s*=",
     r"\.data\s*=", r"eval\s*\(", r"setTimeout\s*\(", r"setInterval\s*\(",
     r"new\s+Function\s*\(", r"\.appendChild\s*\(", r"\.html\s*\(",
@@ -51,6 +52,34 @@ _SINK_RE = re.compile("(" + "|".join(SINKS) + ")", re.I)
 _HANDLER_RE = re.compile(r"\b(on\w+)\s*=\s*[\"']([^\"']*)[\"']", re.I)
 _JAVASCRIPT_URI_RE = re.compile(r"href\s*=\s*[\"']javascript:([^\"']+)", re.I)
 _POSTMSG_RE = re.compile(r"addEventListener\s*\(\s*['\"]message['\"]", re.I)
+
+# URL-property assignments load a resource; `javascript:` executes in an
+# iframe/frame/embed/object but is inert in img/media/script sources.
+# Measured on XSSMaze: `dom-level10` (img.src, control) vs `dom-level18`
+# (iframe.src = location.hash, real positive).  The element tag comes from
+# the page's id map; standalone JS has no page context and stays low.
+_EXECUTABLE_URL_TAGS = frozenset({"iframe", "frame", "embed", "object"})
+_URL_PROP_SINK_RE = re.compile(r"\.(?:src|data)\s*(?:=|$)")
+_ID_ATTR_RE = re.compile(r"<([a-zA-Z][\w-]*)\b[^>]*\bid\s*=\s*(['\"])(.*?)\2",
+                         re.S | re.I)
+_GET_BY_ID_RE = re.compile(r"getElementById\(\s*(['\"])(.*?)\1")
+
+
+def _grade_url_property(finding: dict, id_tags: dict) -> None:
+    """Cap URL-property hints unless the element can actually execute one."""
+    sink = (finding.get("sink") or "").strip()
+    if not _URL_PROP_SINK_RE.search(sink):
+        return
+    m = _GET_BY_ID_RE.search(finding.get("snippet") or "")
+    tag = id_tags.get((m.group(2) if m else "").lower())
+    if tag in _EXECUTABLE_URL_TAGS:
+        # A static hint is a hint: medium at most, never a bare high.
+        finding["confidence"] = "medium"
+        return
+    finding["confidence"] = "low"
+    finding["detail"] = (finding.get("detail") or "") + (
+        " | URL-property sink on an inert/unknown element: javascript: does "
+        "not execute here")
 
 
 def _line_of(code: str, pos: int) -> int:
@@ -193,5 +222,12 @@ def analyze(code_or_html: str, is_html: bool = False) -> list[dict]:
         for sm in re.finditer(r"<script\b[^>]*>(.*?)</script>", code_or_html,
                               re.S | re.I):
             findings.extend(analyze_script(sm.group(1)))
+        id_tags = {m.group(3).strip().lower(): m.group(1).lower()
+                   for m in _ID_ATTR_RE.finditer(code_or_html)}
+        for f in findings:
+            _grade_url_property(f, id_tags)
         return findings
-    return analyze_script(code_or_html)
+    findings = analyze_script(code_or_html)
+    for f in findings:
+        _grade_url_property(f, {})
+    return findings

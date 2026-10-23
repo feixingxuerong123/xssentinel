@@ -19,6 +19,7 @@ from __future__ import annotations
 
 from . import csp as csp_mod
 from . import layer_guard
+from .page_relevance import redirect_landing_drops_input
 from .layers.common import _make_finding  # noqa: F401  (re-export)
 from .layers.client_layers import (  # noqa: F401  (re-exports)
     _scan_postmessage, _scan_prototype, _scan_service_worker,
@@ -71,6 +72,8 @@ def run_page_layers(scanner, req, url: str, response_text: str | None = None,
     # (preferred path), we use it directly; otherwise we fetch it here.
     csp_header = ""
     content_type = ""
+    resp2 = None
+    _hdrs = {}
     try:
         # Reuse the text we already have if the caller also passed a
         # response object via scanner state -- but advanced_layers only
@@ -98,8 +101,40 @@ def run_page_layers(scanner, req, url: str, response_text: str | None = None,
                              if k.lower() == "content-type"), "")
     except Exception:
         pass
-    layer_guard.run_layer(scanner, "postmessage", _scan_postmessage, scanner,
-                          url, text)
+    # Page hints (framework / Trusted Types / WebSocket) describe the page
+    # that was fetched.  If a redirect moved us to another path and dropped
+    # the injected parameters, they describe a different resource -- the
+    # XSSMaze redirect-control FP (302 -> "/").  Header/behaviour layers
+    # (cookie tossing, SRI) and dynamic DOM delivery are not gated here.
+    hints_relevant = True
+    _hint_skip_detail = ""
+    if resp2 is not None:
+        _hist = getattr(resp2, "history", None) or []
+        _req_url = url
+        if _hist:
+            # requests exposes the FINAL request on resp.request; the URL we
+            # actually asked for is on the first history hop.
+            _req_url = (getattr(_hist[0], "url", "")
+                        or getattr(getattr(_hist[0], "request", None),
+                                   "url", "") or url)
+        if redirect_landing_drops_input(
+                _req_url, getattr(resp2, "url", "") or "", bool(_hist),
+                params):
+            _hint_skip_detail = ("redirect landing page dropped the "
+                                 "injected parameters")
+        elif csp_mod.script_execution_blocked(_hdrs, text):
+            _hint_skip_detail = ("CSP blocks every script route on this "
+                                 "page")
+        hints_relevant = not _hint_skip_detail
+    if not hints_relevant:
+        for _lid in ("L8_postmessage", "L8_framework", "L8_trusted_types",
+                     "L8_websocket"):
+            scanner.coverage.record_layer(url, _lid, "GET",
+                                          status="skipped",
+                                          detail=_hint_skip_detail)
+    if hints_relevant:
+        layer_guard.run_layer(scanner, "postmessage", _scan_postmessage,
+                              scanner, url, text)
     layer_guard.run_layer(scanner, "prototype", _scan_prototype, scanner,
                           url, text)
     layer_guard.run_layer(scanner, "service_worker", _scan_service_worker,
@@ -107,16 +142,19 @@ def run_page_layers(scanner, req, url: str, response_text: str | None = None,
     layer_guard.run_layer(scanner, "worker", _scan_worker, scanner, url, text)
     layer_guard.run_layer(scanner, "redirect", _scan_redirect, scanner,
                           url, text)
-    layer_guard.run_layer(scanner, "framework", _scan_framework, scanner,
-                          url, text, content_type)
+    if hints_relevant:
+        layer_guard.run_layer(scanner, "framework", _scan_framework, scanner,
+                              url, text, content_type)
     # Phase 26: new page-level detection layers.
     layer_guard.run_layer(scanner, "graphql", _scan_graphql, scanner, req,
                           url, text)
-    layer_guard.run_layer(scanner, "websocket", _scan_websocket, scanner,
-                          url, text)
+    if hints_relevant:
+        layer_guard.run_layer(scanner, "websocket", _scan_websocket, scanner,
+                              url, text)
     # Phase 27-2: Trusted Types + CSP nonce reuse.
-    layer_guard.run_layer(scanner, "trusted_types", _scan_trusted_types,
-                          scanner, url, text, csp_header, content_type)
+    if hints_relevant:
+        layer_guard.run_layer(scanner, "trusted_types", _scan_trusted_types,
+                              scanner, url, text, csp_header, content_type)
     layer_guard.run_layer(scanner, "csp_nonce", _scan_csp_nonce,
                           scanner, url, text, csp_header)
     # Phase 27-3: Cookie tossing XSS + SRI bypass.

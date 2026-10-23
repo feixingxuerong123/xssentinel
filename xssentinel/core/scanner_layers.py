@@ -24,8 +24,10 @@ from . import template as tpl_mod
 from . import polyglot as poly_mod
 from . import dom as dommod
 from . import dom_engine
+from .page_relevance import redirect_landing_drops_input
+from . import document_kind as dk_mod
 from .findings import (Finding, EVIDENCE_MODEL, EVIDENCE_NO_BROWSER,
-                       _grade_evidence, dom_dynamic_evidence)
+                       _grade_evidence, dom_dynamic_finding)
 from .logger import get_logger
 from .requester import JsonBody
 
@@ -115,10 +117,41 @@ class AdvancedLayerMixin:
         text = resp.text or ""
 
         # --- L3: static taint heuristic (medium/low hints) ---
-        static_results = dommod.analyze(text, is_html=True)
-        # Phase 20-3: record L3 DOM-static layer (always runs).
-        self.coverage.touch_layer(url, "L3_dom_static", "GET",
-                                  detail=f"{len(static_results)} hint(s)")
+        # Page hints describe the document that was fetched.  When a redirect
+        # lands on another path and drops the injected parameters, those
+        # hints belong to a different resource; carrying them under the
+        # scanned URL is the XSSMaze redirect-control FP (302 -> "/").
+        _hist = getattr(resp, "history", None) or []
+        _req_url = url
+        if _hist:
+            _req_url = (getattr(_hist[0], "url", "")
+                        or getattr(getattr(_hist[0], "request", None),
+                                   "url", "") or url)
+        _landing = redirect_landing_drops_input(
+            _req_url, getattr(resp, "url", ""), bool(_hist))
+        _no_exec = csp_mod.script_execution_blocked(
+            dict(getattr(resp, "headers", {}) or {}), text)
+        if _landing or _no_exec:
+            static_results = []
+            _why = ("redirect landing page dropped the injected parameters"
+                    if _landing else
+                    "CSP blocks every script route on this page")
+            self.coverage.record_layer(
+                url, "L3_dom_static", "GET", status="skipped", detail=_why)
+        else:
+            static_results = dommod.analyze(text, is_html=True)
+            _all_hints = len(static_results)
+            # Low static hints (no-source sink inventories, URL-property
+            # loads) are noise: they cannot support a claim and, measured on
+            # XSSMaze, only produced low findings on non-XSS controls
+            # (nonce-level2, dom-level10).  Medium/high hints stay.
+            static_results = [r for r in static_results
+                              if r.get("confidence") != "low"]
+            # Phase 20-3: record L3 DOM-static layer (always runs).
+            self.coverage.touch_layer(
+                url, "L3_dom_static", "GET",
+                detail=f"{len(static_results)} hint(s), "
+                       f"{_all_hints - len(static_results)} low suppressed")
 
         # --- L6: real-browser dynamic confirmation (high confidence) ---
         dyn_findings: list = []
@@ -190,16 +223,13 @@ class AdvancedLayerMixin:
             self.coverage.record_finding(url, "GET")
 
         for d in dyn_findings:
-            # Phase 260: the emit contract lives in dom_dynamic_evidence (ONE
-            # definition for both engines -- see findings.py).  This site used
-            # to hard-code `outcome="fired"`, which `_grade_evidence` turns
-            # into browser-executed/high: it MASKED the engine's own
-            # `executed` flag, so a row the browser never showed executing was
-            # still reported as an execution.  The parity gate measured
-            # exactly that on three DOM endpoints.  `proof` stays a string
-            # only because that is what dom_engine hands back -- report.py's
-            # Burp fallback guards for it.
-            _ev = dom_dynamic_evidence(d)
+            # Phase 265: ONE class chooser for both engines.  Execution
+            # observed -> dom_dynamic/high; delivery only ->
+            # dom_sink_reachability/low with no proof.  Before this, both
+            # sites kept severity="high" and proof=<bare probe marker>, which
+            # made the canonical safe pattern (sanitize()->innerHTML) a
+            # high-severity DOM-XSS false positive on range6.
+            _emit = dom_dynamic_finding(d)
             self._add(Finding(**{
                 "url": url, "method": "GET",
                 # Phase 213: the delivered key (``q`` / ``q@hash`` /
@@ -207,13 +237,14 @@ class AdvancedLayerMixin:
                 # ``@hash`` marks a FRAGMENT-carried key: no HTTP request
                 # ever sees it, so poc/verify_fix must not replay it as one.
                 "param": d.get("param"),
-                "type": "dom_dynamic", "context": d.get("sink"),
+                "type": _emit["type"], "context": d.get("sink"),
                 "payload": d.get("snippet", ""), "transform": [],
-                "severity": "high", "confidence": _ev["confidence"],
-                "detail": _ev["detail"],
-                "evidence_class": _ev["evidence_class"],
-                "headless": _ev["headless"],
-                "proof": d.get("snippet", ""),
+                "severity": _emit["severity"],
+                "confidence": _emit["confidence"],
+                "detail": _emit["detail"],
+                "evidence_class": _emit["evidence_class"],
+                "headless": _emit["headless"],
+                "proof": _emit["proof"],
             }))
             self.coverage.record_finding(url, "GET")
         return text, resp
@@ -537,6 +568,12 @@ class AdvancedLayerMixin:
             self.coverage.record_request(url, method)
         except Exception:
             return
+        if csp_mod.script_execution_blocked(
+                dict(getattr(resp, "headers", {}) or {}), resp.text or ""):
+            self.coverage.record_layer(
+                url, "L7_mutation", method, status="skipped",
+                detail="CSP blocks every script route on this page")
+            return
         result = mxss_mod.analyze(resp.text or "", payload)
         if result["exploitable"]:
             with self._lock:
@@ -579,6 +616,12 @@ class AdvancedLayerMixin:
         except Exception:
             return
         text = resp.text or ""
+        if csp_mod.script_execution_blocked(
+                dict(getattr(resp, "headers", {}) or {}), text):
+            self.coverage.record_layer(
+                url, "L7_dom_clobber", method, status="skipped",
+                detail="CSP blocks every script route on this page")
+            return
         result = clobber_mod.analyze(text, token)
         # Strategy 2: if reflection is confirmed, also check if the page's JS
         # references ANY common clobber target (x, action, location, ...) via
@@ -770,6 +813,14 @@ class AdvancedLayerMixin:
             except Exception:
                 continue
             text = resp.text or ""
+            # Data-only media types (JSON / plain text) never render markup
+            # in a browser tab.  A low polyglot reflection there is noise;
+            # script (JSONP) and XML media types are real vectors and stay.
+            if (_poly_non_html(resp)
+                    and dk_mod.is_data_only_media_type(
+                        (getattr(resp, "headers", {}) or {}).get(
+                            "Content-Type", ""))):
+                continue
             # The polyglot token appears in the alert call -- if it's reflected
             # in an EXECUTABLE context (not just echoed as escaped text), the
             # page is vulnerable in some context (the polyglot tries multiple

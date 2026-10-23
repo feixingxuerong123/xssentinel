@@ -95,8 +95,11 @@ def test_stack_trace_49_is_not_a_render():
     assert findings == [], (
         "a template finding here is the Phase 209 false positive: the probe "
         "was reflected verbatim and '49' came from a line number")
-    assert len(req.calls) == 2, (
-        "the layer must ask once for the render and once for the control")
+    assert len(req.calls) == 1, (
+        "a line number no longer counts as a rendered value: the token "
+        "boundary rejects it from the probe response alone, so no control "
+        "request is needed.  (The control still runs for a STANDALONE "
+        "coincidence -- see test_exploitable_frameworks_threads_the_control.)")
 
 
 def test_genuine_render_still_fires():
@@ -158,12 +161,37 @@ def test_detect_rendered_allowed_when_value_is_ours_alone():
     assert tpl_mod.detect_rendered("got 49", "49", control_text="got 0") is True
 
 
+def test_a_value_inside_a_random_token_is_not_rendering():
+    """XSSMaze nonce-level2, 2026-10-22 client run: the probe response's
+    32-hex nonce happened to contain ``49`` while the control request drew a
+    different nonce, and a bare substring test emitted a critical
+    ``template_ssti_angularjs``.  A hex blob is not a rendered number."""
+    assert tpl_mod.detect_rendered("nonce=ab49cd12ef", "49",
+                                   control_text="nonce=00ff77ee") is False
+
+
+def test_a_rendered_value_is_a_standalone_token():
+    assert tpl_mod.detect_rendered("<div>49</div>", "49",
+                                   control_text="<div>0</div>") is True
+    assert tpl_mod.detect_rendered("<div>49px</div>", "49",
+                                   control_text="<div>0px</div>") is True
+
+
 def test_exploitable_frameworks_threads_the_control():
-    with_coincidence = f"<title>{PROBE}</title>{TRACE}"
-    assert tpl_mod.exploitable_frameworks(with_coincidence), \
-        "without the control this is exactly how the FP happened"
-    assert tpl_mod.exploitable_frameworks(with_coincidence,
-                                          f"<title>{CONTROL}</title>{TRACE}") == []
+    coincidence = f"<title>{PROBE}</title><span>49 bytes</span>"
+    assert tpl_mod.exploitable_frameworks(coincidence), \
+        "a standalone coincidental value without the control is exactly " \
+        "how the FP happened"
+    assert tpl_mod.exploitable_frameworks(
+        coincidence,
+        f"<title>{CONTROL}</title><span>49 bytes</span>") == []
+
+
+def test_a_line_number_is_no_longer_a_rendered_value():
+    """The 2025 shape (``route.js:149:13``) is now rejected by the token
+    boundary even before the control request runs."""
+    assert tpl_mod.exploitable_frameworks(
+        f"<title>{PROBE}</title>{TRACE}") == []
 
 
 def test_control_value_contains_no_digits():

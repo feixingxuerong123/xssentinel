@@ -33,6 +33,9 @@ from urllib.parse import urljoin, urlparse
 
 from .scanner import Finding, json_leaf_paths, _set_json_leaf
 from .requester import JsonBody
+from .page_relevance import redirect_landing_drops_input
+from . import csp as csp_mod
+from . import document_kind as dk_mod
 from . import context as ctx
 from . import coverage as cov_mod
 from . import verifier
@@ -632,6 +635,8 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
                 self._sync_layers_online = self._transport_is_real(
                     aiohttp, getattr(session, "_session", session))
                 # 1) Baseline: get the page for reflection + DOM + advanced.
+                final_url = ""
+                redirected = False
                 try:
                     async with self._semaphore:
                         await self._throttle(url)
@@ -653,6 +658,9 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
                             text = await resp.text()
                             status = getattr(resp, "status", 200)
                             resp_headers = dict(resp.headers)
+                            final_url = str(getattr(resp, "url", "") or "")
+                            redirected = bool(
+                                getattr(resp, "history", None) or ())
                             self.requests_made += 1
                             self._record_status(status)
                 except (BudgetExhausted, CircuitOpen):
@@ -722,7 +730,11 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
                 # (measured: pos-dom-02 async FN / sync TP).
                 if self.advanced_layers:
                     page_tasks.append(("L3_dom", self._scan_dom_async(
-                        url, text, method, params)))
+                        url, text, method, params,
+                        redirect_landing=redirect_landing_drops_input(
+                            url, final_url, redirected, params),
+                        no_script_exec=csp_mod.script_execution_blocked(
+                            resp_headers, text))))
 
                 # L5 advanced page layers (postMessage / prototype / SW / etc).
                 # Phase 87: pass the endpoint params -- run_page_layers uses
@@ -1161,6 +1173,14 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
         # the counter stayed silently at zero until the unit test caught it.
         try:
             _d = getattr(finding, "data", None) or {}
+            if (_d.get("type") in ("reflected", "polyglot_reflection")
+                    and _d.get("severity") == "low"
+                    and dk_mod.is_data_only_media_type(
+                        _d.get("content_type") or "")):
+                # Sync parity (scanner._record): HTML markup reflected into
+                # JSON/plain text is data; the low finding is noise.  Script
+                # and XML media types are preserved (real JSONP/XML vectors).
+                return
             self.coverage.record_finding(_d.get("url") or "",
                                          _d.get("method") or "GET")
         except Exception:

@@ -13,7 +13,7 @@ from typing import AsyncIterator
 from urllib.parse import urlencode
 from .scanner import Finding, json_leaf_paths
 from .findings import (EVIDENCE_MODEL,
-                       EVIDENCE_NO_BROWSER, EVIDENCE_OOB, dom_dynamic_evidence)
+                       EVIDENCE_NO_BROWSER, EVIDENCE_OOB, dom_dynamic_finding)
 from .requester import CountingRequester
 from . import payloads as payloads_mod
 from . import reflection_profile as rp_mod   # Phase 37: reflection-profile parity
@@ -29,8 +29,8 @@ from . import transform as transform_mod  # Phase 166: concat-stamp retry
 from .budget import BudgetExhausted, CircuitOpen
 from .stealth import (marker as _stem_marker)
 from .async_scanner_common import (
-    _AsyncScannerShim, _JSONP_CALLBACK_NAMES, _body_kwargs, _log,
-    _non_html_grade, _polyglot_grade,
+    _AsyncScannerShim, _JSONP_CALLBACK_NAMES, _body_kwargs, _content_type,
+    _log, _non_html_grade, _polyglot_grade,
 )
 
 
@@ -44,8 +44,8 @@ class AsyncDetectionLayersMixin:
     def _touch_coverage(self, url, layer_id, method="GET", detail=""):
         """Phase 290: coverage touch that tolerates __new__-built scanners.
 
-        Several tests construct AsyncScanner via ``__new__`` (no init) and
-        drive a single layer; they have no tracker, and a bare
+        Several tests construct AsyncScanner via ``__new__`` (no __init__)
+        and drive a single layer; they have no tracker, and a bare
         ``self.coverage.touch_layer`` raised AttributeError inside the
         layer (measured: 3 async tests failed).  Same getattr discipline
         the rest of the code uses for those test doubles.
@@ -132,12 +132,13 @@ class AsyncDetectionLayersMixin:
                     # block has an attribute reflection context
                     # AND a script-block sink.
                     context=context,
-                    sink_context=v.get("context").get("context"),
+                    sink_context=v.get("context"),
                     payload=enc,
                     severity=_non_html_grade(resp_headers)[0],
                     evidence=text[max(0, idx - 30):idx + len(marker) + 30],
                     type="reflected",
                     confidence=_non_html_grade(resp_headers)[1],
+                    content_type=_content_type(resp_headers),
                     transform=[f"pre_encode:{struct}"],
                     param_in="body" if is_body else "query",
                     evidence_class=EVIDENCE_MODEL,
@@ -161,7 +162,9 @@ class AsyncDetectionLayersMixin:
 
     async def _scan_dom_async(self, url: str, page_text: str,
                               method: str = "GET",
-                              params: dict | None = None
+                              params: dict | None = None,
+                              redirect_landing: bool = False,
+                              no_script_exec: bool = False
                               ) -> AsyncIterator[Finding]:
         """L3 static + L6 real-browser DOM layer -- sync _scan_dom parity.
 
@@ -188,8 +191,27 @@ class AsyncDetectionLayersMixin:
         self._touch_coverage(url, "L6_dom_dynamic", method)
         try:
             from . import dom as dom_mod
-            static_results = await asyncio.to_thread(
-                dom_mod.analyze, page_text, is_html=True)
+            if redirect_landing or no_script_exec:
+                # Sync parity (scanner_layers._scan_dom): the page hints
+                # describe a different resource when a redirect dropped the
+                # injected parameters, and no JS-dependent hint is supportable
+                # when the CSP blocks every script route.  Dynamic delivery
+                # still runs below.
+                static_results = []
+                _why = ("redirect landing page dropped the injected parameters"
+                        if redirect_landing else
+                        "CSP blocks every script route on this page")
+                _cov = getattr(self, "coverage", None)
+                if _cov is not None:
+                    _cov.record_layer(url, "L3_dom_static", method,
+                                      status="skipped", detail=_why)
+            else:
+                static_results = await asyncio.to_thread(
+                    dom_mod.analyze, page_text, is_html=True)
+                # Sync parity: low static hints (no-source inventories,
+                # URL-property loads) are not emitted as findings.
+                static_results = [r for r in static_results
+                                  if r.get("confidence") != "low"]
             engine = await asyncio.to_thread(self._resolve_dom_engine)
             dyn_findings: list = []
             # Phase 154 (sync parity, scanner_layers.py): page_has_client_js
@@ -244,15 +266,13 @@ class AsyncDetectionLayersMixin:
                     evidence_class=EVIDENCE_NO_BROWSER,
                 )
             for d in dyn_findings:
-                # Phase 260: same emit contract as sync's _scan_dom, from the
-                # same one definition (findings.dom_dynamic_evidence).  This
-                # site used to pass the engine's raw row confidence through
-                # while hard-coding browser-executed + a confirmed "fired"
-                # headless dict -- so a row the browser never showed executing
-                # still claimed browser evidence, and the two engines emitted
-                # different findings from byte-identical engine rows (measured
-                # by the parity gate on three DOM endpoints).
-                _ev = dom_dynamic_evidence(d)
+                # Phase 265: same class chooser as sync's _scan_dom
+                # (findings.dom_dynamic_finding).  Execution observed ->
+                # dom_dynamic/high; delivery only -> dom_sink_reachability/low
+                # with no proof.  Keeping the old high/proof shape here would
+                # re-create the range6 false positive and the sync/async
+                # parity split.
+                _emit = dom_dynamic_finding(d)
                 yield Finding(
                     url=url, method="GET",
                     # Phase 213: delivered key (``q`` / ``q@hash`` /
@@ -260,13 +280,13 @@ class AsyncDetectionLayersMixin:
                     param=d.get("param"),
                     context=d.get("sink"),
                     payload=d.get("snippet", ""),
-                    severity="high",
-                    confidence=_ev["confidence"],
-                    detail=_ev["detail"],
-                    type="dom_dynamic",
-                    headless=_ev["headless"],
-                    proof=d.get("snippet", ""),
-                    evidence_class=_ev["evidence_class"],
+                    severity=_emit["severity"],
+                    confidence=_emit["confidence"],
+                    detail=_emit["detail"],
+                    type=_emit["type"],
+                    headless=_emit["headless"],
+                    proof=_emit["proof"],
+                    evidence_class=_emit["evidence_class"],
                 )
         except Exception as e:
             _log.warning("async DOM layer error: %s", e, exc_info=self.verbose)
@@ -1200,12 +1220,13 @@ class AsyncDetectionLayersMixin:
         yield Finding(
             url=url, method=method, param=param,
             context=context,
-            sink_context=_nv.get("context").get("context"),
+            sink_context=_nv.get("context"),
             payload=_npay,
             severity=_non_html_grade(resp_headers)[0],
             evidence=_ntext[max(0, _idx - 30):_idx + len(_ntok) + 30],
             type="reflected",
             confidence=_non_html_grade(resp_headers)[1],
+            content_type=_content_type(resp_headers),
             transform=["csp_nonce"],
             param_in="body" if is_body else "query",
             evidence_class=EVIDENCE_MODEL,
@@ -1304,13 +1325,14 @@ class AsyncDetectionLayersMixin:
             yield Finding(
                 url=url, method=method, param=param,
                 context=context,
-                sink_context=_gv.get("context").get("context"),
+                sink_context=_gv.get("context"),
                 payload=_gpay,
                 severity=_non_html_grade(_ghdrs)[0],
                 evidence=_gtext[max(0, _gidx - 30):
                                 _gidx + len(_gtok) + 30],
                 type="reflected",
                 confidence=_non_html_grade(_ghdrs)[1],
+                content_type=_content_type(_ghdrs),
                 transform=["csp_gadget"],
                 param_in="body" if is_body else "query",
                 evidence_class=EVIDENCE_MODEL,
@@ -1384,7 +1406,7 @@ class AsyncDetectionLayersMixin:
             yield Finding(
                 url=url, method=method, param=param,
                 context=context,
-                sink_context=_hv.get("context").get("context"),
+                sink_context=_hv.get("context"),
                 payload=_hpay,
                 severity="high",
                 evidence=_htext[max(0, _hidx - 30):
@@ -1639,7 +1661,7 @@ class AsyncDetectionLayersMixin:
                     yield Finding(
                         url=url, method=method, param=param,
                         context=context,
-                        sink_context=v.get("context").get("context"),
+                        sink_context=v.get("context"),
                         payload=variant,
                         severity=_sev,
                         evidence=text[max(0, text.find(marker)-30):
@@ -1647,6 +1669,7 @@ class AsyncDetectionLayersMixin:
                         type=("polyglot_reflection" if _is_poly
                               else "reflected"),
                         confidence=_conf,
+                        content_type=_content_type(resp_headers),
                         transform=tchain,
                         # Phase 164 (sync parity, scanner._record): record
                         # WHERE the payload rode so the PoC replays the same
@@ -1723,7 +1746,7 @@ class AsyncDetectionLayersMixin:
                             yield Finding(
                                 url=url, method=method, param=param,
                                 context=context,
-                                sink_context=v.get("context").get("context"),
+                                sink_context=v.get("context"),
                                 payload=variant,
                                 severity=_sev,
                                 evidence=text[max(0, idx - 30):
@@ -1731,6 +1754,7 @@ class AsyncDetectionLayersMixin:
                                 type=("polyglot_reflection" if _is_poly
                                       else "reflected"),
                                 confidence=_conf,
+                                content_type=_content_type(resp_headers),
                                 transform=tchain,
                                 param_in="body" if is_body else "query",
                                 evidence_class=EVIDENCE_MODEL,
@@ -1776,12 +1800,13 @@ class AsyncDetectionLayersMixin:
                     yield Finding(
                         url=url, method=method, param=param,
                         context=context,
-                        sink_context=v.get("context").get("context"),
+                        sink_context=v.get("context"),
                         payload=marked,
                         severity=_non_html_grade(resp_headers)[0],
                         evidence=text[max(0, idx - 30):idx + len(marker) + 30],
                         type="reflected",
                         confidence=_non_html_grade(resp_headers)[1],
+                        content_type=_content_type(resp_headers),
                         transform=["position_shift"],
                         # Phase 164: the shift re-fires the parameter into the
                         # OTHER location, so the carrier here is the FLIPPED
@@ -1840,13 +1865,14 @@ class AsyncDetectionLayersMixin:
                         yield Finding(
                             url=url, method=method, param=param,
                             context=context,
-                            sink_context=v.get("context").get("context"),
+                            sink_context=v.get("context"),
                             payload=variant,
                             severity=_non_html_grade(resp_headers)[0],
                             evidence=text[max(0, idx - 30):
                                           idx + len(marker) + 30],
                             type="reflected",
                             confidence=_non_html_grade(resp_headers)[1],
+                            content_type=_content_type(resp_headers),
                             transform=tchain,
                             param_in="body" if is_body else "query",
                             evidence_class=EVIDENCE_MODEL,

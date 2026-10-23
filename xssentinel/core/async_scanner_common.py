@@ -126,6 +126,16 @@ def _egress_cookie_jar_cls() -> type:
 
         _EGRESS_JAR = _EgressCookieJar
     return _EGRESS_JAR
+def _content_type(resp_headers) -> str:
+    """The response's Content-Type as sent (empty when unavailable)."""
+    try:
+        hdrs = resp_headers or {}
+        return (hdrs.get("Content-Type")
+                or hdrs.get("content-type") or "")
+    except Exception:
+        return ""
+
+
 def _non_html_grade(resp_headers) -> tuple[str, str]:
     """Phase 32 parity (scanner._record), Phase 179: markup reflected into a
     non-HTML response cannot execute in a browser tab -- keep the finding,

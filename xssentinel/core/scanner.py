@@ -37,6 +37,7 @@ from . import dom_clobber as clobber_mod  # noqa: F401  (Mixin 运行时引用:s
 from . import template as tpl_mod  # noqa: F401  (Mixin 运行时引用:scanner 由 Mixin 组合,静态分析看不见)
 from . import jsonp as jsonp_mod  # noqa: F401  (Mixin 运行时引用:scanner 由 Mixin 组合,静态分析看不见)
 from . import csp as csp_mod
+from . import document_kind as dk_mod
 from . import polyglot as poly_mod  # noqa: F401  (Mixin 运行时引用:scanner 由 Mixin 组合,静态分析看不见)
 from . import bypass as bypass_mod
 # Phase 13: advanced payload engineering.
@@ -1709,6 +1710,16 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
             severity = "low"
             detail = (detail + " (non-HTML content-type '%s')"
                       % ctype.split(";")[0].strip())
+            # Data-only media types (JSON / plain text) never render markup
+            # in a browser tab.  A low finding there is noise: the XSSMaze
+            # controls bugbounty-level10 / json-level2/3 / realworld-level6
+            # were exactly this.  Script and XML media types are NOT
+            # suppressed (callback-level1 and ctype-level1 are real).
+            if (ftype == "reflected"
+                    and dk_mod.is_data_only_media_type(ctype)):
+                _log.debug("suppressing low reflection in data-only %s: %s",
+                           ctype.split(";")[0].strip(), url)
+                return None
         evidence, confidence, detail = _grade_evidence(headless, confidence,
                                                       detail)
         # Phase 188: kxss-style meta-char triage, when this param was
