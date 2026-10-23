@@ -530,6 +530,13 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
                 # FINAL yield -- after any in-place evidence mutation, so a
                 # finding is capped on its last word, not its first.
                 cap_unverified_severity(f.data)
+                # Sync parity: data-only low reflections/polyglots are noise
+                # (scanner._record suppresses them).  The main scan generator
+                # does not go through _add_finding, so the filter lives here
+                # too; measured by the parity gate: sync=[] vs async=[low
+                # reflected] on /r/jsonct01.
+                if self._is_data_only_low(f.data):
+                    continue
                 yield f
             return
         try:
@@ -537,6 +544,8 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
             async for f in self._scan_raw(url, method, params, data):
                 f = await self._headless_verify_finding(f, seen)
                 cap_unverified_severity(f.data)
+                if self._is_data_only_low(f.data):
+                    continue
                 yield f
         finally:
             # The pool outlives individual findings; release the worker
@@ -1163,6 +1172,14 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
 
         return variants
 
+    @staticmethod
+    def _is_data_only_low(data: dict) -> bool:
+        """Low reflection/polyglot in a data-only media type -- never emitted."""
+        return (data.get("type") in ("reflected", "polyglot_reflection")
+                and data.get("severity") == "low"
+                and dk_mod.is_data_only_media_type(
+                    data.get("content_type") or ""))
+
     async def _add_finding(self, finding: Finding) -> None:
         """Thread-safe append to the findings list."""
         # Phase 290: every finding flows through here (page tasks, crawl,
@@ -1173,10 +1190,7 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
         # the counter stayed silently at zero until the unit test caught it.
         try:
             _d = getattr(finding, "data", None) or {}
-            if (_d.get("type") in ("reflected", "polyglot_reflection")
-                    and _d.get("severity") == "low"
-                    and dk_mod.is_data_only_media_type(
-                        _d.get("content_type") or "")):
+            if self._is_data_only_low(_d):
                 # Sync parity (scanner._record): HTML markup reflected into
                 # JSON/plain text is data; the low finding is noise.  Script
                 # and XML media types are preserved (real JSONP/XML vectors).

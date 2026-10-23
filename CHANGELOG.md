@@ -153,8 +153,23 @@
   **静默假成功**,比看得见的漏报更糟 ⇒ **故意不做这个兜底**,失败就报失败。
   能力本身留着(可重复点击是通用形状),测试 `tests/test_stored_view_click.py` 5 例。
 
-- **同一靶场的召回账:9 条 XSS 挑战,当前可复现 4 条 + 1 条曾确认但已不可复现(Phase 270/275/276/278,283 后复核)**:
+- **同一靶场的召回账:9 条 XSS 挑战,当前可复现 5 条 + 1 条曾确认但已不可复现(Phase 270/275/276/278/285,283 后复核)**:
   上游 `data/static/challenges.yml` 共 **9 条 XSS**,逐条对照(不把"没测"算成"没漏"):
+
+- **Phase 285:第 8 条(CSP Bypass)确认,根因是语料缺口**:`usernameXssChallenge` 的机制是
+  用户名经**自家 RegEx 净化**后由 Pug 旧页 `/profile` 渲染,而该页的 **CSP 由
+  `user.profileImage` 拼出来**(`img-src 'self' ${profileImage}; script-src …`)⇒ 可 CSP 注入。
+  手工对照实测:`<script>alert('…')</script>` 被剥(或不执行),**`<<a|ascript>alert(…)</script>`
+  实弹**(`dialogs ['xssv_c8b']`)。查语料:**没有这个形状** ⇒ 不是能力缺口是语料缺口。
+  在 `data/payloads.json` 补 1 条(最小插入:1 增 0 删),置于 html_element 首位以进入
+  `scan_stored_dom` 的探测面。补后扫描器实测:
+  `stored_dom high/medium`、载荷 `<<a|ascript>alert('xssv_ab7ee4e3')</script>`、
+  **sinks `dialog`**、`headless.fired` ⇒ 真执行证据(不是 sink 到达)。
+  confidence 是 medium 而非 high:注入面 == 视图面(`/profile` 自视图),按既有口径
+  "未证明对其他访客渲染"降级——这是对的,不是漏判。
+  前置条件记清楚:该页 CSP 需先用 `POST /profile/image/url`(urlencoded)
+  注入 `imageUrl=*; script-src 'unsafe-inline'`;写入用 `POST /profile` 且**要 cookie 认证**
+  (`-b token=…`),`PUT /api/Users/:id` 是 `denyAll`(恒 401)。
 
   | # | 挑战 | 面 | 状态 |
   |---|---|---|---|
@@ -165,13 +180,13 @@
   | 5 | API-only XSS | `PUT /api/Products/:id` → 产品详情对话框 | **仍未确认(Phase 283)**:URL 探针已关闭，假命中消失；余下的阻塞是该页 consent 遮罩拦住点击（对话框打不开）——属于目标交互，非检测能力 |
   | 6 | Client-side XSS Protection | 注册用户 → 后台用户列表 | **已确认(Phase 276 → 280 升级)**:`POST /api/Users` 的 email 原样落库;Phase 280 探测修复后扫描器自己的载荷 `<img src=x onerror=alert('xssv_…')>` 在管理员页**实弹**(独立 Chromium `dialogs ['xssv_fc4e81fa']`),不再是“只到 sink” |
   | 7 | Server-side XSS Protection | Customer Feedback 评论 | **❌ 不可复现(Phase 283/284 复核)**:写入成功(API 里 33 条含 marker),但管理员 feedback 表只渲染 **≤10 行且 "Next page" 禁用** ⇒ 我们的行**从未进入 DOM**;翻页与点同意都无效(同意按钮点击超时)。Phase 275 那条命中**高度可能是 URL 探针贡献**(Phase 283 已关闭该行为) |
-  | 8 | CSP Bypass | 自家 RegEx 过滤的旧页面 | **够不着**:需登录 + CSP 注入载荷 |
+  | 8 | CSP Bypass | `/profile` 旧页(RegEx 净化 + CSP 由 profileImage 拼出) | **已确认(Phase 285)**:补语料后扫描器自载荷 `<<a|ascript>alert('xssv_…')</script>` 实弹(sinks `dialog`、`fired`);需 cookie 认证 + 先做 CSP 注入两步 |
   | 9 | HTTP-Header XSS | `True-Client-IP` → 最后登录 IP | **已确认(Phase 278 → 280 升级)**:`--stored-header` + `--stored-relogin` 写入后,Phase 280 让扫描器自己的载荷 `<svg/onload=alert('xssv_…')>` 在最后登录 IP 页**实弹**(独立 Chromium `dialogs ['xssv_45f68b71']`);此前(Phase 278)它只到 sink |
 
   准确读法:矩阵证明的是**精度与交付链路**(0 条非预期 finding);**当前可复现的召回是
-  4/9**(#1/#2/#6/#9),#7 已落到"不可复现:该视图不渲染扫描器写入的行"(见该行)。
-  剩余 5 条里 #5 是被目标交互挡住(consent 遮罩),#8 需登录 + CSP 载荷,
-  #4 依赖另一条上传链,#3 是同 sink 的载荷变体 —— 都不是检测层漏报。
+  5/9**(#1/#2/#6/#8/#9),#7 已落到"不可复现:该视图不渲染扫描器写入的行"(见该行)。
+  剩余 4 条里 #5 是被目标交互挡住(consent 遮罩),#4 依赖另一条上传链,
+  #3 是同 sink 的载荷变体,#7 属目标视图不渲染 —— 都不是检测层漏报。
   #6/#9 在 Phase 280 后已由扫描器自己的载荷**实弹**(独立 Chromium dialog 复现),
   不再是"sink 到达"级别。
   **⚠️ 已确认的行要周期性重测**:#7 这次就是 Phase 283 关掉 URL 探针后复核出来的——
@@ -797,6 +812,69 @@
   (含变异对照)持续守护这条边界。
 
 - **[开放] 真实靶场上浏览器爬取宽度不稳定**(实测同命令 18 / 22 / 70 / 70 / 70 / 74 端点)。
+
+## [1.2.0] - 2026-10-23
+
+外部靶场 XSSMaze v0.3.0 全量验证后的修复与发布收口。控制例假阳性从 13 降到 0,
+双引擎在 194 例内部矩阵与第三方官方 scorecard 上均为 FP0。
+
+### Fixed
+
+- **补回 wipe 丢失的 `setHTMLUnsafe` sink 覆盖**:2026-10-16 加入但从未提交的
+  `Element/ShadowRoot.setHTMLUnsafe` 与 `Document.parseHTMLUnsafe` 仪器在
+  2026-10 工作区 wipe 后消失,client 群 `htmlunsafe-level1/5` 变为 0 findings。
+  恢复后六级全部拿到 browser-executed 证据,client 群回到 TP24/FN0。
+- **redirect landing 门**:302 落到另一路径且丢掉注入参数时,页面级静态提示
+  (framework/Trusted Types/WebSocket/静态 DOM)不再归属被扫 URL。4 条
+  redirect 控制例各 6 findings → 0;保留 query 的跳转不受影响。
+- **CSP no-execution 门**:当强制 CSP 封死页面实际携带的全部脚本路由
+  (无外链脚本、无 nonce/hash、无 bypass)时,mutation/DOM-clobber/静态 DOM/
+  页面 hint 不再发射。3 条 CSP 控制例 3/3/8 → 0;`pos-csp-01/02` 与
+  `neg-csp-*` 行为不变。
+- **模板 SSTI 的 nonce 碰撞**:渲染值必须是独立 token(十六进制边界),随机
+  nonce 里的 `49` 不再骗过差分产生 critical 假阳性。10 次重复扫描零
+  template finding,12 条模板类阳性全部保留。
+- **URL 属性 hint 标签感知**:`iframe/frame/embed/object` 的 `.src` 保留
+  medium(真阳性 `dom-level18`),`img/media` 与无页面上下文的 JS 降为 low
+  (`dom-level10` 控制例)。此前的无差别降档曾把 dom18 打成确定性 FN。
+- **低噪声抑制**:数据型媒体(`application/json`、`text/plain`、`+json`)上的
+  低档反射/polyglot 与 low 静态 DOM hint 不再发射;`application/javascript`
+  (JSONP)与 `text/xml` 保留——`callback-level1` 与 `ctype-level1` 是仅靠
+  low 反射成立的真阳性。`pos-jsonct-01` 更名 `neg-jsonct-raw-01`(safe),
+  Phase 176g 的“保留 low 报告”契约被本版本取代;parity gate 的 incident-2
+  变异仍可复现(sync 静默 / async 强制 high)。
+
+### Added
+
+- `core/page_relevance.py`(redirect landing 判定)、
+  `csp.script_execution_blocked()`、`document_kind.is_data_only_media_type()`、
+  `dom` 的 id→tag URL 属性分级。
+- `tests/test_htmlunsafe_sinks.py`、`test_redirect_landing_gate.py`、
+  `test_csp_no_exec_gate.py`、`test_url_property_sink_hint.py`、
+  `test_low_noise_suppression.py`。
+
+### Verified
+
+- XSSMaze v0.3.0(官方 runner,ground truth 来自靶自身):client
+  **TP24/FN0/FP0**(P/R/F1 1.000,418s),server **TP918/FN95/FP0**
+  (P 1.000 / R 0.906 / F1 0.951,4195s);27 条控制例 **0 FP**。
+  口径:对照例上的任何 finding 记 FP,population 上的 low finding 也计检出。
+- 内部 194 例矩阵双引擎 **F1=1.000**:sync TP113/FP0/TN81/FN0/ERR0(858s),
+  async TP107/FP0/TN75/FN0/ERR0(756s);async SKIP12 为 manifest 声明的
+  sync-only(stored/upload/second-order/scenario)。
+- 全量文件级套件 **229/229 绿(4787s,failures none)**;14 例/6 文件跳过,
+  其中 opt-in 的 stored E2E(3 passed)与 DOM live(单跑通过)已显式复跑,
+  `benchmark_fp` 单跑 94 passed。
+- range4/5/6 双引擎门禁全绿(range4 TP2/FP0/TN2/FN0、range5 与 range6
+  TP1/FP0/TN1/FN0);range6 首跑在起靶健康检查处读超时,重试绿。
+- 全仓 `ruff check .` 通过;`python -m build --wheel` 与 CLI 烟测通过。
+
+### Known limitations
+
+- server 95 条 FN:query 能力缺口 + 官方 runner 只给 URL 的 body/header/path
+  投递契约形状;`stream-level1` 有一次 100s wrapper 超时。
+- Phase 218 证据帽在非 CSP 页仍按 `proof/evidence` 豁免;TT 层对 `.src`
+  有一次未复现的 medium 抖动;polyglot 确认存在运行间摆动(server TP 919/921/918)。
 
 ## [1.1.0] - 2026-10-09
 

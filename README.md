@@ -1,6 +1,6 @@
 # XSSentinel — 综合型 XSS 检测框架
 
-![CI](https://github.com/feixingxuerong123/xss/actions/workflows/ci.yml/badge.svg)
+![CI](https://github.com/feixingxuerong123/xssentinel/actions/workflows/ci.yml/badge.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![Python](https://img.shields.io/badge/python-3.9%2B-blue)
 
@@ -31,7 +31,7 @@ XSSentinel 的目标是**在开源/自研工具中做到检测维度最全、架
 - **WAF 自适应绕过**：检测到拦截后，自动套用 **23 种**变形/编码家族（混合大小写、HTML/JS/CSS/UTF-7 实体、注释打断、空字节、全角、构造器逃逸、重复属性等）生成绕过变体；数量以 `core/transform.py` 的 `REGISTRY` 为准，新增变形只改 REGISTRY 即可。
 - **DOM XSS 静态污点分析**：不依赖服务器响应，直接分析前端 JS 的 source→sink 流（如 `location.hash` → `innerHTML`、jQuery `.html()`、`postMessage` 事件、`dangerouslySetInnerHTML`、`v-html`、`{{ }}` 等）。
 - **JS AST 数据流分析（Phase 43）**：esprima ESTree 解析每个 `<script>` 块，跟踪污点变量跨声明/赋值/拼接的多跳传播（含压缩混淆代码与 postMessage 回调函数体），产出带 `[AST]` 标记的高置信 source→sink 链（DalFox v3 式）；解析失败透明回退正则通道（`pip install xssentinel[ast]` 启用，缺失时自动降级）。
-- **DOM XSS 真·浏览器执行确认（L6 强化）**：在真实无头浏览器（Playwright）里给危险 sink 插桩——`innerHTML`/`outerHTML`/`document.write`/`Function`/`setTimeout`/`location.*`/`window.open`/`setAttribute(on*)`/jQuery `.html()` 等，并把唯一标记注入 `location.hash`/`location.search`/`document.cookie`/`postMessage` 等可控源。**标记一旦真正流入 sink，即判定为已确认（high）DOM XSS**——这是猜测式静态分析无法给出的硬证据（静态命中仅作为 medium/low 提示）。Playwright 不可用时优雅降级为静态启发式，不影响其他层。
+- **DOM XSS 真·浏览器执行确认（L6 强化）**：在真实无头浏览器（Playwright）里给危险 sink 插桩——`innerHTML`/`outerHTML`/`document.write`/`Function`/`setTimeout`/`location.*`/`window.open`/`setAttribute(on*)`/jQuery `.html()` 等，并把唯一标记注入 `location.hash`/`location.search`/`document.cookie`/`postMessage` 等可控源。**只有页面自己在真实浏览器里执行了载体（弹窗携带本次探针的 token）才判定为已确认（high）`dom_dynamic`**；数据到达 sink 但没有观测到执行时，单独记为 `dom_sink_reachability`（low，投递线索，**不是已确认 XSS**，也不生成可执行 PoC）。这样净化器正确使用的页面（如当前版 DOMPurify + innerHTML）不会被报成高危；range6 的双引擎门禁同时验证 2.0.7 真执行 / 3.4.17 静默。Playwright 不可用时优雅降级为静态启发式，不影响其他层。
 - **DOM 重建链（Phase 185）**：覆盖 `DOMParser.parseFromString` → `importNode` / `adoptNode` / `cloneNode` → `appendChild` / `insertBefore` / `replaceChild` / `append` / `prepend` / `after` / `before` / `replaceWith` 这条「解析后重建 DOM 再插入」的链路——真实世界绕过 DOMPurify 类净化的主流写法。判定走**污点传播 + 插入时复查节点当下是否仍含标记**：净化器若已把 onerror 摘掉，插入时就不会命中；插入纯文本节点也**不算**命中（`benchmark/sink_execution.py` 实测它根本不执行）。
 - **存储型 XSS**：注入后重新拉取"展示页"确认持久化执行（多数开源工具不做）。
 - **盲打 XSS（OOB）自动确认**：注入带唯一 token 的带外回调 payload，再轮询回调监听服务——**收到 beacon 即判定为已确认（high）盲打**，而非只"撒网不收网"。支持自托管监听器（`--oob self`，离线可测）与公共 interactsh（`--oob interactsh`，真实场景）。
@@ -420,10 +420,13 @@ xssentinel-desktop                 # 或: python -m xssentinel.desktop
 
 | 能力 | 说明 |
 |---|---|
-| 新建扫描 | URL / 方法 / 参数 / POST 体 / 请求头 / Cookie / DOM 引擎 / 线程 / 爬取 / 浏览器确认 |
-| 任务管理 | 列表 + 4 秒轮询、取消、删除 |
-| 发现查看 | 类型 / 严重度 / 置信 / 参数 / 上下文 / 说明，按 high-medium-low 汇总 |
-| 报告 | HTML / JSON / SARIF / CSV / JUnit / Markdown 六格式，可新窗打开或下载 |
+| 新建扫描 | URL / 方法 / 参数 / POST 体 / 请求头 / Cookie / DOM 引擎；快速-标准-深度预算预设；超时、限速、线程、爬取深度、Scope、代理、TLS 校验、自定义载荷 |
+| 任务管理 | 实时/空闲自适应轮询、状态筛选与搜索、取消、删除、批量清理已结束任务、实时请求数/发现数 |
+| 发现查看 | 严重度 + **证据类**（浏览器已执行 / OOB / 浏览器未复现 / 未用浏览器 / 语义确认）筛选、类型/文本过滤、分页、逐条展开；`dom_dynamic` 未观测执行时显式标注“投递证据”，不按已执行读 |
+| PoC 操作 | 展开后可复制载荷、复制 curl、复制 PoC URL、在浏览器打开；报告页可一键打开或下载 |
+| 报告 | HTML / JSON / SARIF / CSV / JUnit / Markdown 六格式 |
+| 界面 | 明暗双主题（跟随系统，可切换）、响应式布局、键盘快捷键（Ctrl/⌘+Enter 开始、`/` 搜索）、页面响应带 CSP/X-Frame-Options/nosniff |
+| API 密钥 | 右上角「密钥」弹层填入，仅存本标签页 `sessionStorage`；带密钥时报告走 fetch + blob 打开 |
 
 **窗口后端按可用性递降**，三者都不需要额外服务：
 
@@ -437,6 +440,9 @@ xssentinel-desktop                 # 或: python -m xssentinel.desktop
 `--host 0.0.0.0` 直接拒绝并提示改用 `xssentinel --serve`；端口默认 `0`（自动分配），
 不会与已有的 `--serve` 部署冲突。控制台页面与 API 同源——这正是 API 的
 same-origin 门（Phase 70）所要求的，`file://` 页面会被所有变更类调用拒绝。
+控制台响应另带 `Content-Security-Policy`、`X-Frame-Options: DENY`、
+`X-Content-Type-Options: nosniff`、`Referrer-Policy: no-referrer` 与
+`Cache-Control: no-store`，避免把扫描结果页变成可嵌入/可嗅探的载体。
 
 其他用法：
 
@@ -562,17 +568,40 @@ python tests/passive_demo.py         # 产出 tests/passive_demo_report.html
 
 （那 1 例 SKIP 是 `engines:["sync"]` 声明的存储型负样本，异步不实现，记 SKIP 不记通过。切片大小与文档口径的一致性由 `tests/test_quick_gate_slice.py` 6 例锁定，其中一条断言"CI / CONTRIBUTING / OPTIMIZATION 里写的切片数字 == 代码实际产生的数字"——本次修的就是这类数字烂掉后没人发现。）
 
-**当前基线（192 用例矩阵，两引擎同一口径）**：`benchmark/run_benchmark_batched.py`，默认预算 10/6/90；结果 `benchmark/results/benchmark_20260924_022744.json`（sync）与 `benchmark/results/benchmark_20260925_asyncfix.json`（async，含 Phase 177 主循环 concat 重试补齐）。**双引擎在各自计分口径内均为 recall 1.000 / precision 1.000 / FPR 0**——此前 async 的 6 条 FN 已归零。async 的 10 例 SKIP 是 manifest 声明 `engines:["sync"]` 的存储型 / 二阶链路，异步不实现，**记 SKIP 而不是记通过或记漏报**，故分母是 182 而非 192：
+**当前基线（Phase 304，194 用例矩阵，双引擎同一口径 14/12/90）**：用
+`benchmark/runner.py --strict-gate` 跑全量并入库：
 
-| 引擎 | 用例 | 计分 | TP | FP | TN | FN | ERROR | recall | precision | FPR | 墙钟 |
-|------|------|------|----|----|----|----|-------|--------|-----------|-----|------|
-| sync | 192 | 192 | 113 | 0 | 79 | 0 | **0** | 1.000 | 1.000 | 0.000 | 1214s |
-| async | 192 | 182 | 108 | 0 | 74 | **0** | **0** | 1.000 | 1.000 | 0.000 | 未记录 |
+| 引擎 | 用例 | 计分 | TP | FP | TN | FN | ERROR | SKIP | recall | precision | 墙钟 | 产物 |
+|------|------|------|----|----|----|----|-------|------|--------|-----------|------|------|
+| sync | 194 | 194 | 113 | 0 | 81 | 0 | 0 | 0 | 1.000 | 1.000 | 858.36s | `benchmark/results/xssmaze_tagaware_20261023_sync.json` |
+| async | 194 | 182 | 107 | 0 | 75 | 0 | 0 | 12 | 1.000 | 1.000 | 756.0s | `benchmark/results/xssmaze_tagaware_20261023_async.json` |
 
-（async 那格留空的原因：`benchmark_20260925_asyncfix.json` 只记录逐例 `scan_time_s`（累计 1719s，含 FN 重试），与 sync 的墙钟口径不可直接比较。**宁可空着，也不填一个看着能比的数字**。）
+async 的 12 个 SKIP = stored 6 + upload 2 + second-order 2 + scenario 2，manifest
+声明 `engines:["sync"]`；**SKIP 不是通过，也不是漏报**。194 例中
+`pos-jsonct-01` 已按 1.2.0 契约更名为 `neg-jsonct-raw-01`（safe，断言静默）。
+Phase 265 的 192 例/10 SKIP 是历史口径，其靶场修复说明仍适用于当前树。
+Phase 265 同时修正了三页 hash→DOM 靶场：Chromium 会把 fragment 里的 `<` 编码成
+`%3C`，旧页面没有 decode，ground truth 已陈旧；修复后用真 Chromium 验证三页各
+弹一次 `alert(777)`，正例回到 TP。修复前的 sync 全量是
+`p265_full_sync_prefix.json`（FN3，恰好就是这三页）；修复前的 async 是
+`p265_full_async_noskip.json`（FN2，so2/scn 未声明 sync-only）。
 
-- **sync 192/192 全部计分**（`scored=192`、`errors=0`、产物里新增 `engine` /
-  `retried_cases` 字段）；async 是 `scored=186 / skipped=6`——那 6 例
+**外部效度（XSSMaze v0.3.0，2026-10-23 终态）**：第三方靶自带 official runner，
+ground truth 来自靶自身的 `/map/json`；口径是“对照例上的任何 finding 记 FP，
+population 上的 low finding 也计检出”。同一棵树的官方 scorecard：
+
+| 群体 | TP | FN | FP | P | R | F1 |
+|---|---|---|---|---|---|---|
+| client（`--reach client --headless`） | 24 | 0 | **0** | 100% | 100% | **1.000** |
+| server（`--reach server`） | 918 | 95 | **0** | 100% | 90.6% | **0.951** |
+
+27 条控制例 **0 findings**（本轮起点 13 条）。server 的 95 条 FN 中，主体是
+query 能力缺口；body/header/path 约 35 条是官方 runner 只给 URL 的投递契约形状。
+逐例账、失败归因与复跑命令在 `dev/_xssmaze/`（dev 目录不入库）。
+
+- **历史口径（Phase 176t；当前 Phase 265 为 sync 192/192、async 182/10，见上表）**：
+  sync 192/192 全部计分（`scored=192`、`errors=0`、产物里新增 `engine` /
+  `retried_cases` 字段）；当时 async 是 `scored=186 / skipped=6`——那 6 例
   （`pos/neg-stored-01..03`）在 manifest 里声明 `engines:["sync"]`，异步引擎不实现
   存储型链路，**记 SKIP 而不是记通过或记漏报**。Phase 176t 之后这一类又加 4 例
   （`pos/neg-so2-01`、`pos/neg-scn-01`）：它们靠 `--second-order-inject` /

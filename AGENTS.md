@@ -3270,3 +3270,238 @@ localStorage——凭据不该活得比填它的那个标签页更久),由 `auth
   `authHeaders()` 只在有密钥时多出 `X-API-Key`(无密钥时不发空头);
 - 回归:桌面 + API 三文件 **150 passed**(74s)。
 - **未动判定语义**(只动 UI 与 CLI 提示文字)⇒ 按约定不需要跑全量 192 门。
+
+## Phase 264:桌面控制台 UI 重做 —— 主题/预设/证据分级/分页/PoC 操作 + 控制台 e2e
+
+Phase 260–263 的控制台是“能用”的最小面；本轮把它做成可日常操作的交付面，
+**不改检测判定**，也不新增外部依赖。控制台仍然是一个进程、一个窗口、同源单页。
+
+### UI
+
+- **明暗双主题**：跟随 `prefers-color-scheme`，可手动切换；主题偏好存
+  `sessionStorage`，刷新不闪白。API key 仍只存 `sessionStorage`（沿用 Phase 263
+  的安全边界：不烘进 HTML、不改 session cookie）。
+- **扫描表单**：快速/标准/深度三档预算预设（8/4/12、14/12/15、28/24/25）；
+  高级区暴露 API 真实读取的字段：timeout、rate_limit、threads、crawl_depth、
+  max_payloads、max_transforms、scope、proxy、verify_ssl、crawl_engine、
+  custom_payloads。**只暴露后端认识的字段**；HAR/OpenAPI/存储型/盲打在页面里
+  明确指向 CLI，不做死控件。
+- **任务面**：状态筛选、目标/ID 搜索、批量清理已结束任务、实时请求数/发现数、
+  自适应轮询（进行中 1.2s / 空闲 4s / 隐藏页暂停）、新任务自动选中、`#scan=`
+  深链恢复。
+- **发现面**：严重度 + **证据类**筛选（浏览器已执行 / OOB / 浏览器未复现 /
+  未用浏览器 / 语义确认）、类型/文本过滤、分页（50/100/200）、逐条展开；
+  `dom_dynamic` 未观测执行时显式标注“投递证据：sink 可达，但未观测到执行”，
+  不把 `browser-refuted` 当已执行读。
+- **PoC 操作**：展开后复制载荷 / 复制 curl / 复制 PoC URL / 打开 URL；报告
+  打开与下载保留，带 API key 时报告仍走 fetch + blob。
+- **可访问性/响应式**：键盘快捷键（Ctrl/⌘+Enter 开始、`/` 聚焦搜索）、
+  `aria-live` toast、focus-visible、`prefers-reduced-motion`、窄屏单列与
+  表格横向滚动；覆盖率层列表加 34vh 滚动区，不再把页面拉成长条。
+- **安全头**：`GET /` 现在返回 CSP（`default-src 'self'`、
+  `frame-ancestors 'none'`、`object-src 'none'` 等）、`X-Frame-Options: DENY`、
+  `X-Content-Type-Options: nosniff`、`Referrer-Policy: no-referrer`、
+  `Cache-Control: no-store`。控制台持有密钥且渲染扫描结果，这几项是交付面
+  的一部分，已由测试钉住。
+
+### 测试与证据
+
+- `tests/test_desktop_shell.py` **29 passed**（25 → 29；新增主题、真实 API
+  选项、PoC 操作、无内联 handler、CSP 响应头）; 新增
+  `tests/test_desktop_ui_e2e.py` **1 passed in 7.9s**：真 Playwright 启动
+  控制台 + 独立 loopback 靶，UI 填 URL → 快速预设 → 启动 → 等 completed →
+  渲染 finding → 展开 → 复制 curl/URL → 证据筛选；并从
+  `/api/v1/scans/{id}` 回读 **options.max_payloads=8 / max_transforms=4 /
+  timeout=12**，证明预设不是装饰。
+- 相关回归批次：desktop/API/report/loopback 门禁 **217 passed in 80.6s**；
+  MCP/CLI/report **55 passed in 37.7s**；ruff 对改动 Python 零告警。
+- **真浏览器人工验收**：明暗主题、空态、扫描完成、发现展开、证据筛选、报告
+  弹窗、`--api-key` 模式下密钥弹层 → 扫描 → **blob 报告**、刷新后 key 仍在
+  sessionStorage；页面无 JS 错误、无横向溢出。截图留在 `dev/_ui_*.png`
+  （dev 忽略，不入库）。
+- **打包**：`python -m build --wheel` 确认
+  `xssentinel/desktop/ui/index.html` 进入 wheel（pyproject 的
+  `package-data` 已有 `desktop/ui/*.html`）；构建产物随后清理。
+- **quick strict 门禁本轮未验证**：在 18943 起 sync 64 例时，子扫描器在
+  `/s/bo01` 上挂起超过 10 分钟（父进程低 CPU、子进程不退出），与同机其它
+  会话的 pytest/loopback 负载同形；已终止并按“未验证”记账，未当作通过。
+  **本轮只动 UI/响应头，未动判定语义，因此没有跑全量 192 矩阵。**
+- 工作树仍有并发会话的未提交改动（`api/server.py` SSE 雏形、
+  `verify_fix.py` 等）；本轮只碰 desktop 页面、desktop app 与对应测试。
+- 一次合并重跑出现 1 个 `URLError`（API key 测试）+ 1 个 e2e skip（整轮 64s，
+  同机其它会话负载）；该 API key 测试**单跑 0.72s passed**，随后合并复跑
+  **30 passed in 10.1s**。按环境瞬态记账，不把它写成产品回归。
+- 带 key 的报告打开改成**点击时先同步开 blank tab、拿到 blob 后导航**：
+  旧实现是在 `fetch` 完成后才 `window.open`，真实浏览器可能按弹窗拦截；
+  新路径在真 Chromium 里验证 `blob:` + `XSSentinel Report`。
+
+## Phase 265:P0 收口——把"到达 DOM sink"和"浏览器执行"拆成两个 finding 类
+
+Phase 225 量出的 P0 是本项目最贵的实战误报：`executed=False` 的 DOM 行仍被两个
+引擎硬编码成 `dom_dynamic/high`，`proof` 放的是裸探针标记；range6 的 safe 孪生
+（DOMPurify 3.4.17 + `sanitize()->innerHTML`）因此在报告里是 high DOM XSS。
+
+### 设计
+
+- `findings.dom_dynamic_finding(d)` 是**唯一**选择 type/severity/proof 的地方：
+  - `executed=True` -> `dom_dynamic` / high / proof=sink 片段；
+  - `executed=False` -> **`dom_sink_reachability` / low / 无 proof**。
+- 后者是**独立 finding 类**，不是"降低严重度的 dom_dynamic"；它的语义是
+  "数据到达 sink，但浏览器没有观测到执行，不是 proof of absence"。
+- 两个引擎（sync/async）都只调这个函数；`dom_dynamic_evidence` 仍只陈述证据，
+  不携带 severity。
+- `poc.py` 对 `dom_sink_reachability` 返回空 PoC：没有观测到执行就不伪造
+  "可执行"载荷。
+- 消费面全部接上：SARIF `XSSENTINEL-DOM-SINK-REACHABILITY`、type_name、
+  interop name、`fix_advice.json`（132 条）、`compliance.json`（124 类）、
+  API `_VALID_TYPES`、桌面 UI 的“投递证据，不是已确认 XSS”标注。
+
+### range6：先绿，再发现正例掉了执行证据，再补 carrier
+
+第一次跑只用现有通用 carrier（html/js/url），结果**正例也只拿到 low
+reachability**——说明 DOMPurify 2.0.7 能穿透的是 range6 已实测的
+form/math/mglyph mXSS 形状，不是通用 `<img>`。range6 的 TP 当时由静态
+`sanitizer_vulnerable_version`/`sanitizer_output_to_innerhtml` 兜住，但
+"browser-executed" 证据丢了。
+
+把 range6 实测的 mXSS 形状加入 `_CARRIER_SHAPES` 后，复跑：
+
+```
+sync  pos: 2 high dom_dynamic + 4 low/medium static
+sync  neg: 4 low only (含 dom_sink_reachability)
+async pos: 2 high dom_dynamic + 4 low/medium static
+async neg: 4 low only
+=> TP1 FP0 TN1 FN0 ERR0（双引擎，exit 0）
+```
+
+即：**正例重新由页面自己的弹窗证明执行；safe 只落 low**。range6 门已挂进
+CI（`Range #6 sanitizer drill`，双引擎），`GATE_STATUS.md` 改为 GREEN。
+
+### 验证
+
+- 离线契约/报告/合规/PoC/复测/API：**243 passed in 56.7s**；
+  `tests/test_dom_dynamic_evidence.py` **23 passed**（新增类区分、无 PoC、
+  mXSS carrier 守卫、报告/建议/合规接线）。
+- 浏览器页层：`test_phase214/215` **10 passed in 367.6s**。
+- range6：双引擎 GREEN（上面的实测）。
+- parity DOM 切片：`TestEngineParityDOM::test_dom_slice_finding_sets_match`
+  **1 passed in 249.6s**（2026-10-19 02:18，detached 方式）。第一次运行被我
+  **误判后提前终止**（实际只跑了约 90 秒，py-spy 显示正常的 Playwright
+  greenlet 等待；不是已证实的 wedge）——教训同 Phase 201 续十：
+  **“观测到等待”不等于“已超过预算”**。
+- 全量 192 双引擎矩阵：第一次 detached 也在约 2 分钟时被同一误判终止；
+  第二次 02:19 启动（sync 18779 / async 18780），结果待回填；未完成前
+  不声称全量已绿。
+- README 已改掉旧的“标记流入 sink = 已确认 high”说法；OPTIMIZATION 3.6 第 7 项
+  标为已修。
+
+### 全量门抓到的第二个问题：三条 DOM 正例的靶场本身不可执行
+
+修复后的第一次 full sync（`p265_full_sync_prefix.json`，保留取证）：
+**FN=3，pos-dom-01 / pos-dom-04 / pos-dom-05**，其他 189 例零 FP/FN/ERR。
+原始报告显示三例都只有 low `dom_sink_reachability`。
+
+真 Chromium 测量（决定性）：
+```
+导航 #<img src=x onerror=alert(777)>
+location.hash  -> "#%3Cimg%20src=x%20onerror=alert(777)%3E"
+innerHTML      -> "%3Cimg..."（纯文本，无弹窗、无活元素）
+加 decodeURIComponent 后 -> dialogs ['777']，live img True
+```
+三页（`innerHTML = location.hash.slice(1)` / `document.write(...)` /
+jQuery `.html(...)`）**都直接切 hash、不 decode**，所以旧 high 完全是
+Phase 225 的自证 bug 掩盖的陈旧 ground truth；不是 P0 修复造成漏报。
+pos-dom-05 还依赖 `code.jquery.com`，离线环境里库根本不会到。
+
+修法在**靶场**，不在判定：
+- 三页改为 `decodeURIComponent(location.hash.slice(1))`；
+- pos-dom-05 改由 benchmark server 伺服仓库内的
+  `benchmark/vendor/jquery.min.js`（新增 `/vendor/jquery.min.js` 路由），
+  不再依赖 CDN；
+- manifest 三条 note 写明这一测量与修正；
+- `tests/test_benchmark_dom_fixture.py` **7 passed**：静态 decode 形状、
+  本地 vendor HTTP 资产、真 Chromium 三页各弹一次 `alert(777)`。
+
+复跑单例（`benchmark/repro_case.py`）：三例全部
+**TP / 1 finding（05 为 2 finding）/ dom_dynamic high / 10.0s / 52 请求**。
+
+靶场修正后的全量 sync（`benchmark/results/p265_full_sync.json`）：
+**TP113 FP0 TN79 FN0 ERR0，f1=1.000，718.17s**；
+pos-dom-01/04/05 分别为 TP（1/1/2 findings，均 52 请求）。
+
+### 全量门抓到的第三个问题：manifest 丢了 sync-only 声明
+
+async 全量（靶场修正后、SKIP 修复前）：
+**TP108 FP0 TN76 FN2 ERR0，706.03s**；FN=pos-so2-01 / pos-scn-01
+（二阶/场景）。async 引擎**不实现**这两类；基线一直应有 **10 SKIP**，
+这次只有 6（stored），因为 manifest 里 so2/scn 四条的
+`engines:["sync"]` 在 wipe/恢复中丢了。同步里的 `neg-so2/neg-scn`
+则被计成 TN，所以净形状正好是“2 个 FN + 2 个多出来的 TN”。
+
+修法：给四条补回 `engines:["sync"]`，并在
+`tests/test_benchmark_dom_fixture.py` 新增守卫
+**8 passed**（静态 decode / 本地 vendor / 真 Chromium 三页弹窗 /
+sync-only 声明）。async 全量单独重跑中，结果回填本节。
+
+取证产物：`p265_full_sync_prefix.json`（DOM 靶场修正前）、
+`p265_full_async_noskip.json`（SKIP 声明修复前）。
+
+SKIP 修复后的 async 全量（`benchmark/results/p265_full_async.json`）：
+**TP108 FP0 TN74 FN0 ERR0，764.35s，10 SKIP**（stored 6 + 二阶 2 + 场景 2），
+与既有 async 基线逐项相同；pos-dom-01/04/05 均为 TP（1/1/2 findings）。
+**全量双引擎门至此双绿**：sync 718.17s / async 764.35s。
+
+## Phase 304：外部靶 XSSMaze 全量验证 —— 六项修复，控制例 FP 13 → 0（release 1.2.0）
+
+请求是「开始外部靶场验证」→「继续/都要」→「交付能提交发布的版本」。靶
+`hahwul/xssmaze` v0.3.0（官方 runner，ground truth 取自靶自身 `/map/json`，
+27 条 `exploitable=false` 控制例）。受测树最终 `ab4b07d`（HEAD 390e96d + 工作树改动）。
+
+### 外部终态
+
+- client（`--reach client --headless`）：**TP24 / FN0 / FP0**，P/R/F1 **1.000**（418s）。
+- server（`--reach server`）：**TP918 / FN95 / FP0**，P **1.000** / R 0.906 / F1 **0.951**（4195s）。
+- 控制例 FP **13 → 0**（按档级 8 → 0）。口径：靶把对照例上的任何 finding 记 FP，
+  population 上的 low finding 也计检出。
+- server 的 3 条 TP 摆动（三次全量 919/921/918）归因：4 条上轮只有 polyglot finding
+  （token 相关确认抖动）+ `stream-level1` 一次 100s wrapper 超时，2 条恢复。
+
+### 六项修复（每项都有测试 + 全量矩阵复跑）
+
+1. 补回 2026-10 wipe 丢失的 `setHTMLUnsafe`/`parseHTMLUnsafe` sink（client
+   `htmlunsafe` level1/5 是 FN；六级均拿到 browser-executed 证据）。
+2. redirect landing 门（`core/page_relevance.py`）：302 换路径且丢掉注入参数时，
+   页面级静态提示不归属被扫 URL（4 条 redirect 控制例各 6 → 0）。
+3. CSP no-execution 门（`csp.script_execution_blocked`）：强制 CSP 封死页面实际
+   携带的全部脚本路由时，mutation/clobber/静态 DOM/页面 hint 不发射（3 条 CSP
+   控制例 3/3/8 → 0；`pos-csp-01/02` 与 `neg-csp-*` 不变）。
+4. 模板 SSTI 渲染值必须是独立 token（十六进制边界），随机 nonce 里的 `49` 不再
+   产生 critical 假阳性。
+5. URL 属性 hint 标签感知：`iframe/frame/embed/object` 的 `.src` 保留 medium
+   （`dom-level18`），`img/media` 与无页面上下文的 JS 降 low（`dom-level10`）；
+   无差别降档曾把 dom18 打成确定性 FN。
+6. 低噪声抑制：数据型媒体（JSON/plain）的 low 反射/polyglot 与 low 静态 DOM
+   不再发射；`application/javascript`（JSONP）与 `text/xml` 保留
+   （`callback-level1`/`ctype-level1` 是仅靠 low 反射成立的真阳性）。
+   `pos-jsonct-01` → `neg-jsonct-raw-01`（safe，Phase 176g 的“保留 low 报告”
+   契约被本版本取代）；parity gate 的 incident-2 变异仍可复现。
+
+### 验证
+
+- 内部 194 例双引擎矩阵 F1 **1.000**（sync TP113/FP0/TN81/FN0/ERR0 858s；
+  async TP107/FP0/TN75/FN0/ERR0 756s；12 SKIP 为 manifest 声明的 sync-only）。
+- 全量文件级套件 **229/229 绿（4787s，failures none）**；14 例/6 文件声明式或
+  环境跳过——opt-in stored E2E 3 passed、DOM live 单跑通过、benchmark_fp 单跑
+  94 passed；其余为 loopback/cryptography 环境门。**“绿”不等于“全部跑过”。**
+- range4/5/6 双引擎门禁全绿（range6 首跑在起靶健康检查处读超时，重试绿）。
+- 全仓 `ruff check .`、`python -m build --wheel`、CLI 烟测通过。
+- 过程中抓到并修复的元问题：async 抑制只加在 `_add_finding`、主 `scan()` 绕过
+  （parity gate 红）；Docker Desktop 两次自发退出（无产物=未验证，分段跑）；
+  控制例 URL 清单 CRLF（打错目标）；`pos-jsonct-01` 旧报告契约冲突（显式更新）。
+
+### 已知限制
+
+server 95 FN（query 能力缺口 + 官方 runner 只给 URL 的 body/header/path 投递
+契约形状）；Phase 218 证据帽在非 CSP 页仍按 `proof/evidence` 豁免；TT 层对
+`.src` 有一次未复现的 medium 抖动；polyglot 确认存在运行间摆动。
+
