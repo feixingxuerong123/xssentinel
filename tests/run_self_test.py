@@ -192,9 +192,15 @@ crawler.dedup()
 crawler.attach_pocs()
 
 crawled_urls = {f.data.get("url") for f in crawler.findings}
+# Phase 265 split delivery from execution; Phase 304 stopped emitting low
+# static DOM hints.  A crawled /dom therefore reports dom_sink_reachability
+# (low, delivery evidence) when the carrier wave does not fire -- that still
+# proves the crawler found the page and the DOM layer ran.  Browser-executed
+# confirmation is asserted separately by the L6 check above.
 dom_via_crawl = [f for f in crawler.findings
                  if "/dom" in f.data.get("url", "")
-                 and f.data.get("type") in ("dom", "dom_dynamic")]
+                 and f.data.get("type") in ("dom", "dom_dynamic",
+                                            "dom_sink_reachability")]
 safe_via_crawl = [f for f in crawler.findings
                   if "/safe" in f.data.get("url", "")]
 # reflected via crawl: proves the crawler's query-param endpoints are actually

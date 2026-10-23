@@ -868,6 +868,8 @@
 - range4/5/6 双引擎门禁全绿(range4 TP2/FP0/TN2/FN0、range5 与 range6
   TP1/FP0/TN1/FN0);range6 首跑在起靶健康检查处读超时,重试绿。
 - 全仓 `ruff check .` 通过;`python -m build --wheel` 与 CLI 烟测通过。
+- `--self-test` **ALL CHECKS PASSED**(93 项);crawler 对 `/dom` 的发现检查已
+  适配 Phase 265 的 `dom_sink_reachability` 投递证据,浏览器执行仍由 L6 独立断言。
 
 ### Known limitations
 
