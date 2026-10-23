@@ -17,10 +17,10 @@
 | 维度 | 数据 |
 |---|---|
 | 核心代码 | 122 模块 / 50396 行(2026-10-05 实测;含 Phase 193–197 与 sandbox 首刀拆分) |
-| 测试 | 177 文件 / 43683 行,其中 `test_*.py` 162 文件 / 38086 行;`pytest --collect-only -q` = **2622 用例**(引用前先重跑,别抄这里的数字当活数) |
+| 测试 | 229 文件(全量套件实测,2026-10-23);`pytest --collect-only -q` = **3495 用例**(引用前先重跑,别抄这里的数字当活数) |
 | ruff 基线 | **0 条**(E/F/W,忽略 E501),`ruff check` 全仓实测 |
 | lint 门禁 | ① CI `ruff check`(2026-09-30 落地,fail-fast 在 tests job 之前)<br>② `tests/test_noqa_hygiene.py`(2026-10-01 落地,锁"F401 抑制必须带原因") |
-| 精度 | sync 192 例 TP113/FP0/TN79/FN0,f1=1.000;async TP108/FP0/TN74/FN0(10 例 sync-only SKIP);range4 双引擎 8/8;**push 门 64 例分层切片双引擎 FP0/FN0/ERROR0** |
+| 精度 | sync 194 例 TP113/FP0/TN81/FN0,f1=1.000;async TP107/FP0/TN75/FN0(12 例 sync-only SKIP);range4/5/6 双引擎全绿;**push 门 64 例分层切片双引擎 FP0/FN0/ERROR0**;外部 XSSMaze client 24/0/0、server 918/95/0(控制例 FP 0) |
 | 最大模块 | scanner.py **1869** 行 / async_scanner.py **1618** 行 / __main__.py **1511** 行 / dom_engine.py **1455** 行 / report.py **1440** 行(sandbox.py 已拆为 sandbox 1320 + sandbox_parser 1125 + sandbox_common 136) |
 
 ---
@@ -43,11 +43,18 @@
 - 我方唯一那条 FN 是**打分口径**:XS-Leaks 审计层按设计给 low/firm,而这里
   "检出"定义为 high/medium/critical 的 XSS 级 finding —— 不是判定错误,也不是
   对手的优势;该层两个第三方工具根本没有。
-- 靶场是**我们自己写的** 192 例矩阵的分层切片,所以"别人出的题"只到位一半:
+- 靶场是**我们自己写的** 194 例矩阵的分层切片,所以"别人出的题"只到位一半:
   判定语料(nuclei dast 模板、dalfox 载荷)是第三方的,目标仍是我们构造的。
   真正的独立靶场(Juice Shop / 商业工具对跑)仍然没做。
 - 速度维度我们既不是最快也不是最慢:nuclei 用 49s 拿到 f1 0.839,我们用 346s
   拿 0.986。任何"性能优于同类"的说法都要按这张表校准。
+
+**2026-10-23 补上"别人出题"的一半**:独立靶 XSSMaze v0.3.0(dalfox 作者维护,
+官方 runner,ground truth 来自靶自身 `/map/json`,27 条 `exploitable=false`
+控制例)终态 —— client 群 **TP24/FN0/FP0**(P/R/F1 1.000)、server 群
+**TP918/FN95/FP0**(P 1.000 / R 0.906 / F1 0.951),**控制例 FP 0**。
+目标、答案键与评分器都是第三方的,补上了"靶场是我们自己写的"这一半;
+仍缺的是与商业工具在同一独立靶上的对跑。口径与已知限制见 README「外部效度」。
 
 **环境复核(推翻本文 2026-10-03 那段"完全出不了网")**:GitHub API 与
 `raw.githubusercontent.com` 可达;Go 模块代理 `goproxy.cn` 可达并成功构建
@@ -67,7 +74,7 @@
 自己的靶场上)。Burp Pro / Acunetix / Netsparker **从未对跑**;真实应用验证
 近空白(只有 Juice Shop 零星几条 + 自编 Range3/Range4)。
 
-现有的 192 例自编矩阵 sync 已满分(f1=1.000),**再加题只是给满分的考试加题**;
+现有的 194 例自编矩阵 sync 已满分(f1=1.000),**再加题只是给满分的考试加题**;
 继续扩大自编基准不产生新的外部信息。真正缺的是"别人出的题"。
 
 **本机结论(2026-09-30 实测,不要再试)** —— **此段已被 2026-10-04 的上表推翻,保留原文以记录它错在哪**:这台机器**装不了任何第三方扫描器**
@@ -91,7 +98,7 @@ CVE/GHSA 编号、latest=3.4.16 全部由此实测取得,不是记忆)。
 语义等价、覆盖 ≠ 能检出、忽略浏览器支持差异。
 
 **改法**:建第三方对照集,样本 ≥ 60 —— Juice Shop XSS 挑战全集 + nuclei 官方
-DAST 模板 + ZAP(换机器跑),落 `benchmark/` 下可复现的 runner,与自编 192 例
+DAST 模板 + ZAP(换机器跑),落 `benchmark/` 下可复现的 runner,与自编 194 例
 分开记账。
 
 **验收**:对照集 ≥ 60 例;与 nuclei 逐例结果可比(TP/FP/FN 口径一致);
@@ -342,7 +349,7 @@ M2 更值钱 —— 遮掉"邻居也算"的循环后我的样本**仍然全绿**
 抓不到已知事故的门,等于没有门(这条教训在 pyflakes 门禁那次已经付过一次学费,
 Phase 222 又付了一次 —— 见 2.1.2 的假绿)。
 
-> **已闭合(Phase 222,见 2.1.2)**:门从 24 个手挑端点扩到 manifest 全 192 例
+> **已闭合(Phase 222,见 2.1.2)**:门从 24 个手挑端点扩到 manifest 全 194 例
 > (182 例可比),测量结果 182 例 **0 分歧**,并当场抓到 1 处真缺陷
 > (`csp_bypass` 缺 confidence)与 1 处我自己造的假分歧(两侧入口点不对齐)。
 
@@ -366,7 +373,7 @@ Phase 222 又付了一次 —— 见 2.1.2 的假绿)。
 
 #### 2.1.1 实测新分歧(Phase 209,2026-10-09):async **发现端点但不检查它们**
 
-真实靶场(OWASP Juice Shop 20.2.0)第一次把这条暴露出来 —— 本仓 192 例矩阵与
+真实靶场(OWASP Juice Shop 20.2.0)第一次把这条暴露出来 —— 本仓 194 例矩阵与
 range3/4 都是**逐端点显式给 URL**,爬取到的端点从未成为 DOM 判定的对照对象,
 所以这一类"一边整个分支不存在"的门是空的:
 
@@ -406,7 +413,7 @@ mined 端点 / L8 + JSONP),门:`test_phase214_crawl_page_layers.py`、
 
 **原改法形状的取舍记录**:没有抽"对一个端点跑全套"的共享入口,而是
 在 async 侧逐层接线。原因与本条 2026-10-09 记的一样 —— 抽共享入口会把
-async 爬取扫描的请求量按"端点数 × 页面层"放大,预算/超时/192 例 async
+async 爬取扫描的请求量按"端点数 × 页面层"放大,预算/超时/194 例 async
 基线都要重测;逐层接线让每条线各自可归因、各自带门。
 ### 2.2 报告层性能
 
@@ -529,15 +536,26 @@ JS config line(那本身就是 script-string sink),四例全 confirmed、safe
    PoC **实测被剥**),两页只差 script 标签指向的构建。构造效度沿用 range5
    (静态壳、参数只进客户端)。`tests/test_range6.py` 7 例全绿并含实时对。
    靶场同时量出三处 detector 缺陷并修掉两处(mXSS 提示版本盲区;TT 两条在
-   sanitizer 介导流上的无证据 medium)——**红因已从三条收敛到一条**:
-   见下面新增的第 7 项(P1)。红因未清前不挂 CI,现状记在 `range6/GATE_STATUS.md`。
+   sanitizer 介导流上的无证据 medium);第三条 P1 已由 Phase 265 收口。
+   **门禁已转绿并挂进 CI**(sync/async TP1 FP0 TN1 FN0 ERR0),现状记在
+   `range6/GATE_STATUS.md`。
 5. ~~原有 1.2(async_scanner 拆分,现约 2960 行)~~ **已完成(Phase 191,纯移动 +
    逐字节/逐用例取证,见 1.2)**。剩余不变:1.3(sandbox 拆分)/ 2.1(双引擎
    判定去重)/ 2.3(range5 框架靶场)/ 1.0(第三方对照集,需换网络)。
    新增一项:**1.4 `_probe_param` 拆分**(683 行单方法)—— 它属于**改逻辑**,
-   验收要配全量 192 例矩阵,不能和纯移动混做。
-7. **【最高优先级】DOM 层把"污点流入汇"当成了"执行",且证据是循环自证的
-   (Phase 225 由 range6 量出,未修)**:`dom_dynamic` 的
+   验收要配全量 194 例矩阵,不能和纯移动混做。
+7. ~~**【最高优先级】DOM 层把"污点流入汇"当成了"执行",且证据是循环自证的
+   (Phase 225 由 range6 量出,未修)**~~ **已修(Phase 265)**:
+   `executed=True -> dom_dynamic/high（proof=sink 片段）；executed=False ->
+   dom_sink_reachability/low（无 proof）`，类型/严重度只由
+   `findings.dom_dynamic_finding` 决定；同时把 range6 实测的 form/math/mglyph
+   mXSS carrier 加入 `_CARRIER_SHAPES`，正例重新拿到页面自弹窗的执行证据，
+   safe 仍只落 low。**range6 双引擎 TP1 FP0 TN1 FN0 ERR0，已挂 CI**；
+   全量双引擎已复跑（Phase 304，194 例）：**sync TP113/FP0/TN81/FN0/ERR0（858.36s）、
+   async TP107/FP0/TN75/FN0/ERR0（12 SKIP，756.0s）**，见 README 当前基线；
+   产物 `benchmark/results/xssmaze_tagaware_20261023_{sync,async}.json`。
+   以下为 Phase 225 的历史分析：
+   `dom_dynamic` 的
    `evidence_class=browser-executed` / `headless.outcome=fired` / high-high
    **全是常量**,不是量出来的。链路:① 探针注入的是**裸标记** `xssentinel_dom_<hex>`
    (污点标记,不是可执行载荷);② `_init_script` 的 `hit()` 只要标记出现在任何
@@ -580,7 +598,7 @@ JS config line(那本身就是 script-string sink),四例全 confirmed、safe
 | 全量类型标注(mypy strict) | 111 模块体量下投入产出不匹配;保持 `test_no_undefined_names` 的 pyflakes 门控即可 |
 | 重写 async 引擎为纯 asyncio 解析 | BS4/lxml 无 async API,`asyncio.to_thread` 是正确折中 |
 | 引入重型 ORM/数据库 | range3 证明 SQLite 足够;API 持久化当前无规模压力 |
-| 继续扩充自编 192 例基准 | sync 已 f1=1.000,边际信息为零;要新信息就去建 **1.0 的第三方对照集** |
+| 继续扩充自编 194 例基准 | sync 已 f1=1.000,边际信息为零;要新信息就去建 **1.0 的第三方对照集** |
 
 ---
 
