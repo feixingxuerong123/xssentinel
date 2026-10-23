@@ -640,6 +640,12 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
                 self.coverage.record_param(url, param, in_body=is_body,
                                            method=method, confirmed=True)
                 self.coverage.record_finding(url, method)
+                return
+            # Phase 306: the parameter may itself be decoded by the app
+            # (base64 / multi-URL-decode) rather than being a container the
+            # scanner wrapped.  Bounded encoding-first pass; see helper.
+            self._try_encoding_first(req, url, method, params, data, param,
+                                     is_body, resp)
             return  # not reflected -> skip
         # Phase 177: classify EVERY reflection point of the marker, not
         # just the first.  A parameter echoed in a nav highlight AND inside
@@ -1269,6 +1275,66 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
             self.coverage.record_finding(url, method)
             if self.verbose:
                 _log.debug("    [+] HPP confirmed (%s)", param)
+            return True
+        return False
+
+    def _try_encoding_first(self, req, url, method, params, data, param,
+                            is_body, resp):
+        """Phase 306: bounded encoded probes for decode-then-reflect endpoints.
+
+        A plain marker is not reflected when the application decodes the
+        parameter before echoing it (base64 / multi-URL-decode), so the
+        normal flow returns at the "not reflected" branch and the transform
+        ladder never sees this parameter.  XSSMaze's encoding families are
+        exactly that shape.
+
+        Deliberately bounded: GET query + HTML response only, ONE canonical
+        payload under three decode shapes -> at most 3 extra requests per
+        parameter.  Evidence grading goes through the same verifier and
+        ``_record`` chain as every other reflection.
+        """
+        if is_body or not url:
+            return False
+        try:
+            ctype = (resp.headers.get("Content-Type") or "").lower()
+        except Exception:
+            ctype = ""
+        if ctype and "text/html" not in ctype and "application/xhtml" not in ctype:
+            return False
+        token = "xssv_" + secrets.token_hex(4)
+        payload = "<script>alert(1)</script>"
+        marked = verifier.mark(payload, token)
+        if marked == payload:
+            return False
+        for name in ("base64", "double_url_encode", "triple_url_encode"):
+            try:
+                variant = transform.apply(name, marked)
+            except Exception:
+                continue
+            send = self._set_param(params, data, param, variant, is_body)
+            try:
+                r = req.request(method, url, params=send["params"],
+                                data=send["data"])
+                self._bump()
+                self.coverage.record_request(url, method)
+            except Exception:
+                continue
+            try:
+                v = verifier.verify_semantic(
+                    r.text or "", token,
+                    response_headers=dict(getattr(r, "headers", {}) or {}))
+            except Exception:
+                continue
+            if not v.get("confirmed"):
+                continue
+            self.coverage.touch_layer(url, "L1_pre_encoded", method,
+                                      detail=f"encoding-first:{name}")
+            self._record(req, url, method, param, is_body, "reflected",
+                         v.get("context") or "html_element", variant,
+                         [name], v, r, token)
+            self.coverage.record_param(url, param, in_body=is_body,
+                                       method=method, confirmed=True)
+            self.coverage.record_finding(url, method)
             return True
         return False
 

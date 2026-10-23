@@ -136,6 +136,31 @@ def _content_type(resp_headers) -> str:
         return ""
 
 
+async def _read_text(resp) -> str:
+    """Decode a body the way the sync engine's ``requests`` transport does.
+
+    aiohttp's ``text()`` decodes strictly: a body that is not valid UTF-8 and
+    carries no usable charset raises UnicodeDecodeError.  requests replaces
+    undecodable bytes instead, so the same target that yields a readable
+    (garbage) string to sync made async raise inside the probe -- and the
+    probe's bare ``except Exception`` turned that into "this parameter has
+    nothing", silently.  Measured on XSSMaze ``/decode/level1``: the marker
+    probe answers 20 bytes of binary, async sent 0 encoded probes and reported
+    nothing while sync confirmed the sink.
+
+    Only the strict-decode failure is covered; every body aiohttp can already
+    decode takes the identical path.
+    """
+    try:
+        return await resp.text()
+    except (UnicodeDecodeError, LookupError):
+        data = await resp.read()
+        try:
+            return data.decode("utf-8", "replace")
+        except Exception:
+            return data.decode("latin-1", "replace")
+
+
 def _non_html_grade(resp_headers) -> tuple[str, str]:
     """Phase 32 parity (scanner._record), Phase 179: markup reflected into a
     non-HTML response cannot execute in a browser tab -- keep the finding,

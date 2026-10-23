@@ -3505,3 +3505,86 @@ server 95 FN（query 能力缺口 + 官方 runner 只给 URL 的 body/header/pat
 契约形状）；Phase 218 证据帽在非 CSP 页仍按 `proof/evidence` 豁免；TT 层对
 `.src` 有一次未复现的 medium 抖动；polyglot 确认存在运行间摆动。
 
+
+## Phase 306：编码优先探针（sync）+ async 镜像与"严格解码"盲区
+
+起点是 Phase 304 的外部账：server 群体 95 个 FN 里，`realworld-encoding` /
+`decode` / `dblenc` / `jsescape` 这些家族共 8 条，共同形状是**应用先解码再回显**。
+Phase 305 先把 base64 / double / triple 塞进变换梯子，实测**零效果**并回滚 ——
+原因不是"梯子没这条"，而是候选与变换都以**基础反射**为前提：明文 marker 都不
+回显时，`_probe_param` 在"未反射"分支就返回了，梯子根本没机会跑；且静态梯子
+会吃满 variant 预算（`len(variants) < effective_max_transforms` 永不成立）。
+
+### 落地
+
+- **sync `_try_encoding_first`**：在"未反射"早退分支做**有界**编码优先探针 ——
+  GET query + HTML 响应两个门、一个固定载荷（`<script>alert(1)</script>`，经
+  `verifier.mark` 打 token）分别按 `base64` / `double_url_encode` /
+  `triple_url_encode` 投递，**每参数至多 3 个请求**；证据走同一
+  `verify_semantic` + `_record` 链，coverage 记在既有 `L1_pre_encoded` id
+  （不新增层）。`transform.py` 新增 `base64` / `triple_url_encode` 两个函数，
+  **不进默认梯子**。
+- **async `_try_encoding_first_async`**：同门、同预算、同证据链（session +
+  `asyncio.to_thread` 里的 verifier）。调用点同时对齐 sync 的控制流：结构化原始
+  值走了 pre-encode 但**未确认**时不再提前 `return`（`_pre_confirmed` 门）。
+
+### 量出来的真实根因：async 的"严格解码"把整参数吞了
+
+镜像接上后 lab 仍然 0 findings。第一假设（早退结构）**被 trace 否证**：编码优先
+根本没有被进入，因为**marker 探针自己先死了**：
+
+```
+XSSMaze /decode/level1 对不可解码输入回 20 字节裸二进制
+aiohttp -> await resp.text() -> UnicodeDecodeError
+_probe_param -> except Exception: return   # 整个参数静默消失
+requests(sync) -> errors="replace" -> 继续走
+```
+
+即二者是**传输层语义差**（与 Phase 209 的 brotli 同族）：sync 的 requests 宽容
+替换坏字节，async 的 aiohttp 严格解码；而裸 `except` 把"读不出来"变成了"没东西"。
+修法是共享 `async_scanner_common._read_text(resp)`：`text()` 失败于
+`UnicodeDecodeError`/`LookupError` 时退回 `read()` + `errors="replace"`
+（最后 latin-1），**能正常解码的响应走完全相同的路径**。接线不只在出错那一处，
+而是 async 引擎**全部文本读取点**（baseline / marker / L1 各阶段 / variant 循环 /
+L8/L9 层 / JSONP/blind / crawl），因为同一个吞异常形状在每处都存在。
+
+### 读数
+
+- 定向（lab，clean URL）：sync 与 async 现在**同两条**命中 ——
+  `realworld-encoding-level4`、`decode-level1`（原 FN）；其余 6 条仍是 0
+  （需要 fullwidth/NFKC、更深解码等家族特定形状，有界探针不是通用解码器）。
+- 27 条控制例：sync **0 findings**（无新 FP）。
+- **sync 全量 194**：TP113 / FP0 / TN81 / FN0 / ERR0，F1 1.000（739.8s）；
+  唯一个案差异是既有的 polyglot context 记账；35 条未反射的负例各 +3 请求
+  （有界探针的精确成本）。
+- **外部 server 群体**：**TP920 / FN93 / FP0**，F1 0.952（4348.9s）。六条编码
+  FN 恢复（dblenc-level3、decode-level1、jsescape-level2、
+  realworld-encoding-level4、realworld-level7、stream-level1），四条此前检出
+  本轮未中（3 个 wrapper 100s 超时 + `eventhandler5` polyglot 确认摆动），净
+  918/95 → 920/93。
+- 测试 `tests/test_phase306_encoding_first.py` **7 passed**：base64/triple 往返、
+  sync 解码回显正例与转义孪生反例、async 同门、`_read_text` 的二进制体与可解码体
+  一对（并断言正常路径不调用 `read()`）、以及 `/bin` 端点（marker 回二进制、
+  base64 探针回 HTML）的 async 端到端。**变异对照**：把 except 收窄成不匹配的
+  异常 → e2e 红（baseline 也红，证明两处 L1 读取都在承重），逐字节还原。
+- **async 全量 194**：TP107 / FP0 / TN75 / FN0 / ERR0（F1 1.000，1131.9s，
+  10 SKIP 为 manifest 声明的 sync-only），与镜像前同一棵树的 01:31 跑**逐例相同**；
+  36 例各 +3 请求 = 有界探针的精确成本，verdict / findings_count 零变化。
+  `benchmark/results/p306_full_async.json`。
+- **strict 64 例切片双引擎**：sync **TP36 / FP0 / TN28 / FN0 / ERROR0**（0 SKIP，
+  337.9s）、async **TP36 / FP0 / TN27 / FN0 / ERROR0**（1 SKIP = stored-dom
+  sync-only，434.3s），与 Phase 190 以来基线逐项相同。
+- 27 条控制例：sync 0 findings；async 26/27 批量 0 findings，`xsleak/redirect`
+  在矩阵同跑的负载下触到批处理 300s 超时、单跑 **0 findings**（环境停顿）。
+
+### 教训
+
+1. **"镜像一个函数"之前，先确认原函数真的被进入过。** 这次的第一假设（控制流）
+   与真实原因（响应体解码）只差一层调用，trace 一跑就分开了 —— 与 Phase 201
+   的"判据测的是表示不是被测物"同一条：**先证明路径到达，再谈路径内部**。
+2. **裸 `except Exception` 在传输层等价于"把能力整体关掉"。** 它与 Phase 63 的
+   async L1 停摆、Phase 200 的爬虫回退是同一族：降级本身可以接受，**不可接受的
+   是降级不留痕**。这次至少让"读不出 body"不再等于"这个参数没有反射"。
+3. **跨引擎对等不止于判定函数，还包括传输与解码。** requests 与 aiohttp 在
+   编码、压缩（209）、坏字节（本轮）上各有一套默认值；不显式归一，就会在真实
+   目标上表现为"sync 有、async 没有"的静默分歧。

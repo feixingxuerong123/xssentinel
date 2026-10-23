@@ -14,7 +14,7 @@ from .requester import CountingRequester
 from . import layer_guard
 from .budget import BudgetExhausted, CircuitOpen
 from .async_scanner_common import (
-    _AsyncScannerShim, _extract_links, _log,
+    _AsyncScannerShim, _extract_links, _log, _read_text,
 )
 
 
@@ -441,7 +441,7 @@ class AsyncCrawlMixin:
                             current_url, headers=self._req_headers(self.headers),
                             proxy=self._next_proxy(),
                         ) as resp:
-                            text = await resp.text()
+                            text = await _read_text(resp)
                             resp_headers = dict(resp.headers)
                             self.requests_made += 1
                             self._record_status(getattr(resp, "status", 200))
@@ -568,7 +568,7 @@ class AsyncCrawlMixin:
                                     m_base,
                                     headers=self._req_headers(self.headers),
                                     proxy=self._next_proxy()) as m_resp:
-                                m_text = await m_resp.text()
+                                m_text = await _read_text(m_resp)
                                 m_headers = dict(m_resp.headers)
                                 self.requests_made += 1
                                 self._record_status(

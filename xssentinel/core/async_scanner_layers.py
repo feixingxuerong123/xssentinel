@@ -30,7 +30,7 @@ from .budget import BudgetExhausted, CircuitOpen
 from .stealth import (marker as _stem_marker)
 from .async_scanner_common import (
     _AsyncScannerShim, _JSONP_CALLBACK_NAMES, _body_kwargs, _content_type,
-    _log, _non_html_grade, _polyglot_grade,
+    _log, _non_html_grade, _polyglot_grade, _read_text,
 )
 
 
@@ -100,7 +100,7 @@ class AsyncDetectionLayersMixin:
                         headers=self._req_headers(self.headers), proxy=self._next_proxy(),
                         **_body_kwargs(send_data),
                     ) as resp:
-                        text = await resp.text()
+                        text = await _read_text(resp)
                         resp_headers = dict(getattr(resp, "headers", None) or {})  # CSP gate parity
                         self.requests_made += 1
                         self._record_status(getattr(resp, "status", 200))
@@ -144,6 +144,78 @@ class AsyncDetectionLayersMixin:
                     evidence_class=EVIDENCE_MODEL,
                 )
                 return
+
+    async def _try_encoding_first_async(self, session, url, method, param,
+                                        params, data, is_body, resp_headers
+                                        ) -> AsyncIterator[Finding]:
+        """Phase 306 sync parity: bounded encoded probes for decode-then-reflect.
+
+        The plain marker is not reflected when the app decodes the parameter
+        before echoing it, so no candidate carries the right encoding.  Same
+        gate and budget as sync: GET query + HTML only, one canonical payload
+        under three decode shapes -> at most 3 requests per parameter.
+        Evidence goes through the same verifier chain.
+        """
+        if is_body:
+            return
+        ctype = (_content_type(resp_headers) or "").lower()
+        if ctype and "text/html" not in ctype and "application/xhtml" not in ctype:
+            return
+        token = "xssv_" + secrets.token_hex(4)
+        payload = "<script>alert(1)</script>"
+        marked = verifier.mark(payload, token)
+        if marked == payload:
+            return
+        for name in ("base64", "double_url_encode", "triple_url_encode"):
+            try:
+                variant = transform_mod.apply(name, marked)
+            except Exception:
+                continue
+            send_params, send_data = self._probe_kv(
+                params, data, param, variant, is_body)
+            send_params, send_data = self._drop_skip_params(
+                send_params, send_data)
+            try:
+                async with self._semaphore:
+                    await self._throttle(url)
+                    async with session.request(
+                        method, url, params=send_params or None,
+                        headers=self._req_headers(self.headers),
+                        proxy=self._next_proxy(),
+                        **_body_kwargs(send_data),
+                    ) as resp:
+                        text = await _read_text(resp)
+                        hdrs = dict(getattr(resp, "headers", None) or {})
+                        self.requests_made += 1
+                        self._record_status(getattr(resp, "status", 200))
+            except (BudgetExhausted, CircuitOpen):
+                raise
+            except Exception:
+                continue
+            v = await asyncio.to_thread(
+                verifier.verify_semantic, text, token,
+                response_headers=hdrs)
+            if not v.get("confirmed"):
+                continue
+            idx = text.find(token)
+            sev, conf = _non_html_grade(hdrs)
+            self._touch_coverage(url, "L1_pre_encoded", method,
+                                 detail=f"encoding-first:{name}")
+            yield Finding(
+                url=url, method=method, param=param,
+                context=v.get("context") or "html_element",
+                sink_context=v.get("context"),
+                payload=variant,
+                severity=sev,
+                evidence=text[max(0, idx - 30):idx + len(token) + 30],
+                type="reflected",
+                confidence=conf,
+                content_type=_content_type(hdrs),
+                transform=[name],
+                param_in="body" if is_body else "query",
+                evidence_class=EVIDENCE_MODEL,
+            )
+            return
 
     def _resolve_dom_engine(self):
         """Phase 65: mirror the sync _resolve_dom_engine for L6 parity."""
@@ -726,7 +798,7 @@ class AsyncDetectionLayersMixin:
                             params=params or None, data=body,
                             headers=hdrs, proxy=self._next_proxy(),
                         ) as resp:
-                            text = await resp.text()
+                            text = await _read_text(resp)
                             resp_headers = dict(resp.headers)
                             self.requests_made += 1
                             self._record_status(getattr(resp, "status", 200))
@@ -769,7 +841,7 @@ class AsyncDetectionLayersMixin:
                             target, headers=self._req_headers(self.headers),
                             proxy=self._next_proxy(),
                         ) as sresp:
-                            stext = await sresp.text()
+                            stext = await _read_text(sresp)
                             s_headers = dict(sresp.headers)
                             self.requests_made += 1
                             self._record_status(getattr(sresp, "status", 200))
@@ -829,7 +901,7 @@ class AsyncDetectionLayersMixin:
                             params=params or None, data=body,
                             headers=hdrs, proxy=self._next_proxy(),
                         ) as resp:
-                            text = await resp.text()
+                            text = await _read_text(resp)
                             resp_headers = dict(resp.headers)
                             self.requests_made += 1
                             self._record_status(
@@ -851,7 +923,7 @@ class AsyncDetectionLayersMixin:
                             target, headers=self._req_headers(self.headers),
                             proxy=self._next_proxy(),
                         ) as sresp:
-                            stext = await sresp.text()
+                            stext = await _read_text(sresp)
                             s_headers = dict(sresp.headers)
                             self.requests_made += 1
                             self._record_status(getattr(sresp, "status", 200))
@@ -924,7 +996,7 @@ class AsyncDetectionLayersMixin:
                         async with sess.get(
                             url, params=probe_params, proxy=self._next_proxy(),
                         ) as resp:
-                            text = await resp.text()
+                            text = await _read_text(resp)
                             self.requests_made += 1
                             self._record_status(getattr(resp, "status", 200))
                 if marker not in text:
@@ -1009,7 +1081,7 @@ class AsyncDetectionLayersMixin:
                             proxy=self._next_proxy(),
                             **_body_kwargs(send_data),
                         ) as resp:
-                            text = await resp.text()
+                            text = await _read_text(resp)
                             self.requests_made += 1
                             self._record_status(getattr(resp, "status", 200))
                 except (BudgetExhausted, CircuitOpen):
@@ -1044,7 +1116,7 @@ class AsyncDetectionLayersMixin:
                             proxy=self._next_proxy(),
                             **_body_kwargs(send_data),
                         ) as resp:
-                            await resp.text()
+                            await _read_text(resp)
                             self.requests_made += 1
                             self._record_status(getattr(resp, "status", 200))
                 except (BudgetExhausted, CircuitOpen):
@@ -1199,7 +1271,7 @@ class AsyncDetectionLayersMixin:
                     proxy=self._next_proxy(),
                     **_body_kwargs(_ndata),
                 ) as nresp:
-                    _ntext = await nresp.text()
+                    _ntext = await _read_text(nresp)
                     _nhdrs = dict(getattr(nresp, "headers", None) or {})
                     self.requests_made += 1
                     self._record_status(getattr(nresp, "status", 200))
@@ -1276,7 +1348,7 @@ class AsyncDetectionLayersMixin:
                         proxy=self._next_proxy(),
                         **_body_kwargs(_gdata),
                     ) as gresp:
-                        _gtext = await gresp.text()
+                        _gtext = await _read_text(gresp)
                         _ghdrs = dict(getattr(gresp, "headers", None) or {})
                         self.requests_made += 1
                         self._record_status(getattr(gresp, "status", 200))
@@ -1387,7 +1459,7 @@ class AsyncDetectionLayersMixin:
                         proxy=self._next_proxy(),
                         **_body_kwargs(_hdata),
                     ) as hresp:
-                        _htext = await hresp.text()
+                        _htext = await _read_text(hresp)
                         _hhdrs = dict(getattr(hresp, "headers", None) or {})
                         self.requests_made += 1
                         self._record_status(getattr(hresp, "status", 200))
@@ -1492,7 +1564,7 @@ class AsyncDetectionLayersMixin:
                         proxy=self._next_proxy(),
                         **_body_kwargs(sd),
                     ) as resp2:
-                        ptext = await resp2.text()
+                        ptext = await _read_text(resp2)
                         self.requests_made += 1
                         self._record_status(getattr(resp2, "status", 200))
                 prof = await asyncio.to_thread(rp_mod.profile_reflection,
@@ -1627,7 +1699,7 @@ class AsyncDetectionLayersMixin:
                             headers=self._req_headers(self.headers), proxy=self._next_proxy(),
                             **_body_kwargs(send_data),
                         ) as resp:
-                            text = await resp.text()
+                            text = await _read_text(resp)
                             # Phase 43: capture headers for the verifier's
                             # CSP gate (sync parity) -- without them the
                             # CSP-blocks-inline check is skipped and strict
@@ -1719,7 +1791,7 @@ class AsyncDetectionLayersMixin:
                                     proxy=self._next_proxy(),
                                     **_body_kwargs(send_data),
                                 ) as resp:
-                                    text = await resp.text()
+                                    text = await _read_text(resp)
                                     resp_headers = dict(getattr(
                                         resp, "headers", None) or {})
                                     self.requests_made += 1
@@ -1783,7 +1855,7 @@ class AsyncDetectionLayersMixin:
                             headers=self._req_headers(self.headers), proxy=self._next_proxy(),
                             **_body_kwargs(sd),
                         ) as resp:
-                            text = await resp.text()
+                            text = await _read_text(resp)
                             resp_headers = dict(getattr(resp, "headers", None) or {})  # CSP gate parity
                             self.requests_made += 1
                         self._record_status(getattr(resp, "status", 200))
@@ -1845,7 +1917,7 @@ class AsyncDetectionLayersMixin:
                                 proxy=self._next_proxy(),
                                 **_body_kwargs(send_data),
                             ) as resp:
-                                text = await resp.text()
+                                text = await _read_text(resp)
                                 resp_headers = dict(
                                     getattr(resp, "headers", None) or {})
                                 self.requests_made += 1

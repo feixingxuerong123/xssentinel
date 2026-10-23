@@ -552,7 +552,21 @@
 
 ### Fixed
 
-- **四个靶场 runner 都没有"楔死重试",本机一进楔死窗口就整面变红(Phase 269)**:
+- **解码回显型 XSS 的漏报与 async 的"严格解码"盲区(Phase 306)**:应用先解码再回显
+  (base64 / 多轮 URL 解码)时明文 marker 不回显,而候选与变换梯子都以"已反射"为前提,
+  该参数在早退分支就被放弃。新增**有界编码优先探针**(GET query + HTML、单个载荷 ×
+  base64 / double / triple,至多 3 请求/参数),sync 与 async 同门同预算,证据走既有
+  verifier 与 `_record`。定向 lab:sync 与 async **各命中 2 条**(`realworld-encoding-level4`、`decode-level1`),其余 6 条需要
+  家族特定形状;27 条控制例 0 findings。外部 server 群体 **TP920 / FN93 / FP0**
+  (F1 0.952,4348.9s;六条编码 FN 恢复,四条既有检出因超时/polyglot 摆动本轮未中)。
+  同步修掉一个更深的 async 缺陷:aiohttp 的 `text()` 严格解码遇到非 UTF-8 响应体
+  (lab 的 `/decode/level1` 对不可解码输入回裸二进制)会抛错,被 `_probe_param` 的裸
+  `except` 吞成"该参数无反射" —— sync 的 requests 用 `errors="replace"` 所以一直能
+  扫。共享 `_read_text()` 让 async 退回 `read()` + `errors="replace"`,并接到引擎全部
+  文本读取点(能正常解码的响应路径不变)。sync 全量矩阵 TP113/FP0/TN81/FN0/ERR0
+  (F1 1.000),async 全量矩阵 TP107/FP0/TN75/FN0/ERR0(F1 1.000);新增 7 例(含 `_read_text` 双向与二进制
+  回显端到端,变异对照证明两处 L1 读取都在承重)。
+
   无代理复测时 range4 跑成 **8m58s / 2 个 ERROR**、range6 **3m44s / 1 个 ERROR**
   (每次卡住的用例还都不同),range5 却 49s 全绿 —— 同一个提交、同一台机器。
   `benchmark/runner.py` 从 Phase 69 起就有 `_evaluate_with_retries`(Phase 176n 又把

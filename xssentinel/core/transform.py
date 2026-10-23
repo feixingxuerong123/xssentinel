@@ -63,6 +63,19 @@ def t_double_url_encode(s: str) -> str:
     return once.replace("%", "%25")
 
 
+def t_triple_url_encode(s: str) -> str:
+    """Three nested percent-encodings (3x server-side decode shapes)."""
+    once = "".join(f"%{ord(c):02X}" for c in s)
+    twice = once.replace("%", "%25")
+    return twice.replace("%", "%25")
+
+
+def t_base64(s: str) -> str:
+    """Base64-encode the payload (servers that decode before reflecting)."""
+    import base64
+    return base64.b64encode(s.encode("utf-8")).decode("ascii")
+
+
 def t_null_byte(s: str) -> str:
     """Insert a URL-encoded null byte before risky chars."""
     out = []
@@ -247,6 +260,8 @@ REGISTRY = {
     "url_encode_all": t_url_encode_all,
     "url_encode_selective": t_url_encode_spaces_and_quotes,
     "double_url_encode": t_double_url_encode,
+    "triple_url_encode": t_triple_url_encode,
+    "base64": t_base64,
     "null_byte": t_null_byte,
     "tab_break": t_tab_break,
     "newline_break": t_newline_break,

@@ -86,6 +86,7 @@ from .async_scanner_common import (  # noqa: E402  (must follow the block above)
     # Phase 211 round 3: grading and the fire-state now belong to the
     # variant loop in async_scanner_layers.
     _ProbeFireState,
+    _read_text,
     safe_accept_encoding,
 )
 from .async_scanner_verify import AsyncHeadlessVerifyMixin
@@ -664,7 +665,7 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
                             headers=self._req_headers(self.headers),
                             proxy=self._next_proxy(), **_dkw,
                         ) as resp:
-                            text = await resp.text()
+                            text = await _read_text(resp)
                             status = getattr(resp, "status", 200)
                             resp_headers = dict(resp.headers)
                             final_url = str(getattr(resp, "url", "") or "")
@@ -932,7 +933,7 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
                     headers=self._req_headers(self.headers), proxy=self._next_proxy(),
                     **_body_kwargs(probe_data),
                 ) as resp:
-                    text = await resp.text()
+                    text = await _read_text(resp)
                     # Phase 100: keep this response's headers AND body --
                     # the CSP nonce-leak exploit (sync _try_csp_nonce
                     # parity) runs on the marker-reflection response.  The
@@ -958,10 +959,28 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
             enc0 = (pre_mod.detect_structure(orig_value0)
                     if orig_value0 else "none")
             if enc0 != "none":
+                _pre_confirmed = False
                 async for f in self._try_pre_encoded_async(
                         session, url, method, param, params, data, is_body,
                         orig_value0, enc0, "html_element", marker):
+                    _pre_confirmed = True
                     yield f
+                # Sync parity: a structured ORIGINAL value whose wrapped
+                # probes did not confirm must not end the parameter here --
+                # the app may simply decode whatever it is given, which is
+                # exactly what the encoding-first pass below covers.
+                if _pre_confirmed:
+                    return
+            # Phase 306 sync parity: decode-then-reflect endpoints never show
+            # the plain marker; try the bounded encoded shapes before the
+            # normal (marker-less) candidate flow.
+            _enc_confirmed = False
+            async for f in self._try_encoding_first_async(
+                    session, url, method, param, params, data, is_body,
+                    probe_headers):
+                _enc_confirmed = True
+                yield f
+            if _enc_confirmed:
                 return
 
         # Classify context (CPU-bound) -- run in thread.
