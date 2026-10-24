@@ -593,9 +593,9 @@ population 上的 low finding 也计检出”。同一棵树的官方 scorecard�
 | 群体 | TP | FN | FP | P | R | F1 |
 |---|---|---|---|---|---|---|
 | client（`--reach client --headless`） | 24 | 0 | **0** | 100% | 100% | **1.000** |
-| server（`--reach server`） | 918 | 95 | **0** | 100% | 90.6% | **0.951** |
+| server（`--reach server`） | 920 | 93 | **0** | 100% | 90.8% | **0.952** |
 
-27 条控制例 **0 findings**（本轮起点 13 条）。server 的 95 条 FN 中，主体是
+27 条控制例 **0 findings**（本轮起点 13 条）。server 的 93 条 FN 中，主体是
 query 能力缺口；body/header/path 约 35 条是官方 runner 只给 URL 的投递契约形状。
 逐例账、失败归因与复跑命令在 `dev/_xssmaze/`（dev 目录不入库）。
 

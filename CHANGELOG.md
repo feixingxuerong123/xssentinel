@@ -552,6 +552,18 @@
 
 ### Fixed
 
+- **反射了 marker 但拒原始标签的解码端点补上编码重试（Phase 307）**：Phase 306 的
+  有界编码探针只挂在"未反射"分支；XSSMaze `realworld-encoding` 1–3 / `decode`
+  3–4 是明文 marker 回显、原始标签被拒的兄弟形状，而变换梯子因 Phase 157 的
+  token 守卫跳过所有会改写 token 的编码。现在载荷循环失败后再跑一次，形态扩到
+  `base64` / `double_base64` / `double_url_encode` / `triple_url_encode` /
+  `html_escape` / `fullwidth`（单载荷、至多 6 请求/参数），双引擎同门同预算。
+  新增 `double_base64` / `html_escape`（`&#x27;` 形态，匹配 lab level3 的自定义
+  双解码器）。真实 lab 双引擎五端点全部命中且 transform 与形态对应，27 条控制例
+  0 findings；sync/async 全量 194 均 F1 1.000；strict 64 双引擎 FP0/FN0/ERROR0。
+  同时修掉同函数两处不一致：编码探针未过滤 `--skip-param`，以及
+  `BudgetExhausted`/`CircuitOpen` 被裸 `except` 吞掉。
+
 - **解码回显型 XSS 的漏报与 async 的"严格解码"盲区(Phase 306)**:应用先解码再回显
   (base64 / 多轮 URL 解码)时明文 marker 不回显,而候选与变换梯子都以"已反射"为前提,
   该参数在早退分支就被放弃。新增**有界编码优先探针**(GET query + HTML、单个载荷 ×

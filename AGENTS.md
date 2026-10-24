@@ -3588,3 +3588,47 @@ L8/L9 层 / JSONP/blind / crawl），因为同一个吞异常形状在每处都�
 3. **跨引擎对等不止于判定函数，还包括传输与解码。** requests 与 aiohttp 在
    编码、压缩（209）、坏字节（本轮）上各有一套默认值；不显式归一，就会在真实
    目标上表现为"sync 有、async 没有"的静默分歧。
+
+## Phase 307：反射了 marker 但拒原始标签的解码端点 —— 编码重试补到载荷循环之后
+
+Phase 306 的有界编码探针只挂在"未反射"早退分支。XSSMaze `realworld-encoding`
+1–3 / `decode` 3–4 是**兄弟形状**：明文 marker 回显、原始标签被拒，而变换梯子
+因 Phase 157 的 token 守卫跳过所有会改写 token 的编码。现在同一有界探针在
+载荷循环失败后再跑一次，形态从 3 种扩到 6 种（`base64` / `double_base64` /
+`double_url_encode` / `triple_url_encode` / `html_escape` / `fullwidth`），
+仍是单载荷、至多 6 请求/参数；sync/async 同门（非 body、非转义反射、非 strict
+CSP）同预算，证据走同一 verifier 与 `_record`。`transform.py` 新增
+`double_base64` / `html_escape`（`&#x27;` 形态：lab 的 level3 自定义双解码器
+认它、不认 `html_entity_named` 的 `&apos;`/`&#40;`）。
+
+**真实靶形状先量后写（2026-10-24，lab 3001，curl 逐形态）**：re1 三重 URL；
+re2 fullwidth/NFKC；re3 双 HTML 实体；d3 双 URL；d4 双 base64（marker 不回显
+→ Phase 306 分支）；level4/decode1 单 base64（Phase 306 已覆盖）。re1–d3 的
+sandwich 探针返回固定 "Detect Special Character" 页（不含输入），因此 Phase 95
+的 `profile_says_encoded` 不会把 `marker_escaped` 置真，新分支在真实靶上可达。
+**这一条是 fixture 首版踩出来的**：回显转义输入会让收敛门把重试挡掉；夹具的
+拒绝页改成"只回显裸标记、其余输入返回固定页"后才与真实形状一致。
+
+**同步修掉同函数两处与 async / Phase 185 不一致**：① 编码探针未走
+`_skip_filtered`，`--skip-param` 的名字仍随请求上线（async 一直走
+`_drop_skip_params`）；② `BudgetExhausted`/`CircuitOpen` 被裸 `except` 吞掉，
+预算耗尽后还会多发至多 6 个请求（async 一直会抛）。
+
+**门（本机实测）**：`tests/test_phase307_encoding_shapes.py` 33 例 —— 六形态
+sync/async 正例、五个 safe 孪生（断言零 finding）、两个变异对照（摘掉重试必须
+红）、精确成本 6/3/5（在重试函数内部计数）、is_body/非 HTML 门、skip-param
+双向对照、budget/circuit 传播、strict-CSP 门；`tests/test_transform.py` 注册表
+计数从 Phase 306 遗留的 23（HEAD 实际 25）修正到 27 并点名六形态。
+定点批 119 passed；strict 64 双引擎 FP0/FN0/ERROR0；sync 全量 194
+**TP113/FP0/TN81/FN0/ERR0 F1 1.000**（1334.1s）；async 全量 194
+**TP107/FP0/TN75/FN0/ERR0（12 SKIP）F1 1.000**（1551.8s）。**真实 lab
+双引擎**：五个目标端点全部命中且 transform 与形态逐一对应（re1 triple、
+re2 fullwidth、re3 html_escape、d3 double_url、d4 double_base64），27 条控制例
+双引擎 **0 findings**。**未跑**：1013 端点 official server 群体全量（本轮用
+五个目标端点 + 27 控制例取证），server 总分仍记 Phase 306 的 920/93；
+`tests/test_engine_parity_gate.py` 只跑了 HTTP 切片（3 passed），重型 DOM
+切片未跑（与本改动无交集，基线仍为 Phase 222 的全量结果）。
+
+**顺带发现**：`tests/test_transform.py` 的计数在 Phase 306 加 3 个注册表
+条目后就已陈旧（23 vs 实际 25），说明那次提交的受影响面没有包含它 ——
+本轮把计数与六形态名字一起钉住，避免"删一个加一个"仍保持计数不变。

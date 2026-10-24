@@ -19,7 +19,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 
 from . import payloads, transform
-from .budget import BudgetExhausted
+from .budget import BudgetExhausted, CircuitOpen
 from . import context as ctx
 from . import waf as wafmod
 from . import verifier
@@ -829,6 +829,18 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
                 self.coverage.record_finding(url, method)
                 confirmed = True
                 break  # one confirmed finding per param is enough
+        # Phase 307: bounded encoding retry.  A reflected marker does not
+        # mean the raw payload survives: decode/normalize-then-reflect pages
+        # (XSSMaze realworld-encoding 1-3, decode 3-4) echo the marker but
+        # reject raw tags, and the ladder's token-rewriting encodings are
+        # skipped by the Phase-157 guard before a request is ever sent.  The
+        # same one-payload pass used for the not-reflected branch runs here,
+        # after the normal candidates have failed (so confirmed params and
+        # encoded reflections pay nothing).
+        if (not confirmed and not marker_escaped and not csp_strict
+                and not is_body):
+            confirmed = self._try_encoding_first(
+                req, url, method, params, data, param, is_body, resp)
         # Phase 33: parameter position shifting (Burp-style).  WAFs often
         # guard only the parameter's ORIGINAL location (query or body).
         # When a WAF is present and nothing confirmed, re-fire the top
@@ -1280,16 +1292,25 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
 
     def _try_encoding_first(self, req, url, method, params, data, param,
                             is_body, resp):
-        """Phase 306: bounded encoded probes for decode-then-reflect endpoints.
+        """Bounded encoded probes for decode/normalize-then-reflect endpoints.
 
-        A plain marker is not reflected when the application decodes the
-        parameter before echoing it (base64 / multi-URL-decode), so the
-        normal flow returns at the "not reflected" branch and the transform
-        ladder never sees this parameter.  XSSMaze's encoding families are
-        exactly that shape.
+        Phase 306: a plain marker is not reflected when the application
+        decodes the parameter before echoing it (base64 / multi-URL-decode),
+        so the normal flow returns at the "not reflected" branch and the
+        transform ladder never sees this parameter.
+
+        Phase 307: the same shapes also occur *with* a reflected marker --
+        XSSMaze realworld-encoding 1-3 echo the plain marker but reject raw
+        tags and only render them after 3x URL-decode (level1), NFKC
+        fullwidth normalization (level2) or double HTML-entity decode
+        (level3); decode 3/4 double-decode URL/base64.  The ladder cannot
+        cover them: those transforms rewrite the token, so Phase 157's
+        "token not in variant" guard skips them before any request is sent.
+        The bounded retry is therefore also called after the payload loop
+        fails (see `_probe_param`), with the same one-payload budget.
 
         Deliberately bounded: GET query + HTML response only, ONE canonical
-        payload under three decode shapes -> at most 3 extra requests per
+        payload under six decode shapes -> at most 6 extra requests per
         parameter.  Evidence grading goes through the same verifier and
         ``_record`` chain as every other reflection.
         """
@@ -1306,17 +1327,22 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
         marked = verifier.mark(payload, token)
         if marked == payload:
             return False
-        for name in ("base64", "double_url_encode", "triple_url_encode"):
+        for name in ("base64", "double_base64", "double_url_encode",
+                     "triple_url_encode", "html_escape", "fullwidth"):
             try:
                 variant = transform.apply(name, marked)
             except Exception:
                 continue
             send = self._set_param(params, data, param, variant, is_body)
+            send_params, send_data = self._skip_filtered(
+                send["params"], send["data"])
             try:
-                r = req.request(method, url, params=send["params"],
-                                data=send["data"])
+                r = req.request(method, url, params=send_params,
+                                data=send_data)
                 self._bump()
                 self.coverage.record_request(url, method)
+            except (BudgetExhausted, CircuitOpen):
+                raise
             except Exception:
                 continue
             try:

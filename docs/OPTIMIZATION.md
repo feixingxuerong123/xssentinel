@@ -20,7 +20,7 @@
 | 测试 | 229 文件(全量套件实测,2026-10-23);`pytest --collect-only -q` = **3495 用例**(引用前先重跑,别抄这里的数字当活数) |
 | ruff 基线 | **0 条**(E/F/W,忽略 E501),`ruff check` 全仓实测 |
 | lint 门禁 | ① CI `ruff check`(2026-09-30 落地,fail-fast 在 tests job 之前)<br>② `tests/test_noqa_hygiene.py`(2026-10-01 落地,锁"F401 抑制必须带原因") |
-| 精度 | sync 194 例 TP113/FP0/TN81/FN0,f1=1.000;async TP107/FP0/TN75/FN0(12 例 sync-only SKIP);range4/5/6 双引擎全绿;**push 门 64 例分层切片双引擎 FP0/FN0/ERROR0**;外部 XSSMaze client 24/0/0、server 918/95/0(控制例 FP 0) |
+| 精度 | sync 194 例 TP113/FP0/TN81/FN0,f1=1.000;async TP107/FP0/TN75/FN0(12 例 sync-only SKIP);range4/5/6 双引擎全绿;**push 门 64 例分层切片双引擎 FP0/FN0/ERROR0**;外部 XSSMaze client 24/0/0、server 920/93/0(控制例 FP 0,Phase 306) |
 | 最大模块 | scanner.py **1869** 行 / async_scanner.py **1618** 行 / __main__.py **1511** 行 / dom_engine.py **1455** 行 / report.py **1440** 行(sandbox.py 已拆为 sandbox 1320 + sandbox_parser 1125 + sandbox_common 136) |
 
 ---
@@ -52,7 +52,7 @@
 **2026-10-23 补上"别人出题"的一半**:独立靶 XSSMaze v0.3.0(dalfox 作者维护,
 官方 runner,ground truth 来自靶自身 `/map/json`,27 条 `exploitable=false`
 控制例)终态 —— client 群 **TP24/FN0/FP0**(P/R/F1 1.000)、server 群
-**TP918/FN95/FP0**(P 1.000 / R 0.906 / F1 0.951),**控制例 FP 0**。
+**TP920/FN93/FP0**(P 1.000 / R 0.908 / F1 0.952,Phase 306),**控制例 FP 0**。
 目标、答案键与评分器都是第三方的,补上了"靶场是我们自己写的"这一半;
 仍缺的是与商业工具在同一独立靶上的对跑。口径与已知限制见 README「外部效度」。
 
@@ -694,8 +694,8 @@ ephemeral 绑定把机制本身去掉了。
 已完成: 1.0 真实靶场复跑(Phase 219,Juice Shop 20.2.0 双臂各 1 条 browser-executed)
 已完成: 2.3 range5(Phase 220,Lit)+ 2.1 parity 门扩到全 192 例(Phase 222,182 例 0 分歧)
 仍未做: 1.0 商业工具 × 真实第三方靶对跑(现只有自建矩阵上的切片)
-仍未做: 1.4 _probe_param 拆分(683 行单方法,属改逻辑,验收配全量矩阵)
-下一轮: 1.4 或 1.0 的"商业工具 × 真实第三方靶"那一支
+已完成: 1.4 _probe_param 拆分(Phase 211,787 → 171 行;当前 209 行)
+下一轮: 1.0 的"商业工具 × 真实第三方靶"那一支
 顺手:  3.x 随对应模块改动时一并处理
 ```
 

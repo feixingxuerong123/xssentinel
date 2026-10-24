@@ -7,6 +7,7 @@ independent of evasion tricks and lets the engine adapt to observed blocks.
 """
 from __future__ import annotations
 
+import html
 import re
 
 
@@ -74,6 +75,23 @@ def t_base64(s: str) -> str:
     """Base64-encode the payload (servers that decode before reflecting)."""
     import base64
     return base64.b64encode(s.encode("utf-8")).decode("ascii")
+
+
+def t_double_base64(s: str) -> str:
+    """Base64 applied twice (servers that decode twice)."""
+    return t_base64(t_base64(s))
+
+
+def t_html_escape(s: str) -> str:
+    """HTML-escape with the numeric apostrophe form.
+
+    Distinct from ``html_entity_named``: that one emits ``&apos;``/``&#40;``/
+    ``&#x2F;``, which some hand-rolled decoders do not understand (measured
+    on XSSMaze realworld-encoding level3: the double decoder restores
+    ``&lt;``/``&gt;``/``&#x27;`` and leaves the named forms alone, so the
+    closing tag never becomes a real ``</script>``).
+    """
+    return html.escape(s, quote=True)
 
 
 def t_null_byte(s: str) -> str:
@@ -262,6 +280,8 @@ REGISTRY = {
     "double_url_encode": t_double_url_encode,
     "triple_url_encode": t_triple_url_encode,
     "base64": t_base64,
+    "double_base64": t_double_base64,
+    "html_escape": t_html_escape,
     "null_byte": t_null_byte,
     "tab_break": t_tab_break,
     "newline_break": t_newline_break,

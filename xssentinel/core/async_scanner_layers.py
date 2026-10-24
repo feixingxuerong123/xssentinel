@@ -148,13 +148,18 @@ class AsyncDetectionLayersMixin:
     async def _try_encoding_first_async(self, session, url, method, param,
                                         params, data, is_body, resp_headers
                                         ) -> AsyncIterator[Finding]:
-        """Phase 306 sync parity: bounded encoded probes for decode-then-reflect.
+        """Phase 306/307 sync parity: bounded encoded probes.
 
-        The plain marker is not reflected when the app decodes the parameter
-        before echoing it, so no candidate carries the right encoding.  Same
-        gate and budget as sync: GET query + HTML only, one canonical payload
-        under three decode shapes -> at most 3 requests per parameter.
-        Evidence goes through the same verifier chain.
+        Phase 306: the plain marker is not reflected when the app decodes the
+        parameter before echoing it, so no candidate carries the right
+        encoding.  Phase 307: the same endpoint family also answers with the
+        plain marker reflected while rejecting raw tags (3x URL decode,
+        NFKC fullwidth, double HTML-entity decode, double base64), and the
+        ladder cannot reach those shapes because the Phase-157 token guard
+        skips every transform that rewrites the token.  Same gate and budget
+        as sync: GET query + HTML only, one canonical payload under six
+        decode shapes -> at most 6 requests per parameter.  Evidence goes
+        through the same verifier chain.
         """
         if is_body:
             return
@@ -166,7 +171,8 @@ class AsyncDetectionLayersMixin:
         marked = verifier.mark(payload, token)
         if marked == payload:
             return
-        for name in ("base64", "double_url_encode", "triple_url_encode"):
+        for name in ("base64", "double_base64", "double_url_encode",
+                     "triple_url_encode", "html_escape", "fullwidth"):
             try:
                 variant = transform_mod.apply(name, marked)
             except Exception:

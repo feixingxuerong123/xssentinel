@@ -1059,6 +1059,20 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
             csp_hdr = probe_headers.get("Content-Security-Policy") or ""
         except Exception:
             csp_hdr = ""
+        # Phase 307 sync parity: bounded encoding retry.  A reflected marker
+        # does not mean the raw payload survives -- decode/normalize-then-
+        # reflect pages echo the marker but reject raw tags, and the ladder's
+        # token-rewriting encodings are skipped by the Phase-157 guard before
+        # a request is sent.  Same one-payload pass as the not-reflected
+        # branch; runs only when nothing confirmed and the reflection is not
+        # output-encoded.
+        if (not param_confirmed and not marker_escaped and not is_body
+                and not (csp_hdr and csp_mod.is_strict_inline(csp_hdr))):
+            async for _f in self._try_encoding_first_async(
+                    session, url, method, param, params, data, is_body,
+                    probe_headers):
+                param_confirmed = True
+                yield _f
         # Phase 132: also gated on ``not param_confirmed`` -- sync's nonce
         # step (scanner.py:656) carries the same guard, and the block is
         # only reached on an unconfirmed param anyway.
