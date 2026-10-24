@@ -972,6 +972,7 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
                 # the app may simply decode whatever it is given, which is
                 # exactly what the encoding-first pass below covers.
                 if _pre_confirmed:
+                    self._cov_param_confirmed(url, method, param, is_body)
                     return
             # Phase 306 sync parity: decode-then-reflect endpoints never show
             # the plain marker; try the bounded encoded shapes before the
@@ -983,6 +984,7 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
                 _enc_confirmed = True
                 yield f
             if _enc_confirmed:
+                self._cov_param_confirmed(url, method, param, is_body)
                 return
         else:
             # Phase 308 sync parity: a case-normalised reflection still
@@ -1008,6 +1010,14 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
         _sel = await asyncio.to_thread(ctx.analyze_all, text, marker)
         context = _sel["context"]
         _extra_contexts = [c for c in _sel["contexts"] if c != context][:2]
+        # Phase 310 (sync parity, scanner.py:690): the param row now says
+        # the marker WAS reflected and in which context -- previously the
+        # async report read reflected=False/context=None for scans that
+        # had just confirmed a finding there (measured on /r/jsecho01).
+        _cov = getattr(self, "coverage", None)
+        if _cov is not None:
+            _cov.record_param(url, param, in_body=is_body, method=method,
+                              reflected=True, context=context)
 
         # Phase 93: escaped-reflection convergence (sync parity).  When the
         # marker reflects but the input around it is HTML-encoded, the
@@ -1054,6 +1064,8 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
                 context, marker, cands, marker_escaped, _fire):
             yield _f
         param_confirmed = _fire.param_confirmed
+        if param_confirmed:
+            self._cov_param_confirmed(url, method, param, is_body)
         resp_headers = _fire.resp_headers
         text = _fire.text
 

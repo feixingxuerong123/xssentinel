@@ -54,6 +54,20 @@ class AsyncDetectionLayersMixin:
         if cov is not None:
             cov.touch_layer(url, layer_id, method, detail)
 
+    def _cov_param_confirmed(self, url, method, param, is_body):
+        """Phase 310 (sync parity, scanner.py:833): mark the param row
+        confirmed once a payload verified.
+
+        The report's per-param "confirmed" column read False for async
+        scans that had just yielded a finding there.  One helper so the
+        three confirm paths (pre-encoded, encoding-first, main loop)
+        share the shape; getattr discipline as in _touch_coverage.
+        """
+        cov = getattr(self, "coverage", None)
+        if cov is not None:
+            cov.record_param(url, param, in_body=is_body, method=method,
+                             confirmed=True)
+
     def _drop_skip_params(self, params, data):
         """Phase 185: strip operator --skip-param names from a request pair.
 
@@ -1742,6 +1756,14 @@ class AsyncDetectionLayersMixin:
             if param_confirmed:
                 break
             marked = verifier.mark(payload, marker)
+            # Phase 310 (sync parity, scanner.py:824): one row per base
+            # payload dispatched.  Sync stamps each payload's own corpus
+            # family; async's candidates are plain strings, so the class
+            # recorded here is the classified driving context.
+            cov = getattr(self, "coverage", None)
+            if cov is not None:
+                cov.record_param(url, param, in_body=is_body, method=method,
+                                 payload_class=context, payloads_sent=1)
             # Phase 86: WAF/filter evasion parity with the sync _try_payload.
             # Until now the async path fired only the bare marked payload plus
             # one polyglot, so every evasion variant the sync engine tries

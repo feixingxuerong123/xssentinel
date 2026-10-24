@@ -3765,3 +3765,26 @@ TP107/FP0/TN75/FN0/ERR0** —— **5 条 FN 全部转正,TP 数与 p307_full_asy
 crawl 对必须带 `--crawl`(manifest extra_args)。"复现成功"先核对形状再下
 结论。② 门禁中途 loopback 劣化抖动(5 探 1 绿形态,187/200 同族),健康门
 按设计跳过,窗口恢复后复跑;劣化窗口里跑出的数字一律不作数。
+
+## Phase 310:async 逐参数覆盖接线 —— 报告不再为 --async 显示零
+
+Phase 309 排查时量到的副产品:Phase 290 给 async 接了 requests 与 layers 两
+路,但**逐参数行从未接线** —— 任何 --async 报告的参数覆盖区都读
+`reflected=False / context=None / payloads_sent=0 / payload_classes=[] /
+confirmed=False`,哪怕扫描刚在该参数上确认了 finding(309 的探针把
+"0 payloads dispatched"误读成引擎行为,正是这条缺口造成)。sync 侧五处
+record_param(Phase 20-3 契约,scanner.py 604/642/690/824/833),async 对位
+四处接线:反射+上下文在 `analyze_all` 后(sync :690 对位);载荷派发在
+`_fire_probe_variants` 逐基础载荷记 `payloads_sent=1` +
+`payload_class=分类上下文`(sync :824 对位;async 候选是纯字符串、不带语
+料族,记分类上下文并注明);确认经 `_cov_param_confirmed` 助手统一覆盖三条
+确认路径(pre-encoded / encoding-first / 主循环,sync :833 对位);
+`record_finding` 咽喉点 Phase 290 已接,不动。
+
+测试 `tests/test_phase310_async_param_coverage.py` 2 例(raw-echo 页参数行
+四字段全真;转义孪生 reflected=True / confirmed=False),**变异对照**:
+checkout 997a522 的两文件版本 → 2 failed,修复版 → 2 passed,守卫吃劲。
+门禁:受影响批 **7/7 文件绿 152s**(0 skip,含 Phase 290 覆盖套件与
+308/309 回归);quick 严格切片双引擎 **F1=1.0**(sync TP36/FP0/TN28/FN0,
+async TP36/FP0/TN27/FN0 1 SKIP,`p310_quick_{sync,async}.json`);ruff 全过。
+全量分批门禁与 XSSMaze 复扫随本轮串行补跑,见下一条目。
