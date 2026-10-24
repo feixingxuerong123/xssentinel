@@ -56,6 +56,9 @@ from server import run_server as bench_run_server  # noqa: E402
 
 # One endpoint per reflection family that has a deterministic manifest
 # case, plus BOTH incident shapes and two safe twins.  (path, param)
+# Optional 3rd element: the probe value; optional 4th: crawl=True (the
+# Phase 309 crawl pair -- the finding lands on a DISCOVERED endpoint, so
+# both engines must run their crawler for the slice to mean anything).
 _PARITY_SLICE = [
     ("/echo", "q"),            # raw html_element
     ("/attr", "q"),            # quoted attribute
@@ -69,6 +72,17 @@ _PARITY_SLICE = [
     ("/s/jsonct01", "q"),      # escaped JSON content-type -> BOTH silent
     ("/s/flt05", "q"),         # keyword filter -> concat stamp (incident 1)
     ("/r/jsonct01", "q"),      # raw JSON content-type -> downgrade (incident 2)
+    # Phase 309 (incident 3): async's per-payload build_polyglot probe
+    # confirmed on the FIRST candidate as polyglot_reflection and stopped
+    # the loop before any context-specific payload fired, so these five
+    # raw-echoing/crawled endpoints came out reflected/high on sync and
+    # polyglot_reflection/medium (or nothing) on async.  The direct trio
+    # pins the order fix; the crawl pair pins the crawled-endpoint path.
+    ("/r/jsecho01", "q"),      # raw echo -> reflected/high both engines
+    ("/r/formecho01", "q"),    # raw echo -> reflected/high both engines
+    ("/r/md01", "q"),          # markdown keeps scheme -> reflected/high
+    ("/r/crawl01", "q", "probe", True),   # form discovered -> /r/formecho01
+    ("/r/crawl02", "q", "probe", True),   # js discovered  -> /r/jsecho01
 ]
 
 _BUDGETS = dict(max_payloads=14, max_transforms=12)
@@ -96,9 +110,22 @@ def _run_sync(base: str, slice_=_PARITY_SLICE, dom_engine: str = "off") -> dict:
     for entry in slice_:
         path, param = entry[0], entry[1]
         value = entry[2] if len(entry) > 2 else "probe"
+        crawl = bool(entry[3]) if len(entry) > 3 else False
         sc = Scanner(requester=Requester(timeout=8), dom_engine=dom_engine,
-                     verbose=False, **_BUDGETS)
-        sc.scan_endpoint(base + path, "GET", {param: value}, {})
+                     verbose=False, crawl=crawl, **_BUDGETS)
+        if crawl:
+            # sync's crawl dispatch lives in scan_target (scan_endpoint is
+            # the single-endpoint pass only); async's lives in scan().
+            # Driving sync through scan_endpoint would zero the crawl pair
+            # and read as a divergence that the engines do not have.
+            sc.scan_target(base + path, "GET", {param: value}, {},
+                           oob_collect=False)
+            # The CLI dedups after every target (cli_runner); scan_target's
+            # discovered-endpoint list includes the start URL, so without
+            # this the landing page's finding is counted twice on sync only.
+            sc.dedup()
+        else:
+            sc.scan_endpoint(base + path, "GET", {param: value}, {})
         out[path] = _norm(sc.findings)
     return out
 
@@ -110,9 +137,10 @@ def _run_async(base: str, slice_=_PARITY_SLICE,
     async def _one(entry):
         path, param = entry[0], entry[1]
         value = entry[2] if len(entry) > 2 else "probe"
+        crawl = bool(entry[3]) if len(entry) > 3 else False
         asc = AsyncScanner(max_concurrent=4, per_host_delay=0, jitter=0,
                            timeout=8, dom_engine=dom_engine,
-                           advanced_layers=True, **_BUDGETS)
+                           advanced_layers=True, crawl=crawl, **_BUDGETS)
         got = []
         async for f in asc.scan(base + path, method="GET",
                                 params={param: value}):

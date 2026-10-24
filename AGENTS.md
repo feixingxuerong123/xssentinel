@@ -3718,3 +3718,50 @@ polyglot_reflection 而非 reflected(titlecase 反射的上下文分类不同),l
 测试 `tests/test_phase308_case_reflection.py` 18 例:双引擎 casemanip 三形态真
 HTTP 检出、safe 孪生沉默、重试成本记账(恰好 1 请求)、门控反例(非 swap
 变换不触发)、变异对照(摘 find_reflected_marker / 摘 _try_case_swap 必红)。
+
+## Phase 309:polyglot 探针不再抢先 —— async 主循环确认顺序对齐 sync
+
+起点是 Phase 308 收口时 full async 的 5 条 FN(当时按"b1b5417 既有"记账,
+假设是"确认落点 L7 fallback vs L1 主循环")。本轮逐帧插桩**把该假设推翻了**:
+
+**测量(全程实测)**:① 报告里 `payloads_dispatched: 0` / `reflected: False`
+是 async 覆盖报告没接线(Phase 290 只接了请求与层两路,`payloads_sent` 与
+reflected/context 只在 sync 侧写),不是行为证据;② 全局钩
+`aiohttp.ClientSession.request` + verify 逐调用打印后,真机制浮出:
+**L1 主循环自己确认并 yield 了 `polyglot_reflection`** ——
+`_fire_probe_variants` 把 `build_polyglot(marker)` 附加到**每个候选**的
+variant 列表(Phase 86 遗产),而候选队列首位正是语料 polyglot
+(`cross_context_candidates`);其基础+变换形态被静态验证器**正确拒绝**
+(token 在 `javascript:` URI 里,`<<script>` 标签汤使其不可执行),随后附加的
+味确认 → `param_confirmed=True` → 外层循环在候选 #2 之前 break —— 上下文
+专属载荷(`<script>alert()` 是候选 #2)**一个都没发**。sync 无此附加(它的
+polyglot 在 L7 层、受 nothing-confirmed 门),同页第 2 个候选即确认
+`reflected`/high。五例 FN 由评分侧 `finding_types:["reflected"]` 类型收窄
+单独造成。
+
+**修复**:`build_polyglot` 味从 per-payload 附加移到**整个候选队列之后**只发
+一次 —— 永不抢在上下文载荷前面;全部未确认时仍会发到(L7 离线时保有 L1
+覆盖);分级不变(`_polyglot_grade`),证据语义零新增。
+
+**门禁**:新测试 `tests/test_phase309_polyglot_order.py` 3 例(raw-echo 页
+async 必须确认 `reflected`/high —— 前代码按构造必红;sync 同页形状一致;
+转义孪生连尾部探针一起沉默);Phase 208 契约(/r/url03 双引擎一致 + polyglot
+分级)3/3 复跑过。**对等门 HTTP 切片 +5 端点**(jsecho01/formecho01/md01
+直达 + crawl01/crawl02 爬取对)—— 门当天抓到**两个门自己的形状错**,即修:
+sync 爬取派发在 `scan_target`(`scan_endpoint` 不含爬取,门凭空造出
+sync=空手的假分歧);爬取端点表含起始 URL 而 CLI 契约是每目标后 `dedup()`
+(门内不 dedup 则 sync 侧 landing finding 计双)。17 端点双引擎一致
+**39.5s**。受影响面定点批 **9/9 文件绿 242s**(308 回归 / 红队 / async 套件
+全过,0 skip)。benchmark 门禁(本机实测,产物 `p309_*.json`):quick 严格切片
+**sync TP36/FP0/TN28/FN0/ERR0、async TP36/FP0/TN27/FN0/ERR0(1 SKIP =
+stored-dom sync-only),双引擎 F1=1.0**;full 194 例 **sync
+TP113/FP0/TN81/FN0/ERR0**(与 p308_full_sync 逐例 verdict 全同)、**async
+TP107/FP0/TN75/FN0/ERR0** —— **5 条 FN 全部转正,TP 数与 p307_full_async
+记录逐项一致,双引擎 full 矩阵自本轮起双双 F1=1.0**。
+
+**过程两则**:① 排查早期三次自摆乌龙,都是复现形状不等价 ——
+`/r/jsecho01/` 带尾斜杠是 404 页(扫了个寂寞);进程内直调
+`scan(url)` 不拆 query 参数(async 引擎不自行解析 URL query,CLI 才拆);
+crawl 对必须带 `--crawl`(manifest extra_args)。"复现成功"先核对形状再下
+结论。② 门禁中途 loopback 劣化抖动(5 探 1 绿形态,187/200 同族),健康门
+按设计跳过,窗口恢复后复跑;劣化窗口里跑出的数字一律不作数。

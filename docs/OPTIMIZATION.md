@@ -589,17 +589,19 @@ JS config line(那本身就是 script-string sink),四例全 confirmed、safe
    基准里没有"慢速大 body"用例,先补用例再改。
    (同源背景:413 用例的 flake 是 13h 套件 ~20× 劣化下 2.1 MB 传输超 15s
    预算,Phase 224 按环境修了测试侧,产品侧这个候选仍开着。)
-7. **async 的 polyglot 确认落点与 sync 分叉(L7 fallback vs L1 主循环),叠加评分
-   类型收窄后记成 FN(Phase 308 门禁归因时量出,b1b5417 既有,未做)**:五个
-   benchmark 阳性例(pos-markdown-01 / pos-formmine-01 / pos-jsmine-01 /
-   aux-r-formecho01 / aux-r-jsecho01)sync 在主循环以 `reflected` 确认、async
-   只由 L7 polyglot fallback 以 `polyglot_reflection` 确认,而 manifest 的
-   `finding_types:["reflected"]` 不计后者 → async 全量记 FN5。原始报告里
-   finding 在(`_invoke_scanner` 直调两棵树都可见),引擎并未沉默。动它 = 动
-   async 的确认落点语义(把 polyglot 提进主循环候选,或扩评分类型表),要
-   单独 Phase + 测量。另:p307_full_async.json 的 TP 路径是在未提交 WIP 树
-   (早于 1580f8c 三分钟)上量的、加大预算(max_payloads 10/14/20)也造不
-   出来,不能再当 b1b5417 的 async 基线引用。
+7. ~~**async 的 polyglot 确认落点与 sync 分叉(L7 fallback vs L1 主循环),叠加
+   评分类型收窄后记成 FN**~~ **已修(Phase 309,测量推翻了本条的原假设)**:
+   逐帧插桩发现 finding 不是 L7 fallback 发的 —— L1 主循环自己的
+   `build_polyglot` 附加探针(每个候选的 variant 列表都附加一次)在候选 #1
+   (语料 polyglot,基础形态被静态模型正确拒绝)之后就确认并置
+   `param_confirmed`,上下文专属载荷一个都没发。sync 无此附加(它的 polyglot
+   在 L7 层、受 nothing-confirmed 门),同页确认 `reflected`/high。修复:该味
+   移到整个候选队列之后只发一次(永不抢在上下文载荷前面,L7 离线时仍保有
+   L1 覆盖)。五个用例 CLI 精确形状全部转正 `reflected`/high;对等门 HTTP
+   切片 +5 端点(含 crawl 对,sync 侧经 `scan_target` 驱动 —— `scan_endpoint`
+   不含爬取派发,门会凭空造出分歧)。另:p307_full_async.json 的 TP 路径是在
+   未提交 WIP 树(早于 1580f8c 三分钟)上量的、加大预算也造不出来,不能再当
+   b1b5417 的 async 基线引用。
 
 ---
 

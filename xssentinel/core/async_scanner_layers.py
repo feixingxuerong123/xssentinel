@@ -1751,13 +1751,6 @@ class AsyncDetectionLayersMixin:
             variants = await asyncio.to_thread(
                 self._build_variants, marked, context, marker,
                 2 if marker_escaped else None)
-            try:
-                # Polyglot probe for unknown contexts.
-                poly = poly_mod.build_polyglot(marker)
-                if not any(v == poly for _, v in variants):
-                    variants.append((["polyglot"], poly))
-            except Exception:
-                pass
 
             for tchain, variant in variants:
                 send_params, send_data = self._probe_kv(
@@ -2022,6 +2015,63 @@ class AsyncDetectionLayersMixin:
                         )
                         break
 
+
+        # Phase 309 (sync parity): the build_polyglot flavour used to be
+        # appended to EVERY payload's variant list, which put it AHEAD of
+        # every other candidate's base variant.  On a raw-echoing page it
+        # confirmed on payload #1 as polyglot_reflection and stopped the
+        # loop before any context-specific payload fired -- sync confirms
+        # reflected/high on the same pages (no per-payload append; its
+        # polyglot lives in the L7 layer behind the nothing-confirmed
+        # guard), so five benchmark cases scored FN on the scorer's type
+        # narrowing alone.  Fire the flavour ONCE, after the whole queue:
+        # never ahead of a context payload, still reached when nothing
+        # context-specific confirmed, same grading as before.
+        if not param_confirmed:
+            poly = poly_mod.build_polyglot(marker)
+            send_params, send_data = self._probe_kv(
+                params, data, param, poly, is_body)
+            try:
+                async with self._semaphore:
+                    await self._throttle(url)
+                    async with session.request(
+                        method, url, params=send_params or None,
+                        headers=self._req_headers(self.headers),
+                        proxy=self._next_proxy(),
+                        **_body_kwargs(send_data),
+                    ) as resp:
+                        text = await _read_text(resp)
+                        resp_headers = dict(getattr(resp, "headers", None) or {})
+                        self.requests_made += 1
+                        self._record_status(getattr(resp, "status", 200))
+            except (BudgetExhausted, CircuitOpen):
+                raise
+            except Exception:
+                pass
+            else:
+                v = await asyncio.to_thread(verifier.verify_semantic,
+                                            text, marker,
+                                            response_headers=resp_headers)
+                if (v["confirmed"]
+                        and verifier.payload_survived(text, poly)):
+                    idx = text.find(marker)
+                    param_confirmed = True
+                    _sev, _conf = _polyglot_grade(resp_headers)
+                    yield Finding(
+                        url=url, method=method, param=param,
+                        context=context,
+                        sink_context=v.get("context"),
+                        payload=poly,
+                        severity=_sev,
+                        evidence=text[max(0, idx - 30):
+                                      idx + len(marker) + 30],
+                        type="polyglot_reflection",
+                        confidence=_conf,
+                        content_type=_content_type(resp_headers),
+                        transform=["polyglot"],
+                        param_in="body" if is_body else "query",
+                        evidence_class=EVIDENCE_MODEL,
+                    )
 
         st.text = text
         st.resp_headers = resp_headers
