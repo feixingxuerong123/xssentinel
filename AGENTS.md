@@ -3808,3 +3808,28 @@ payload"注(文档刻度纪律)。
 以为 escaped 页能看到多族,实际 escaped 时 cand_budget=3、采样器前 3 个全是
 primary;插桩后又把生成式载荷的 context 标签误当接线错 —— 行为本来就对,
 断言改为"两路都可见"。门禁:受影响批 8/8 文件绿(0 skip),ruff 全过。
+
+## Phase 312:证据形状不变量跨引擎实测门(OPTIMIZATION 3.6 遗留 ① 结案)
+
+3.6 记的"仍然待做 ①":静态层一律 proof=None,"不可核对的高危"该被门拒绝
+—— 需要跨**全部**静态层的证据形状门,而不是每种错各修各的那一处。本轮先
+读清现状:Phase 218 的 `cap_unverified_severity` **就是**通用规则,且双引擎
+咽喉点都已接线(async `scan()` 最终 yield / sync `_record`)—— 缺的是**实
+证**:帽在真实服务器群体上确实咬得住,而不是信接线。落地两件:
+
+① `benchmark/evidence_shape_sweep.py`:共享不变量函数(`invariant_
+violations`:high/critical ⇒ browser-executed / OOB / headless 已确认 /
+proof / evidence 五者必有其一)+ 双引擎 sweep(`dom_engine="static"`,纯
+HTTP,无浏览器)+ 全量模式(211 路由,账本落
+`benchmark/results/phase312_evidence_shapes.json`,机器时间,不入套件 ——
+与 Phase 222 全量对等矩阵同一挂法)。
+
+② `tests/test_phase312_evidence_shape_gate.py` 常驻门 3 例:**cap 目标族**
+常驻 sweep(tt 静态提示 / prototype pollution / 反射与 safe 孪生,8 路由 ×
+双引擎)零违规;**变异对照**(帽从两引擎的绑定上 monkeypatch 掉)必须咬出
+违规 —— 实测咬出 4 条:trusted_types_policy_bypass 与 prototype_pollution
+各双引擎回到 high + evidence_class=browser-unavailable + 无 proof/evidence;
+外加不变量函数的单元形状。空转风险显式钉死:路由集若产出零 high 会被断言
+拒绝("gate would pass on an empty population")。
+
+全量 sweep 随本轮链式任务在 XSSMaze 复扫之后跑,账本数字见下一条目。
