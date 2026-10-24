@@ -586,18 +586,21 @@ Phase 265 同时修正了三页 hash→DOM 靶场：Chromium 会把 fragment 里
 `p265_full_sync_prefix.json`（FN3，恰好就是这三页）；修复前的 async 是
 `p265_full_async_noskip.json`（FN2，so2/scn 未声明 sync-only）。
 
-**外部效度（XSSMaze v0.3.0，2026-10-23 终态）**：第三方靶自带 official runner，
+**外部效度（XSSMaze v0.3.0，2026-10-24 终态）**：第三方靶自带 official runner，
 ground truth 来自靶自身的 `/map/json`；口径是“对照例上的任何 finding 记 FP，
 population 上的 low finding 也计检出”。同一棵树的官方 scorecard：
 
 | 群体 | TP | FN | FP | P | R | F1 |
 |---|---|---|---|---|---|---|
 | client（`--reach client --headless`） | 24 | 0 | **0** | 100% | 100% | **1.000** |
-| server（`--reach server`） | 920 | 93 | **0** | 100% | 90.8% | **0.952** |
+| server（`--reach server`） | 925 | 88 | **0** | 100% | 91.3% | **0.955** |
 
-27 条控制例 **0 findings**（本轮起点 13 条）。server 的 93 条 FN 中，主体是
+27 条控制例 **0 findings**（本轮起点 13 条）。server 的 88 条 FN 中，主体是
 query 能力缺口；body/header/path 约 35 条是官方 runner 只给 URL 的投递契约形状。
 逐例账、失败归因与复跑命令在 `dev/_xssmaze/`（dev 目录不入库）。
+其中 4 条 100s wrapper 超时在单独复跑里 **10–12s 完成并命中**（环境），补齐口径
+**929 / 84 / 0（R 91.7% / F1 0.957）**；Phase 306 的 920 也含 3 条超时（本轮恢复），
+两次都不是无噪声读数。
 
 - **历史口径（Phase 176t；当前 Phase 265 为 sync 192/192、async 182/10，见上表）**：
   sync 192/192 全部计分（`scored=192`、`errors=0`、产物里新增 `engine` /

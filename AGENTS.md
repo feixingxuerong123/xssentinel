@@ -3624,8 +3624,34 @@ sync/async 正例、五个 safe 孪生（断言零 finding）、两个变异对�
 **TP107/FP0/TN75/FN0/ERR0（12 SKIP）F1 1.000**（1551.8s）。**真实 lab
 双引擎**：五个目标端点全部命中且 transform 与形态逐一对应（re1 triple、
 re2 fullwidth、re3 html_escape、d3 double_url、d4 double_base64），27 条控制例
-双引擎 **0 findings**。**未跑**：1013 端点 official server 群体全量（本轮用
-五个目标端点 + 27 控制例取证），server 总分仍记 Phase 306 的 920/93；
+双引擎 **0 findings**。
+
+### 全量 server 群体重扫（2026-10-24，干净 worktree HEAD 1580f8c）
+
+官方 runner `--reach server`，1013 population + 27 controls，wrapper 100s，
+**4849.0s** —— **TP925 / FN88 / FP0，P 100% / R 91.3% / F1 0.955**
+（Phase 306：920/93，净 +5）。**6 条可稳定归因于 Phase 307**：五条目标端点
+全部命中且 transform 逐一对应（re1 `triple_url_encode`、re2 `fullwidth`、
+re3 `html_escape`、d3 `double_url_encode`、d4 `double_base64`），外加
+`polyglot/level3`（`triple_url_encode`，2/2 复跑稳定）；27 条控制例 **0 findings**。
+**4 条 100s wrapper 超时是环境**：`csti/level4` / `domctx/level6` /
+`domsink/level7` / `domsource/level1` 单独复跑均 **10–12s 完成并有 finding**
+→ 补齐口径 **929 / 84 / 0（R 91.7% / F1 0.957）**。反过来 Phase 306 的 920
+也含 3 条超时（`dom/level33`、`dom/level4`、`scriptgadget/level5`，本轮恢复），
+所以两次总分都不是"无噪声"读数。其余差值：polyglot 摆动（`eventhandler/level3`
+本轮 +1、复跑 0/2；`realworld/level7` 本轮 -1、复跑 1/2；`jsescape/level2`
+本轮 -1、复跑 0/2，p306 那次是摆动）、`truncation/level6` 的 base-payload
+命中（非新形态）、`csti/level5` / `jquery/level3` 的 `dom_dynamic` 条数变化
+（浏览器层摆动）——均不计入 Phase 307 的增益。
+
+**过程两则**：① 首跑把 `C:\...\python.exe` 写进 `--custom-scanner`，runner
+的 `shlex.split` 吃掉反斜杠 → 第一个 URL 就 `OSError` 并 `break`，随后把
+**0/1013** 写成成绩、exit 0；改正斜杠路径后正常（错误产物留档
+`server_p307_INVALID_zero.*`）。**runner 的 exit 0 不等于它执行过**。
+② 干净 worktree（`1580f8c`）跑，避免把工作树里并发会话的未提交改动算进
+这次外部读数；命令与逐例账在 `dev/_xssmaze/server_p307_run.log` /
+`server_p307.tsv` / `rerun_p307.tsv`。
+
 `tests/test_engine_parity_gate.py` 只跑了 HTTP 切片（3 passed），重型 DOM
 切片未跑（与本改动无交集，基线仍为 Phase 222 的全量结果）。
 

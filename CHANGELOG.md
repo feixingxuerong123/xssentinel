@@ -562,7 +562,9 @@
   双解码器）。真实 lab 双引擎五端点全部命中且 transform 与形态对应，27 条控制例
   0 findings；sync/async 全量 194 均 F1 1.000；strict 64 双引擎 FP0/FN0/ERROR0。
   同时修掉同函数两处不一致：编码探针未过滤 `--skip-param`，以及
-  `BudgetExhausted`/`CircuitOpen` 被裸 `except` 吞掉。
+  `BudgetExhausted`/`CircuitOpen` 被裸 `except` 吞掉。全量 1013 端点 server
+  群体（干净 worktree HEAD 1580f8c，官方 runner）：**TP925/FN88/FP0，F1 0.955**；
+  4 条 100s wrapper 超时单跑 10–12s 命中（补齐口径 929/84），27 控制例 0 findings。
 
 - **解码回显型 XSS 的漏报与 async 的"严格解码"盲区(Phase 306)**:应用先解码再回显
   (base64 / 多轮 URL 解码)时明文 marker 不回显,而候选与变换梯子都以"已反射"为前提,

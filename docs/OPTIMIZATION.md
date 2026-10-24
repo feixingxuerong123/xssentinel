@@ -20,7 +20,7 @@
 | 测试 | 229 文件(全量套件实测,2026-10-23);`pytest --collect-only -q` = **3495 用例**(引用前先重跑,别抄这里的数字当活数) |
 | ruff 基线 | **0 条**(E/F/W,忽略 E501),`ruff check` 全仓实测 |
 | lint 门禁 | ① CI `ruff check`(2026-09-30 落地,fail-fast 在 tests job 之前)<br>② `tests/test_noqa_hygiene.py`(2026-10-01 落地,锁"F401 抑制必须带原因") |
-| 精度 | sync 194 例 TP113/FP0/TN81/FN0,f1=1.000;async TP107/FP0/TN75/FN0(12 例 sync-only SKIP);range4/5/6 双引擎全绿;**push 门 64 例分层切片双引擎 FP0/FN0/ERROR0**;外部 XSSMaze client 24/0/0、server 920/93/0(控制例 FP 0,Phase 306) |
+| 精度 | sync 194 例 TP113/FP0/TN81/FN0,f1=1.000;async TP107/FP0/TN75/FN0(12 例 sync-only SKIP);range4/5/6 双引擎全绿;**push 门 64 例分层切片双引擎 FP0/FN0/ERROR0**;外部 XSSMaze client 24/0/0、server 925/88/0(控制例 FP 0,Phase 307) |
 | 最大模块 | scanner.py **1869** 行 / async_scanner.py **1618** 行 / __main__.py **1511** 行 / dom_engine.py **1455** 行 / report.py **1440** 行(sandbox.py 已拆为 sandbox 1320 + sandbox_parser 1125 + sandbox_common 136) |
 
 ---
@@ -49,10 +49,12 @@
 - 速度维度我们既不是最快也不是最慢:nuclei 用 49s 拿到 f1 0.839,我们用 346s
   拿 0.986。任何"性能优于同类"的说法都要按这张表校准。
 
-**2026-10-23 补上"别人出题"的一半**:独立靶 XSSMaze v0.3.0(dalfox 作者维护,
+**2026-10-24 补上"别人出题"的一半**:独立靶 XSSMaze v0.3.0(dalfox 作者维护,
 官方 runner,ground truth 来自靶自身 `/map/json`,27 条 `exploitable=false`
 控制例)终态 —— client 群 **TP24/FN0/FP0**(P/R/F1 1.000)、server 群
-**TP920/FN93/FP0**(P 1.000 / R 0.908 / F1 0.952,Phase 306),**控制例 FP 0**。
+**TP925/FN88/FP0**(P 1.000 / R 0.913 / F1 0.955,Phase 307),**控制例 FP 0**。
+4 条 100s wrapper 超时在单独复跑里 10–12s 完成并命中(环境),补齐口径
+**929/84/0**(R 91.7% / F1 0.957);Phase 306 的 920 也含 3 条超时(本轮恢复)。
 目标、答案键与评分器都是第三方的,补上了"靶场是我们自己写的"这一半;
 仍缺的是与商业工具在同一独立靶上的对跑。口径与已知限制见 README「外部效度」。
 
