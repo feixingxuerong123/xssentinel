@@ -139,8 +139,12 @@ class TestGenericErrorsDegrade:
     @pytest.mark.skipif(not SOCKETPAIR_OK,
                         reason="needs loopback (moved down from the file-level gate)")
     def test_transport_error_on_a_variant_tries_the_next_variant(self):
-        # call 3 (first variant) dies, call 4 (the polyglot) reflects and
-        # confirms: one dead request must not cost the finding.
+        # call 3 (first variant) dies, call 4 (the next variant) reflects
+        # and confirms: one dead request must not cost the finding.
+        # (Phase 309: call 4 used to be the per-payload build_polyglot
+        # flavour -- that append is gone, the flavour now fires once after
+        # the whole queue -- so call 4 is the next variant in the ladder
+        # and grades like a context hit, not like a polyglot.)
         s = _ScriptedSession(["echo", "echo",
                               ConnectionError("reset by peer"),
                               "echo"])
@@ -155,14 +159,13 @@ class TestGenericErrorsDegrade:
         # -- so it accepts either name rather than re-typing the grader's
         # vocabulary into a budget test.
         assert findings[0].data["type"] in ("reflected", "polyglot_reflection")
-        # Phase 221: confidence is 'medium', and always has been for this
-        # finding TYPE.  scanner_layers.py:781 sets confidence="medium" for
-        # every polyglot reflection on BOTH engines ("Phase 198: ... medium
-        # is the honest model-only default"), and the measured shape here is
-        # evidence_class=model-only.  This assertion carried 'high' from
-        # before Phase 198, i.e. it had been stale for the whole life of
-        # the polyglot grader.  Assert the grader's real contract.
-        assert findings[0].data["confidence"] == "medium"
+        # Phase 309: the confirming variant is a context-queue hit, graded
+        # by _non_html_grade (high on this HTML echo) where it used to be
+        # the appended polyglot flavour (graded medium by _polyglot_grade).
+        # The grading itself has its own gate (Phase 208 file); what THIS
+        # file pins is that the confirm is honestly graded, never None --
+        # whichever variant survived the dead one.
+        assert findings[0].data["confidence"] in ("high", "medium")
         assert findings[0].data["evidence_class"] == "model-only"
         assert findings[0].data.get("evidence"), \
             "a model-only claim must still show its evidence excerpt"
