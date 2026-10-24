@@ -1592,10 +1592,13 @@ class AsyncDetectionLayersMixin:
         payloads (Phase 37/95) -> RCDATA breakout surfacing (Phase 96) ->
         WAF bypass prepend (Phase 29-2).
 
-        Returns ``(cands, marker_escaped, prof)``:
+        Returns ``(cands, marker_escaped, prof, families)``:
         - ``marker_escaped`` comes back because the profile convergence can
           SET it mid-way (Phase 95), and every later stage reads it;
-        - ``prof`` comes back because the RCDATA stage reads it.
+        - ``prof`` comes back because the RCDATA stage reads it;
+        - ``families`` (Phase 311) maps each candidate to the corpus family
+          it was sampled from -- derived strings the profiler/ladder created
+          are simply absent and fall back to the classified context.
         No yields and no early returns -- which is why this stage could move
         as a plain function while B1 could not (B1 yields pre-encoded
         findings and returns out of the caller).
@@ -1612,11 +1615,18 @@ class AsyncDetectionLayersMixin:
         # on a param that is almost certainly safe.
         cand_budget = 3 if marker_escaped else self.max_payloads
         try:
-            cands = await asyncio.to_thread(
-                payloads_mod.cross_context_candidates, context,
+            tagged = await asyncio.to_thread(
+                payloads_mod.cross_context_candidates_tagged, context,
                 cand_budget)
         except Exception:
-            cands = payloads_mod.for_context("html_element")[:cand_budget]
+            tagged = [(s, context)
+                      for s in payloads_mod.for_context("html_element")
+                      [:cand_budget]]
+        # Phase 311: the real corpus family per candidate -- the coverage
+        # row's payload_classes column used to stamp every dispatch with
+        # the classified context because candidates were plain strings.
+        families = dict(tagged)
+        cands = [s for s, _ in tagged]
         # Phase 177: multi-reflection parity with sync -- append a small
         # slice for each additional reflection context after the primary
         # queue; the payload-loop budget decides whether they ever fire.
@@ -1626,6 +1636,7 @@ class AsyncDetectionLayersMixin:
                 for p in payloads_mod.for_context(_xc):
                     if p not in _seen:
                         _seen.add(p)
+                        families[p] = _xc
                         cands.append(p)
 
         # Phase 37: reflection profile + generative payloads (sync parity).
@@ -1670,6 +1681,11 @@ class AsyncDetectionLayersMixin:
                     gen_strs = [g["payload"] for g in gen_pls]
                     known = set(cands)
                     cands = [g for g in gen_strs if g not in known] + cands
+                    # Phase 311: generative payloads are built FOR the
+                    # classified context -- tag them as such.
+                    for g in gen_strs:
+                        if g not in known:
+                            families[g] = context
                 except Exception:
                     pass
                 # Phase 95: profile-backed escape convergence (sync parity).
@@ -1724,10 +1740,10 @@ class AsyncDetectionLayersMixin:
                 cands = bypass_payloads + cands
             except Exception:
                 pass
-        return cands, marker_escaped, prof
+        return cands, marker_escaped, prof, families
     async def _fire_probe_variants(self, session, url, method, param,
                                    params, data, is_body, context, marker,
-                                   cands, marker_escaped, st,
+                                   cands, marker_escaped, families, st,
                                    ) -> AsyncIterator[Finding]:
         """Phase 211 round 3: stages C/D/E of _probe_param, moved verbatim.
 
@@ -1756,14 +1772,16 @@ class AsyncDetectionLayersMixin:
             if param_confirmed:
                 break
             marked = verifier.mark(payload, marker)
-            # Phase 310 (sync parity, scanner.py:824): one row per base
-            # payload dispatched.  Sync stamps each payload's own corpus
-            # family; async's candidates are plain strings, so the class
-            # recorded here is the classified driving context.
+            # Phase 310/311 (sync parity, scanner.py:824): one row per base
+            # payload dispatched, stamped with the payload's real corpus
+            # family (Phase 311 tagged sampler).  Derived strings the
+            # profiler/ladder created are absent from the map and fall back
+            # to the classified context.
             cov = getattr(self, "coverage", None)
             if cov is not None:
                 cov.record_param(url, param, in_body=is_body, method=method,
-                                 payload_class=context, payloads_sent=1)
+                                 payload_class=families.get(payload, context),
+                                 payloads_sent=1)
             # Phase 86: WAF/filter evasion parity with the sync _try_payload.
             # Until now the async path fired only the bare marked payload plus
             # one polyglot, so every evasion variant the sync engine tries

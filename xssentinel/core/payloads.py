@@ -89,35 +89,51 @@ def _stride_sample(items: list[dict], n: int) -> list[dict]:
     return [items[int(i * step)] for i in range(n)]
 
 
+def cross_context_candidates_tagged(context: str, budget: int
+                                    ) -> list[tuple[str, str]]:
+    """(payload, corpus family) pairs -- ``cross_context_candidates`` with
+    the family each string came from.
+
+    Same order, same dedup, same caps as the plain list; the async engine
+    stamps each dispatched payload's real family into the coverage row
+    (Phase 311) instead of labelling every dispatch with the classified
+    context because the candidates were plain strings.
+    """
+    primary = by_context(context)[:max(6, budget // 2)]
+    out: list[tuple[str, str]] = [(p["payload"], context)
+                                  for p in primary if p.get("payload")]
+    seen = {s for s, _ in out}
+    for extra_ctx, n in _CROSS_CONTEXT.get(context, []):
+        for p in _stride_sample(by_context(extra_ctx), n):
+            s = p.get("payload", "")
+            if s and s not in seen:
+                seen.add(s)
+                out.append((s, extra_ctx))
+    return out[:budget]
+
+
 def cross_context_candidates(context: str, budget: int) -> list[str]:
     """Payload STRINGS for a context: even-stride sample of the primary
     corpus + the cross-context sibling corpora, capped at ``budget``.
     Order: primary first (biggest slice), then siblings — dedup preserves
     first-seen order.
 
-    NOTE: polyglots are deliberately NOT included here — the async probe
-    loop already appends a ``build_polyglot(marker)`` variant per payload
-    (matching the pre-Phase-43 behavior).  Adding the full polyglot corpus
-    here reordered multi-context gadget payloads into the budget window on
-    strictly-escaped endpoints and caused jQuery-gadget false positives
-    (their execution depends on page-level conditions the verifier cannot
-    see: jQuery presence, ``.html()`` entity decoding).
+    Phase 309 note: the async probe loop no longer appends a
+    ``build_polyglot(marker)`` variant per payload (that append reordered
+    the queue ahead of context-specific payloads and cost five benchmark
+    cases their finding type); the flavour now fires once, after the whole
+    candidate queue.  This sampler never carried the full polyglot corpus:
+    adding it here reordered multi-context gadget payloads into the budget
+    window on strictly-escaped endpoints and caused jQuery-gadget false
+    positives (their execution depends on page-level conditions the
+    verifier cannot see: jQuery presence, ``.html()`` entity decoding).
 
     The primary corpus is taken from the HEAD, not stride-sampled: the
     corpus is ordered by real-world yield, and stride sampling with small
     budgets was observed to skip the basic confirmation payloads (async L1
     tests with budget=3 regressed to zero findings).
     """
-    primary = by_context(context)[:max(6, budget // 2)]
-    out: list[str] = [p["payload"] for p in primary if p.get("payload")]
-    seen = set(out)
-    for extra_ctx, n in _CROSS_CONTEXT.get(context, []):
-        for p in _stride_sample(by_context(extra_ctx), n):
-            s = p.get("payload", "")
-            if s and s not in seen:
-                seen.add(s)
-                out.append(s)
-    return out[:budget]
+    return [s for s, _ in cross_context_candidates_tagged(context, budget)]
 
 
 def for_context(context: str) -> list[str]:

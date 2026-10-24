@@ -1049,9 +1049,10 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
         # bypass) moved to _build_probe_candidates.  marker_escaped comes back
         # because the profile convergence can set it, prof because the RCDATA
         # stage reads it.
-        cands, marker_escaped, prof = await self._build_probe_candidates(
-            session, url, method, param, params, data, is_body, context,
-            marker, marker_escaped, _extra_contexts)
+        cands, marker_escaped, prof, families = (
+            await self._build_probe_candidates(
+                session, url, method, param, params, data, is_body, context,
+                marker, marker_escaped, _extra_contexts))
 
 
         # Phase 211 round 3: the variant loop, the concat-stamp retry and the
@@ -1061,7 +1062,7 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
         _fire = _ProbeFireState(text)
         async for _f in self._fire_probe_variants(
                 session, url, method, param, params, data, is_body,
-                context, marker, cands, marker_escaped, _fire):
+                context, marker, cands, marker_escaped, families, _fire):
             yield _f
         param_confirmed = _fire.param_confirmed
         if param_confirmed:

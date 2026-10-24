@@ -3788,3 +3788,23 @@ checkout 997a522 的两文件版本 → 2 failed,修复版 → 2 passed,守卫�
 308/309 回归);quick 严格切片双引擎 **F1=1.0**(sync TP36/FP0/TN28/FN0,
 async TP36/FP0/TN27/FN0 1 SKIP,`p310_quick_{sync,async}.json`);ruff 全过。
 全量分批门禁与 XSSMaze 复扫随本轮串行补跑,见下一条目。
+
+## Phase 311:payload_classes 记真实语料族 —— 采样器带族标签
+
+310 的记账残留:逐参数行的 payload_classes 列,async 侧只能记分类上下文 ——
+候选采样器(`cross_context_candidates`)返回纯字符串,族信息在采样器边界
+就丢了。本轮:`cross_context_candidates_tagged` 返回 `(payload, family)` 对
+(原函数变成它的纯投影,顺序/去重/上限逐项不变);async 的
+`_build_probe_candidates` 建族映射(采样候选记真实族、extra-context 记其
+上下文、生成式载荷记分类上下文 —— 与 sync 的 dict 候选同语义),返回四元
+组;fire 循环记 `families.get(payload, context)` —— profiler/梯子派生的字
+符串不在映射里,按设计回落到分类上下文。顺带修掉采样器 docstring 里在 309
+之后过时的"probe loop already appends a build_polyglot variant per
+payload"注(文档刻度纪律)。
+
+测试 `tests/test_phase311_payload_family_tags.py` 5 例:tagged 与 plain 列表
+逐项镜像(3 上下文)、族含 primary + 兄弟族、回环集成用哨兵族名 monkeypatch
+采样器断言覆盖行两路都诚实(采样族 + 派生回落)。**第一版集成断言是错的**:
+以为 escaped 页能看到多族,实际 escaped 时 cand_budget=3、采样器前 3 个全是
+primary;插桩后又把生成式载荷的 context 标签误当接线错 —— 行为本来就对,
+断言改为"两路都可见"。门禁:受影响批 8/8 文件绿(0 skip),ruff 全过。
