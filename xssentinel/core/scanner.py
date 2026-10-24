@@ -603,6 +603,7 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
                                   detail=f"probing param '{param}'")
         self.coverage.record_param(url, param, in_body=is_body, method=method)
         marker = _stem_marker("xssm_") + secrets.token_hex(4)
+        sent_marker = marker
         probe = self._set_param(params, data, param, marker, is_body)
         # Phase 185: the probe request must not carry names the operator
         # listed in --skip-param.  Phase 184 kept them out of the iteration
@@ -623,7 +624,8 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
             # which otherwise only exists on the success path (_bump).
             self._check_cancel()
             return
-        if marker not in resp.text:
+        reflected_marker = ctx.find_reflected_marker(resp.text, marker)
+        if reflected_marker is None:
             # Phase 178c: a container param whose endpoint echoes only the
             # DECODED value shows nothing for a plain marker probe -- and
             # this early return ran before the pre-encode pipeline ever
@@ -647,6 +649,10 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
             self._try_encoding_first(req, url, method, params, data, param,
                                      is_body, resp)
             return  # not reflected -> skip
+        # Phase 308: the application may have changed only the case of the
+        # input.  Use the reflected spelling for context analysis and the
+        # escaped-marker check.
+        marker = reflected_marker
         # Phase 177: classify EVERY reflection point of the marker, not
         # just the first.  A parameter echoed in a nav highlight AND inside
         # a script block used to be classified by whichever came first in
@@ -840,6 +846,16 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
         if (not confirmed and not marker_escaped and not csp_strict
                 and not is_body):
             confirmed = self._try_encoding_first(
+                req, url, method, params, data, param, is_body, resp)
+        # Phase 308: a case-inverting application turned our lowercase
+        # <script>/alert/token into uppercase, so every payload above is
+        # dead.  A swap-cased payload is restored by the same transform; the
+        # reflected marker's exact swap-case spelling is the gate, so normal
+        # pages and upper-first/titlecase pages pay nothing.
+        if (not confirmed and not marker_escaped and not csp_strict
+                and not is_body and marker != sent_marker
+                and marker == sent_marker.swapcase()):
+            confirmed = self._try_case_swap(
                 req, url, method, params, data, param, is_body, resp)
         # Phase 33: parameter position shifting (Burp-style).  WAFs often
         # guard only the parameter's ORIGINAL location (query or body).
@@ -1363,6 +1379,59 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
             self.coverage.record_finding(url, method)
             return True
         return False
+
+    def _try_case_swap(self, req, url, method, params, data, param,
+                       is_body, resp):
+        """Phase 308: one swap-cased payload for case-inverting servers.
+
+        Called only when the reflected marker is the exact swap-case of the
+        sent marker.  One marked payload, at most one request; the server's
+        own case inversion restores the script and its token byte-for-byte,
+        so the normal verifier and ``_record`` chain apply unchanged.
+        """
+        if is_body or not url:
+            return False
+        try:
+            ctype = (resp.headers.get("Content-Type") or "").lower()
+        except Exception:
+            ctype = ""
+        if ctype and "text/html" not in ctype and "application/xhtml" not in ctype:
+            return False
+        token = "xssv_" + secrets.token_hex(4)
+        payload = "<script>alert(1)</script>"
+        marked = verifier.mark(payload, token)
+        if marked == payload:
+            return False
+        variant = transform.apply("swap_case", marked)
+        send = self._set_param(params, data, param, variant, is_body)
+        send_params, send_data = self._skip_filtered(
+            send["params"], send["data"])
+        try:
+            r = req.request(method, url, params=send_params,
+                            data=send_data)
+            self._bump()
+            self.coverage.record_request(url, method)
+        except (BudgetExhausted, CircuitOpen):
+            raise
+        except Exception:
+            return False
+        try:
+            v = verifier.verify_semantic(
+                r.text or "", token,
+                response_headers=dict(getattr(r, "headers", {}) or {}))
+        except Exception:
+            return False
+        if not v.get("confirmed"):
+            return False
+        self.coverage.touch_layer(url, "L1_pre_encoded", method,
+                                  detail="case-swap")
+        self._record(req, url, method, param, is_body, "reflected",
+                     v.get("context") or "html_element", variant,
+                     ["swap_case"], v, r, token)
+        self.coverage.record_param(url, param, in_body=is_body,
+                                   method=method, confirmed=True)
+        self.coverage.record_finding(url, method)
+        return True
 
     def _try_position_shift(self, req, url, method, params, data, param,
                             is_body, bases, context, waf_info,

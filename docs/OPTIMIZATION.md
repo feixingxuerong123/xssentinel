@@ -589,6 +589,17 @@ JS config line(那本身就是 script-string sink),四例全 confirmed、safe
    基准里没有"慢速大 body"用例,先补用例再改。
    (同源背景:413 用例的 flake 是 13h 套件 ~20× 劣化下 2.1 MB 传输超 15s
    预算,Phase 224 按环境修了测试侧,产品侧这个候选仍开着。)
+7. **async 的 polyglot 确认落点与 sync 分叉(L7 fallback vs L1 主循环),叠加评分
+   类型收窄后记成 FN(Phase 308 门禁归因时量出,b1b5417 既有,未做)**:五个
+   benchmark 阳性例(pos-markdown-01 / pos-formmine-01 / pos-jsmine-01 /
+   aux-r-formecho01 / aux-r-jsecho01)sync 在主循环以 `reflected` 确认、async
+   只由 L7 polyglot fallback 以 `polyglot_reflection` 确认,而 manifest 的
+   `finding_types:["reflected"]` 不计后者 → async 全量记 FN5。原始报告里
+   finding 在(`_invoke_scanner` 直调两棵树都可见),引擎并未沉默。动它 = 动
+   async 的确认落点语义(把 polyglot 提进主循环候选,或扩评分类型表),要
+   单独 Phase + 测量。另:p307_full_async.json 的 TP 路径是在未提交 WIP 树
+   (早于 1580f8c 三分钟)上量的、加大预算(max_payloads 10/14/20)也造不
+   出来,不能再当 b1b5417 的 async 基线引用。
 
 ---
 

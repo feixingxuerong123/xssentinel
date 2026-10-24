@@ -223,6 +223,71 @@ class AsyncDetectionLayersMixin:
             )
             return
 
+    async def _try_case_swap_async(self, session, url, method, param,
+                                   params, data, is_body, resp_headers
+                                   ) -> AsyncIterator[Finding]:
+        """Phase 308 sync parity: one swap-cased payload.
+
+        Called only when the reflected marker is the exact swap-case of the
+        sent marker.  One request; the app's case inversion restores the
+        script and its token byte-for-byte, so the same verifier applies.
+        """
+        if is_body:
+            return
+        ctype = (_content_type(resp_headers) or "").lower()
+        if ctype and "text/html" not in ctype and "application/xhtml" not in ctype:
+            return
+        token = "xssv_" + secrets.token_hex(4)
+        payload = "<script>alert(1)</script>"
+        marked = verifier.mark(payload, token)
+        if marked == payload:
+            return
+        variant = transform_mod.apply("swap_case", marked)
+        send_params, send_data = self._probe_kv(
+            params, data, param, variant, is_body)
+        send_params, send_data = self._drop_skip_params(
+            send_params, send_data)
+        try:
+            async with self._semaphore:
+                await self._throttle(url)
+                async with session.request(
+                    method, url, params=send_params or None,
+                    headers=self._req_headers(self.headers),
+                    proxy=self._next_proxy(),
+                    **_body_kwargs(send_data),
+                ) as resp:
+                    text = await _read_text(resp)
+                    hdrs = dict(getattr(resp, "headers", None) or {})
+                    self.requests_made += 1
+                    self._record_status(getattr(resp, "status", 200))
+        except (BudgetExhausted, CircuitOpen):
+            raise
+        except Exception:
+            return
+        v = await asyncio.to_thread(
+            verifier.verify_semantic, text, token,
+            response_headers=hdrs)
+        if not v.get("confirmed"):
+            return
+        idx = text.find(token)
+        sev, conf = _non_html_grade(hdrs)
+        self._touch_coverage(url, "L1_pre_encoded", method,
+                             detail="case-swap")
+        yield Finding(
+            url=url, method=method, param=param,
+            context=v.get("context") or "html_element",
+            sink_context=v.get("context"),
+            payload=variant,
+            severity=sev,
+            evidence=text[max(0, idx - 30):idx + len(token) + 30],
+            type="reflected",
+            confidence=conf,
+            content_type=_content_type(hdrs),
+            transform=["swap_case"],
+            param_in="body" if is_body else "query",
+            evidence_class=EVIDENCE_MODEL,
+        )
+
     def _resolve_dom_engine(self):
         """Phase 65: mirror the sync _resolve_dom_engine for L6 parity."""
         de = self.dom_engine

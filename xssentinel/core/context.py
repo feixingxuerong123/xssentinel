@@ -139,6 +139,41 @@ _ESCAPED_HINT_ENTITIES = (
     "&lt;", "&gt;", "&quot;", "&#39;", "&#x27;", "&amp;lt;", "&amp;gt;",
 )
 
+_ASCII_LOWER = str.maketrans("ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+                             "abcdefghijklmnopqrstuvwxyz")
+
+
+def _ascii_lower(value: str) -> str:
+    """Lowercase ASCII only -- length-preserving, unlike Unicode case folding.
+
+    The marker is an ASCII alphanumeric token, so only ASCII letters can
+    change; Unicode-aware lowercasing can change a string's length (e.g.
+    dotted capital I) and would desynchronise the match offset.
+    """
+    return value.translate(_ASCII_LOWER)
+
+
+def find_reflected_marker(text: str, marker: str) -> str | None:
+    """Return the marker exactly as it appears in *text*, or None.
+
+    Exact match first, then an ASCII case-insensitive match.  Some
+    applications normalise the case of their input (upper-first, titlecase,
+    swap-case); XSSMaze's casemanip family does exactly that.  A scanner
+    that only tests ``marker in text`` classifies those pages as "not
+    reflected" and never sends a payload -- measured on casemanip level2/3/6
+    where an `<img onerror>` reflection is live but the marker came back as
+    ``Xssm_...``.  The returned string is the reflected spelling, so the
+    context analyser and the escaped-marker check see the real bytes.
+    """
+    if not text or not marker:
+        return None
+    if marker in text:
+        return marker
+    index = _ascii_lower(text).find(_ascii_lower(marker))
+    if index < 0:
+        return None
+    return text[index:index + len(marker)]
+
 
 def is_marker_escaped(text: str, marker: str) -> bool:
     """True when the marker reflected but the input around it was encoded.

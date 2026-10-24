@@ -3658,3 +3658,63 @@ re3 `html_escape`、d3 `double_url_encode`、d4 `double_base64`），外加
 **顺带发现**：`tests/test_transform.py` 的计数在 Phase 306 加 3 个注册表
 条目后就已陈旧（23 vs 实际 25），说明那次提交的受影响面没有包含它 ——
 本轮把计数与六形态名字一起钉住，避免"删一个加一个"仍保持计数不变。
+
+## Phase 308:只改大小写的应用 —— 反射判定 ASCII 大小写不敏感 + swap-case 单载荷重试
+
+XSSMaze `casemanip` 家族 6 级里 p307 只过 3 级:level2(upper-first)/
+level3(swap-case)/ level6(titlecase)各 0 findings,而靶页里坐着活的
+`<img onerror>` 反射。根因是两引擎的反射判定都是 `marker in text` 精确匹配
+—— 输入被服务端改了大小写,参数就被分类成"未反射",载荷循环根本不进。
+修复两件:
+① `context.find_reflected_marker(text, marker)`:先精确匹配,再 ASCII-only
+大小写不敏感匹配(只转 ASCII:Unicode case folding 会改串长、匹配偏移会漂),
+**返回反射后的真实拼写**;双引擎的上下文分类与转义检查从此看到真字节。
+② swap-case 还有第二层:marker 回来了,但小写 `alert`/`<script>`/token 已被
+反转成大写,常规载荷照死。`transform.py` 注册 `swap_case`(不进默认梯子);
+sync `_try_case_swap` / async `_try_case_swap_async` 只在"反射 marker 恰是发送
+marker 的 swap-case"这门开时补发**一条** swap-case 标记载荷 —— 服务器自己的
+反转把 script 和 token 逐字节还原,证据走正常 verifier 与 `_record`
+(L1_pre_encoded,`transform=["swap_case"]`)。正常页与 upper-first/titlecase
+页零开销(门 = 精确 swap-case 相等)。
+
+**门禁**:ruff 全过(工作树 41 个 .py + 新测试);受影响面定点批 **8/8 文件绿
+938s**(`test_phase308_case_reflection.py` 558.5s / redteam 266.7s /
+attribute_context_quote 100s;`test_multi_reflection_context` 批内 1 环境序
+skip,单独复跑 6/6 过 —— 按跳过盲区纪律记);quick 严格切片双引擎 F1=1.0
+(21:32/21:41,`p308_quick_{sync,async}.json`);full sync 194 例
+**TP113/FP0/TN81/FN0/ERR0 F1=1.0**(733s,与 p307_full_sync 逐例 verdict 全同);
+full async 194 例 **TP102/FP0/TN75/FN5/ERR0**(643s)—— 5 条 FN 经差分归因为
+b1b5417 既有、与本 Phase 零因果(下详)。
+
+**full async 的 5 条 FN 归因(全程实测,不是推断)**:翻转 5 例
+(pos-markdown-01 / pos-formmine-01 / pos-jsmine-01 / aux-r-formecho01 /
+aux-r-jsecho01)在 p307_full_async 记 TP、本轮记 FN,请求数
+44/294/285/43/44 → 35/168/159/35/35。归因链:
+- 精确 harness 差分(b1b5417 worktree,cwd 钉死 worktree,runner 与 scanner
+  子进程全部落在旧树):**同 5 例同 FN、同请求数** —— b1b5417 今天就是这个行为;
+- 原始报告核查:`_invoke_scanner` 直调在两棵树上都**有** finding
+  (`polyglot_reflection`/medium),FN 是评分侧 `_is_detected` 的类型收窄
+  (用例声明 `finding_types:["reflected"]`,L7 polyglot fallback 的
+  `polyglot_reflection` 不计入)—— 扫描器没有沉默,是确认落点从 sync 的
+  L1 主循环(`reflected`;sync 全量 FN0 佐证)漂到了 async 的 L7 fallback;
+- **p307_full_async 记录本身不可复现**:它 17:41:45 落盘,早于 1580f8c
+  (17:44:18)与 b1b5417(19:38:07)两个提交 —— 那条 TP 是**未提交的 307 WIP
+  树**上量的,且当天下午全部跑数慢 1.8–2.4×(机器忙),其主循环 `reflected`
+  确认路径(44 请求)在 b1b5417 上加大预算(max_payloads 10/14/20 →
+  35/39/48 请求)也造不出来。
+**结论:Phase 308 零回归;5 条 FN 是既有 async 缺口的新暴露** —— async 的
+polyglot 确认落 L7 fallback 而 sync 落 L1 主循环,叠加评分类型收窄记成 FN。
+这是要单独开 Phase 的判定面问题(动它 = 动确认落点语义),本轮不动,已记入
+`docs/OPTIMIZATION.md` 3.6。引用旧 async 基线时注意:p307_full_async.json 的
+TP 路径不可复现,不能再当 b1b5417 的 async 基线引用。
+
+**外部效度(XSSMaze lab 3001 定点复验,wrapper 口径与 p307 一致、无 headless)**:
+casemanip level2 `high:reflected`、level3 `high:reflected`(走 swap_case)、
+level6 `medium:polyglot_reflection` —— **3 条 FN 全部转正,家族 3/6 → 6/6**,
+投射全量 929/84 → **932/81(R 92.0%)**;全量复扫未跑,按口径记账。level6 落
+polyglot_reflection 而非 reflected(titlecase 反射的上下文分类不同),lab 只看
+`findings[].url`,TP 判定不受影响。
+
+测试 `tests/test_phase308_case_reflection.py` 18 例:双引擎 casemanip 三形态真
+HTTP 检出、safe 孪生沉默、重试成本记账(恰好 1 请求)、门控反例(非 swap
+变换不触发)、变异对照(摘 find_reflected_marker / 摘 _try_case_swap 必红)。

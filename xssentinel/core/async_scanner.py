@@ -919,6 +919,7 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
         """Probe a single parameter for XSS. Yields findings."""
         stem = _stem_marker("xssentinel_async_")
         marker = f"{stem}{param}_{secrets.token_hex(2)}"
+        sent_marker = marker
         probe_params, probe_data = self._probe_kv(
             params, data, param, marker, is_body)
         # Phase 185: never transmit names the operator asked to withhold.
@@ -949,7 +950,8 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
             raise        # Phase 86: never treated as "this param failed"
         except Exception:
             return
-        if marker not in text:
+        reflected_marker = ctx.find_reflected_marker(text, marker)
+        if reflected_marker is None:
             # Phase 178c (sync parity): a container param whose endpoint
             # echoes only the DECODED value never reflects a plain marker
             # probe -- try the pre-encode pipeline from the ORIGINAL value
@@ -982,6 +984,11 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
                 yield f
             if _enc_confirmed:
                 return
+        else:
+            # Phase 308 sync parity: a case-normalised reflection still
+            # proves the parameter reached the page; use the reflected
+            # spelling for context analysis and the escaped-marker check.
+            marker = reflected_marker
 
         # Classify context (CPU-bound) -- run in thread.
         # `ctx.classify` never existed: this call raised AttributeError on every
@@ -1069,6 +1076,19 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
         if (not param_confirmed and not marker_escaped and not is_body
                 and not (csp_hdr and csp_mod.is_strict_inline(csp_hdr))):
             async for _f in self._try_encoding_first_async(
+                    session, url, method, param, params, data, is_body,
+                    probe_headers):
+                param_confirmed = True
+                yield _f
+        # Phase 308 sync parity: a case-inverting app turns the lowercase
+        # script/alert/token into uppercase, so the payloads above are dead.
+        # One swap-cased payload is restored by the same transform; the
+        # reflected marker's exact swap-case spelling is the gate.
+        if (not param_confirmed and not marker_escaped and not is_body
+                and not (csp_hdr and csp_mod.is_strict_inline(csp_hdr))
+                and marker != sent_marker
+                and marker == sent_marker.swapcase()):
+            async for _f in self._try_case_swap_async(
                     session, url, method, param, params, data, is_body,
                     probe_headers):
                 param_confirmed = True

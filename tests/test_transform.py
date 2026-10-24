@@ -39,12 +39,13 @@ PAYLOAD = "<svg/onload=alert('TOK')>"
 # registry contract
 # ---------------------------------------------------------------------------
 
-def test_registry_has_the_27_advertised_families():
-    assert len(T.REGISTRY) == 27
-    # Phase 306/307 encoding-first shapes.  Named explicitly so a deletion
-    # cannot be masked by some other addition keeping the count constant.
+def test_registry_has_the_28_advertised_families():
+    assert len(T.REGISTRY) == 28
+    # Phase 306/307/308 shapes.  Named explicitly so a deletion cannot be
+    # masked by some other addition keeping the count constant.
     for name in ("base64", "double_base64", "double_url_encode",
-                 "triple_url_encode", "html_escape", "fullwidth"):
+                 "triple_url_encode", "html_escape", "fullwidth",
+                 "swap_case"):
         assert name in T.REGISTRY
     assert all(callable(fn) for fn in T.REGISTRY.values())
 

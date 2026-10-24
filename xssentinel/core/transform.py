@@ -94,6 +94,18 @@ def t_html_escape(s: str) -> str:
     return html.escape(s, quote=True)
 
 
+def t_swap_case(s: str) -> str:
+    """Swap letter case.
+
+    For an application that inverts the case of its input (XSSMaze
+    casemanip level3), a swap-cased payload is restored byte-for-byte by the
+    same transform -- including the verification token.  Not part of the
+    default ladder; the scanner uses it only when the reflected marker is
+    exactly the swap-case of the sent marker.
+    """
+    return s.swapcase()
+
+
 def t_null_byte(s: str) -> str:
     """Insert a URL-encoded null byte before risky chars."""
     out = []
@@ -282,6 +294,7 @@ REGISTRY = {
     "base64": t_base64,
     "double_base64": t_double_base64,
     "html_escape": t_html_escape,
+    "swap_case": t_swap_case,
     "null_byte": t_null_byte,
     "tab_break": t_tab_break,
     "newline_break": t_newline_break,
