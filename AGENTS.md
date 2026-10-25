@@ -4103,3 +4103,21 @@ TP113/FP0/TN81/FN0/ERR0 F1=1.0;full async TP106/FP0/TN75/FN1 —— 唯一 FN
 
 **XSSMaze 投射:947/66**(942/71 + navsink-3 + codeexec-1,叠加 318 的三
 条)。全量复扫官方口径随后。
+
+## Phase 319 终账:官方口径 946/67/0(replay-corrected 948/65)
+
+官方 runner 全量复扫(`server_p319.{json,md,tsv}`,wrapper 100s,4541.8s):
+**TP946 / FN67 / FP0,P 100% / R 93.4% / F1 0.966**;控制例 0 FP。两行
+wrapper 100s 超时(codeexec/level5、mxss/level5)都是此前 TP 的重 DOM 页
+(p310/p316 各 12s×多次)—— **探索波的真实成本在此显形**:每页多 5 次
+导航,顶破了 wrapper 预算。replay-corrected **948/65**。
+
+**session 终轨迹:925/88(1.2.0)→ 948/65(replay-corrected),+23 条 FN
+关闭**,横跨:case 反射(308)、polyglot 顺序(309)、HPP 双序(315)、语
+料两批(316/318)、沙箱 tagged-template(316)、DOM sink 三钩子(317)、
+探索波(319)。控制例全程 0 FP。
+
+**下一步调优(319 的成本尾巴)**:wrapper 预算 100s 对重 DOM 页收紧了
+(探索波 +5 导航)—— 要么 wrapper 预算上调,要么探索波只付给静态层显式旗
+标了导航/模块 sink 字样的页面(成本回落近基线,能力不丢),独立小轮带测量
+再动。剩余 65 条 FN 的分解照 FN_ATTRIBUTION_20261025 的族表更新口径。
