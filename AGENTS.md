@@ -4046,3 +4046,7 @@ dom-9(script.innerText)、domsink-6(Object.assign href)三条全部
 (`import()` 是语法构造)—— 两者都能被正确的 carrier 执行,但都无命中可记
 、wave-1 永不付账。出路是"无命中探索波"机制(每端点限额的一次盲付),会改
 Phase 226 的成本模型,要独立一轮带成本测量再动。
+
+**外部靶复核**:dom/level30、dom/level9、domsink/level6 三端点全部
+FN→`high:1 dom_dynamic:1`(wrapper 实测)—— 317 的三条 closes 全部在
+真实 lab 上兑现,投射 942/71 → **945/68**。
