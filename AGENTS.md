@@ -3969,3 +3969,25 @@ JS 启用的 noscript rawtext 里是惰性文本 / meta-refresh js: 现代 Chrom
 jsescape-3(反引号页被分类为 script_string_sq,模板语料永不触发 —— 上下文
 分类的产品缺口)、sanitizer-6(href 空格等号,语料非头部位)、edge-1(前导
 null)、sanitizer-edge-2(未加引号 var)仍为 FN,已记入下一批。
+
+## Phase 317(开局):DOM 通道 5 个 sink 的仪器缺口清单(实测)
+
+314 归因的 DOM 通道 5 条 FN,对照 `_init_script` 的现有钩子清单逐个核实:
+**五个 sink 全部未钩** —— dynamic `import()`(codeexec-1)、
+`document.execCommand('insertHTML')`(dom-30)、script 元素的
+`innerText`/`textContent` 赋值(dom-9:script 文本即执行)、
+`Object.assign(location, {href})`(domsink-6:href setter 导航)、
+`location.assign(js:)`(navsink-3)。现有钩子覆盖 innerHTML/write/
+setAttribute(NS)/insertAdjacentHTML/parseFromString/eval/Function 家族,
+不含上述五个。
+
+每条的实现要点:① 钩子进 `_init_script`(记录 marker 命中,不自证 ——
+Phase 226 契约:执行由页面自己的 dialog 测量);② 每个形状配 Chromium
+可执行/不可执行对照页(312 同款纪律:浏览器先裁再改判定);③ DOM 引擎的
+carrier 波要把载荷送到这些 sink(现值注入走 query → location.search 派生
+变量,五个页面的 source 都是 location.search 族,触发路径现成)。
+
+**本轮只落清单不开工**:XSSMaze 全量复扫仍在跑(DOM 页 12s/条,机器被
+占),Chromium 验证与实现等复扫结束 —— 与 187/200 记过的同机争用同一条
+纪律。实现估计:5 钩子 + 5 对照 fixture + carrier 接线 + oracle 测试,一整
+轮。
