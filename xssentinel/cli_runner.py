@@ -396,11 +396,19 @@ def _run_scan(args, url: str, requester, oob, progress, checkpoint,
                 _log.warning("--json given but -d is not valid JSON; "
                              "falling back to form encoding")
     base_url = _base_url_keeping_fragment(parsed)
+    # Phase 315: parameter names the target URL carried MORE than once --
+    # the dict parse keeps the first value, the dup evidence feeds the HPP
+    # layer's ordering probes (XSSMaze hpp-level1: first value rendered,
+    # last value filter-checked).
+    dup_params: set = set()
     if parsed.query:
+        seen_counts: dict = {}
         for pair in parsed.query.split("&"):
             if "=" in pair:
                 k, v = pair.split("=", 1)
+                seen_counts[k] = seen_counts.get(k, 0) + 1
                 params.setdefault(k, v)
+        dup_params = {k for k, n in seen_counts.items() if n > 1}
 
     custom_pl = []
     if args.custom_payloads and os.path.isfile(args.custom_payloads):
@@ -515,6 +523,7 @@ def _run_scan(args, url: str, requester, oob, progress, checkpoint,
         custom_payloads=custom_pl, crawl_engine=args.crawl_engine,
         scenario_file=getattr(args, "scenarios", None),
         skip_params=_operator_skip_params(args),
+        dup_params=dup_params,
         bav=bool(getattr(args, "bav", False)),
         param_wordlist=_param_wl,
         max_requests=getattr(args, "max_requests", None),
@@ -847,11 +856,16 @@ def _run_async_scan(args, url: str, oob, progress, checkpoint,
         params = kv
     parsed = urlparse(url)
     base_url = _base_url_keeping_fragment(parsed)
+    # Phase 315 (single-URL async path): same dup evidence as the sync path.
+    _dup_params: set = set()
     if parsed.query:
+        seen_counts: dict = {}
         for pair in parsed.query.split("&"):
             if "=" in pair:
                 k, v = pair.split("=", 1)
+                seen_counts[k] = seen_counts.get(k, 0) + 1
                 params.setdefault(k, v)
+        _dup_params = {k for k, n in seen_counts.items() if n > 1}
 
     # Phase 47: JSON-body support on the async path (sync parity).  A -d
     # value that parses as a JSON object (or an explicit --json flag)
@@ -902,6 +916,7 @@ def _run_async_scan(args, url: str, oob, progress, checkpoint,
         max_concurrent=args.threads * 5 if args.threads > 1 else 20,
         max_payloads=args.max_payloads, max_transforms=args.max_transforms,
         timeout=args.timeout, headers=headers, cookies=cookies,
+        dup_params=_dup_params,
         proxy=args.proxy, verify_ssl=not args.no_verify_ssl,
         verbose=args.verbose, crawl=args.crawl, crawl_depth=args.crawl_depth,
         oob=oob, advanced_layers=True,
@@ -1033,8 +1048,10 @@ def _run_async_batch(args, urls: list[str], requester, oob, progress,
         the global concurrency cap is respected across all URLs.
 
     Returns a ``{url: scanner_shim}`` dict so the batch loop can write
-    a per-URL report just like the sync path.  Failed URLs are omitted
-    from the dict (the caller checks for missing keys).
+    a per-URL report just like the sync path.  A URL whose scan RAISED
+    is still in the dict (with 0 findings -- the caller can tell the
+    attempt apart from a clean miss via the error log); only URLs that
+    were never tracked (checkpoint-skipped) are absent.
     """
     import asyncio
     from .core.async_scanner import AsyncScanner, is_available as async_available
@@ -1126,6 +1143,7 @@ def _run_async_batch(args, urls: list[str], requester, oob, progress,
     # async coroutine doesn't need to touch argparse.
     from xssentinel.__main__ import _parse_kv  # lazy: avoid circular import
     targets = []
+    _batch_dup_params: set = set()
     for url in urls:
         if checkpoint and checkpoint.is_scanned(url):
             continue
@@ -1142,11 +1160,22 @@ def _run_async_batch(args, urls: list[str], requester, oob, progress,
         parsed = urlparse(url)
         base_url = _base_url_keeping_fragment(parsed)
         if parsed.query:
+            # Phase 315: collect the batch's dup evidence (the scanner is
+            # constructed once for all URLs; the union is scanned -- a
+            # non-dup URL's HPP probe costs a few requests and cannot
+            # fabricate a finding, the dup-shape verify chain is unchanged).
+            _counts: dict = {}
             for pair in parsed.query.split("&"):
                 if "=" in pair:
                     k, v = pair.split("=", 1)
+                    _counts[k] = _counts.get(k, 0) + 1
                     params.setdefault(k, v)
+            for k, n in _counts.items():
+                if n > 1:
+                    _batch_dup_params.add(k)
         targets.append((url, base_url, params, data))
+    if _batch_dup_params:
+        asc.dup_params = _batch_dup_params
 
     # Track per-URL findings by recording the findings-list length before
     # each URL scan.  Findings [before, after) belong to that URL.
@@ -1219,13 +1248,15 @@ def _run_async_batch(args, urls: list[str], requester, oob, progress,
         shim.findings = list(asc.findings[lo:hi])
         shim.requests_made = requests_before.get(orig_url, 0)
         shim.waf_name = getattr(asc, "waf_name", None)
-    # Phase 290: the shim was built with its OWN empty CoverageTracker, so
-    # every --async report's coverage section read all zeros no matter what
-    # the scan did.  Hand the async engine's real tracker over -- the async
-    # scanner fills it at the session boundary (requests), the finding
-    # choke point, and per layer.  (Both async entry points build a shim.)
-    if getattr(asc, "coverage", None) is not None:
-        shim.coverage = asc.coverage
+        # Phase 290: the shim was built with its OWN empty CoverageTracker,
+        # so every --async report's coverage section read all zeros no matter
+        # what the scan did.  Hand the async engine's real tracker over --
+        # the async scanner fills it at the session boundary (requests), the
+        # finding choke point, and per layer.  (Both async entry points build
+        # a shim; the handover is per-shim and guarded so test doubles
+        # without a tracker keep working.)
+        if getattr(asc, "coverage", None) is not None:
+            shim.coverage = asc.coverage
         # Phase 98b: same credential bridge as the single-URL async path
         # (attach_pocs reads the shim's session, which was empty).
         try:

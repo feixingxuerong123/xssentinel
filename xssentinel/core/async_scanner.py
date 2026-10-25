@@ -211,6 +211,7 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
                  verbose: bool = False,
                  crawl: bool = False,
                  crawl_depth: int = 2,
+                 dup_params: set | None = None,
                  oob=None,
                  advanced_layers: bool = True,
                  dom_engine: str = "off",
@@ -336,6 +337,9 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
         self.verbose = verbose
         self.crawl = crawl
         self.crawl_depth = crawl_depth
+        # Phase 315 (sync parity): parameter names the target URL itself
+        # duplicated -- HPP probes them without a WAF fingerprint.
+        self.dup_params = set(dup_params or ())
         self.oob = oob
         self.advanced_layers = advanced_layers
         self.dom_engine = dom_engine
@@ -1125,7 +1129,11 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
                     context, csp_hdr):
                 yield _f
 
-        if self.waf_name and not param_confirmed:
+        # Phase 315: the dup-evidence gate widens the WAF gate -- a
+        # parameter the target URL itself carried twice gets the HPP probe
+        # without a WAF fingerprint (sync parity).
+        if ((self.waf_name or param in getattr(self, "dup_params", ()))
+                and not param_confirmed):
             self._touch_coverage(url, "L2_hpp", method)
             async for _f in self._probe_hpp(
                     session, url, method, param, params, data, is_body,

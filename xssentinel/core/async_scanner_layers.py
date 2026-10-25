@@ -1500,11 +1500,14 @@ class AsyncDetectionLayersMixin:
                          is_body, context, cands) -> AsyncIterator[Finding]:
         """Phase 193/196: HPP -- HTTP Parameter Pollution (sync _try_hpp parity).
 
-        The parameter is sent twice -- first occurrence benign, second the
-        payload; a filter inspecting only the first occurrence passes the
-        request while the backend renders the payload occurrence.  WAF gate
-        mirrors sync; both positions (query pairs / raw urlencoded body);
-        capped at two payloads per (url, param).
+        The parameter is sent twice -- one occurrence the payload, the
+        other benign, BOTH orderings probed (Phase 315): payload-second
+        catches filters reading the first occurrence; payload-first
+        catches the mirror shape (first value rendered, last value
+        filter-checked -- measured on XSSMaze hpp-level1).  Gate mirrors
+        sync (WAF fingerprint or the operator URL's own dup evidence);
+        both positions (query pairs / raw urlencoded body); capped at two
+        payloads x two orderings per (url, param).
         """
         _htried = getattr(self, "_hpp_tried", None)
         if _htried is None:
@@ -1514,73 +1517,76 @@ class AsyncDetectionLayersMixin:
             return
         _htried.add((url, param))
         for _cand in cands[:2]:
-            _htok = "xssv_" + secrets.token_hex(4)
-            _hpay = verifier.mark(_cand, _htok)
-            if _hpay == _cand:
-                continue
-            if is_body:
-                _bpairs = [(k, v) for k, v in (data or {}).items()
-                           if k != param]
-                _bpairs.append((param, "xsssafe"))
-                _bpairs.append((param, _hpay))
-                _hparams = params
-                _hdata = urlencode(_bpairs)
-                _hheaders = dict(self._req_headers(self.headers))
-                _hheaders["Content-Type"] = \
-                    "application/x-www-form-urlencoded"
-            else:
-                _hparams = [(k, v) for k, v in (params or {}).items()
-                            if k != param]
-                _hparams.append((param, "xsssafe"))
-                _hparams.append((param, _hpay))
-                _hdata = data
-                _hheaders = self._req_headers(self.headers)
-            try:
-                async with self._semaphore:
-                    await self._throttle(url)
-                    async with session.request(
-                        method, url, params=_hparams or None,
-                        headers=_hheaders,
-                        proxy=self._next_proxy(),
-                        **_body_kwargs(_hdata),
-                    ) as hresp:
-                        _htext = await _read_text(hresp)
-                        _hhdrs = dict(getattr(hresp, "headers", None) or {})
-                        self.requests_made += 1
-                        self._record_status(getattr(hresp, "status", 200))
-            except (BudgetExhausted, CircuitOpen):
-                raise
-            except Exception:
-                continue
-            if not _htext or _htok not in _htext:
-                continue
-            _hv = await asyncio.to_thread(
-                verifier.verify_semantic, _htext, _htok,
-                response_headers=_hhdrs)
-            if not _hv.get("confirmed"):
-                continue
-            _hidx = _htext.find(_htok)
-            yield Finding(
-                url=url, method=method, param=param,
-                context=context,
-                sink_context=_hv.get("context"),
-                payload=_hpay,
-                severity="high",
-                evidence=_htext[max(0, _hidx - 30):
-                                _hidx + len(_htok) + 30],
-                type="reflected",
-                confidence="high",
-                transform=["hpp"],
-                param_in="body" if is_body else "query",
-                evidence_class=EVIDENCE_MODEL,
-                detail=(
-                    "HPP: the parameter was sent twice (first occurrence "
-                    "benign, second the payload) and the payload-carrying "
-                    "occurrence is what the application rendered -- a "
-                    "filter inspecting only the first occurrence was "
-                    "bypassed"),
-            )
-            break
+            for _payload_first in (False, True):
+                _htok = "xssv_" + secrets.token_hex(4)
+                _hpay = verifier.mark(_cand, _htok)
+                if _hpay == _cand:
+                    continue
+                _dup = ([(param, _hpay), (param, "xsssafe")]
+                        if _payload_first
+                        else [(param, "xsssafe"), (param, _hpay)])
+                if is_body:
+                    _bpairs = [(k, v) for k, v in (data or {}).items()
+                               if k != param]
+                    _bpairs.extend(_dup)
+                    _hparams = params
+                    _hdata = urlencode(_bpairs)
+                    _hheaders = dict(self._req_headers(self.headers))
+                    _hheaders["Content-Type"] = \
+                        "application/x-www-form-urlencoded"
+                else:
+                    _hparams = [(k, v) for k, v in (params or {}).items()
+                                if k != param]
+                    _hparams.extend(_dup)
+                    _hdata = data
+                    _hheaders = self._req_headers(self.headers)
+                try:
+                    async with self._semaphore:
+                        await self._throttle(url)
+                        async with session.request(
+                            method, url, params=_hparams or None,
+                            headers=_hheaders,
+                            proxy=self._next_proxy(),
+                            **_body_kwargs(_hdata),
+                        ) as hresp:
+                            _htext = await _read_text(hresp)
+                            _hhdrs = dict(getattr(hresp, "headers", None) or {})
+                            self.requests_made += 1
+                            self._record_status(getattr(hresp, "status", 200))
+                except (BudgetExhausted, CircuitOpen):
+                    raise
+                except Exception:
+                    continue
+                if not _htext or _htok not in _htext:
+                    continue
+                _hv = await asyncio.to_thread(
+                    verifier.verify_semantic, _htext, _htok,
+                    response_headers=_hhdrs)
+                if not _hv.get("confirmed"):
+                    continue
+                _hidx = _htext.find(_htok)
+                yield Finding(
+                    url=url, method=method, param=param,
+                    context=context,
+                    sink_context=_hv.get("context"),
+                    payload=_hpay,
+                    severity="high",
+                    evidence=_htext[max(0, _hidx - 30):
+                                    _hidx + len(_htok) + 30],
+                    type="reflected",
+                    confidence="high",
+                    transform=["hpp"],
+                    param_in="body" if is_body else "query",
+                    evidence_class=EVIDENCE_MODEL,
+                    detail=(
+                        "HPP: the parameter was sent twice (payload "
+                        f"occurrence {'first' if _payload_first else 'second'}, "
+                        "the other benign) and the payload-carrying "
+                        "occurrence is what the application rendered -- a "
+                        "filter inspecting only the other occurrence was "
+                        "bypassed"),
+                )
+                break
 
     async def _build_probe_candidates(self, session, url, method, param,
                                       params, data, is_body, context,

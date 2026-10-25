@@ -131,6 +131,7 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
                  crawl_depth: int = 2, scope: str | None = None,
                  threads: int = 1, oob: OOBListener | None = None,
                  dom_engine: str = "auto", verbose: bool = False,
+                 dup_params: set | None = None,
                  progress=None, checkpoint=None,
                  custom_payloads: list[str] | None = None,
                  advanced_layers: bool = True,
@@ -160,6 +161,11 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
         self.max_payloads = max_payloads
         self.crawl = crawl
         self.crawl_depth = max(0, int(crawl_depth))
+        # Phase 315: parameter names the target URL itself carried MORE
+        # than once (the CLI's dict parse keeps the first value; the dup
+        # evidence lives here).  The HPP layer probes such params without
+        # requiring a WAF fingerprint -- the duplicated key IS the shape.
+        self.dup_params = set(dup_params or ())
         # Scope: when set, only crawl URLs that start with this prefix (in
         # addition to the same-origin check).  None -> same-origin only.
         self.scope = scope
@@ -869,14 +875,17 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
                 req, url, method, params, data, param, is_body,
                 bases, context, waf_info, transform_priority)
         # Phase 193: HPP (HTTP Parameter Pollution, dalfox --hpp parity).
-        # Same parameter sent TWICE -- first occurrence benign, second the
-        # payload.  Backends disagree about which occurrence wins (PHP/ASP
-        # take the last, some stacks the first) while a filter that inspects
-        # only the first occurrence sees the benign value and passes the
-        # request through.  Same WAF gate as the position shift, and the
-        # standard ladder has already failed here.
+        # Same parameter sent TWICE -- one occurrence the payload, the other
+        # benign, BOTH orderings probed (Phase 315).  Backends and filters
+        # disagree about which occurrence they inspect and which they
+        # render: first-benign/second-payload catches filters reading the
+        # first occurrence, first-payload/second-benign catches the mirror
+        # (first value rendered, last value filter-checked -- measured on
+        # XSSMaze hpp-level1).  WAF gate as before, widened with params the
+        # operator's URL itself duplicated (dup evidence, no WAF needed).
         if (not confirmed and not marker_escaped and not csp_strict
-                and waf_info and waf_info.get("waf")):
+                and ((waf_info and waf_info.get("waf"))
+                     or param in getattr(self, "dup_params", ()))):
             confirmed = self._try_hpp(
                 req, url, method, params, data, param, is_body,
                 bases, context) or confirmed
@@ -1201,17 +1210,21 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
                  is_body, bases, context):
         """Phase 193/196: HTTP Parameter Pollution attempt (dalfox --hpp).
 
-        The parameter is duplicated -- first occurrence keeps its benign
-        baseline value, second carries the marked payload.  Confirmation is
-        the standard ``verify_semantic`` on the response, so nothing here
-        changes verdict semantics: this only ADDS a request shape the
-        ladder never tried.  Both positions (Phase 196): query parameters
-        duplicate as a list of pairs; form-encoded bodies duplicate as a
-        raw urlencoded string with an explicit ``application/x-www-form-
-        urlencoded`` Content-Type (a dict cannot carry duplicate keys).
-        JSON carriers are skipped -- duplicate-key semantics there belong
-        to the pre-encode machinery.  Capped at two payloads per
-        (url, param).
+        The parameter is duplicated -- one occurrence carries the marked
+        payload, the other a benign value.  BOTH orderings are probed
+        (Phase 315): first-benign/second-payload catches backends that
+        render the last occurrence behind a filter reading the first;
+        first-payload/second-benign catches the mirror shape measured on
+        XSSMaze hpp-level1 (first value rendered, last value
+        filter-checked).  Confirmation is the standard ``verify_semantic``
+        on the response, so nothing here changes verdict semantics: this
+        only ADDS request shapes the ladder never tried.  Both positions
+        (Phase 196): query parameters duplicate as a list of pairs;
+        form-encoded bodies duplicate as a raw urlencoded string with an
+        explicit ``application/x-www-form-urlencoded`` Content-Type (a
+        dict cannot carry duplicate keys).  JSON carriers are skipped --
+        duplicate-key semantics there belong to the pre-encode machinery.
+        Capped at two payloads x two orderings per (url, param).
         Returns True when a finding was added.
         """
         tried = getattr(self, "_hpp_tried", None)
@@ -1226,46 +1239,49 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
             return False
         self.coverage.touch_layer(
             url, "L2_hpp", method,
-            detail=f"param='{param}' duplicated: first occurrence benign, "
-                   f"second carries the payload")
+            detail=f"param='{param}' duplicated, both orderings probed: "
+                   f"payload in the second occurrence (filter reads the "
+                   f"first) and in the first (render takes the first)")
         for base in bases[:2]:
-            self._check_cancel()
-            payload = base.get("payload") if isinstance(base, dict) else None
-            if not payload:
-                continue
-            token = "xssv_" + secrets.token_hex(4)
-            marked = verifier.mark(payload, token)
-            if marked == payload:
-                continue          # nothing stampable -> no attributable proof
-            if is_body:
-                # Phase 196: form-body duplication -- a dict cannot carry
-                # duplicate keys, so the body goes out as a raw urlencoded
-                # string with an explicit Content-Type.
-                from urllib.parse import urlencode
-                body_pairs = [(k, v) for k, v in (data or {}).items()
-                              if k != param]
-                body_pairs.append((param, "xsssafe"))
-                body_pairs.append((param, marked))
-                try:
-                    resp = req.request(
-                        method, url, params=params, data=urlencode(body_pairs),
-                        headers={"Content-Type":
-                                 "application/x-www-form-urlencoded"})
-                    self._bump()
-                    self.coverage.record_request(url, method)
-                except Exception:
+            for payload_first in (False, True):
+                self._check_cancel()
+                payload = base.get("payload") if isinstance(base, dict) else None
+                if not payload:
                     continue
-            else:
-                pairs = [(k, v) for k, v in (params or {}).items()
-                         if k != param]
-                pairs.append((param, "xsssafe"))
-                pairs.append((param, marked))
-                try:
-                    resp = req.request(method, url, params=pairs, data=data)
-                    self._bump()
-                    self.coverage.record_request(url, method)
-                except Exception:
-                    continue
+                token = "xssv_" + secrets.token_hex(4)
+                marked = verifier.mark(payload, token)
+                if marked == payload:
+                    continue          # nothing stampable -> no attributable proof
+                dup_pairs = ([(param, marked), (param, "xsssafe")]
+                             if payload_first
+                             else [(param, "xsssafe"), (param, marked)])
+                if is_body:
+                    # Phase 196: form-body duplication -- a dict cannot carry
+                    # duplicate keys, so the body goes out as a raw urlencoded
+                    # string with an explicit Content-Type.
+                    from urllib.parse import urlencode
+                    body_pairs = [(k, v) for k, v in (data or {}).items()
+                                  if k != param]
+                    body_pairs.extend(dup_pairs)
+                    try:
+                        resp = req.request(
+                            method, url, params=params, data=urlencode(body_pairs),
+                            headers={"Content-Type":
+                                     "application/x-www-form-urlencoded"})
+                        self._bump()
+                        self.coverage.record_request(url, method)
+                    except Exception:
+                        continue
+                else:
+                    pairs = [(k, v) for k, v in (params or {}).items()
+                             if k != param]
+                    pairs.extend(dup_pairs)
+                    try:
+                        resp = req.request(method, url, params=pairs, data=data)
+                        self._bump()
+                        self.coverage.record_request(url, method)
+                    except Exception:
+                        continue
             if resp is None or token not in (resp.text or ""):
                 continue
             try:
@@ -1279,10 +1295,11 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
                 continue
             _cls, _conf, _det = _grade_evidence(
                 None, "high",
-                ("HPP: the parameter was sent twice (first occurrence "
-                 "benign, second the payload) and the payload-carrying "
-                 "occurrence is what the application rendered -- a filter "
-                 "inspecting only the first occurrence was bypassed"),
+                ("HPP: the parameter was sent twice (payload occurrence "
+                 f"{'first' if payload_first else 'second'}, the other "
+                 "benign) and the payload-carrying occurrence is what the "
+                 "application rendered -- a filter inspecting only the "
+                 "other occurrence was bypassed"),
                 model_judged=True)
             self._add(Finding(**{
                 "url": url, "method": method, "param": param,

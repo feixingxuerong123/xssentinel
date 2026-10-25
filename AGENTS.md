@@ -3888,3 +3888,26 @@ cspbypass-6 的外链脚本同族,共 2 条)。
 token 预算硬约束);产品代码 1(HPP 镜像);结构性 2;DOM 通道 5(独立工
 作量);其余为逐上下文长尾。约束照旧:语料加形状不加梯子条目(校准预算
 已满,2026-10-23 的 instrument-first 协议继续有效)。
+
+## Phase 315:HPP 首现位镜像 —— 314 归因量出的唯一产品缺口落地
+
+归因实测先补齐(hpp-level1 四形状 curl):单值 payload 被过滤、**dup 且
+payload 首位**才渲染、dup 次位被拦 —— 过滤只看末值、渲染取首值,与 193 的
+"首现 benign/次现 payload"正好互为镜像。且 dup 证据在 CLI 解析处就被丢掉
+(`setdefault` 只留首值)。落地三件:
+
+① **dup 证据保留**:`cli_runner` 三处 query 拆分点收集重复键名,经新构造
+参数 `dup_params` 到达双引擎(多 URL 批路径用并集,构造后赋属性 —— 非复
+URL 的 HPP 探测多花几个请求、verify 链不变不可能造假阳性)。
+② **HPP 双序探针**:sync `_try_hpp` / async `_probe_hpp` 各加
+payload-first 排序(原 payload-second 先跑,193 契约顺序不变),detail 文案
+按实际命中的顺序写;上限改 2 载荷 × 2 序。
+③ **门加宽**:WAF 指纹之外,`param in dup_params` 也开 HPP 层 —— URL 自带
+的重复键**就是** HPP 形状的证据,不需要 WAF。
+
+测试 `tests/test_phase315_hpp_first_slot.py` 4 例(render-first/filter-last
+fixture):sync/async 首现位确认、无 dup 且无 WAF 双引擎保持沉默(门不许
+加宽过头)。**端到端**:XSSMaze hpp-level1 用 wrapper 复扫 —— FN → 1 条
+`high:reflected`(1.7s)。门禁:受影响批 8/8 文件绿(含 193/196 既有 HPP
+契约),quick 严格切片双引擎 F1=1.0(`p315_quick_{sync,async}.json`),ruff
+全过。重构插曲:async 侧尾部缩进没跟上新排序循环层级,AST 当场咬住即修。
