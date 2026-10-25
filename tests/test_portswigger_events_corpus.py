@@ -30,7 +30,13 @@ _EXPECTED_FAMILY_SIZE = 48
 # this test file back to its pre-addition copy while keeping the corpus
 # that has the payload, so the two disagreed; the corpus is the newer
 # artefact and the constant follows it.
-_EXPECTED_HTML_ELEMENT_SIZE = 206
+# 207, not 206: `html-legacy-regex-001` (Phase 285 -- measured live
+# against the OWASP Juice Shop legacy-profile RegEx sanitizer, browser
+# dialog carried the probe token) was appended at the TAIL.  Same
+# rule: the corpus is the newer artefact.  Note a tail append still
+# shifts sync's stride sample (len feeds the step), which is why
+# Phase 285 re-measured the gate in this state.
+_EXPECTED_HTML_ELEMENT_SIZE = 209
 
 
 def test_family_loads_and_is_registered():

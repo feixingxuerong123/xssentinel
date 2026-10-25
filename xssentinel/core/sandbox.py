@@ -1002,6 +1002,18 @@ def _token_in_executing_call(body: str, token: str) -> str:
                         _EXECUTING_CALLEES:
                     found[0] = True
                     return
+            # Phase 316: a TAGGED template `alert\`tok\`` is a CALL -- the tag
+            # function receives the literal as its argument (Chromium-measured:
+            # the dialog fires with the token).  esprima models it as
+            # TaggedTemplateExpression, not CallExpression, so the
+            # call-argument rule above never matches and the lexical scan
+            # classifies the backtick span as template-data.
+            if node.get("type") == "TaggedTemplateExpression":
+                r = node.get("range")
+                if r and r[0] <= span[0] and span[1] <= r[1] \
+                        and _callee_name(node.get("tag")) in _EXECUTING_CALLEES:
+                    found[0] = True
+                    return
             for v in node.values():
                 walk(v)
         elif isinstance(node, list):

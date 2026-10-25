@@ -3911,3 +3911,39 @@ fixture):sync/async 首现位确认、无 dup 且无 WAF 双引擎保持沉默(�
 `high:reflected`(1.7s)。门禁:受影响批 8/8 文件绿(含 193/196 既有 HPP
 契约),quick 严格切片双引擎 F1=1.0(`p315_quick_{sync,async}.json`),ruff
 全过。重构插曲:async 侧尾部缩进没跟上新排序循环层级,AST 当场咬住即修。
+
+## Phase 316:语料批落地(instrument-first 全程)+ 沙箱 tagged-template 保真缺陷
+
+314 归因的语料批。**instrument 两课(都是实测撞出来的)**:① sync 的
+`_build_candidates` 用**等距步进采样**(209 条取 0/29/59/89/119/149/179 位),
+async 用头取 —— 头部插入的新条目 sync 永远采不到;步进位上的 7 个既有条目
+在三个全量 run 里**全部 0 产出**(挖 p307/p308/p315 的 finding payload 对账
+语料条目,零新跑)。② 逃逸收敛(`profile_says_encoded` → `del cands[3:]`)
+把 sq 队列砍到前 3 —— 排序在第 4 位的反引号变体被切。
+
+**语料变更**(209 钉同步,207→209):html_element 步进位 29/89 原位替换
+(0 产出的 svg-style-img 与 form-button)为 noscript 破口与
+`<IMG SRC=x ONERROR=alert(1)>`(标签大写 + JS 体原样 —— mixed_case 连 JS
+体一起变是实测死因);步进位 59 原位替换为 `<NoScript><script>`(noscript-3
+只剥字面小写);script_string_sq 加 2 条(标签破口 + **反引号戳**变体),
+反引号变体重排进收敛窗口。
+
+**顺带修掉一个沙箱保真缺陷(Chromium 先裁)**:jsescape-2 的答案键载荷在
+响应里原样携带 token,沙箱却判 inert —— `alert\`tok\`` 是**带标签的模板字
+面量**(标签函数收到字面量作为参数,Chromium 实测弹窗带 token),esprima 建
+模为 TaggedTemplateExpression 而非 CallExpression,`_token_in_executing_call`
+的调用参数规则永不匹配。walk 加 TaggedTemplateExpression 分支(tag 属执行族
+即 live)。`test_sandbox_fidelity` 8/8 复跑通过。
+
+**端到端**:noscript-1 / pdiff-1 / ctxv2-5 / chain-4 / jsescape-2 五端点
+FN→TP(wrapper 实测 high:reflected);nonce-4 与 noscript-4 记账为结构不可
+达(quote 转义服务器杀掉一切含引号的 token 戳;meta-refresh js: 现代
+Chromium 不执行 —— lab 弱 oracle);noscript-3 同族(答案键载荷在 JS 启用
+的 noscript rawtext 里是惰性文本)。门禁:受影响批 10/10 绿、quick 严格切片
+双引擎 F1=1.0(async 的 neg-ws-01 三次 90s 超时记 ERROR,单例复跑 TN 10.4s
+—— 环境传输抖动,服务器日志同刻 ConnectionReset),ruff 全过。
+
+**结构性残留( honest 记账)**:quote 转义服务器 + 引号 token 戳的不兼容
+是 mark() 契约级问题(戳必然引入引号);这类端点要确认需要无引号的 token
+携带形状(alert(1) 无法携带归属 token)—— 与 312 的静态形状检出是同一个
+讨论,不在本批。
