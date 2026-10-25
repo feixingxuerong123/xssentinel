@@ -39,6 +39,9 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
 
+import pytest  # noqa: E402  (Phase 321: the measured 267s shape needs an
+# explicit per-test timeout so a slow CI runner cannot kill a green drill)
+
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
@@ -191,6 +194,7 @@ def _scan(base: str, path: str, extra: tuple = (),
             pass
 
 
+@pytest.mark.timeout(900)
 class TestIndependentTarget(unittest.TestCase):
     """Recall on shapes the benchmark never sees, and silence on decoys."""
 
@@ -340,23 +344,22 @@ class TestIndependentTarget(unittest.TestCase):
     def test_decoy_requires_auth(self):
         self._silent("/api/private/item")
 
-    def test_json_body_is_reported_at_LOW_confidence(self):
-        """Not an FP and not a plain TP -- it locks the engine's own choice.
-
-        Phase 32 (scanner.py) sees a non-HTML content type, keeps the finding
-        and drops it to low confidence.  That decision used to live only in a
-        comment; this asserts it, including that the detail line names the
-        content type.  It does NOT assert exploitability.
+    def test_json_body_reflection_is_suppressed_as_noise(self):
+        """Not an FP and not a plain TP -- it locks the engine's content-type
+        gate.  Phase 32 kept the finding at low confidence; the XSSMaze
+        controls measured on 2026-10-22 (bugbounty-level10 / json-level2/3 /
+        realworld-level6) showed that family to be pure triage noise -- a
+        browser tab renders neither JSON nor text/plain as markup -- so the
+        gate now records NOTHING on data-only media types.  The branch is
+        still exercised here; the counter-case (application/javascript and
+        text/xml reflections SURVIVE the same gate) is pinned in
+        tests/test_low_noise_suppression.py.
         """
-        # Phase 179: severity drops WITH confidence -- a severity-high
-        # finding on a non-HTML response triaged like a live sink in every
-        # severity-only consumer (benchmark FP gate, SARIF error level).
         got = _scan(self.base, "/api/echo-json?msg=probe", min_severity=None)
-        self.assertTrue(got, "the reflection should still be recorded")
-        for f in got:
-            self.assertEqual(f.get("confidence"), "low")
-            self.assertEqual(f.get("severity"), "low")
-            self.assertIn("application/json", f.get("detail") or "")
+        self.assertEqual(
+            got, [],
+            "a reflection in data-only application/json must be suppressed "
+            f"as noise, got {got}")
 
 
 if __name__ == "__main__":

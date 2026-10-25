@@ -4121,3 +4121,28 @@ wrapper 100s 超时(codeexec/level5、mxss/level5)都是此前 TP 的重 DOM 页
 (探索波 +5 导航)—— 要么 wrapper 预算上调,要么探索波只付给静态层显式旗
 标了导航/模块 sink 字样的页面(成本回落近基线,能力不丢),独立小轮带测量
 再动。剩余 65 条 FN 的分解照 FN_ATTRIBUTION_20261025 的族表更新口径。
+
+## Phase 320/321:性能测量与优化(一次同日回退)+ CI 审计
+
+**320a 性能测量(数据)**:full sync 从 733s 涨到 1049s,差值 ≈ 319 探索波
+在 ~25 个静态旗标页各付 ~12s(逐 case 时间分布:最慢的 pos-url-01 83.7s/
+61 请求 —— 非请求密集,是 DOM analyze 的导航波)。async quick 同形状。
+
+**320b 尝试与同日回退**:探索波关键字门控(`location.assign/href=/import(`
+出现在渲染页 JS 才付波;关键字源经 `page_text` 从调用方首份响应穿入 —— 导
+航 sink 会在分析中途把活文档导航走,活页 content() 读到的是 404)。
+**实测:成本砍半**(async quick 886s→310s)但 **pos-dom-04 丢 TP** —— 它的
+sink 是 document.write,hash 投递的载荷经命中钩子付波,**页面文本里没有任何
+导航关键字** —— 关键字集漏了全部"已钩 sink"族。**同日回退到 319 无条件
+行为**(召回不换墙钟),精化设计(关键字集 = 全部执行族 sink 的并集,或静
+态层 sink 旗标穿参)记账待矩阵验证轮。page_text 穿参保留(无害,是精化设
+计的地基)。
+
+**321 CI 审计(抓到静默缺口)**:push 作业 `--timeout=120` 会掐死实测长测
+试(parity DOM 切片 875s、redteam 至 267s)——修:作业上限 300 + 三个已知
+长测试显式 per-test marker(900/1800/900);nightly 挂 312 证据形状 sweep。
+验证只能到本地(集合数 + ruff + YAML parse),CI 端在下一次 push 兑现。
+
+**门禁**:318 批 8/8 + quick 双引擎 F1=1.0 + full sync TP113/FP0/TN81/FN0;
+320 的关键字门控版 full sync TP112/FN1(pos-dom-04)即回退依据;回退后的
+full sync 复验在队列(机器 loopback 节流中,单跑诊断亦受阻)。

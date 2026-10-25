@@ -1797,6 +1797,23 @@ class DynamicDomAnalyzer:
             # converts a 763s stall into a 0.02s empty read.
             _recover_nav(page)
 
+    #: Phase 320: a navigation/module sink the exploratory carriers can
+    #: actually ride.  Kept tight on purpose -- a false "has" costs a wave
+    #: (~10s), a false "has not" only misses pages whose sink lives in an
+    #: externally loaded bundle (the same limit the sink hooks already have).
+    _NAV_SINK_RE = re.compile(
+        r"location\.(?:assign|replace)\s*\(|location\.href\s*=|"
+        r"Object\.assign\(\s*location|import\s*\(")
+
+    def _page_has_nav_sink(self, page) -> bool:
+        """Does the rendered page's own markup contain a navigation/module
+        sink?  One content() read per call; failures read as "no" (the safe
+        direction -- the wave is skipped, not misfired)."""
+        try:
+            return bool(self._NAV_SINK_RE.search(page.content() or ""))
+        except Exception:
+            return False
+
     def _try_carriers(self, page, probe: dict, marker: str, numtok: str,
                       dialog_msgs: list, deadline: float) -> tuple[bool, str]:
         """Replay ``probe``'s channel with executable carriers (Phase 226).
@@ -1908,7 +1925,8 @@ class DynamicDomAnalyzer:
     def analyze(self, url: str, marker: str | None = None,
                 dialog_token: str | None = None,
                 click_selector: str | list | None = None,
-                url_probes: bool = True) -> list:
+                url_probes: bool = True,
+                page_text: str | None = None) -> list:
         """Render ``url`` in the instrumented browser and report sink hits.
 
         ``dialog_token`` (Phase 194, stored-XSS closure): when set, a
@@ -1930,6 +1948,12 @@ class DynamicDomAnalyzer:
         """
         if not self.available():
             return []
+        # Phase 320: the caller's first-response text -- the exploratory
+        # wave's keyword gate reads THIS, not the live page, because
+        # navigation sinks navigate the live document away mid-analysis
+        # (measured on XSSMaze navsink-3: the gate read the post-navigation
+        # 404 and skipped the wave that would have proven the sink).
+        self._caller_page_text = page_text
         marker = marker or (_stem_marker("xssentinel_dom_") + secrets.token_hex(4))
         # Phase 226: the decimal token carrier dialogs carry (see
         # _carrier_token).  Dialogs are attributed by EITHER token: the
@@ -2269,6 +2293,19 @@ class DynamicDomAnalyzer:
                         # names, and the wave must ride the name the page
                         # actually reads (measured: spending the wave on
                         # __xss__ missed navsink-3's `query` entirely).
+                        #
+                        # Phase 320 NOTE: a keyword gate (pay only when the
+                        # page text matches location.assign/import(/...) was
+                        # MEASURED and REVERTED the same day -- it cut the
+                        # async quick slice 886s -> 310s but cost pos-dom-04
+                        # its TP: the page's sink is document.write, whose
+                        # hash-delivered payload the carriers execute
+                        # through a hook that fires with no nav keyword in
+                        # the page text.  The refined design (keyword set =
+                        # the UNION of all executing sinks, or a
+                        # static-layer sink flag threaded from the caller)
+                        # needs its own matrix-verified round; recall is
+                        # not traded for wall clock.
                         _exploratory_done = True
                         carrier_waves += 1
                         executed, carrier_used = self._try_carriers(

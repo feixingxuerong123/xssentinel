@@ -198,6 +198,7 @@ def bench_base():
 
 
 class TestEngineParity:
+    @pytest.mark.timeout(900)
     def test_reflection_slice_finding_sets_match(self, bench_base):
         """The gate: same input, same verdict shape, both engines."""
         sync_out = _run_sync(bench_base)
@@ -235,6 +236,7 @@ class TestEngineParityDOM:
         ("/s/prt01", "q", "{}"),
     ]
 
+    @pytest.mark.timeout(1800)
     def test_dom_slice_finding_sets_match(self, bench_base):
         sync_out = _run_sync(bench_base, self._DOM_SLICE, dom_engine="auto")
         async_out = _run_async(bench_base, self._DOM_SLICE, dom_engine="auto")

@@ -172,7 +172,7 @@ class AdvancedLayerMixin:
             # went unexamined -- the one evidence class this scanner cannot
             # substitute a heuristic for.
             try:
-                dyn_findings = engine.analyze(url)
+                dyn_findings = engine.analyze(url, page_text=text)
                 self.coverage.touch_layer(url, "L6_dom_dynamic", "GET",
                                           detail="playwright engine")
             except Exception as e:

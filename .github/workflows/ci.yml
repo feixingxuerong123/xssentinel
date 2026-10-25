@@ -61,7 +61,14 @@ jobs:
         run: python -m ruff check
 
       - name: Unit + integration tests (pipeline slice included)
-        run: pytest tests/ -q --ignore=tests/test_benchmark.py --timeout=120
+        # --timeout=300: the measured shape of the long tests (parity DOM
+        # slice 875s on the author's Windows box with loopback throttling,
+        # redteam up to 267s) exceeds 120s locally; on Linux runners they
+        # fit, but the margin is thin enough that a slow runner kills a
+        # green test mid-run.  The heavy tests carry explicit per-test
+        # timeout markers sized from their local measurements; this job
+        # ceiling only bounds runaway hangs.
+        run: pytest tests/ -q --ignore=tests/test_benchmark.py --timeout=300
 
       - name: Accuracy benchmark (64-case stratified slice, both engines, zero-error gate)
         # --strict-gate: FP0/FN0/ERROR0, because a gate that tolerates an FP or
@@ -73,7 +80,7 @@ jobs:
           python -m benchmark.runner --quick --engine sync --strict-gate
           python -m benchmark.runner --quick --engine async --strict-gate
 
-      - name: Range #2 accuracy drill (must be 100% / 100%)
+      - name: "Range #2 accuracy drill (must be 100% / 100%)"
         run: python tests/run_range2.py
 
       # Range #3: an APPLICATION, not a fixture matrix -- SQLite state, a
@@ -98,7 +105,7 @@ jobs:
       # is authored from framework semantics, and the -safe twins are
       # proven first by dev/_r4_construct_probe.py (no browser): the
       # attacker string must not appear in server HTML at all.
-      - name: Range #4 SPA drill (real framework sinks, 100%/100% required)
+      - name: "Range #4 SPA drill (real framework sinks, 100%/100% required)"
         run: python range4/runner.py --engine both --out range4/results_ci.json
 
       - uses: actions/upload-artifact@v4
@@ -112,7 +119,7 @@ jobs:
       # (static shells -- construct validity by construction, pinned by
       # tests/test_range5.py); the unsafeHTML directive is Lit's analogue
       # of dangerouslySetInnerHTML / v-html.  Same gate standard as range4.
-      - name: Range #5 Lit drill (unsafeHTML vs text interpolation, 100%/100% required)
+      - name: "Range #5 Lit drill (unsafeHTML vs text interpolation, 100%/100% required)"
         run: python range5/runner.py --engine both --out range5/results_ci.json
 
       - uses: actions/upload-artifact@v4
@@ -120,6 +127,20 @@ jobs:
         with:
           name: range5-results
           path: range5/results_ci.json
+          if-no-files-found: ignore
+
+      # Range #6: a real sanitizer pair (DOMPurify 2.0.7 vs 3.4.17).  The
+      # positive must keep browser-executed DOM evidence; the safe twin must
+      # stay at low delivery evidence only.  This was RED for several phases
+      # and is now a push gate (Phase 265).
+      - name: "Range #6 sanitizer drill (safe twin must stay low-only)"
+        run: python range6/runner.py --engine both --out range6/results_ci.json
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: range6-results
+          path: range6/results_ci.json
           if-no-files-found: ignore
 
   benchmark-full:
@@ -174,6 +195,8 @@ jobs:
           pip install -e ".[dev,async,ast,api]"
       - name: Full file-by-file test gate
         run: python tests/run_all_batched.py --quiet
+      - name: Evidence-shape sweep (Phase 312, all routes both engines)
+        run: python benchmark/evidence_shape_sweep.py
       - name: Upload failure evidence
         if: failure()
         uses: actions/upload-artifact@v4
