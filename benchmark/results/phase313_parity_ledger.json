@@ -1,0 +1,2954 @@
+{
+ "generated": "2026-10-25 16:57:04",
+ "cases_total": 194,
+ "cases_direct": 158,
+ "cases_skipped": 36,
+ "runtime_s": 1245.3,
+ "divergences": 0,
+ "rows": [
+  {
+   "case": "pos-elem-01",
+   "path": "/r/elem01",
+   "context": "html_element",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "pos-elem-02",
+   "path": "/r/elem02",
+   "context": "html_element",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "pos-elem-03",
+   "path": "/r/elem03",
+   "context": "html_element",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "pos-elem-04",
+   "path": "/r/elem04",
+   "context": "html_element",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "pos-elem-05",
+   "path": "/r/elem05",
+   "context": "html_element",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "pos-attr-01",
+   "path": "/r/attr01",
+   "context": "html_attribute_dq",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "pos-attr-02",
+   "path": "/r/attr02",
+   "context": "html_attribute_sq",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "pos-attr-03",
+   "path": "/r/attr03",
+   "context": "html_attribute_noquote",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "pos-attr-04",
+   "path": "/r/attr04",
+   "context": "url_href",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "markdown_xss",
+     "medium",
+     "high"
+    ],
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "markdown_xss",
+     "medium",
+     "high"
+    ],
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "pos-attr-05",
+   "path": "/r/attr05",
+   "context": "html_attribute_dq",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "polyglot_reflection",
+     "medium",
+     "medium"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "polyglot_reflection",
+     "medium",
+     "medium"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "pos-attr-06",
+   "path": "/r/attr06",
+   "context": "url_href",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "pos-attr-07",
+   "path": "/r/attr07",
+   "context": "event_handler",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "pos-attr-08",
+   "path": "/r/attr08",
+   "context": "css_context",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "pos-attr-09",
+   "path": "/r/attr09",
+   "context": "url_href",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "pos-attr-10",
+   "path": "/r/attr10",
+   "context": "url_href",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "pos-script-01",
+   "path": "/r/scr01",
+   "context": "script_string_dq",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "pos-script-02",
+   "path": "/r/scr02",
+   "context": "script_string_sq",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "pos-script-03",
+   "path": "/r/scr03",
+   "context": "script_block",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "pos-script-04",
+   "path": "/r/scr04",
+   "context": "script_template",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "pos-script-05",
+   "path": "/r/scr05",
+   "context": "script_block",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "polyglot_reflection",
+     "medium",
+     "medium"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "polyglot_reflection",
+     "medium",
+     "medium"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "pos-script-06",
+   "path": "/r/scr06",
+   "context": "script_block",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "pos-svg-01",
+   "path": "/r/svg01",
+   "context": "svg_context",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "pos-svg-02",
+   "path": "/r/svg02",
+   "context": "html_attribute_dq",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "pos-svg-03",
+   "path": "/r/svg03",
+   "context": "event_handler",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ],
+    [
+     "svg_xss_svg_event_handler",
+     "medium",
+     "high"
+    ],
+    [
+     "svg_xss_svg_onload",
+     "medium",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ],
+    [
+     "svg_xss_svg_event_handler",
+     "medium",
+     "high"
+    ],
+    [
+     "svg_xss_svg_onload",
+     "medium",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "pos-svg-04",
+   "path": "/r/svg04",
+   "context": "svg_context",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "pos-math-01",
+   "path": "/r/math01",
+   "context": "math_context",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "pos-math-02",
+   "path": "/r/math02",
+   "context": "math_context",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "pos-url-01",
+   "path": "/r/url01",
+   "context": "url_javascript",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "markdown_xss",
+     "medium",
+     "high"
+    ],
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "markdown_xss",
+     "medium",
+     "high"
+    ],
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "pos-url-02",
+   "path": "/r/url02",
+   "context": "url_href",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "markdown_xss",
+     "medium",
+     "high"
+    ],
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "markdown_xss",
+     "medium",
+     "high"
+    ],
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "pos-url-03",
+   "path": "/r/url03",
+   "context": "meta_refresh",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "polyglot_reflection",
+     "medium",
+     "medium"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "polyglot_reflection",
+     "medium",
+     "medium"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "pos-url-04",
+   "path": "/r/url04",
+   "context": "url_href",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "pos-url-05",
+   "path": "/r/url05",
+   "context": "html_attribute_dq",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "pos-url-06",
+   "path": "/r/url06",
+   "context": "url_href",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "polyglot_reflection",
+     "medium",
+     "medium"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "polyglot_reflection",
+     "medium",
+     "medium"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "neg-url-03",
+   "path": "/s/url03",
+   "context": "meta_refresh",
+   "ground_truth": "safe",
+   "sync_shapes": [],
+   "async_shapes": [],
+   "divergent": false
+  },
+  {
+   "case": "pos-style-01",
+   "path": "/r/sty01",
+   "context": "css_context",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "pos-comment-01",
+   "path": "/r/cmt01",
+   "context": "html_comment",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "pos-cdata-01",
+   "path": "/r/cdata01",
+   "context": "cdata",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "pos-tpl-01",
+   "path": "/r/tpl01",
+   "context": "template_angular",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "pos-tpl-02",
+   "path": "/r/tpl02",
+   "context": "template_angular",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "pos-embed-01",
+   "path": "/r/emb01",
+   "context": "html_element",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "pos-form-01",
+   "path": "/r/form01",
+   "context": "html_element",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "pos-input-01",
+   "path": "/r/inp01",
+   "context": "html_element",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "pos-select-01",
+   "path": "/r/sel01",
+   "context": "html_element",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "pos-details-01",
+   "path": "/r/det01",
+   "context": "html_element",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "pos-video-01",
+   "path": "/r/vid01",
+   "context": "html_element",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "pos-body-01",
+   "path": "/r/body01",
+   "context": "event_handler",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "pos-a-01",
+   "path": "/r/a01",
+   "context": "html_element",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "pos-div-tab-01",
+   "path": "/r/tab01",
+   "context": "html_element",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "pos-foreign-01",
+   "path": "/r/for01",
+   "context": "svg_context",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ],
+    [
+     "svg_xss_svg_foreignobject",
+     "medium",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ],
+    [
+     "svg_xss_svg_foreignobject",
+     "medium",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "pos-encode-01",
+   "path": "/r/enc01",
+   "context": "html_element",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "pos-encode-02",
+   "path": "/r/enc02",
+   "context": "html_element",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "pos-dom-02",
+   "path": "/dom/search-eval",
+   "context": "dom_xss",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "dom_dynamic",
+     "high",
+     "high"
+    ],
+    [
+     "trusted_types_no_policy",
+     "medium",
+     "high"
+    ],
+    [
+     "trusted_types_taint_flow",
+     "medium",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "dom_dynamic",
+     "high",
+     "high"
+    ],
+    [
+     "trusted_types_no_policy",
+     "medium",
+     "high"
+    ],
+    [
+     "trusted_types_taint_flow",
+     "medium",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "pos-dom-07",
+   "path": "/dom/hash-route#/route",
+   "context": "dom_xss",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "dom_dynamic",
+     "high",
+     "high"
+    ],
+    [
+     "trusted_types_no_policy",
+     "medium",
+     "high"
+    ],
+    [
+     "trusted_types_taint_flow",
+     "medium",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "dom_dynamic",
+     "high",
+     "high"
+    ],
+    [
+     "trusted_types_no_policy",
+     "medium",
+     "high"
+    ],
+    [
+     "trusted_types_taint_flow",
+     "medium",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "neg-dom-07",
+   "path": "/dom/hash-route-safe#/route",
+   "context": "dom_xss",
+   "ground_truth": "safe",
+   "sync_shapes": [],
+   "async_shapes": [],
+   "divergent": false
+  },
+  {
+   "case": "pos-dom-08",
+   "path": "/dom/tt-innerhtml#/route",
+   "context": "dom_xss",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "dom_dynamic",
+     "high",
+     "high"
+    ],
+    [
+     "trusted_types_policy_bypass",
+     "medium",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "dom_dynamic",
+     "high",
+     "high"
+    ],
+    [
+     "trusted_types_policy_bypass",
+     "medium",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "neg-dom-08",
+   "path": "/dom/tt-innerhtml-safe#/route",
+   "context": "dom_xss",
+   "ground_truth": "safe",
+   "sync_shapes": [],
+   "async_shapes": [],
+   "divergent": false
+  },
+  {
+   "case": "pos-polyglot-01",
+   "path": "/r/poly01",
+   "context": "html_element",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "pos-marquee-01",
+   "path": "/r/marq01",
+   "context": "html_element",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "pos-audio-01",
+   "path": "/r/aud01",
+   "context": "html_element",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "neg-escape-01",
+   "path": "/s/esc01",
+   "context": "html_element",
+   "ground_truth": "safe",
+   "sync_shapes": [],
+   "async_shapes": [],
+   "divergent": false
+  },
+  {
+   "case": "neg-escape-02",
+   "path": "/s/esc02",
+   "context": "html_attribute_dq",
+   "ground_truth": "safe",
+   "sync_shapes": [],
+   "async_shapes": [],
+   "divergent": false
+  },
+  {
+   "case": "neg-escape-03",
+   "path": "/s/esc03",
+   "context": "html_attribute_sq",
+   "ground_truth": "safe",
+   "sync_shapes": [],
+   "async_shapes": [],
+   "divergent": false
+  },
+  {
+   "case": "neg-escape-04",
+   "path": "/s/esc04",
+   "context": "script_string_dq",
+   "ground_truth": "safe",
+   "sync_shapes": [],
+   "async_shapes": [],
+   "divergent": false
+  },
+  {
+   "case": "neg-escape-05",
+   "path": "/s/esc05",
+   "context": "url_href",
+   "ground_truth": "safe",
+   "sync_shapes": [],
+   "async_shapes": [],
+   "divergent": false
+  },
+  {
+   "case": "neg-escape-06",
+   "path": "/s/esc06",
+   "context": "html_attribute_noquote",
+   "ground_truth": "safe",
+   "sync_shapes": [],
+   "async_shapes": [],
+   "divergent": false
+  },
+  {
+   "case": "neg-rcdata-01",
+   "path": "/s/rcd01",
+   "context": "html_element",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "neg-rcdata-02",
+   "path": "/s/rcd02",
+   "context": "html_element",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "neg-rcdata-03",
+   "path": "/s/rcd03",
+   "context": "html_element",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "neg-rcdata-04",
+   "path": "/s/rcd04",
+   "context": "html_element",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "neg-comment-01",
+   "path": "/s/cmt01",
+   "context": "html_comment",
+   "ground_truth": "safe",
+   "sync_shapes": [],
+   "async_shapes": [],
+   "divergent": false
+  },
+  {
+   "case": "neg-comment-02",
+   "path": "/s/cmt02",
+   "context": "html_comment",
+   "ground_truth": "safe",
+   "sync_shapes": [],
+   "async_shapes": [],
+   "divergent": false
+  },
+  {
+   "case": "neg-attr-01",
+   "path": "/s/attr01",
+   "context": "html_attribute_dq",
+   "ground_truth": "safe",
+   "sync_shapes": [],
+   "async_shapes": [],
+   "divergent": false
+  },
+  {
+   "case": "neg-attr-02",
+   "path": "/s/attr02",
+   "context": "html_attribute_dq",
+   "ground_truth": "safe",
+   "sync_shapes": [],
+   "async_shapes": [],
+   "divergent": false
+  },
+  {
+   "case": "neg-attr-03",
+   "path": "/s/attr03",
+   "context": "html_attribute_dq",
+   "ground_truth": "safe",
+   "sync_shapes": [],
+   "async_shapes": [],
+   "divergent": false
+  },
+  {
+   "case": "neg-attr-04",
+   "path": "/s/attr04",
+   "context": "html_attribute_dq",
+   "ground_truth": "safe",
+   "sync_shapes": [],
+   "async_shapes": [],
+   "divergent": false
+  },
+  {
+   "case": "neg-csp-01",
+   "path": "/s/csp01",
+   "context": "html_element",
+   "ground_truth": "safe",
+   "sync_shapes": [],
+   "async_shapes": [],
+   "divergent": false
+  },
+  {
+   "case": "neg-csp-02",
+   "path": "/s/csp02",
+   "context": "url_href",
+   "ground_truth": "safe",
+   "sync_shapes": [],
+   "async_shapes": [],
+   "divergent": false
+  },
+  {
+   "case": "neg-csp-03",
+   "path": "/s/csp03",
+   "context": "html_element",
+   "ground_truth": "safe",
+   "sync_shapes": [
+    [
+     "csp_nonce_misconfigured",
+     "medium",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "csp_nonce_misconfigured",
+     "medium",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "neg-csp-04",
+   "path": "/s/csp04",
+   "context": "html_attribute_dq",
+   "ground_truth": "safe",
+   "sync_shapes": [],
+   "async_shapes": [],
+   "divergent": false
+  },
+  {
+   "case": "neg-jsonp-01",
+   "path": "/s/jsonp01",
+   "context": "script_block",
+   "ground_truth": "safe",
+   "sync_shapes": [],
+   "async_shapes": [],
+   "divergent": false
+  },
+  {
+   "case": "neg-jsonp-02",
+   "path": "/s/jsonp02",
+   "context": "script_block",
+   "ground_truth": "safe",
+   "sync_shapes": [],
+   "async_shapes": [],
+   "divergent": false
+  },
+  {
+   "case": "neg-filter-01",
+   "path": "/s/flt01",
+   "context": "html_element",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "neg-filter-02",
+   "path": "/s/flt02",
+   "context": "html_element",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "neg-filter-03",
+   "path": "/s/flt03",
+   "context": "url_href",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "markdown_xss",
+     "medium",
+     "high"
+    ],
+    [
+     "polyglot_reflection",
+     "medium",
+     "medium"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "markdown_xss",
+     "medium",
+     "high"
+    ],
+    [
+     "polyglot_reflection",
+     "medium",
+     "medium"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "neg-filter-04",
+   "path": "/s/flt04",
+   "context": "html_element",
+   "ground_truth": "safe",
+   "sync_shapes": [],
+   "async_shapes": [],
+   "divergent": false
+  },
+  {
+   "case": "neg-filter-05",
+   "path": "/s/flt05",
+   "context": "html_element",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "neg-filter-06",
+   "path": "/s/flt06",
+   "context": "html_element",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "neg-encode-01",
+   "path": "/s/enc01",
+   "context": "html_element",
+   "ground_truth": "safe",
+   "sync_shapes": [],
+   "async_shapes": [],
+   "divergent": false
+  },
+  {
+   "case": "neg-encode-02",
+   "path": "/s/enc02",
+   "context": "html_element",
+   "ground_truth": "safe",
+   "sync_shapes": [],
+   "async_shapes": [],
+   "divergent": false
+  },
+  {
+   "case": "neg-encode-03",
+   "path": "/s/enc03",
+   "context": "html_element",
+   "ground_truth": "safe",
+   "sync_shapes": [],
+   "async_shapes": [],
+   "divergent": false
+  },
+  {
+   "case": "neg-encode-04",
+   "path": "/s/enc04",
+   "context": "html_element",
+   "ground_truth": "safe",
+   "sync_shapes": [],
+   "async_shapes": [],
+   "divergent": false
+  },
+  {
+   "case": "neg-json-01",
+   "path": "/s/json01",
+   "context": "script_string_dq",
+   "ground_truth": "safe",
+   "sync_shapes": [],
+   "async_shapes": [],
+   "divergent": false
+  },
+  {
+   "case": "neg-json-02",
+   "path": "/s/json02",
+   "context": "script_block",
+   "ground_truth": "safe",
+   "sync_shapes": [],
+   "async_shapes": [],
+   "divergent": false
+  },
+  {
+   "case": "neg-jsonct-raw-01",
+   "path": "/r/jsonct01",
+   "context": "script_string_dq",
+   "ground_truth": "safe",
+   "sync_shapes": [],
+   "async_shapes": [],
+   "divergent": false
+  },
+  {
+   "case": "neg-jsonct-01",
+   "path": "/s/jsonct01",
+   "context": "script_string_dq",
+   "ground_truth": "safe",
+   "sync_shapes": [],
+   "async_shapes": [],
+   "divergent": false
+  },
+  {
+   "case": "neg-header-01",
+   "path": "/s/hdr01",
+   "context": "header_reflection",
+   "ground_truth": "safe",
+   "sync_shapes": [],
+   "async_shapes": [],
+   "divergent": false
+  },
+  {
+   "case": "pos-hdr-01",
+   "path": "/s/hdr02",
+   "context": "header_reflection",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "header_xss",
+     "medium",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "header_xss",
+     "medium",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "neg-hdr-02",
+   "path": "/s/hdr03",
+   "context": "header_reflection",
+   "ground_truth": "safe",
+   "sync_shapes": [],
+   "async_shapes": [],
+   "divergent": false
+  },
+  {
+   "case": "neg-js-01",
+   "path": "/s/js01",
+   "context": "script_string_dq",
+   "ground_truth": "safe",
+   "sync_shapes": [],
+   "async_shapes": [],
+   "divergent": false
+  },
+  {
+   "case": "neg-js-02",
+   "path": "/s/js02",
+   "context": "script_string_dq",
+   "ground_truth": "safe",
+   "sync_shapes": [],
+   "async_shapes": [],
+   "divergent": false
+  },
+  {
+   "case": "neg-select-01",
+   "path": "/s/sel01",
+   "context": "html_element",
+   "ground_truth": "safe",
+   "sync_shapes": [],
+   "async_shapes": [],
+   "divergent": false
+  },
+  {
+   "case": "neg-null-01",
+   "path": "/s/null01",
+   "context": "html_element",
+   "ground_truth": "safe",
+   "sync_shapes": [],
+   "async_shapes": [],
+   "divergent": false
+  },
+  {
+   "case": "neg-rcdata-05",
+   "path": "/s/rcd05",
+   "context": "html_element",
+   "ground_truth": "safe",
+   "sync_shapes": [],
+   "async_shapes": [],
+   "divergent": false
+  },
+  {
+   "case": "neg-rcdata-06",
+   "path": "/s/rcd06",
+   "context": "html_element",
+   "ground_truth": "safe",
+   "sync_shapes": [],
+   "async_shapes": [],
+   "divergent": false
+  },
+  {
+   "case": "neg-rcdata-07",
+   "path": "/s/rcd07",
+   "context": "html_element",
+   "ground_truth": "safe",
+   "sync_shapes": [],
+   "async_shapes": [],
+   "divergent": false
+  },
+  {
+   "case": "neg-rcdata-08",
+   "path": "/s/rcd08",
+   "context": "html_element",
+   "ground_truth": "safe",
+   "sync_shapes": [],
+   "async_shapes": [],
+   "divergent": false
+  },
+  {
+   "case": "neg-csp-05",
+   "path": "/s/csp05",
+   "context": "html_element",
+   "ground_truth": "safe",
+   "sync_shapes": [
+    [
+     "csp_nonce_misconfigured",
+     "medium",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "csp_nonce_misconfigured",
+     "medium",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "pos-csp-01",
+   "path": "/r/csp06",
+   "context": "html_element",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "pos-csp-02",
+   "path": "/r/csp07",
+   "context": "html_element",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "csp_bypass",
+     "medium",
+     "medium"
+    ],
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "csp_bypass",
+     "medium",
+     "medium"
+    ],
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "pos-multi-01",
+   "path": "/r/mr01",
+   "context": "html_element",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "polyglot_reflection",
+     "medium",
+     "medium"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "polyglot_reflection",
+     "medium",
+     "medium"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "pos-multi-02",
+   "path": "/r/mr02",
+   "context": "html_element",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "pos-cookie-01",
+   "path": "/r/ck01",
+   "context": "html_element",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "cookie_xss",
+     "medium",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "cookie_xss",
+     "medium",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "neg-cookie-01",
+   "path": "/s/ck01",
+   "context": "html_element",
+   "ground_truth": "safe",
+   "sync_shapes": [],
+   "async_shapes": [],
+   "divergent": false
+  },
+  {
+   "case": "pos-ctoss-01",
+   "path": "/r/ctoss01",
+   "context": "header",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "cookie_tossing_set_cookie",
+     "medium",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "cookie_tossing_set_cookie",
+     "medium",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "neg-ctoss-01",
+   "path": "/s/ctoss01",
+   "context": "header",
+   "ground_truth": "safe",
+   "sync_shapes": [],
+   "async_shapes": [],
+   "divergent": false
+  },
+  {
+   "case": "pos-path-01",
+   "path": "/r/pth01/*",
+   "context": "html_element",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "path_xss",
+     "medium",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "path_xss",
+     "medium",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "neg-path-01",
+   "path": "/s/pth01/*",
+   "context": "html_element",
+   "ground_truth": "safe",
+   "sync_shapes": [],
+   "async_shapes": [],
+   "divergent": false
+  },
+  {
+   "case": "pos-error-01",
+   "path": "/r/err01/*",
+   "context": "html_element",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "error_page_xss",
+     "medium",
+     "high"
+    ],
+    [
+     "path_xss",
+     "medium",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "error_page_xss",
+     "medium",
+     "high"
+    ],
+    [
+     "path_xss",
+     "medium",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "neg-error-01",
+   "path": "/s/err01/*",
+   "context": "html_element",
+   "ground_truth": "safe",
+   "sync_shapes": [],
+   "async_shapes": [],
+   "divergent": false
+  },
+  {
+   "case": "pos-cors-01",
+   "path": "/r/cors01",
+   "context": "header",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "cors_misconfig",
+     "high",
+     "firm"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "cors_misconfig",
+     "high",
+     "firm"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "neg-cors-01",
+   "path": "/s/cors01",
+   "context": "header",
+   "ground_truth": "safe",
+   "sync_shapes": [],
+   "async_shapes": [],
+   "divergent": false
+  },
+  {
+   "case": "pos-markdown-01",
+   "path": "/r/md01",
+   "context": "html_attribute",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "neg-markdown-01",
+   "path": "/s/md01",
+   "context": "html_attribute",
+   "ground_truth": "safe",
+   "sync_shapes": [],
+   "async_shapes": [],
+   "divergent": false
+  },
+  {
+   "case": "pos-redirect-01",
+   "path": "/r/red01",
+   "context": "redirect",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "dom",
+     "medium",
+     "medium"
+    ],
+    [
+     "open_redirect_xss",
+     "medium",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "dom",
+     "medium",
+     "medium"
+    ],
+    [
+     "open_redirect_xss",
+     "medium",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "neg-redirect-01",
+   "path": "/s/red01",
+   "context": "redirect",
+   "ground_truth": "safe",
+   "sync_shapes": [],
+   "async_shapes": [],
+   "divergent": false
+  },
+  {
+   "case": "pos-proto-01",
+   "path": "/r/prt01",
+   "context": "dom_prototype",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "dom",
+     "medium",
+     "medium"
+    ],
+    [
+     "prototype_pollution",
+     "medium",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "dom",
+     "medium",
+     "medium"
+    ],
+    [
+     "prototype_pollution",
+     "medium",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "neg-proto-01",
+   "path": "/s/prt01",
+   "context": "dom_prototype",
+   "ground_truth": "safe",
+   "sync_shapes": [],
+   "async_shapes": [],
+   "divergent": false
+  },
+  {
+   "case": "pos-sw-01",
+   "path": "/r/sw01",
+   "context": "service_worker",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "service_worker_xss",
+     "medium",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "service_worker_xss",
+     "medium",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "neg-sw-01",
+   "path": "/s/sw01",
+   "context": "service_worker",
+   "ground_truth": "safe",
+   "sync_shapes": [],
+   "async_shapes": [],
+   "divergent": false
+  },
+  {
+   "case": "pos-worker-01",
+   "path": "/r/wk01",
+   "context": "web_worker",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "web_worker_xss",
+     "medium",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "web_worker_xss",
+     "medium",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "neg-worker-01",
+   "path": "/s/wk01",
+   "context": "web_worker",
+   "ground_truth": "safe",
+   "sync_shapes": [],
+   "async_shapes": [],
+   "divergent": false
+  },
+  {
+   "case": "pos-dangle-01",
+   "path": "/r/dgl01",
+   "context": "attribute",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "dangling_markup_potential",
+     "medium",
+     "high"
+    ],
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "dangling_markup_potential",
+     "medium",
+     "high"
+    ],
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "neg-dangle-01",
+   "path": "/s/dgl01",
+   "context": "attribute",
+   "ground_truth": "safe",
+   "sync_shapes": [],
+   "async_shapes": [],
+   "divergent": false
+  },
+  {
+   "case": "pos-importmap-01",
+   "path": "/r/imp01",
+   "context": "import_map",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "import_map_cross_origin",
+     "medium",
+     "high"
+    ],
+    [
+     "import_map_user_controlled",
+     "medium",
+     "high"
+    ],
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "import_map_cross_origin",
+     "medium",
+     "high"
+    ],
+    [
+     "import_map_user_controlled",
+     "medium",
+     "high"
+    ],
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "neg-importmap-01",
+   "path": "/s/imp01",
+   "context": "import_map",
+   "ground_truth": "safe",
+   "sync_shapes": [],
+   "async_shapes": [],
+   "divergent": false
+  },
+  {
+   "case": "pos-sri-01",
+   "path": "/r/sri01",
+   "context": "sri",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ],
+    [
+     "sri_missing_script",
+     "medium",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ],
+    [
+     "sri_missing_script",
+     "medium",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "neg-sri-01",
+   "path": "/s/sri01",
+   "context": "sri",
+   "ground_truth": "safe",
+   "sync_shapes": [],
+   "async_shapes": [],
+   "divergent": false
+  },
+  {
+   "case": "pos-tt-01",
+   "path": "/r/tt01",
+   "context": "trusted_types",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "dom_clobber",
+     "high",
+     null
+    ],
+    [
+     "mutation_xss",
+     "high",
+     null
+    ],
+    [
+     "reflected",
+     "high",
+     "high"
+    ],
+    [
+     "trusted_types_policy_bypass",
+     "medium",
+     "high"
+    ],
+    [
+     "trusted_types_policy_unused",
+     "low",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "dom_clobber",
+     "high",
+     null
+    ],
+    [
+     "mutation_xss",
+     "high",
+     null
+    ],
+    [
+     "reflected",
+     "high",
+     "high"
+    ],
+    [
+     "trusted_types_policy_bypass",
+     "medium",
+     "high"
+    ],
+    [
+     "trusted_types_policy_unused",
+     "low",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "neg-tt-01",
+   "path": "/s/tt01",
+   "context": "trusted_types",
+   "ground_truth": "safe",
+   "sync_shapes": [
+    [
+     "trusted_types_policy_unused",
+     "low",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "trusted_types_policy_unused",
+     "low",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "pos-ws-01",
+   "path": "/r/wss01",
+   "context": "websocket",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "dom",
+     "medium",
+     "medium"
+    ],
+    [
+     "postmessage_xss",
+     "medium",
+     "high"
+    ],
+    [
+     "trusted_types_no_policy",
+     "medium",
+     "high"
+    ],
+    [
+     "trusted_types_taint_flow",
+     "medium",
+     "high"
+    ],
+    [
+     "websocket_xss",
+     "medium",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "dom",
+     "medium",
+     "medium"
+    ],
+    [
+     "postmessage_xss",
+     "medium",
+     "high"
+    ],
+    [
+     "trusted_types_no_policy",
+     "medium",
+     "high"
+    ],
+    [
+     "trusted_types_taint_flow",
+     "medium",
+     "high"
+    ],
+    [
+     "websocket_xss",
+     "medium",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "neg-ws-01",
+   "path": "/s/wss01",
+   "context": "websocket",
+   "ground_truth": "safe",
+   "sync_shapes": [],
+   "async_shapes": [],
+   "divergent": false
+  },
+  {
+   "case": "pos-sanitizer-01",
+   "path": "/r/san01",
+   "context": "sanitizer",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "dom_clobber",
+     "high",
+     null
+    ],
+    [
+     "mutation_xss",
+     "high",
+     null
+    ],
+    [
+     "reflected",
+     "high",
+     "high"
+    ],
+    [
+     "sanitizer_output_to_innerhtml",
+     "medium",
+     "high"
+    ],
+    [
+     "sanitizer_vulnerable_version",
+     "medium",
+     "high"
+    ],
+    [
+     "trusted_types_no_policy",
+     "medium",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "dom_clobber",
+     "high",
+     null
+    ],
+    [
+     "mutation_xss",
+     "high",
+     null
+    ],
+    [
+     "reflected",
+     "high",
+     "high"
+    ],
+    [
+     "sanitizer_output_to_innerhtml",
+     "medium",
+     "high"
+    ],
+    [
+     "sanitizer_vulnerable_version",
+     "medium",
+     "high"
+    ],
+    [
+     "trusted_types_no_policy",
+     "medium",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "neg-sanitizer-01",
+   "path": "/s/san01",
+   "context": "sanitizer",
+   "ground_truth": "safe",
+   "sync_shapes": [],
+   "async_shapes": [],
+   "divergent": false
+  },
+  {
+   "case": "pos-graphql-01",
+   "path": "/r/gql01",
+   "context": "graphql",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "dom",
+     "medium",
+     "medium"
+    ],
+    [
+     "graphql_xss",
+     "medium",
+     "high"
+    ],
+    [
+     "trusted_types_no_policy",
+     "medium",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "dom",
+     "medium",
+     "medium"
+    ],
+    [
+     "graphql_xss",
+     "medium",
+     "high"
+    ],
+    [
+     "trusted_types_no_policy",
+     "medium",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "neg-graphql-01",
+   "path": "/s/gql01",
+   "context": "graphql",
+   "ground_truth": "safe",
+   "sync_shapes": [],
+   "async_shapes": [],
+   "divergent": false
+  },
+  {
+   "case": "pos-waf-01",
+   "path": "/r/waf01",
+   "context": "html_element",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "neg-waf-01",
+   "path": "/s/waf01",
+   "context": "html_element",
+   "ground_truth": "safe",
+   "sync_shapes": [],
+   "async_shapes": [],
+   "divergent": false
+  },
+  {
+   "case": "pos-preenc-01",
+   "path": "/r/pe01",
+   "context": "html_element",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "neg-preenc-01",
+   "path": "/s/pe01",
+   "context": "html_element",
+   "ground_truth": "safe",
+   "sync_shapes": [],
+   "async_shapes": [],
+   "divergent": false
+  },
+  {
+   "case": "pos-clobber-01",
+   "path": "/r/clob01",
+   "context": "html_element",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "dom_clobber",
+     "high",
+     null
+    ],
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "dom_clobber",
+     "high",
+     null
+    ],
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "neg-clobber-01",
+   "path": "/s/clob01",
+   "context": "html_element",
+   "ground_truth": "safe",
+   "sync_shapes": [],
+   "async_shapes": [],
+   "divergent": false
+  },
+  {
+   "case": "neg-clobber-02",
+   "path": "/s/clob02",
+   "context": "html_element",
+   "ground_truth": "safe",
+   "sync_shapes": [],
+   "async_shapes": [],
+   "divergent": false
+  },
+  {
+   "case": "pos-mx-01",
+   "path": "/r/mx01",
+   "context": "html_element",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "mutation_xss",
+     "high",
+     null
+    ],
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "mutation_xss",
+     "high",
+     null
+    ],
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "neg-mx-01",
+   "path": "/s/mx01",
+   "context": "html_element",
+   "ground_truth": "safe",
+   "sync_shapes": [],
+   "async_shapes": [],
+   "divergent": false
+  },
+  {
+   "case": "aux-r-formecho01",
+   "path": "/r/formecho01",
+   "context": "html_element",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "aux-s-formecho01",
+   "path": "/s/formecho01",
+   "context": "html_element",
+   "ground_truth": "safe",
+   "sync_shapes": [],
+   "async_shapes": [],
+   "divergent": false
+  },
+  {
+   "case": "aux-r-jsecho01",
+   "path": "/r/jsecho01",
+   "context": "html_element",
+   "ground_truth": "vulnerable",
+   "sync_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "async_shapes": [
+    [
+     "reflected",
+     "high",
+     "high"
+    ]
+   ],
+   "divergent": false
+  },
+  {
+   "case": "aux-s-jsecho01",
+   "path": "/s/jsecho01",
+   "context": "html_element",
+   "ground_truth": "safe",
+   "sync_shapes": [],
+   "async_shapes": [],
+   "divergent": false
+  }
+ ]
+}

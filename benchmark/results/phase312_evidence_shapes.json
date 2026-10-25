@@ -1,0 +1,3209 @@
+{
+ "generated": "2026-10-25 16:36:19",
+ "routes": 211,
+ "findings": 320,
+ "high_findings": 164,
+ "violations": [],
+ "rows": [
+  {
+   "url": "http://127.0.0.1:8909/dom/hash-docwrite?q=probe",
+   "type": "dom",
+   "severity": "medium",
+   "confidence": "medium",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/dom/hash-docwrite",
+   "type": "trusted_types_taint_flow",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/dom/hash-docwrite",
+   "type": "trusted_types_no_policy",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/dom/hash-innerhtml?q=probe",
+   "type": "dom",
+   "severity": "medium",
+   "confidence": "medium",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/dom/hash-innerhtml",
+   "type": "trusted_types_taint_flow",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/dom/hash-innerhtml",
+   "type": "trusted_types_no_policy",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/dom/hash-innerhtml",
+   "type": "unsanitized_innerhtml_user_source",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/dom/hash-route?q=probe",
+   "type": "dom",
+   "severity": "medium",
+   "confidence": "medium",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/dom/hash-route",
+   "type": "trusted_types_taint_flow",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/dom/hash-route",
+   "type": "trusted_types_no_policy",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/dom/hash-settimeout?q=probe",
+   "type": "dom",
+   "severity": "medium",
+   "confidence": "medium",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/dom/jquery-html?q=probe",
+   "type": "dom",
+   "severity": "medium",
+   "confidence": "medium",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/dom/postmsg?q=probe",
+   "type": "dom",
+   "severity": "medium",
+   "confidence": "medium",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/dom/postmsg",
+   "type": "postmessage_xss",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/dom/postmsg",
+   "type": "websocket_xss",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/dom/postmsg",
+   "type": "trusted_types_taint_flow",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/dom/postmsg",
+   "type": "trusted_types_no_policy",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/dom/search-eval?q=probe",
+   "type": "dom",
+   "severity": "medium",
+   "confidence": "medium",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/dom/search-eval",
+   "type": "trusted_types_taint_flow",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/dom/search-eval",
+   "type": "trusted_types_no_policy",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/dom/tt-innerhtml?q=probe",
+   "type": "dom",
+   "severity": "medium",
+   "confidence": "medium",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/dom/tt-innerhtml",
+   "type": "trusted_types_policy_bypass",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/fuzz/render",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/a01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/attr01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/attr02",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/attr03",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/attr04",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/attr04",
+   "type": "markdown_xss",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/attr05",
+   "type": "polyglot_reflection",
+   "severity": "medium",
+   "confidence": "medium",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/attr06",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/attr07",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/attr08",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/attr09",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/attr10",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/aud01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/bo01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/body01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/cdata01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/ck01",
+   "type": "cookie_xss",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/clob01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/clob01",
+   "type": "dom_clobber",
+   "severity": "high",
+   "confidence": null,
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/cmt01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/cors01",
+   "type": "cors_misconfig",
+   "severity": "high",
+   "confidence": "firm",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/crawl02?q=probe",
+   "type": "dom",
+   "severity": "medium",
+   "confidence": "medium",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/crawl02",
+   "type": "trusted_types_no_policy",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/csp06",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/csp07",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/csp07",
+   "type": "csp_bypass",
+   "severity": "medium",
+   "confidence": "medium",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/cssi01",
+   "type": "css_import_injection",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/cssi01",
+   "type": "css_template_reflection",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/det01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/dgl01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/dgl01",
+   "type": "dangling_markup_potential",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/elem01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/elem02",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/elem03",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/elem04",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/elem05",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/emb01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/enc01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/enc02",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/err01/%3Cscript%3Ealert%28%27xspath_259d21%27%29%3C%2Fscript%3E",
+   "type": "path_xss",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/err01/*/%3Csvg%2Fonload%3Dalert%28%27xserr_e27994%27%29%3E",
+   "type": "error_page_xss",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/for01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/for01",
+   "type": "svg_xss_svg_foreignobject",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/form01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/formecho01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/gql01?q=probe",
+   "type": "dom",
+   "severity": "medium",
+   "confidence": "medium",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/gql01",
+   "type": "graphql_xss",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/gql01",
+   "type": "trusted_types_no_policy",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/imp01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/imp01",
+   "type": "import_map_cross_origin",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/imp01",
+   "type": "import_map_user_controlled",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/inp01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/jsecho01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/marq01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/math01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/math02",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/md01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/mr01",
+   "type": "polyglot_reflection",
+   "severity": "medium",
+   "confidence": "medium",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/mr02",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/mx01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/mx01",
+   "type": "mutation_xss",
+   "severity": "high",
+   "confidence": null,
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/poly01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/prt01?q=probe",
+   "type": "dom",
+   "severity": "medium",
+   "confidence": "medium",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/prt01",
+   "type": "prototype_pollution",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/ps01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/pth01/%3Cscript%3Ealert%28%27xspath_5cd955%27%29%3C%2Fscript%3E",
+   "type": "path_xss",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/red01?q=probe",
+   "type": "dom",
+   "severity": "medium",
+   "confidence": "medium",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/red01",
+   "type": "open_redirect_xss",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/san01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/san01",
+   "type": "mutation_xss",
+   "severity": "high",
+   "confidence": null,
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/san01",
+   "type": "dom_clobber",
+   "severity": "high",
+   "confidence": null,
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/san01",
+   "type": "trusted_types_no_policy",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/san01",
+   "type": "sanitizer_vulnerable_version",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/san01",
+   "type": "sanitizer_output_to_innerhtml",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/scr01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/scr02",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/scr03",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/scr04",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/scr05",
+   "type": "polyglot_reflection",
+   "severity": "medium",
+   "confidence": "medium",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/scr06",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/sel01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/so2in01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/so2view01",
+   "type": "svg_xss_svg_a_jsuri",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/sri01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/sri01",
+   "type": "sri_missing_script",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/st01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/st02/view",
+   "type": "trusted_types_no_policy",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/st03/view",
+   "type": "trusted_types_no_policy",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/sty01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/svg01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/svg02",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/svg03",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/svg03",
+   "type": "svg_xss_svg_onload",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/svg03",
+   "type": "svg_xss_svg_event_handler",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/svg04",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/sw01",
+   "type": "service_worker_xss",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/tab01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/tpl01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/tpl02",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/tt01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/tt01",
+   "type": "mutation_xss",
+   "severity": "high",
+   "confidence": null,
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/tt01",
+   "type": "dom_clobber",
+   "severity": "high",
+   "confidence": null,
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/tt01",
+   "type": "trusted_types_policy_bypass",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/tt01",
+   "type": "trusted_types_policy_unused",
+   "severity": "low",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/url01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/url01",
+   "type": "markdown_xss",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/url02",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/url02",
+   "type": "markdown_xss",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/url03",
+   "type": "polyglot_reflection",
+   "severity": "medium",
+   "confidence": "medium",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/url04",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/url05",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/url06",
+   "type": "polyglot_reflection",
+   "severity": "medium",
+   "confidence": "medium",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/vid01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/waf01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/wk01",
+   "type": "web_worker_xss",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/wss01?q=probe",
+   "type": "dom",
+   "severity": "medium",
+   "confidence": "medium",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/wss01?q=probe",
+   "type": "dom",
+   "severity": "medium",
+   "confidence": "medium",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/wss01",
+   "type": "postmessage_xss",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/wss01",
+   "type": "websocket_xss",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/wss01",
+   "type": "trusted_types_taint_flow",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/wss01",
+   "type": "trusted_types_no_policy",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/s/csp03",
+   "type": "csp_nonce_misconfigured",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/s/csp05",
+   "type": "csp_nonce_misconfigured",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/s/flt01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/s/flt02",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/s/flt03",
+   "type": "polyglot_reflection",
+   "severity": "medium",
+   "confidence": "medium",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/s/flt03",
+   "type": "markdown_xss",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/s/flt05",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/s/flt06",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/s/hdr02",
+   "type": "header_xss",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/s/rcd01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/s/rcd02",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/s/rcd03",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/s/rcd04",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": true,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/s/tt01",
+   "type": "trusted_types_policy_unused",
+   "severity": "low",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/v/st01",
+   "type": "svg_xss_svg_a_jsuri",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/dom/hash-docwrite",
+   "type": "dom",
+   "severity": "medium",
+   "confidence": "medium",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/dom/hash-docwrite",
+   "type": "trusted_types_taint_flow",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/dom/hash-docwrite",
+   "type": "trusted_types_no_policy",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/dom/hash-innerhtml",
+   "type": "dom",
+   "severity": "medium",
+   "confidence": "medium",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/dom/hash-innerhtml",
+   "type": "trusted_types_taint_flow",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/dom/hash-innerhtml",
+   "type": "trusted_types_no_policy",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/dom/hash-innerhtml",
+   "type": "unsanitized_innerhtml_user_source",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/dom/hash-route",
+   "type": "dom",
+   "severity": "medium",
+   "confidence": "medium",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/dom/hash-route",
+   "type": "trusted_types_taint_flow",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/dom/hash-route",
+   "type": "trusted_types_no_policy",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/dom/hash-settimeout",
+   "type": "dom",
+   "severity": "medium",
+   "confidence": "medium",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/dom/jquery-html",
+   "type": "dom",
+   "severity": "medium",
+   "confidence": "medium",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/dom/postmsg",
+   "type": "dom",
+   "severity": "medium",
+   "confidence": "medium",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/dom/postmsg",
+   "type": "postmessage_xss",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/dom/postmsg",
+   "type": "websocket_xss",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/dom/postmsg",
+   "type": "trusted_types_taint_flow",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/dom/postmsg",
+   "type": "trusted_types_no_policy",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/dom/search-eval",
+   "type": "dom",
+   "severity": "medium",
+   "confidence": "medium",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/dom/search-eval",
+   "type": "trusted_types_taint_flow",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/dom/search-eval",
+   "type": "trusted_types_no_policy",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/dom/tt-innerhtml",
+   "type": "dom",
+   "severity": "medium",
+   "confidence": "medium",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/dom/tt-innerhtml",
+   "type": "trusted_types_policy_bypass",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/fuzz/render",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/a01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/attr01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/attr03",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/attr04",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/attr04",
+   "type": "markdown_xss",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/attr05",
+   "type": "polyglot_reflection",
+   "severity": "medium",
+   "confidence": "medium",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/attr06",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/attr07",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/attr08",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/attr09",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/attr10",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/body01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/cdata01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/ck01",
+   "type": "cookie_xss",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/clob01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/clob01",
+   "type": "dom_clobber",
+   "severity": "high",
+   "confidence": null,
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/cmt01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/cors01",
+   "type": "cors_misconfig",
+   "severity": "high",
+   "confidence": "firm",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/crawl02",
+   "type": "dom",
+   "severity": "medium",
+   "confidence": "medium",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/crawl02",
+   "type": "trusted_types_no_policy",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/csp06",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/csp07",
+   "type": "csp_bypass",
+   "severity": "medium",
+   "confidence": "medium",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/csp07",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/cssi01",
+   "type": "css_import_injection",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/cssi01",
+   "type": "css_template_reflection",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/det01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/dgl01",
+   "type": "dangling_markup_potential",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/dgl01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/elem01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/elem02",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/elem03",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/elem04",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/elem05",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/emb01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/enc01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/enc02",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/err01/%3Cscript%3Ealert%28%27xspath_d34d94%27%29%3C%2Fscript%3E",
+   "type": "path_xss",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/err01/*/%3Csvg%2Fonload%3Dalert%28%27xserr_02cd6f%27%29%3E",
+   "type": "error_page_xss",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/for01",
+   "type": "svg_xss_svg_foreignobject",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/for01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/form01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/formecho01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/gql01",
+   "type": "dom",
+   "severity": "medium",
+   "confidence": "medium",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/gql01",
+   "type": "graphql_xss",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/gql01",
+   "type": "trusted_types_no_policy",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/imp01",
+   "type": "import_map_cross_origin",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/imp01",
+   "type": "import_map_user_controlled",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/imp01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/inp01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/jsecho01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/marq01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/math01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/math02",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/md01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/mr01",
+   "type": "polyglot_reflection",
+   "severity": "medium",
+   "confidence": "medium",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/mr02",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/mx01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/mx01",
+   "type": "mutation_xss",
+   "severity": "high",
+   "confidence": null,
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/pm01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/poly01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/prt01",
+   "type": "prototype_pollution",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/prt01",
+   "type": "dom",
+   "severity": "medium",
+   "confidence": "medium",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/ps01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/pth01/%3Cscript%3Ealert%28%27xspath_0f0e00%27%29%3C%2Fscript%3E",
+   "type": "path_xss",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/red01",
+   "type": "dom",
+   "severity": "medium",
+   "confidence": "medium",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/red01",
+   "type": "open_redirect_xss",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/san01",
+   "type": "trusted_types_no_policy",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/san01",
+   "type": "sanitizer_vulnerable_version",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/san01",
+   "type": "sanitizer_output_to_innerhtml",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/san01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/san01",
+   "type": "mutation_xss",
+   "severity": "high",
+   "confidence": null,
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/san01",
+   "type": "dom_clobber",
+   "severity": "high",
+   "confidence": null,
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/scr01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/scr02",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/scr03",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/scr04",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/scr05",
+   "type": "polyglot_reflection",
+   "severity": "medium",
+   "confidence": "medium",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/scr06",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/sel01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/so2in01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/so2view01",
+   "type": "svg_xss_svg_script",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/so2view01",
+   "type": "svg_xss_svg_a_jsuri",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/so2view01",
+   "type": "svg_xss_svg_a_jsuri",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/sri01",
+   "type": "sri_missing_script",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/sri01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/st01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/st02/view",
+   "type": "trusted_types_no_policy",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/st03/view",
+   "type": "trusted_types_no_policy",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/sty01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/svg01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/svg02",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/svg03",
+   "type": "svg_xss_svg_onload",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/svg03",
+   "type": "svg_xss_svg_event_handler",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/svg03",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/svg04",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/sw01",
+   "type": "service_worker_xss",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/tab01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/tpl01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/tpl02",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/tt01",
+   "type": "trusted_types_policy_bypass",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/tt01",
+   "type": "trusted_types_policy_unused",
+   "severity": "low",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/tt01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/tt01",
+   "type": "mutation_xss",
+   "severity": "high",
+   "confidence": null,
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/tt01",
+   "type": "dom_clobber",
+   "severity": "high",
+   "confidence": null,
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/url01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/url01",
+   "type": "markdown_xss",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/url02",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/url02",
+   "type": "markdown_xss",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/url03",
+   "type": "polyglot_reflection",
+   "severity": "medium",
+   "confidence": "medium",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/url04",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/url05",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/url06",
+   "type": "polyglot_reflection",
+   "severity": "medium",
+   "confidence": "medium",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/vid01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/waf01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/wk01",
+   "type": "web_worker_xss",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/wss01",
+   "type": "dom",
+   "severity": "medium",
+   "confidence": "medium",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/wss01",
+   "type": "dom",
+   "severity": "medium",
+   "confidence": "medium",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/wss01",
+   "type": "postmessage_xss",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/wss01",
+   "type": "websocket_xss",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/wss01",
+   "type": "trusted_types_taint_flow",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/r/wss01",
+   "type": "trusted_types_no_policy",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/s/csp03",
+   "type": "csp_nonce_misconfigured",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/s/csp05",
+   "type": "csp_nonce_misconfigured",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/s/flt01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/s/flt02",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/s/flt03",
+   "type": "polyglot_reflection",
+   "severity": "medium",
+   "confidence": "medium",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/s/flt03",
+   "type": "markdown_xss",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/s/flt05",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/s/flt06",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/s/hdr02",
+   "type": "header_xss",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/s/rcd01",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/s/rcd02",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/s/rcd03",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/s/rcd04",
+   "type": "reflected",
+   "severity": "high",
+   "confidence": "high",
+   "evidence_class": "model-only",
+   "has_proof": false,
+   "has_evidence": true,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/s/tt01",
+   "type": "trusted_types_policy_unused",
+   "severity": "low",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/v/st01",
+   "type": "svg_xss_svg_script",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/v/st01",
+   "type": "svg_xss_svg_a_jsuri",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  },
+  {
+   "url": "http://127.0.0.1:8909/v/st01",
+   "type": "svg_xss_svg_a_jsuri",
+   "severity": "medium",
+   "confidence": "high",
+   "evidence_class": "browser-unavailable",
+   "has_proof": false,
+   "has_evidence": false,
+   "headless_confirmed": false
+  }
+ ]
+}

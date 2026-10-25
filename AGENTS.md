@@ -3833,3 +3833,32 @@ HTTP,无浏览器)+ 全量模式(211 路由,账本落
 拒绝("gate would pass on an empty population")。
 
 全量 sweep 随本轮链式任务在 XSSMaze 复扫之后跑,账本数字见下一条目。
+
+## Phase 312/313 补记:三份账落定(链式收口,XSSMaze 复扫 + 两个台账)
+
+**XSSMaze 全量复扫(官方 runner --reach server,干净 worktree @ eacda9d,
+wrapper 100s,4148.8s)—— TP931 / FN82 / FP0,P 100% / R 91.9% / F1 0.958**
+(`dev/_xssmaze/server_p310.{json,md,tsv}`,命令与 p307 逐字同款)。**与
+p307 的差值逐条对上了**:gain 7 = casemanip level2/3/6(Phase 308 的三条,
+家族 3/6→6/6,投射精确命中)+ csti/level4 / domctx/level6 / domsink/level7
+/ domsource/level1(p307 的四条 wrapper 超时环境例,本轮机器空闲全部恢复);
+loss 1 = `dom/level26` 本轮撞 100s wrapper 超时(p307 它是 TP——与 p307 记
+过的浏览器层摆动同族,方向相反)。**补齐口径 932 / 81 / 0(R 92.0% /
+F1 0.958),与 308 时的投射逐条一致**;27 条控制例 0 findings。
+过程一则:复扫的 run.log 前 4 分钟全空(stdout 缓冲),进度要看 wrapper 的
+逐 URL tsv —— "exit 0 不等于执行过"的下一个兄弟是"日志静不等于停滞"。
+
+**Phase 312 全量证据形状 sweep(211 路由 × 双引擎,dom_engine=static):
+320 findings / 164 high-critical / 0 违规**
+(`benchmark/results/phase312_evidence_shapes.json`)—— 218 的帽在全体静态层
+上实测咬住,3.6 的"仍然待做 ①"从"接线正确"升级为"实证成立"。
+
+**Phase 313 全量 parity 台账(158 直达用例 × 双引擎,原始报告三元组):
+0 分歧**(`benchmark/results/phase313_parity_ledger.json`,1245.3s)——
+17 端点切片之外,直达 HTTP 族已无 (type, severity, confidence) 形状的
+引擎分歧;DOM-browser 族与 stored/upload 族不在台账口径内(各自有
+专门的门)。
+
+**门禁链终态**:full_gate=GREEN(169/170,红点已修)→ xssmaze=OK →
+evidence_sweep=OK → parity_ledger=OK,全链退出码 0。机器昨夜休眠 ~9.7h,
+链的轮询循环跨休眠存活并正确恢复。
