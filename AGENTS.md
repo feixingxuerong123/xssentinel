@@ -3947,3 +3947,25 @@ Chromium 不执行 —— lab 弱 oracle);noscript-3 同族(答案键载荷在 J
 是 mark() 契约级问题(戳必然引入引号);这类端点要确认需要无引号的 token
 携带形状(alert(1) 无法携带归属 token)—— 与 312 的静态形状检出是同一个
 讨论,不在本批。
+
+## Phase 316 补记:收尾门禁全绿 + 一次自我归因修正
+
+**full 194 双引擎矩阵:sync TP113/FP0/TN81/FN0/ERR0、async
+TP107/FP0/TN75/FN0/ERR0,双 F1=1.0,与语料批之前逐项一致 —— 零 FP 回归**
+(`p316_full_{sync,async}.json`)。
+
+**XSSMaze 触及族 16 端点定点复扫:8 条 FN→TP**(noscript-1、pdiff-1、
+ctxv2-5、hidden-reflection-6、multicontext-3、chain-4、jsescape-2、
+**nonce-4**)。投射全量 932/81 → **940/73**(R 92.8%)。
+
+**自我归因修正(314 的两条结构性判断被本批修复推翻,改账)**:nonce-4 的
+确认者是 sq 重排送进收敛窗口的**反引号 tag-breakout**
+(`</script><script>alert\`xssv…\`</script>`)—— 我在 314 说"quote 转义服
+务器杀掉一切含引号的 token 戳"错在两处:反引号戳没有可转义字符;token 本
+身是字母数字,活得过转义。真正的结构不可达只剩 noscript-3/4(lab 答案在
+JS 启用的 noscript rawtext 里是惰性文本 / meta-refresh js: 现代 Chromium
+不执行 —— 弱 oracle)与 cspbypass-6(外链脚本)。
+
+jsescape-3(反引号页被分类为 script_string_sq,模板语料永不触发 —— 上下文
+分类的产品缺口)、sanitizer-6(href 空格等号,语料非头部位)、edge-1(前导
+null)、sanitizer-edge-2(未加引号 var)仍为 FN,已记入下一批。
