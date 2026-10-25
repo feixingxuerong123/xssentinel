@@ -841,6 +841,66 @@
 
 - **[开放] 真实靶场上浏览器爬取宽度不稳定**(实测同命令 18 / 22 / 70 / 70 / 70 / 74 端点)。
 
+## [1.2.1] - 2026-10-25
+
+判定顺序与诚实性收口:case 归一化反射、async 主循环确认顺序、逐参数覆盖列,
+以及三个跨引擎/外部靶实测台账。外部靶 XSSMaze server 复扫补齐口径
+**932/81/0(R 92.0% / F1 0.958)**,控制例保持 0 FP。
+
+### Fixed
+
+- **case 归一化反射不再被判"未反射"(Phase 308)**:两引擎的反射判定从
+  `marker in text` 精确匹配改为 `context.find_reflected_marker()`(先精确、
+  再 ASCII-only 大小写不敏感,返回反射后的真实拼写);swap-case 服务器另有
+  单载荷重试(`swap_case` 变换,sync/async 同门)。XSSMaze `casemanip` 家族
+  3 条 FN 全部转正。
+- **async 主循环的确认顺序对齐 sync(Phase 309)**:per-payload 的
+  `build_polyglot` 附加探针会在上下文专属载荷之前确认并短路队列,五个
+  benchmark 阳性例因此以 `polyglot_reflection` 记 FN;该味改为整个候选队列
+  之后一次性发射。对等门扩到 17 端点(含 crawl 对)后 158 直达用例台账
+  **0 分歧**。
+- **--async 报告的逐参数覆盖列不再显示假零(Phase 310/311)**:
+  `reflected`/`context`/`payloads_sent`/`confirmed` 接线,`payload_classes`
+  记录每个派发载荷的真实语料族(tagged 采样器;派生载荷按设计记分类上下
+  文)。此前任何 --async 报告读作 "0 payloads sent / reflected=False"。
+- **预算传播测试契约随 309 更新**:`test_async_budget_propagation` 的
+  confidence 断言原先钉的是被移除的 per-payload polyglot 评分。
+
+### Added
+
+- `context.find_reflected_marker()`、`swap_case` 变换、双引擎
+  `_try_case_swap`、`cross_context_candidates_tagged` 采样器。
+- **证据形状不变量门(Phase 312)**:high/critical 必须携带可查凭据
+  (browser-executed / OOB / headless 已确认 / proof / evidence 五者其一),
+  常驻门带帽变异对照(帽关掉实测咬出 4 条),211 路由全量 sweep 账本
+  `benchmark/results/phase312_evidence_shapes.json`:164 条 high **0 违规**。
+- **全量 parity 台账(Phase 313)**:158 直达用例 × 双引擎原始报告三元组,
+  `phase313_parity_ledger.json`:**0 分歧**。
+- XSSMaze 剩余 FN 重新归因(Phase 314,`dev/_xssmaze/`
+  `FN_ATTRIBUTION_20261025.md`):delivery 切分 query 46 / 其他 35;唯一产品
+  缺口 = HPP 首现位顺序;两条 dialog 模型结构性 FN(外链脚本 / 大写 JS)
+  经 Chromium 实测定性。
+
+### Verified
+
+- XSSMaze v0.3.0 官方 runner 复扫(干净 worktree):server **TP931/FN82/FP0**
+  in-run,补齐 1 条 wrapper 超时后 **932/81/0**(P 1.000 / R 0.920 /
+  F1 0.958,4149s);27 条控制例 **0 FP**。与 1.2.0 的 929/84 相比 +3 全部
+  来自 casemanip(投射逐条命中)。
+- 内部 194 例矩阵双引擎 **F1=1.000**:sync TP113/FP0/TN81/FN0/ERR0,
+  async TP107/FP0/TN75/FN0/ERR0;quick 严格切片双引擎 F1=1.0。
+- 全量文件级套件 **169/170 绿**;唯一红是 309 的测试契约漂移(非产品回归),
+  修复后复跑 7/7。
+- 受影响面定点批与 ruff 全过;变异对照(310/312)实测咬合。
+- `--self-test` **ALL CHECKS PASSED**(rc=0,~13 分钟)。
+
+### Known limitations
+
+- server 81 条实测 FN 的族分解与可修估算见 FN_ATTRIBUTION_20261025:语料可修
+  ~16-20,产品缺口 1(HPP 首现位),结构性 2,DOM 通道 5,其余为逐上下文
+  长尾;语料批次须遵守 instrument-first 协议(梯子预算已满)。
+- 非 query delivery(25 body / 6 header / 4 path)受官方 runner 的 URL-only
+  投递契约限制,不构成能力结论。
 ## [1.2.0] - 2026-10-23
 
 外部靶场 XSSMaze v0.3.0 全量验证后的修复与发布收口。控制例假阳性从 13 降到 0,
