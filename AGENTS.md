@@ -3862,3 +3862,29 @@ F1 0.958),与 308 时的投射逐条一致**;27 条控制例 0 findings。
 **门禁链终态**:full_gate=GREEN(169/170,红点已修)→ xssmaze=OK →
 evidence_sweep=OK → parity_ledger=OK,全链退出码 0。机器昨夜休眠 ~9.7h,
 链的轮询循环跨休眠存活并正确恢复。
+
+## Phase 314:XSSMaze 剩余 FN 重新归因(81 条,answer key 对照 + 代表例实测)
+
+932/81 复扫后的全量归因(`dev/_xssmaze/FN_ATTRIBUTION_20261025.md`,方法
+同 2026-10-23 轮:map_all/solutions 答案键 + curl/扫描器/Chromium 实测)。
+**delivery 切分:query 46 / body 25 / header 6 / path 4** —— 35 条非 query
+是官方 runner 的 URL-only 投递契约,与上轮同判。query 46 的族:noscript 破
+口 7(答案键 `</noscript><script>`,语料缺口,上轮已记)、JS 字符串逃逸 7、
+截断/检查上限 4、sanitize 绕过 5、CSP/nonce 3、DOM 通道 5、attr/iframe 5、
+HPP 顺序 1、大写服务器 1、杂项 8。
+
+**本轮量出的唯一产品缺口:HPP 顺序** —— lab 形状是"首值渲染、末值过滤"
+(hpp-level1),Phase 193 的 `_try_hpp` 只探次现位;要打中需要首现 payload
+的镜像顺序(193 的测试钉的是现行契约,两个方向都该探)。
+
+**Chromium 实测否掉一个直觉**:obfuscation-2 的答案键载荷
+`<IMG SRC=X ONERROR=ALERT(1)>` 在真 Chromium **不弹窗**(JS 大小写敏感;
+干净三臂对照:小写弹、大写不弹、纯大写 script 不弹)—— lab 用弱 oracle 判
+可利用,dialog 验证模型对该端点结构性不可达,只能静态形状检出(与
+cspbypass-6 的外链脚本同族,共 2 条)。
+
+**可修估算**:语料可修 ~16-20(noscript 7 + JS 逃逸 ~5 + 标签大写/JS 体原
+样 ~2 + 空格等号 1 + 前导 null 1 + 截断形状 2-3,后者受 30 字符内 13 字符
+token 预算硬约束);产品代码 1(HPP 镜像);结构性 2;DOM 通道 5(独立工
+作量);其余为逐上下文长尾。约束照旧:语料加形状不加梯子条目(校准预算
+已满,2026-10-23 的 instrument-first 协议继续有效)。
