@@ -4074,3 +4074,32 @@ full sync 194 例 **TP113/FP0/TN81/FN0/ERR0 F1=1.0**(`p318_full_sync.json`,
 modern-bypass-25 TP,sanitizer-6 / edgefilter-5 / sanitizer-edge-2 FN(弱
 oracle / 结构,已记账)。ruff 全过。**XSSMaze 投射更新:942/71 → 945/68**
 (edge-1 + jsescape-3 + modern-25 三条,叠加 317 的三条)。
+
+## Phase 319:无命中探索波 —— 最后两条 DOM FN 关闭(navsink-3 + codeexec-1)
+
+317 记账的出路落地:carrier 形状加第五个
+`("data-module", "data:text/javascript,alert(%d)")`(dynamic `import()` 只认
+模块 URL,其余形状不加载);analyze 的探针循环内加**探索波**门 —— 参数探针
+(排除通用 `__xss__` 探针)零命中且零 dialog 时,回放该通道一次可执行
+carrier:dialog 带数字 token 即 browser-executed,沉默仍是同一"未观测到"
+(每次 analyze 一波,在既有 wave 上限内)。
+
+**两课**:① 探索波首版误付在通用 `__xss__` 探针上(页面读自己的参数名,
+wave 必须骑页面真读的名字 —— spy 实测 navsink-3 的 wave 打在 `__xss__` 上
+全空),排除后 `query` 探针立刻兑现;② 探波的诊断链:直接探针用错参数名
+(q vs query)也一度误报"机制不工作" —— 形状错是本 session 反复付学费的
+同一课。
+
+**端到端**:navsink-3(`location.assign(js:)`)与 codeexec-1(`import()`
+加载 data: 模块)两条 FN→`executed: True / browser-executed` —— **五条
+DOM FN 全部关闭**。成本实测:无命中页 ~12s(探索波 = 5 次导航,一次性,
+在 wave 上限内)。
+
+**门禁**:DOM 回归批 4/4;quick 严格切片双引擎 F1=1.0;full sync
+TP113/FP0/TN81/FN0/ERR0 F1=1.0;full async TP106/FP0/TN75/FN1 —— 唯一 FN
+(neg-rcdata-04)单例复跑 **TP 1.1s 零重试**,批跑撞 loopback 楔(同刻
+服务器 ConnectionReset;quick async 首跑的 header 两例 FN 同楔,单跑 TP
+1.3s)—— 全部按环境形状记账,引擎零回归。ruff 全过。
+
+**XSSMaze 投射:947/66**(942/71 + navsink-3 + codeexec-1,叠加 318 的三
+条)。全量复扫官方口径随后。

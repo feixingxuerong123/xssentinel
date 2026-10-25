@@ -1173,6 +1173,10 @@ _CARRIER_SHAPES = (
     # delivery hint.  The page's own dialog is still the proof.
     ("mxss", "<form><math><mtext></form><form><mglyph><style></math>"
              "<img src onerror=alert(%d)>"),
+    # Phase 319: dynamic `import(query)` (XSSMaze codeexec-1) executes a
+    # data: module -- the module's code runs in the page's own realm and the
+    # dialog is the page's own.  No other shape loads as a module.
+    ("data-module", "data:text/javascript,alert(%d)"),
 )
 
 # Phase 226: cap on carrier-wave navigations per analyze() call.  Wave 1 is
@@ -2009,6 +2013,7 @@ class DynamicDomAnalyzer:
                     probes = [{"kind": "goto", "url": url,
                                "source": "stored_view"}]
                 consumed_hits = 0   # Phase 317: sessionStorage slice cursor
+                _exploratory_done = False   # Phase 319: one exploratory wave max
                 for probe in probes:
                     if time.monotonic() > deadline:
                         _log.debug(
@@ -2242,6 +2247,49 @@ class DynamicDomAnalyzer:
                         carrier_waves += 1
                         executed, carrier_used = self._try_carriers(
                             page, probe, marker, numtok, dialog_msgs, deadline)
+                    elif (not other_hits and not pm_hits and not executed
+                          and probe.get("param")
+                          and probe["param"] != "__xss__"
+                          and not _exploratory_done
+                          and carrier_waves < _DOM_CARRIER_WAVE_MAX
+                          and time.monotonic() <= deadline):
+                        # Phase 319: the EXPLORATORY wave.  Navigation and
+                        # module sinks (location.assign, import()) fire the
+                        # moment the value arrives and kill their own
+                        # document -- no hook can record a hit, so the
+                        # Phase 226 gate above (wave only on a hit) can
+                        # never pay for them.  On a real-param probe with
+                        # NOTHING recorded, replay the channel once with
+                        # the executable carriers: a dialog carrying the
+                        # numeric token proves the page's own code ran it;
+                        # silence stays the same measured "not observed"
+                        # as everywhere else.  One per analyze(), inside
+                        # the existing wave cap.  The generic __xss__ probe
+                        # is excluded: pages read their own parameter
+                        # names, and the wave must ride the name the page
+                        # actually reads (measured: spending the wave on
+                        # __xss__ missed navsink-3's `query` entirely).
+                        _exploratory_done = True
+                        carrier_waves += 1
+                        executed, carrier_used = self._try_carriers(
+                            page, probe, marker, numtok, dialog_msgs, deadline)
+                        if executed:
+                            findings.append({
+                                "type": "dom_dynamic",
+                                "sink": "exploratory-carrier",
+                                "source": probe["source"],
+                                "param": probe.get("param"),
+                                "snippet": "",
+                                "confidence": "high",
+                                "executed": True,
+                                "carrier": carrier_used,
+                                "detail": (
+                                    "DOM XSS CONFIRMED in real browser: the "
+                                    "page routed the query value into a sink "
+                                    "that no hook can observe (navigation or "
+                                    f"module load) and its own handler fired "
+                                    f"alert(marker) (carrier: {carrier_used})."),
+                            })
                     elif any(h.get("via") == "dialog" for h in hits):
                         # Stored-payload token channel: the dialog IS the
                         # execution (Phase 194), no replay needed.
