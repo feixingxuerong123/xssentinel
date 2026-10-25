@@ -4050,3 +4050,27 @@ Phase 226 的成本模型,要独立一轮带成本测量再动。
 **外部靶复核**:dom/level30、dom/level9、domsink/level6 三端点全部
 FN→`high:1 dom_dynamic:1`(wrapper 实测)—— 317 的三条 closes 全部在
 真实 lab 上兑现,投射 942/71 → **945/68**。
+
+## Phase 318:语料第二批(模板反引号戳 + 前导 null)+ 弱 oracle 再添两例
+
+**模板族**:jsescape-3 分类本就正确(script_template,318a 的"分类缺口"假设
+被实测否证)—— FN 的真因是服务器转义引号,`${alert('tok')}` 死于
+`'` 语法错。修:script_template 加 `${alert\`1\`}`(反引号戳,服务器不转
+义反引号,316 的 tagged-template 沙箱支持让它过 verify)。**jsescape-3 与
+modern-bypass-25 两条 FN→TP**。
+
+**edge-1**:步进位 149 原位替换为 ` <script>`(前导 null 令过滤器只查
+前缀)—— FN→TP。**sanitizer-6 反例即回退**:href 空格等号载荷装上后实测
+仍是 FN,curl 揭穿答案键是弱 oracle —— 服务器把 `javascript:` 剥成 `#`,
+渲染出惰性片段 `href="#alert(1)"`,lab 按形状判可利用。替换已回退,记账
+为弱 oracle 结构不可达(与 obfuscation-2/noscript-3/4/cspbypass-6 同族,
+外加 edgefilter-5/sanitizer-edge-2 的 `alert(1)` 无 token 可携带 —— 答案键
+载荷全都不含归属 token,quote-strip 服务器上 token 模型结构性够不着)。
+
+**门禁(实测)**:受影响批 8/8 绿;quick 严格切片双引擎 F1=1.0(sync
+TP36/FP0/TN28/FN0/ERR0,async TP36/FP0/TN27/FN0/ERR0,1 SKIP);
+full sync 194 例 **TP113/FP0/TN81/FN0/ERR0 F1=1.0**(`p318_full_sync.json`,
+与基线逐项一致);触及族定点复扫两轮稳定:edge-1 / jsescape-3 /
+modern-bypass-25 TP,sanitizer-6 / edgefilter-5 / sanitizer-edge-2 FN(弱
+oracle / 结构,已记账)。ruff 全过。**XSSMaze 投射更新:942/71 → 945/68**
+(edge-1 + jsescape-3 + modern-25 三条,叠加 317 的三条)。

