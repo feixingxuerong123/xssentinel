@@ -4144,5 +4144,72 @@ sink 是 document.write,hash 投递的载荷经命中钩子付波,**页面文本
 验证只能到本地(集合数 + ruff + YAML parse),CI 端在下一次 push 兑现。
 
 **门禁**:318 批 8/8 + quick 双引擎 F1=1.0 + full sync TP113/FP0/TN81/FN0;
-320 的关键字门控版 full sync TP112/FN1(pos-dom-04)即回退依据;回退后的
-full sync 复验在队列(机器 loopback 节流中,单跑诊断亦受阻)。
+320 的关键字门控版 full sync TP112/FN1(pos-dom-04)即回退依据;**回退后的 full sync 复验(实测)**:**TP113/FP0/TN81/FN0/ERR0 F1=1.0**
+(`p320b_full_sync.json`,915.9s)—— pos-dom-04 复位,零召回代价;915.9s
+即无条件探索波的实测常驻成本(733s 基线 + ~180s)。
+
+## Phase 322:对齐 2026-10 安全热门方向(竞品吸收第九轮:Agent 面 / 语料生态 / LLM 提议-验证 / 基准口径)
+
+**背景**:全盘对照本周 GitHub 安全热门(AI 自主渗透 Agent 是绝对主角:Strix 66.7k
+stars、PentAGI 25.2k、HexStrike AI v6.0 12.4k(MCP 多 Agent,已进 Kali)、RedAmon
+(链式利用+自动修复 PR)、Deadend CLI(攻击失败自己写绕过代码);nuclei templates
+v10.5.0 单月 +295 检查的社区飞轮;XSSMaze 0.3.0)。结论:引擎本体已领先(Phase 196b
+跨工具 f1=0.986 vs dalfox 0.825/nuclei 0.839;XSSMaze v0.3.0 官方口径 946/67),
+差距集中在「怎么被使用」与「语料怎么生长」——本轮四线落地。
+
+- **322a MCP 工具面 3→7**(HexStrike/Deadend 式细粒度范式):新增
+  `xssentinel_verify`(单载荷回放,同一 mark() 打 token + verify_semantic(可选
+  verify_headless)判定器——Agent 的调整-重试循环;**无执行点载荷诚实标注**:
+  mark() 无法打 token 的载荷给出 `payload_reflected` 弱信号并注明「可反射、永不
+  可确认执行」,不假装测过)、`xssentinel_param_mine`(mine_params 差分挖参,
+  max_params 有界;实测教训:默认词表 313 名,`debug` 在第 65 位——fixture 选词表
+  前排的 `search` 才测得到)、`xssentinel_csp_analyze`(一次请求,header+`<meta>`
+  双通道经同一 `csp.policies()`,分族报 script-src-elem/attr 内联放行 + weak/
+  bypass 候选)。目录测试双向钉死七个工具名。
+- **322b 场景语料正式化**:`data/scenarios.json`(`_meta` 含贡献契约与
+  non_goals)+ `--scenarios builtin` 别名 + `{self}` 占位符(扫描 URL 自身路径)
+  → 唯一不需要应用端点知识的通用存储形状「POST 写回同一页再读回」。**GET 写入
+  变体经活体测量证伪后不发布**:DSL 的 read 步会把裸 token 作为参数值重发,有状态
+  GET 页会覆写自己的写入;无状态反射 GET 是主循环的工作且证据更强——记入
+  `_meta.non_goals`,不是静默删除。占位符三向闭合:语料 `_meta.placeholders` ==
+  {token,param,self} 且每个都在 run_scenario 源码真实展开(inspect.getsource)。
+- **322c nuclei dast 桥接 + `--custom-payloads` 死接线修复**:`core/nuclei_import.py`
+  提取 XSS 相关字面载荷进 custom 通道(模板**不**执行:interactsh 依赖载荷/
+  nuclei DSL 占位符(`{{url_encode(...)}}`)/路径形状字符串(`/wp-login`,xss 打标
+  CVE 模板的 payloads 块装的是路径)三类诚实跳过并计数——后两类都是**真实语料实测
+  抓出来的**,首版把 `{{first}}` 和 `/wp-login` 当载荷导出过)。**接线时发现
+  `--custom-payloads` 是死接线**:CLI 加载、Scanner 存进 `self._custom_payloads`、
+  全仓零消费点零测试(Phase 183 `--poc-dir` 同族)。复活:双引擎候选队列
+  **prepend**(操作者显式意图优先于自动梯子;max_payloads 仍封顶;反射画像重排
+  仍可把字符被滤的条目沉底)+ `verifier.has_execution_point()` 公共助手(mark()
+  三形态正则的唯一权威封装,双引擎与 MCP verify 三处共用)。守卫测试用**自造标签
+  名**(`<xssentinel322 onpointerover=alert(1)>`)证明载荷只能来自 custom 通道
+  (语料不可能有),惰性条目断言从不发。**本机 dast 快照实测:251 模板 0 导入**
+  (72 OOB/81 DSL/228 非 XSS)——桥接正确但快照无可导内容,诚实记账;消费面是
+  XSS 专用模板集与未来月度增长。
+- **322d XSSMaze xsleak 记分契约版本化**:`benchmark/xssmaze_scoring.py`(纯函数:
+  category_of/detection_expected/outcome/contract_mismatches)+ 8 例测试。上游
+  v0.3.0「xsleak 全类是 cross-site leaks,报 0 才正确」从 README+记忆钉进版本化
+  代码;dev 归因工具(attribute.py)对官方 runner 结果每次跑交叉核对,上游若重新
+  分类会响亮报 CONTRACT MISMATCH 而非静默漂移 FN 分母。官方 runner 仍是唯一权威
+  记分者(2026-10-22 起我方全用它),本模块不重记分。
+- **322e LLM 提议-验证管线**:`core/llm_propose.py` + `xssentinel_propose` MCP
+  工具。分工一句话:**模型提议,引擎裁决**——每条候选 mark() 打新 token 真回放,
+  verify_semantic(可选 headless)是唯一裁判;confirmed=令牌执行,未确认=
+  unverified 如实上报(编码回显fixture 钉死这条);确认的提议**不**自动晋升进
+  交付语料(晋升是评审决策,318 纪律)。确定性预检(执行点/长度/控制字符/占位符
+  语法)在回放前把关;pool 未配置/耗尽(LLMConfigError/LLMPoolExhausted)诚实报错。
+  parse_candidates 容忍模型真实输出形态(裸数组/围栏/散文夹数组)。
+
+**门禁(本机实测)**:定向批全绿——MCP 20 例(test_mcp_server)+ 17 例
+(test_llm_propose,假 pool 全桩无网)+ 场景 10 + 桥接 16 + 契约 8 + async 管线/
+phase311 20;改动文件 ruff 零基线;`xssentinel/core` 全包 ruff 干净。引擎对等门
+(双引擎候选队列都被 322c 触碰)与全量分批门禁结果续记于本条目下方;未跑完前按
+「未验证」记账,不引用。
+
+**方法论记账**:① 两个测试首版预期写错被现场纠正——分类器对
+`<script>alert('tok')</script>` 的诚实答案是 script_string_sq(不是 element body),
+参数挖掘的词表位置决定可达性:**预期要读被测物,不是读直觉**;② nuclei 桥接的
+三个过滤器全部来自真实语料的第一跑,不是想象出来的威胁模型;③ Phase 编号与并发
+会话碰撞(320/321 已被占用)——26 处引用整体重编号为 322 并逐一 AST/JSON 复验,
+这是共享 worktree 的常规风险,提交前必须 grep 确认。
