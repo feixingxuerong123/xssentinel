@@ -58,9 +58,20 @@ def _init_script(marker: str) -> str:
   var MARKER = "__MARKER__";
   window.__xss_dom_hits = [];
   function hit(sink, snippet){
-    window.__xss_dom_hits.push({sink: sink, snippet: String(snippet||'').slice(0,200),
-                                via: window.__xss_pm_dispatching ? 'postmsg'
-                                     : (window.__xss_dispatching ? 'interaction' : 'auto')});
+    var row = {sink: sink, snippet: String(snippet||'').slice(0,200),
+               via: window.__xss_pm_dispatching ? 'postmsg'
+                    : (window.__xss_dispatching ? 'interaction' : 'auto')};
+    window.__xss_dom_hits.push(row);
+    // Phase 317: navigation sinks (Object.assign(location,{href}) etc.) kill
+    // the document the moment they fire -- the in-window array dies with it.
+    // Mirror to sessionStorage: same-origin navigation survives, and the
+    // reader slices by what it already consumed.
+    try {
+      var prev = [];
+      try { prev = JSON.parse(sessionStorage.getItem('__xss_dom_hits') || '[]'); } catch(e){}
+      prev.push(row);
+      sessionStorage.setItem('__xss_dom_hits', JSON.stringify(prev));
+    } catch(e){}
   }
   // Phase 144: do NOT require a primitive string.  Angular (Trusted Types)
   // hands the innerHTML setter a TrustedHTML wrapper -- typeof is 'object',
@@ -332,25 +343,32 @@ def _init_script(marker: str) -> str:
     };
   }
   ['innerText','textContent'].forEach(function(prop){
-    // innerText lives on HTMLElement.prototype, textContent on Node.prototype
-    // -- one descriptor lookup per prototype, silent no-op when absent.
-    [HTMLElement.prototype, Node.prototype].forEach(function(proto){
-      try {
-        var d = Object.getOwnPropertyDescriptor(proto, prop);
-        if (d && d.set){
-          Object.defineProperty(proto, prop, {
-            configurable: true,
-            get: d.get,
-            set: function(v){
-              try {
-                if (this.tagName === 'SCRIPT' && has(v)) hit('script.'+prop, v);
-              } catch(e){}
-              return d.set.call(this, v);
-            }
-          });
-        }
-      } catch(e){}
-    });
+    // Phase 317: the accessor may live on ANY level of the prototype chain.
+    // Measured: Chromium puts an innerText accessor on
+    // HTMLScriptElement.prototype that SHADOWS HTMLElement.prototype's --
+    // hooking the latter silently misses every script element (the load-time
+    // assignment never reaches it; a post-load manual assignment through the
+    // descriptor does, which is why the first probe run read as "installed
+    // but never called").  Hook the level that OWNS the accessor, discovered
+    // from a live probe element.
+    var probe = document.createElement('script');
+    var o = Object.getPrototypeOf(probe);
+    while (o){
+      var d = Object.getOwnPropertyDescriptor(o, prop);
+      if (d && d.set){
+        Object.defineProperty(o, prop, {
+          configurable: true, get: d.get,
+          set: function(v){
+            try {
+              if (this.tagName === 'SCRIPT' && has(v)) hit('script.'+prop, v);
+            } catch(e){}
+            return d.set.call(this, v);
+          }
+        });
+        break;
+      }
+      o = Object.getPrototypeOf(o);
+    }
   });
   try {
     var oAssign = Object.assign;
@@ -1990,6 +2008,7 @@ class DynamicDomAnalyzer:
                 else:
                     probes = [{"kind": "goto", "url": url,
                                "source": "stored_view"}]
+                consumed_hits = 0   # Phase 317: sessionStorage slice cursor
                 for probe in probes:
                     if time.monotonic() > deadline:
                         _log.debug(
@@ -2160,7 +2179,18 @@ class DynamicDomAnalyzer:
                     except Exception:
                         pass
                     try:
-                        hits = page.evaluate("window.__xss_dom_hits || []")
+                        # Phase 317: sessionStorage mirrors hits across the
+                        # navigations that navigation sinks themselves cause;
+                        # slice by what this analyze call already consumed so
+                        # a hit lands on the probe that produced it, never on
+                        # a later one.
+                        _all_hits = page.evaluate(
+                            "(function(){ try { var s = JSON.parse("
+                            "sessionStorage.getItem('__xss_dom_hits')||'[]');"
+                            " if (s.length) return s; } catch(e){}"
+                            " return window.__xss_dom_hits || []; })()")
+                        hits = _all_hits[consumed_hits:]
+                        consumed_hits = len(_all_hits)
                     except Exception:
                         hits = []
                     # Phase 194: the dialog channel as a FALLBACK -- when no

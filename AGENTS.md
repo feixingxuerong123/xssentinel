@@ -4019,3 +4019,30 @@ Has() 门均未排除。**不猜修** —— 下一会话从受控页 + 时间�
 **顺带的表示与现实之课(第 N 次)**:`String(d.set).indexOf('script.innerText')`
 查的是源码字面量,而包裹源码里是 `'script.'+prop` 拼接 —— mySetter:False
 是假读数,真判据是 setSrc 的实际源码。测表示前先看被测物自己的形状。
+
+## Phase 317 收口:三钩子全通(hermetic 测试)+ 导航擦除的 sessionStorage 解
+
+**谜底(受控页 + 内联探针实测)**:script-text 钩子"已安装但从不触发"的根
+因是**原型链遮蔽** —— Chromium 把 innerText accessor 放在
+`HTMLScriptElement.prototype` 上,遮蔽 HTMLElement.prototype 的同层:挂在后
+者永远够不到 script 元素,而 load 后经描述符直调恰恰绕过遮蔽直击我那层
+—— "安装了却不触发"与"直调成功"两个读数由此同时成立。修法:从活体探测
+元素沿链找**真正拥有 accessor 的层**挂钩(每浏览器版本自适应)。
+
+**domsink-6 的第二课:导航擦除** —— `Object.assign(location, {href})` 触发
+的瞬间文档就死了,命中数组随葬。修:`hit()` 镜像进 sessionStorage(同源跳
+转存活),读取端按已消费游标切片(命中落在产出它的那个探针上,绝不记到后
+来的探针头上 —— 跨探针归属污染被游标显式防住)。载波 `javascript:alert(N)`
+经赋值导航执行,页面自己的 dialog 兑现 browser-executed。
+
+**端到端(外部靶 + hermetic fixture 双验证)**:dom-30(execCommand)、
+dom-9(script.innerText)、domsink-6(Object.assign href)三条全部
+**executed: True / browser-executed**。新测试
+`tests/test_phase317_dom_navigation_sinks.py` 4 例(三 sink 本地 fixture 全
+通 + safe 孪生零执行主张)。DOM 回归批 6/6 绿。
+
+**剩余两条记录在案,不装已修**:navsink-3(`location.assign` 是
+[LegacyUnforgeable] 实例成员,defineProperty 直接抛)与 codeexec-1
+(`import()` 是语法构造)—— 两者都能被正确的 carrier 执行,但都无命中可记
+、wave-1 永不付账。出路是"无命中探索波"机制(每端点限额的一次盲付),会改
+Phase 226 的成本模型,要独立一轮带成本测量再动。
