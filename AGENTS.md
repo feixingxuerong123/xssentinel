@@ -3999,3 +3999,23 @@ carrier 波要把载荷送到这些 sink(现值注入走 query → location.sear
 940/73 还多 2 条(摆动/潜在效应),控制例 0 FP。本 session 的 server 轨迹:
 925/88(1.2.0)→ 932/81(308)→ **942/71**(315 HPP + 316 语料/沙箱),
 **+17 FN 关闭**。1 行 timeout(见 tsv),与 p307 的四条环境超时同族。
+
+## Phase 317 会话实录:dom-30 端到端全通;script-text 钩子留一个精确复现的谜
+
+**Chromium 会话实测**:_init_script 注入三个新钩子后,`dom/level30` 走完整
+analyze 流 —— **execCommand 命中 → carrier wave 付账 → 页面自己的 dialog →
+`executed: True`(browser-executed),外加四条其它 source 的投递行**。钩子→
+命中→wave→dialog 的链在真实外部靶上成立(5 条 DOM FN 里第 1 条关闭)。
+
+**dom-9(script.innerText)未通,谜面精确记录**:① 手动赋值(load 后)命中
+钩子(direct descriptor 调用与赋值均验证,`setSrc` 显示包裹代码在位);
+② 但 analyze 的 load 时赋值零命中 —— 受控页(复刻 dom-9 模式)同样:load
+时赋值不命中、load 后赋值命中;③ 探针插桩轮次被自己的替换点污染(第一处
+`if (d && d.set){` 在 innerHTML 钩子里,不在目标块)—— 复现命令与探针教训
+都在本条。加载时 vs 手动赋值的分叉机制未定:init 时序、元素宿主差异、
+Has() 门均未排除。**不猜修** —— 下一会话从受控页 + 时间戳探针(init script
+首行记时 vs 页面脚本记时)开测。
+
+**顺带的表示与现实之课(第 N 次)**:`String(d.set).indexOf('script.innerText')`
+查的是源码字面量,而包裹源码里是 `'script.'+prop` 拼接 —— mySetter:False
+是假读数,真判据是 setSrc 的实际源码。测表示前先看被测物自己的形状。

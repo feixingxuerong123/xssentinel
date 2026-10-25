@@ -305,6 +305,70 @@ def _init_script(marker: str) -> str:
     }
   });
 
+  // Phase 317: the three HOOKABLE sinks from the 314 attribution's
+  // DOM-channel list.  Execution is still claimed only by the page's own
+  // dialogs -- these record DELIVERY so the carrier wave gets paid (no hit
+  // -> no wave -> the FN shape measured on XSSMaze dom-30 / dom-9 /
+  // domsink-6).
+  //
+  //   document.execCommand('insertHTML', false, marker)   -> dom-30
+  //   scriptTag.innerText / textContent = marker          -> dom-9
+  //   Object.assign(location, {href: marker})             -> domsink-6
+  //
+  // location.assign / location.href are [LegacyUnforgeable] instance
+  // members -- defining a property on them throws, so navsink-3 and the
+  // direct href-setter path CANNOT be hooked here; their Chromium-session
+  // verdict is recorded in the 317 notes.  Object.assign is Proxy-wrapped
+  // (Phase 141's identity lesson: a plain replacement drops nativeness).
+  if (document.execCommand){
+    var oEC = document.execCommand;
+    document.execCommand = function(cmd){
+      try {
+        if (String(cmd).toLowerCase() === 'inserthtml')
+          for (var i=1;i<arguments.length;i++)
+            if (has(arguments[i])) hit('document.execCommand', arguments[i]);
+      } catch(e){}
+      return oEC.apply(document, arguments);
+    };
+  }
+  ['innerText','textContent'].forEach(function(prop){
+    // innerText lives on HTMLElement.prototype, textContent on Node.prototype
+    // -- one descriptor lookup per prototype, silent no-op when absent.
+    [HTMLElement.prototype, Node.prototype].forEach(function(proto){
+      try {
+        var d = Object.getOwnPropertyDescriptor(proto, prop);
+        if (d && d.set){
+          Object.defineProperty(proto, prop, {
+            configurable: true,
+            get: d.get,
+            set: function(v){
+              try {
+                if (this.tagName === 'SCRIPT' && has(v)) hit('script.'+prop, v);
+              } catch(e){}
+              return d.set.call(this, v);
+            }
+          });
+        }
+      } catch(e){}
+    });
+  });
+  try {
+    var oAssign = Object.assign;
+    Object.assign = new Proxy(oAssign, {
+      apply: function(t, thisArg, args){
+        try {
+          if (args[0] === window.location)
+            for (var i=1;i<args.length;i++){
+              var src = args[i];
+              if (src && typeof src === 'object' && 'href' in src && has(src.href))
+                hit('Object.assign(location.href)', src.href);
+            }
+        } catch(e){}
+        return Reflect.apply(t, thisArg, args);
+      }
+    });
+  } catch(e){}
+
   // Function constructor (covers eval-like dynamic code).
   //
   // Phase 141: a plain ``window.Function = function(){...}`` replacement is
