@@ -16,6 +16,13 @@
 
 ### Verified
 
+- **依赖审计基线(Phase 328c)**:本机 `pip-audit 2.9.0` 对 258 个已安装包量出
+  **43 条 / 7 个直接或可选依赖**(aiohttp 3.13.3、urllib3 2.6.3、requests 2.32.5、
+  soupsieve 2.8.4、Flask 2.2.5、werkzeug 3.1.8、pytest 8.4.2)。未盲升——aiohttp
+  的跨源重定向/解压修复与本仓 egress、brotli 兼容面重叠,Flask 3.x 需 API 回归;
+  已落 [docs/DEPENDENCY_AUDIT.md](docs/DEPENDENCY_AUDIT.md) 与 nightly 非阻断
+  审计作业,隔离环境验证后再收紧版本下限并把审计改为阻断。
+
 - **MCP 默认值对齐 + 输出信任边界(Phase 328)**:① **默认值**:`xssentinel_scan`
   此前强制 `dom_engine="off"`(除 `headless`)并硬编码 `max_transforms=8`,而 CLI
   normal 是 `auto`/12——Agent 用默认值会漏掉全部 DOM finding 和 1/3 变换变体,

@@ -204,3 +204,30 @@ jobs:
           name: regression-logs
           path: benchmark/results/regression_logs/
           if-no-files-found: ignore
+
+  dependency-audit:
+    # Supply-chain measurement (Phase 328c). REPORT-ONLY until the fixed
+    # versions have been verified in an isolated venv (see
+    # docs/DEPENDENCY_AUDIT.md): flipping this to blocking before that run
+    # would make the gate red on known, unmeasured upgrades.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev,async,ast,api]"
+          pip install pip-audit
+      - name: Audit installed dependencies
+        continue-on-error: true
+        run: python -m pip_audit --format json -o pip-audit.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pip-audit
+          path: pip-audit.json
+          if-no-files-found: ignore

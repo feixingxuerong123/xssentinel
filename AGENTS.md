@@ -4496,3 +4496,29 @@ sitemap 与子 sitemap 两个解析点都走它。AST 守卫钉死"全文件只�
 
 门禁:`tests/test_phase328b_sitemap_entities.py` 6 例 + 既有
 `test_sitemap_input.py` 9 例 = **15 passed**;ruff 零告警。
+
+## Phase 328c:依赖审计基线(供应链方向,"无交集"判断被实测推翻)
+
+本周对照文档把供应链/MCP 生态安全判为"与本仓无直接交集"。本轮用
+`pip-audit 2.9.0` 实测本机 258 个已安装包,按本仓直接/可选依赖闭包过滤:
+**43 条 / 7 个包**。关键项不是泛泛的"有新版本",而是与既有威胁模型同面:
+
+- **aiohttp 3.13.3(32 条)**:跨源重定向保留 Cookie / `cookies=` 到达下一源
+  (PYSEC-2026-2100/-2105)——Phase 189 的 egress 守卫正是手工解决这一类;
+  另有解析器、解压、资源耗尽类。修复线 3.13.4 / 3.14.4。
+- **urllib3 2.6.3(5 条)**:流式 API 解压整个响应、`ProxyManager` 跨源重定向
+  转发认证、代理 TLS 配置。修复线 2.7.0 / 2.8.0。
+- requests 2.33.0(可预测临时文件名)、soupsieve 2.9.0(选择器正则回溯)、
+  Flask 3.1.3(`Vary: Cookie`)、werkzeug 3.1.9(Windows 设备名 safe_join)、
+  pytest 9.0.3(dev-only `/tmp` 目录)。
+
+**决定:本轮不盲升**。本机是共享的长期 3.9 全局环境(258 个包),在其中升级
+既测不到声明依赖,又会踩两处本仓记过的兼容面:aiohttp 3.14 与 Phase 209/306
+的 brotli 解码、egress cookie-jar 行为;Flask 3.x/werkzeug 3.1.9 与 Phase 326
+的 API 前端。落地的是**记账 + 非阻断门**:
+`docs/DEPENDENCY_AUDIT.md`(逐包表 + 下一轮隔离环境步骤)、
+`ci.yml` 新增 `dependency-audit` 作业(weekly/dispatch,`continue-on-error`,
+上传 JSON 工件),等隔离 venv 跑完 egress/async/API/MCP + self-test + strict
+切片后再抬 `pyproject` 下限并把该作业改为阻断。YAML 已用 PyYAML 解析复核
+(4 个 job / 5 steps)。`pip check` 的 4 条冲突全在无关全局包
+(django/httpcore/langsmith/py7zr),不计入本仓依赖。
