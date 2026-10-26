@@ -21,21 +21,25 @@ hosts are reported and dropped unless --allow-host / --allow-any-host say
 otherwise (partitioning itself lives in ``cli_runner``, mirroring the HAR
 path, so the behavior is identical across imports).
 
-Security note: the XML is untrusted input.  Parsing uses ``xml.etree``
-(external entities are never resolved by the stdlib parser) and the text
-is never interpolated into anything but URL strings; caps bound both the
-number of child sitemaps and total URLs so a hostile 10GB sitemap cannot
-turn into a memory event.
+Security note: the XML is untrusted input.  External entities are never
+resolved by the stdlib parser, and documents that *declare* an entity are
+refused before parsing: stdlib ElementTree expands internal entities, and
+a 585-byte billion-laughs sitemap measured >720 MB RSS (Phase 328b).  Real
+sitemaps never need custom entities, so the refusal costs nothing.  Caps
+bound both the number of child sitemaps and total URLs, and the text is
+never interpolated into anything but URL strings.
 """
 from __future__ import annotations
 
 import os
+import re
 import xml.etree.ElementTree as ET
 from urllib.parse import urlparse
 
 __all__ = ["sitemap_to_urls"]
 
 _MAX_BYTES = 8 * 1024 * 1024      # per-document cap
+_ENTITY_DECL_RE = re.compile(r"<!ENTITY\b", re.IGNORECASE)
 
 
 def _local_tag(elem) -> str:
@@ -43,11 +47,27 @@ def _local_tag(elem) -> str:
     return elem.tag.rsplit("}", 1)[-1].lower()
 
 
+def _parse_xml(xml_text: str):
+    """Parse a sitemap document, refusing entity declarations first.
+
+    stdlib ET expands internal entities at parse time; the size cap cannot
+    help because the expansion happens after the bytes arrive.  A document
+    that declares one is treated as unparseable rather than handed to the
+    parser.  External entities were never resolved, so this closes the
+    exponential side without changing normal sitemap behavior.
+    """
+    if _ENTITY_DECL_RE.search(xml_text):
+        return None
+    try:
+        return ET.fromstring(xml_text)
+    except ET.ParseError:
+        return None
+
+
 def _iter_locs(xml_text: str) -> tuple[list[str], bool]:
     """Parse one sitemap document -> (loc urls, is_index)."""
-    try:
-        root = ET.fromstring(xml_text)
-    except ET.ParseError:
+    root = _parse_xml(xml_text)
+    if root is None:
         return [], False
     urls: list[str] = []
     child_sitemaps: list[str] = []
@@ -120,14 +140,13 @@ def sitemap_to_urls(source: str, timeout: int = 15, max_urls: int = 500,
             ctext = _load(child, timeout, fetch)
         except Exception:
             continue                    # a dead child must not kill the rest
-        try:
-            croot = ET.fromstring(ctext)
-            for elem in croot.iter():
-                if _local_tag(elem) == "loc" and elem.text \
-                        and elem.text.strip():
-                    out.append(elem.text.strip())
-        except ET.ParseError:
+        croot = _parse_xml(ctext)        # same entity guard as the root
+        if croot is None:
             continue
+        for elem in croot.iter():
+            if _local_tag(elem) == "loc" and elem.text \
+                    and elem.text.strip():
+                out.append(elem.text.strip())
         if len(out) >= max_urls:
             break
     return list(dict.fromkeys(out))[:max_urls]

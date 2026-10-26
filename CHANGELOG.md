@@ -5,6 +5,15 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **恶意 sitemap 的实体膨胀(Phase 328b)**:stdlib `xml.etree` 会展开内部实体,
+  585 字节的 billion-laughs sitemap 实测 >720 MB RSS(8 MB 文档上限无效),
+  `--sitemap` 可被一个极小响应打崩。`sitemap_import._parse_xml` 现在在
+  `ET.fromstring` 前拒绝任何 `<!ENTITY` 声明(根/子 sitemap 两个解析点),
+  AST 守卫钉死所有解析必须经过它;正常 sitemap(含无实体的 DOCTYPE)不变。
+  HTML 侧实测为线性放大(100k 层嵌套/1.1 MB ≈1.09 s/67.7 MB),按已知边界记账。
+
 ### Verified
 
 - **MCP 默认值对齐 + 输出信任边界(Phase 328)**:① **默认值**:`xssentinel_scan`

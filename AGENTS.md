@@ -4473,3 +4473,26 @@ MCP 原样交给 LLM——恶意页面可在反射点附近写指令。所有成
 本轮只动 MCP 接入面与文档,未动检测判定,故未跑 benchmark 矩阵。
 **剩余交付项**:Phase 322–327 仍未提交,GitHub 无 remote(badge 404)
 ——待操作者拍板。
+
+## Phase 328b:恶意 sitemap 的实体膨胀 —— 585 字节打崩扫描器(已修)
+
+自加固清单里最后一条"lxml/BS4 实体放大/深嵌套未实测"的落地。探针
+`dev/parser_caps_probe.py`(入库)先量:
+
+- **stdlib `xml.etree` 的内部实体是指数膨胀**:585 字节 billion-laughs
+  → 子进程在 **720 MB RSS** 处被探针的 RSS cap 杀掉(levels 7);levels
+  5/6 也分别到 33/80 MB。sitemap 的 8 MB 文档上限完全无效——膨胀发生在
+  字节到齐之后。外部实体本来就不解析,docstring 只覆盖了这一半。
+- **lxml/BS4 的 HTML 侧是线性的**:100k 层嵌套 `<div>`(1.1 MB)≈1.09 s /
+  67.7 MB RSS;20k 属性 ≈0.41 s / 3.0 MB;2M 个 `&amp;`(10 MB)≈0.78 s /
+  2.3 MB。32 MB 响应上限下最坏仍是 GB 级,但需要大响应,按已知边界记账,
+  本轮不加深度门。
+
+修法:`sitemap_import._parse_xml` 在 `ET.fromstring` 前拒绝任何
+`<!ENTITY` 声明(外部实体本来就不解析;sitemap 不需要自定义实体),根
+sitemap 与子 sitemap 两个解析点都走它。AST 守卫钉死"全文件只有一处
+`fromstring`、两处必须调 `_parse_xml`",防未来新增解析点绕过。
+复测:同一探针 levels 5/6/7 全部 0.0 s / 0 MB delta,不再被 RSS cap 杀。
+
+门禁:`tests/test_phase328b_sitemap_entities.py` 6 例 + 既有
+`test_sitemap_input.py` 9 例 = **15 passed**;ruff 零告警。
