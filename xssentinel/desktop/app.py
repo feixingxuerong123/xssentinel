@@ -44,8 +44,25 @@ def install_ui_route() -> bool:
             return False
 
     def _serve_ui(ctx, match, body, query):
-        return api.Response.text(200, load_ui_html(),
-                                 content_type="text/html; charset=utf-8")
+        # The console renders scanner output (URLs, payloads, snippets) and
+        # can hold an API key in the tab.  Keep it same-origin, un-framable
+        # and un-sniffable.  The page is a single self-contained file, so the
+        # only inline allowances are its own <style>/<script> blocks.
+        headers = {
+            "Content-Security-Policy": (
+                "default-src 'self'; script-src 'unsafe-inline'; "
+                "style-src 'unsafe-inline'; img-src 'self' data:; "
+                "connect-src 'self'; object-src 'none'; base-uri 'none'; "
+                "frame-ancestors 'none'; form-action 'none'"
+            ),
+            "X-Frame-Options": "DENY",
+            "X-Content-Type-Options": "nosniff",
+            "Referrer-Policy": "no-referrer",
+            "Cache-Control": "no-store",
+        }
+        return api.Response(200, load_ui_html().encode("utf-8"),
+                            headers=headers,
+                            content_type="text/html; charset=utf-8")
 
     api._ROUTES.append(("GET", re.compile(_UI_ROUTE_PATTERN), _serve_ui))
     return True
@@ -108,8 +125,8 @@ def main(argv: list[str] | None = None) -> int:
         # fetch wrapper, because embedding it in the HTML would hand it to
         # anything able to GET / and a cookie would mean editing the API's
         # auth gate.
-        print("[*] 已启用 API 密钥：打开窗口后把同一个密钥粘到右上角的 "
-              "X-API-Key 输入框（只存在该标签页，不写回服务器）")
+        print("[*] 已启用 API 密钥：打开窗口后点右上角「密钥」，把同一个 "
+              "X-API-Key 填进去（只存在该标签页，不写回服务器）")
 
     if args.print_url_only:
         print(url)

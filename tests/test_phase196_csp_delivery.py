@@ -39,6 +39,8 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from xssentinel.core import csp as c                                    # noqa: E402
+from xssentinel.core.async_scanner_layers import (                     # noqa: E402
+    AsyncDetectionLayersMixin)
 from xssentinel.core.scanner_layers import AdvancedLayerMixin            # noqa: E402
 from xssentinel.core.verifier import (                                   # noqa: E402
     _csp_blocks_attr, _csp_blocks_inline, verify_semantic)
@@ -234,22 +236,32 @@ def test_enforcing_header_still_wins_over_the_meta_channel():
 # ---------------------------------------------------------------------------
 # 4. the async engine resolves the same channels (no silent second-class path)
 # ---------------------------------------------------------------------------
+class _AsyncLayerStub(AsyncDetectionLayersMixin):
+    """Enough surface for ``AsyncDetectionLayersMixin._scan_csp_async``.
+
+    Phase 290 added a ``self._touch_coverage`` call at the layer's entry,
+    so a bare ``object()`` no longer carries the method; inheriting the
+    mixin restores it, and the wrapper's own contract tolerates the
+    absent ``coverage`` (it is a touch, not a measurement).
+    """
+
+    verbose = False
+
+
 def _async_csp_findings(headers, html):
     """Drive AsyncDetectionLayersMixin._scan_csp_async on a bare stub.
 
-    The layer only needs the policy resolution and a Finding sink, so no
-    scanner is constructed -- and if someone narrows the signature back to
-    headers-only, these two assertions go red instead of the asymmetry
-    quietly coming back.
+    The layer needs the policy resolution, a Finding sink and (since
+    Phase 290) the mixin's coverage touch, so no scanner is constructed
+    -- and if someone narrows the signature back to headers-only, these
+    two assertions go red instead of the asymmetry quietly coming back.
     """
     import asyncio
-
-    from xssentinel.core.async_scanner_layers import AsyncDetectionLayersMixin
 
     async def run():
         out = []
         agen = AsyncDetectionLayersMixin._scan_csp_async(
-            object(), "http://t/x", headers, html)
+            _AsyncLayerStub(), "http://t/x", headers, html)
         async for f in agen:
             out.append(f.data if hasattr(f, "data") else f)
         return out
@@ -288,16 +300,27 @@ def test_async_call_site_still_hands_the_layer_a_body():
         .parameters["html"].default == ""
 
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    src = open(os.path.join(root, "xssentinel", "core", "async_scanner.py"),
-               encoding="utf-8").read()
-    tree = ast.parse(src)
-    calls = [n for n in ast.walk(tree)
-             if isinstance(n, ast.Call)
-             and getattr(n.func, "attr", "") == "_scan_csp_async"]
+    calls = []
+    for fname in ("async_scanner.py", "async_scanner_crawl.py"):
+        # every call site lives OUTSIDE the mixin (a narrowed signature
+        # would not fail any behavior test), and the split moved one of
+        # them into the crawl module -- scanning one file left that call
+        # unguarded.
+        src = open(os.path.join(root, "xssentinel", "core", fname),
+                   encoding="utf-8").read()
+        tree = ast.parse(src)
+        calls += [n for n in ast.walk(tree)
+                  if isinstance(n, ast.Call)
+                  and getattr(n.func, "attr", "") == "_scan_csp_async"]
     assert calls, "no _scan_csp_async call site found -- guard gone vacuous"
     for call in calls:
         args = list(call.args)
-        assert len(args) == 3, ast.dump(call)
+        # 3 positionals (url, resp_headers, html), or 4 when the caller
+        # also threads the request method through for the coverage touch
+        # (Phase 290).  What this guard pins is that args[2] is the page
+        # BODY either way -- that is the part whose loss would silently
+        # re-blind async to meta policies.
+        assert 3 <= len(args) <= 4, ast.dump(call)
         # 3rd positional must be the page body, not another dict
         name = getattr(args[2], "id", None)
         assert name and "header" not in name.lower(), ast.dump(args[2])

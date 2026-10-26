@@ -17,6 +17,8 @@ import logging
 import sys
 import threading
 
+from .term_safe import SanitizedStream
+
 _ROOT_NAME = "xssentinel"
 _configured = False
 _config_lock = threading.Lock()
@@ -63,7 +65,12 @@ def configure_logging(level: str | int = "WARNING",
         for h in list(root.handlers):
             if not isinstance(h, logging.NullHandler):
                 root.removeHandler(h)
-        handler = logging.StreamHandler(stream or sys.stderr)
+        # Phase 323: every log record reaches the operator's terminal
+        # through this one handler, so target-controlled strings inside
+        # records (payloads, reflected contexts, discovered URLs) get their
+        # ANSI/VT sequences stripped once here, at the sink, instead of at
+        # each _log call site that interpolates target-derived data.
+        handler = logging.StreamHandler(SanitizedStream(stream or sys.stderr))
         handler.setFormatter(logging.Formatter(
             "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
             datefmt="%Y-%m-%d %H:%M:%S",

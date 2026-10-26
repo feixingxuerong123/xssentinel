@@ -7,6 +7,135 @@
 
 ### Verified
 
+- **MCP 默认值对齐 + 输出信任边界(Phase 328)**:① **默认值**:`xssentinel_scan`
+  此前强制 `dom_engine="off"`(除 `headless`)并硬编码 `max_transforms=8`,而 CLI
+  normal 是 `auto`/12——Agent 用默认值会漏掉全部 DOM finding 和 1/3 变换变体,
+  且 Skill 宣称 scan 覆盖 DOM。现在两个参数都暴露且默认与 CLI 对齐(`dom_engine`
+  可选 auto/playwright/static/off;Playwright 缺失时 auto 自动降级 static);
+  `headless` 只负责浏览器确认。② **信任边界**:finding 的 `evidence`/`detail`/
+  mined `param` 是目标页面可控文本,MCP 会原样送给 LLM——恶意页面可在反射点附近
+  写指令。所有成功结果现在带 `output_safety` 说明与 `untrusted_fields` 列表,
+  `initialize.instructions`、scan 工具描述与 Skill 同步声明;证据本身不删除
+  (删掉就看不到判定依据)。门禁:新 9 例 + MCP 回归 79 例;ruff 零告警。
+
+- **报告产物私密化 + 重复 CSP 头实测(Phase 326,P2 收尾)**:① **重复 CSP
+  头**(实测确认的假阳性):`requests` 把同一响应的多条
+  `Content-Security-Policy` 头 join 成一个逗号串,旧 `csp.policies()` 当单条
+  策略读 → strict 策略被吞 → 浏览器会拦的页面被判"可绕"(FP 方向)。修复
+  `core/csp.py`:保守切分(逗号后须是已知指令名;`a,b.js` 这类源表达式不切),
+  str/list 双形态接受;经 `policies()` 的全部判定路径一次修复,零调用方改动。
+  ② **报告 0600**:`core/fsutil.secure_write_text`(POSIX chmod 0600;Windows
+  明确跳过不做假承诺),接线 CLI 主报告 / PoC 目录 / nuclei 模板 / verify-fix
+  与 diff 报告。③ **英文 README**:`README.en.md`(与中文版互链;压缩版按
+  新用户视角组织,事实数字与中文版同源)。门禁:新 13 例 + CSP/报告回归 152 例;
+  ruff 零告警。
+
+- **MCP 进度/取消 + Agent Skill(Phase 325,P2 落地)**:stdio 传输此前在唯一
+  耗时的调用(scan)期间完全失聪——取消通知读不到、Agent 没有进度信号。
+  ① **进度**:`tools/call` 带 `_meta.progressToken` 即收到
+  `notifications/progress`(progress=已发请求数、250ms 限频、起始 progress=0
+  信标);HTTP 传输是请求/响应,明确不宣称有流。② **取消**:
+  `notifications/cancelled` 按 request id 中止,在下一个请求前生效(单次在途
+  请求为上界),被取消的请求**不回响应**(MCP 规范);`_ToolCancelled` 继承
+  `BaseException`,不被 runner 的 `except Exception` 吞掉。③ **线程化
+  serve()**:`tools/call` 进 2 线程池、读循环保持监听;响应/进度/错误同锁
+  写出,EOF 后 `shutdown(wait=True)` 等全部 worker 写完再返回。④ **Agent
+  Skill**:`skills/xssentinel-mcp/SKILL.md`(编排工作流、成本对照、假阴性
+  陷阱、进度/取消用法、判定诚意边界)。门禁:新 11 例 + MCP 回归 51 例
+  (含子进程 e2e);ruff 零告警。
+
+- **MCP 远程接面(Phase 324,P1 清单落地)**:本周热门缺口 1/2 两条代码项。
+  ① **structuredContent + outputSchema(dalfox v3.2.4 同款)**:七个工具在目录里
+  声明 `outputSchema`(宽容模式:只钉稳定顶层字段,不 pin additionalProperties),
+  `tools/call` 成功结果额外携带 `structuredContent` = 文本反序列化后的同一对象
+  ——文本字节不变、只读 text 的 Agent 零感知,**错误结果不带**(不教 Agent 学
+  一个永不出现的形状)。7 个 runner 零改动,统一由 `_attach_structured` 附加。
+  ② **Streamable HTTP 传输(`POST /mcp` on `--serve`)**:抽取模块级
+  `dispatch_message`,stdio 与 HTTP 共享同一实现(守卫测试钉死委托关系),
+  两传输不可能答得不一样;GET/DELETE 显式 405(不提供 SSE 升级、无 session);
+  批量数组逐条响应、全通知 202 空体、**畸形 JSON 回 JSON-RPC -32700**
+  (规范要求,通用 HTTP 400 对 /mcp 路径放行)。安全层全部沿用并逐项测试:
+  同一 `--api-key`(401)、同一同源门(跨源 POST 403——最新端点不是墙上唯一
+  没砖的一块)、无 key 时 Host 限本机(带 key 远程合法,Phase 190 语义)。
+  门禁:新 14 例 + MCP/API 回归 136 + desktop/api_ai_report 55,合计 205 passed;
+  改动文件 ruff 零告警。**附记账(既有行为缺口,待后续 phase)**:
+  MCP scan 对被过滤端口的快速失败缺失——Windows 对未监听但过滤的端口连接
+  ~21s/请求(SYN 重传),扫描每层各试一次 → 单次工具调用分钟级;后续用连接
+  超时或 scan 总预算处理,见 AGENTS.md Phase 324。
+
+- **本周热门方向对齐三件套 P0(Phase 323,竞品吸收第十轮)**:来自
+  `docs/TRENDING_20261026.md` 的差距清单,三项全部代码级落地:
+  ① **MCP `tools/call` 参数校验——未知键拒绝,永不静默丢弃**(对标 dalfox
+  v3.2.4 #1464/#1513 的语义级修复):此前 Agent 传错一个键名(如 `cookie`
+  单数)会得到**不带认证的"无发现"**——假阴性穿着成功的衣服。现按各工具
+  inputSchema 校验:未知键在错误文本里带上可接受键名清单(一轮自我纠正),
+  已知同义拼写先归一——REST 名(`target`/`cookie`/`header`/`body`/`parameter`)
+  与 JS 驼峰(`maxPayloads`)折叠到规范名;canonical 与 alias 并存时 canonical
+  赢。类型面:integer 接受数字串(REST 面同款宽容)、enum 大小写不敏感归一到
+  规范成员、bool 严格(bool 是 Python int 子类,显式排除);其余错误形状诚实报
+  错。`_tool_call` 从七段重复 if 重构为 `_TOOL_TABLE` 表驱动,守卫测试钉死
+  目录与表键集一致。测试 `tests/test_phase323_mcp_arguments.py` 13 例
+  (归一化单元 + JSON-RPC 端到端 + 别名对活体反射页往返)。
+  ② **终端转义序列剥离(ANSI/VT 注入)**:`core/term_safe.py`——控制台行携带
+  目标派生数据(反射串、发现的 URL/参数名、报错文本),带 `\x1b[2J\x1b[H`
+  的响应可清屏重写操作者已看到的结论行。三个咽喉点:日志 stream handler
+  (`configure_logging`)、进度条(`ConsoleProgress`)、CLI 进程 print 守卫
+  (`install_cli_print_guard`,装在 `main()` 包装器、try/finally 出栈卸载,
+  `--mcp` 分支进协议前先卸载——stdout 是 JSON-RPC 通道,payload 字节必须
+  精确)。剥离范围:CSI/OSC/DCS/ECMA-48 通用 ESC 序列(参数+终态整段),
+  尾部裸 ESC,8-bit CSI(`\x9b` 同语法整段),C1 控制块。**存留的 findings/
+  报告保持原始字节**——PoC 必须能重放真实参数名;剥离只发生在渲染到终端的
+  那一刻。守卫修复了自身递归隐患(safe_print 持有原始 print 引用)。
+  测试 `tests/test_term_safe.py` 12 例。
+  ③ **CSP-bypass 发现场合并全部 enforcing 策略**(sync+async 双引擎 +
+  `advanced_layers` 第三处同形):浏览器只在**每条** enforcing 策略都放行时
+  才执行脚本,旧 break-on-first 把"头一条可绕"报成"CSP 可绕"——策略二更严的
+  页面上是系统性假阳性。现 all-bypassable 才发 finding,evidence 聚合各策略
+  weak,`csp_header` 展示字段用 ` || ` 连接全部策略(无程序化消费者,已核);
+  `advanced_layers` 给 TT/nonce 层的解析从 `_enf[0]` 改为全策略 join——nonce
+  只声明在第二条策略时原来不可见,TT 正则消费方对 join 串逐正则扫描语义不变。
+  测试 `tests/test_phase323_csp_multipolicy.py` 13 例(FP 类双向、单策略字节
+  等价回归、双可绕聚合、join 串到 nonce/TT 正则消费方的可达性、源形守卫)。
+  门禁:定向批 **329 passed + 1 skip**(新 38 + MCP/CSP/logger 回归批 143 +
+  CLI e2e 红队/async 管线 48 + 进程内 CLI 驱动 100)+ `test_benchmark.py`
+  35 例全绿(双引擎全管线);改动文件 ruff 零基线。全量分批门禁按惯例未跑,
+  「未验证」记账。
+
+- **对齐 2026-10 安全热门方向的四线落地(Phase 322,竞品吸收第九轮)**:
+  ① **MCP 工具面 3→7**(HexStrike/Deadend 式 Agent 细粒度范式):新增
+  `xssentinel_verify`(单载荷回放+同一确定性判定器,Agent 的调整-重试循环;
+  无执行点载荷诚实标注「可反射、不可确认执行」)、`xssentinel_param_mine`
+  (Arjun 血统差分挖参,一次一名有界)、`xssentinel_csp_analyze`(一次请求读
+  header+`<meta>` 双通道,按 script-src-elem/attr 分族报内联放行;Phase 196b
+  契约)、`xssentinel_propose`(见④)。`tests/test_mcp_server.py` 20 例 +
+  `tests/test_llm_propose.py` 17 例(假 pool 全桩无网)。
+  ② **场景语料正式化**:`data/scenarios.json`(带 `_meta` 贡献契约;`--scenarios
+  builtin` 别名直达),新增 `{self}` 占位符表达「写回同一页再读回」的 self-echo
+  存储型 XSS(唯一不需要应用端点知识的通用存储形状);GET 写入变体经活体测量
+  证明语义不成立(read 步会覆写自己的写入)已记入 `_meta.non_goals` 不发布。
+  占位符三向闭合测试:语料广告的每个占位符必须在 `run_scenario` 源码里真实展开。
+  ③ **nuclei dast 桥接 + `--custom-payloads` 死接线修复**:`core/nuclei_import.py`
+  提取 XSS 相关字面载荷(模板不执行;interactsh 依赖载荷、DSL 占位符、路径形状
+  字符串三类诚实跳过并计数)。接线时发现 `--custom-payloads` 自 CLI 进 Scanner
+  后**零消费点零测试**——已复活:双引擎候选队列 prepend(操作者显式意图优先,
+  max_payloads 仍封顶;无执行点载荷在门口丢弃),`verifier.has_execution_point()`
+  公共助手供两引擎与 MCP verify 共用。**本机 dast 快照实测:251 模板 0 导入**
+  (72 OOB + 81 DSL 占位符 + 228 非 XSS)——桥接正确但该快照无可导内容,诚实记账;
+  XSS 专用模板集/未来月度增长才是消费面。
+  ④ **LLM 提议-验证管线**(`core/llm_propose.py` + `xssentinel_propose` 工具):
+  模型只提议,每条候选经 mark() 打新 token 后真回放,`verify_semantic`(可选
+  verify_headless)是唯一裁判——confirmed=令牌执行,未确认=unverified 如实上报;
+  确认的提议**不**自动晋升进交付语料(晋升是评审决策,Phase 318 纪律)。pool
+  未配置/耗尽诚实报错。判定语义零变化:这是回放路径,不是检测路径。
+  ⑤ **XSSMaze xsleak 记分契约版本化**(`benchmark/xssmaze_scoring.py` + 8 例纯
+  函数测试):上游 v0.3.0「xsleak 全类是 cross-site leaks,报 0 才正确」的口径
+  从 README+记忆钉进版本化代码;dev 归因工具每次跑官方 runner 结果都做交叉核对,
+  上游若重新分类会响亮报 CONTRACT MISMATCH 而不是静默漂移 FN 分母。
+  官方 runner 仍是唯一权威记分者,本模块不重记分。
+  门禁:受影响面定向批全绿(MCP 20+17、场景 10、桥接 16、契约 8、async 管线/
+  phase311 20);改动文件 ruff 零基线;引擎对等门与全量分批门禁结果见 AGENTS.md
+  Phase 322 条目(未跑完的按「未验证」记账)。
+
 - **第三方靶场(OWASP Juice Shop 20.2.0)五行矩阵全测(Phase 270,无出口代理)**:目标是官方
   20.2.0 树(`build/` + `node_modules/`,Node 22),ground truth 来自应用自身的 Angular
   路由与上游 `challenges.yml`,每行都走真实 CLI。同一目标、同一提交:

@@ -383,28 +383,35 @@ class AdvancedLayerMixin:
         # no dialog -- so it is not analysed as a protection we can bypass.
         # The old loop fell back to Report-Only and reported "CSP bypassable"
         # for a policy that was never in force.
+        # Phase 323 (dalfox v3.2.4 parity: "CSP analysis merges every
+        # enforcing policy"): a script runs only when EVERY enforcing policy
+        # allows it, so "CSP bypassable" must mean all of them are -- the
+        # old break-on-first reported a bypassable header policy on a page
+        # whose strict <meta> policy blocked the claimed path (FP class).
         try:
             body_text = resp.text if hasattr(resp, "text") else ""
         except Exception:
             body_text = ""
         headers_dict = ({k: v for k, v in resp.headers.items()}
                         if hasattr(resp, "headers") else {})
-        csp_header = ""
-        for policy in csp_mod.policies(headers_dict, body_text)["enforcing"]:
-            csp_header = policy
-            break
-        if not csp_header:
+        enforcing = csp_mod.policies(headers_dict, body_text)["enforcing"]
+        if not enforcing:
             return  # No enforcing CSP -> nothing to analyze (no finding either).
-        report = csp_mod.analyze(csp_header)
-        if not report.bypassable:
-            return
-        best = csp_mod.best_bypass(csp_header) or {}
+        weak_all: list = []
+        best: dict = {}
+        for policy in enforcing:
+            report = csp_mod.analyze(policy)
+            if not report.bypassable:
+                return  # one strict policy kills the "bypassable" claim
+            weak_all.extend(report.weak)
+            if not best:
+                best = csp_mod.best_bypass(policy) or {}
         with self._lock:
             self.findings.append(Finding(
                 url=url, method="GET", param="(header)",
                 payload=best.get("payload", ""),
                 context="csp_header",
-                severity="medium" if report.bypassable else "info",
+                severity="medium",
                 type="csp_bypass",
                 # Phase 222: same defect class Phase 198 fixed for polyglot
                 # and Phase 209 for template_ssti_* -- this branch appends the
@@ -424,8 +431,11 @@ class AdvancedLayerMixin:
                 # ever executed anything through the claimed path.
                 confidence="medium",
                 evidence_class=EVIDENCE_NO_BROWSER,
-                evidence="; ".join(report.weak),
-                csp_header=csp_header,
+                evidence="; ".join(weak_all),
+                # Phase 323: display field only (no consumer parses it back);
+                # every enforcing policy is shown because every one of them
+                # had to be bypassable for the finding to fire.
+                csp_header=" || ".join(enforcing),
                 bypass_type=best.get("type", ""),
                 bypass_reason=best.get("reason", ""),
             ))

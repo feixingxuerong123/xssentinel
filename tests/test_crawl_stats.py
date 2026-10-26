@@ -15,7 +15,6 @@ the counters that now reach the report (crawl_stats).
 """
 from __future__ import annotations
 
-import pytest
 
 from xssentinel.core import spa_crawler as spa
 

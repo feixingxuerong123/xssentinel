@@ -444,6 +444,14 @@ def build_parser():
     g_det.add_argument("--threads", type=int, default=None)
     g_det.add_argument("--custom-payloads", default=None,
                        help="File of custom payloads to append to the corpus")
+    g_det.add_argument("--nuclei-dast", dest="nuclei_dast", default=None,
+                       help="nuclei dast template file or directory "
+                            "(e.g. ~/nuclei-templates/dast): XSS-relevant "
+                            "literal payloads are extracted into the "
+                            "custom-payload channel behind the context-"
+                            "matched ladder (Phase 322; templates are NOT "
+                            "executed -- matchers/OOB payloads skipped "
+                            "honestly; requires pyyaml)")
     g_det.add_argument("--json", dest="json_body", action="store_true",
                        help="Treat -d as a JSON document (application/json "
                             "body). Auto-detected when -d starts with '{'; "
@@ -451,8 +459,10 @@ def build_parser():
                             "document (deep nested coverage).")
     g_det.add_argument("--scenarios", default=None,
                        help="JSON file of declarative multi-step detection "
-                            "scenarios (stored flows etc.; see "
-                            "data/scenarios.example.json)")
+                            "scenarios (stored flows etc.), or 'builtin' "
+                            "for the shipped formal corpus "
+                            "data/scenarios.json (Phase 322; minimal "
+                            "sample: scenarios.example.json)")
     # Phase 53: XS-Leaks surface audit (opt-in -- records a low finding on
     # pages that set no cross-origin isolation / framing headers).
     g_det.add_argument("--audit-xs-leaks", dest="xsleak_audit",
@@ -1058,6 +1068,28 @@ def _build_spec_targets(args, urls):
 
 
 def main(argv=None):
+    """CLI entry -- the Phase 323 terminal-sink guard is scoped to the call.
+
+    Console lines carry target-derived data (reflected strings, discovered
+    URLs/params, server error text), so a hostile response with ANSI/VT
+    escape sequences must not be able to rewrite the operator's terminal
+    (see :mod:`xssentinel.core.term_safe`).  The guard is installed for
+    the duration of the run and removed on the way out, so an in-process
+    test driver never leaks a patched ``print`` into the host process.
+    ``--mcp`` uninstalls it before serving: stdout there is a JSON-RPC
+    protocol channel whose payload bytes must stay exact (the MCP server
+    already forbids any print to stdout).
+    """
+    from .core.term_safe import (install_cli_print_guard,
+                                  uninstall_cli_print_guard)
+    install_cli_print_guard()
+    try:
+        return _main_impl(argv)
+    finally:
+        uninstall_cli_print_guard()
+
+
+def _main_impl(argv=None):
     ap = build_parser()
     args = ap.parse_args(argv)
 
@@ -1086,7 +1118,11 @@ def main(argv=None):
     # Phase 189: MCP stdio server (dalfox v3 parity) -- agents drive the
     # scanner as a tool over JSON-RPC/stdio.  Must sit before target
     # handling: MCP mode carries its targets in tool calls, not argv.
+    # Phase 323: uninstall the terminal print guard first -- stdout is
+    # the protocol channel here and its payload bytes must stay exact.
     if getattr(args, "mcp", False):
+        from .core.term_safe import uninstall_cli_print_guard
+        uninstall_cli_print_guard()
         from .api.mcp_server import serve as _mcp_serve
         return _mcp_serve()
 

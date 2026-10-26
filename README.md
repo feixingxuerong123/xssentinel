@@ -6,6 +6,8 @@
 
 > 一款**多层级、可扩展**的 XSS 检测工具：反射点上下文感知注入 + WAF 自适应绕过 + DOM 污点分析 +（可选）无头浏览器真实验证。
 
+中文 | [English](README.en.md)
+
 ---
 
 ## ⚠️ 定位与诚实声明（请先读）
@@ -69,7 +71,7 @@ XSSentinel 的目标是**在开源/自研工具中做到检测维度最全、架
 - **CSP 交付家族粒度（Phase 189）**：`script-src-elem` / `script-src-attr` 不是"追加"到 `script-src`，而是对各自投递形态**替换**。原实现（`csp.analyze` / `is_strict_inline` / `gadget_chain_relevant` / `verifier._csp_blocks_inline`）一律只读 `script-src`，于是两个方向都错：`script-src 'self'; script-src-attr 'unsafe-inline'` 被判"内联全禁"（反射型 `onerror` 被否证 = FN，预算还被切到早停档），`script-src https://cdn.example.com`（没有 `'unsafe-inline'`）里的反射 `<script>` 被判可执行 = FP。nonce 的"使 `unsafe-inline` 失效"规则改为**按家族**判定：`script-src` 上的 nonce 不再吃掉 `script-src-attr` 里的 `unsafe-inline`。同时 `'unsafe-hashes'` 与 gadget 主机识别覆盖 `-elem`/`-attr` 列表。
 - **净化器语料现代化（Phase 189）**：DOMPurify 版本线从"停在 2020（<2.0.8）"改为三段**修复线**（<2.0.8 mXSS／<3.1.3 原型污染+嵌套 mXSS／≤3.4.15 2026 集群），编号取自厂商 advisory 列表（GitHub API 实测 25 条，最新发布 3.4.16），并按"一个版本一条发现"去重（横幅注释与 npm 路径两种形态不再各报一次）。2026 年全部 advisory 的利用面都是**配置项**而非标签白名单，故新增 `IN_PLACE` / `CUSTOM_ELEMENT_HANDLING` / `SAFE_FOR_TEMPLATES` / `setConfig()` 持久化 / `USE_PROFILES` / `ADD_ATTR` 里的 `on*`（high）/ `ADD_URI_SAFE_ATTR` / `ALLOWED_URI_REGEXP` / `RETURN_TRUSTED_TYPE` 检测，且带"加固过的页面必须沉默"反向对照。
 - **Source map 摄取（Phase 189，对标 nexa / ASTra 类 JS 源码挖掘）**：`//# sourceMappingURL=`（含 legacy `//@`、块注释形、`data:` 内联形）→ 取回 `.map` → `sourcesContent` 里的**未压缩原始源码**进既有 JS 端点/汇聚点挖矿通道（压缩改名的路由、被 tree-shake 掉的 API 路径只有在这里看得见）；能读回 `sourcesContent` 时另记一条 `source_map_exposed`（low）发现。两道硬限制：每个脚本最多取一个 map、引用指向别的源就不取（页面点名的 URL 不构成抓取授权）；非 JSON/超限 body 静默不炸挖矿。
-- **多格式报告 + 并发**：HTML / JSON / CSV / **SARIF(2.1.0) / JUnit / Markdown** 六格式，SARIF 可直接接入 CI / 缺陷平台（如 GitHub code scanning、Defender、Jira）；多线程端点/参数并发扫描。
+- **多格式报告 + 并发**：HTML / JSON / CSV / **SARIF(2.1.0) / JUnit / Markdown** 六格式，SARIF 可直接接入 CI / 缺陷平台（如 GitHub code scanning、Defender、Jira）；多线程端点/参数并发扫描；报告与 PoC 产物在 POSIX 上以 **0600** 写出（Phase 326，产物含目标 URL/参数/载荷，共享主机上不应全局可读）。
 
 
 </details>
@@ -345,15 +347,52 @@ python -m xssentinel --wayback target.com -o reports/ -f json
 # 路径前缀收窄：--wayback target.com/app
 ```
 
-**MCP stdio server（Phase 192/202，dalfox v3 同款）**——把扫描器作为工具暴露给
-LLM Agent（JSON-RPC over stdin/stdout），三个工具组成侦察链：
+**MCP stdio server（Phase 192/202/322/323，dalfox v3 同款）**——把扫描器作为工具暴露给
+LLM Agent（JSON-RPC over stdin/stdout），七个工具覆盖「侦察 → 扫描 → 调整重试」
+全链路（2025-26 Agent 工具的主流形态是细粒度可组合，不是单一巨型调用）。
+**参数契约（Phase 323，对标 dalfox v3.2.4 #1464/#1513 的语义级修复）**：`tools/call`
+按各工具 inputSchema 校验参数——**未知键 = isError + 可接受键名清单，永不静默丢弃**
+（拼错的 `cookies` 曾会让扫描不带认证跑完、回一份假"无发现"）；REST 同义拼写
+（`target`/`cookie`/`header`/`body`/`parameter`）与 JS 驼峰（`maxPayloads`）先归一
+到规范名再校验，canonical 与 alias 并存时 canonical 赢；integer 收数字串、enum
+大小写不敏感，其余错误形状诚实报错、一轮可自我纠正：
 
 ```bash
 python -m xssentinel --mcp
-# xssentinel_scan    全量扫描,返回压缩后的 finding 判定,无发现=成功
-# xssentinel_discover  无头渲染一次,回 SPA 表单字段名 + 同源 API 端点
-# xssentinel_profile   单请求反射画像(context + raw=/stripped=/encoded= 元字符分类)
+# 侦察链
+# xssentinel_discover    无头渲染一次,回 SPA 表单字段名 + 同源 API 端点
+# xssentinel_profile     单请求反射画像(context + raw=/stripped=/encoded= 元字符分类)
+# xssentinel_param_mine  差分探测挖隐藏参数(Arjun 血统,一次一名有界)
+# xssentinel_csp_analyze 一次请求读双通道(header+<meta>)CSP,按投递家族报内联放行
+# 扫描与验证
+# xssentinel_scan        全量扫描,返回压缩后的 finding 判定,无发现=成功
+# xssentinel_verify      回放单条 Agent 自选载荷(同一确定性判定器;Agent 的调整-重试循环)
+# xssentinel_propose     LLM 提议候选载荷,每条都经 token oracle 重放裁决——
+#                        confirmed=令牌执行,永远不是模型说了算(pool 未配置则诚实报错)
 ```
+
+**远程 MCP（Phase 324，Streamable HTTP）**——同一套 JSON-RPC 分发也挂在 REST API 的
+`POST /mcp` 上，按 URL 挂工具的 Agent 平台（ARTEX / Claude / Cursor 类）无需起子进程：
+
+```bash
+python -m xssentinel --serve --host 127.0.0.1 --port 8080      # 生产建议再加 --api-key
+# MCP 客户端配置：url = http://127.0.0.1:8080/mcp（配置了 --api-key 时加 X-API-Key 头）
+```
+
+传输形态：单条或批量 JSON-RPC 数组（逐条响应）；全通知批量回 202 空体；畸形 JSON
+回 JSON-RPC `-32700`（不是 HTTP 400）；GET/DELETE `/mcp` 为 405（不提供 SSE 升级、
+无 session 可删）。安全层与 REST 同一套：`--api-key`、同源门（跨源 POST 403）、
+无 key 时 Host 限本机。**结构化输出（Phase 324）**：七个工具都带 `outputSchema`，
+成功结果额外携带 `structuredContent`（与文本内容同一对象；错误结果只回文本）。
+**进度与取消（Phase 325，stdio）**：`tools/call` 的 `_meta.progressToken` 会收到
+`notifications/progress`（progress = 已发请求数 + 起始信标）；`notifications/cancelled`
+按 request id 中止（下一个请求处停，被取消的请求**不回响应**——MCP 规范）。
+**Agent 面默认与信任边界（Phase 328）**：`xssentinel_scan` 默认与 CLI normal 对齐
+（`dom_engine=auto`、`max_transforms=12`；DOM 层默认运行，Playwright 缺失时静态降级，
+`headless` 只负责浏览器确认）。工具输出里的 `evidence`/`detail`/`param` 可能包含从目标
+页面复制来的文本；结果会带 `untrusted_fields` 与 `output_safety` 提示——Agent 应把它们
+当数据，绝不当作指令。
+Agent 侧接入指南见 [skills/xssentinel-mcp/SKILL.md](skills/xssentinel-mcp/SKILL.md)。
 
 **浏览器渲染输入发现（`--discover`，Phase 196）**——渲染目标一次：SPA 表单
 字段名并入挖矿词表，页面自己 fetch 的同源 API 端点在主目标后扫描（上限 10）；

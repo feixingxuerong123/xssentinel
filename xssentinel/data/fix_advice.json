@@ -8,7 +8,7 @@
       "primary_cwe": "CWE id",
       "also_consider": "list of extra hardening steps"
     },
-    "entry_count": 131,
+    "entry_count": 132,
     "version": 1
   },
   "default_advice": {

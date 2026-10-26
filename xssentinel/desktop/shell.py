@@ -40,7 +40,7 @@ def pywebview_available() -> bool:
 def tkinter_available() -> bool:
     """Whether tkinter can actually create a window (import + display)."""
     try:
-        import tkinter  # noqa: F401
+        import tkinter  # noqa: F401  (probe only)
     except Exception:
         return False
     # A headless box imports tkinter fine but cannot open a display; probing

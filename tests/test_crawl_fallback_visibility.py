@@ -25,7 +25,6 @@ from __future__ import annotations
 import sys
 import types
 
-import pytest
 
 from xssentinel.core import spa_crawler as spa
 

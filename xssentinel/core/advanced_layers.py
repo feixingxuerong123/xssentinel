@@ -89,7 +89,13 @@ def run_page_layers(scanner, req, url: str, response_text: str | None = None,
         _hdrs = ({k: v for k, v in resp2.headers.items()}
                  if hasattr(resp2, "headers") else {})
         _enf = csp_mod.policies(_hdrs, text)["enforcing"]
-        csp_header = _enf[0] if _enf else ""
+        # Phase 323: ALL enforcing policies, joined.  Both consumers
+        # (_scan_trusted_types, _scan_csp_nonce) scan this string with
+        # regexes (require-TT, directive, nonce-'xxx' findall), so a join
+        # keeps single-policy behavior byte-identical while making a nonce
+        # declared only in the SECOND policy visible -- break-on-first
+        # hid it.
+        csp_header = " || ".join(_enf)
         # Phase 210b: the same header read settles "is this document code or
         # a page", which decides whether page-policy claims apply at all.
         # No extra request -- this is the GET the CSP check already does.

@@ -234,6 +234,68 @@ def _meta_attributes(tag: str) -> dict:
     return out
 
 
+#: Directive names a policy can legitimately start with.  Used only to
+#: decide whether a comma inside a header value starts a NEW policy (the
+#: HTTP field-line join) or is part of a source expression (a URL path).
+_KNOWN_DIRECTIVES = frozenset({
+    "base-uri", "block-all-mixed-content", "child-src", "connect-src",
+    "default-src", "font-src", "form-action", "frame-ancestors",
+    "frame-src", "img-src", "manifest-src", "media-src", "navigate-to",
+    "object-src", "plugin-types", "prefetch-src", "report-to", "report-uri",
+    "require-sri-for", "require-trusted-types-for", "sandbox", "script-src",
+    "script-src-attr", "script-src-elem", "style-src", "style-src-attr",
+    "style-src-elem", "trusted-types", "upgrade-insecure-requests",
+    "worker-src",
+})
+
+_JOINED_TAIL_RE = re.compile(r"\s*([a-z][a-z0-9-]*)\s")
+
+
+def _split_joined(text: str) -> list[str]:
+    """Split one header value into the policies it encodes.
+
+    Repeated HTTP field lines reach a client as ONE comma-joined value
+    (RFC 9110), while CSP treats every line as its own policy and a
+    script must satisfy ALL enforcing policies.  Measured (Phase 326):
+    ``requests`` hands a client ``"script-src 'self' 'unsafe-inline',
+    script-src 'self'"`` for two header lines -- read as one policy, the
+    strict second policy vanishes and the page is judged bypassable
+    (false-positive direction).
+
+    The split is conservative on purpose: a comma only starts a new
+    policy when the next token is a KNOWN directive name.  A comma inside
+    a source expression (``https://cdn.example.com/a,b.js``) is left
+    where it belongs.
+    """
+    parts: list[str] = []
+    cur: list[str] = []
+    i = 0
+    while i < len(text):
+        if text[i] == ",":
+            m = _JOINED_TAIL_RE.match(text, i + 1)
+            if m and m.group(1).lower() in _KNOWN_DIRECTIVES:
+                parts.append("".join(cur))
+                cur = []
+                i += 1
+                continue
+        cur.append(text[i])
+        i += 1
+    parts.append("".join(cur))
+    return [p.strip() for p in parts if p.strip()]
+
+
+def _as_policy_list(value) -> list[str]:
+    """One header value (str or list of strs) -> the policies it encodes."""
+    if value is None:
+        return []
+    if isinstance(value, (list, tuple)):
+        out: list[str] = []
+        for v in value:
+            out.extend(_as_policy_list(v))
+        return out
+    return _split_joined(str(value))
+
+
 def meta_policies(html: str | None) -> tuple[list, list]:
     """Return ([enforcing], [report-only]) policies carried by <meta> tags."""
     enforcing: list[str] = []
@@ -245,25 +307,29 @@ def meta_policies(html: str | None) -> tuple[list, list]:
         if not content:
             continue
         if equiv == "content-security-policy":
-            enforcing.append(content)
+            enforcing.extend(_as_policy_list(content))
         elif equiv == "content-security-policy-report-only":
-            report_only.append(content)
+            report_only.extend(_as_policy_list(content))
     return enforcing, report_only
 
 
 def policies(headers: dict | None = None, html: str | None = None) -> dict:
     """Every policy the browser will act on, split by enforcement mode.
 
-    More than one enforcing policy can be in force (header AND meta); a
-    script runs only when all of them allow it, so "is inline blocked?" is
-    any() over this list rather than a lookup of the first entry.
+    More than one enforcing policy can be in force (repeated headers,
+    header AND meta); a script runs only when all of them allow it, so
+    "is inline blocked?" is any() over this list rather than a lookup of
+    the first entry.
+
+    ``headers`` values may be a single string (the ``requests`` view, where
+    repeated field lines arrive comma-joined) or a list of strings (the raw
+    ``getlist`` view); both are normalized into the full policy list
+    (Phase 326).
     """
-    lower = {str(k).lower(): (v or "") for k, v in (headers or {}).items()}
+    lower = {str(k).lower(): v for k, v in (headers or {}).items()}
     meta_enf, meta_ro = meta_policies(html)
-    header_enf = [lower["content-security-policy"]] \
-        if lower.get("content-security-policy") else []
-    header_ro = [lower["content-security-policy-report-only"]] \
-        if lower.get("content-security-policy-report-only") else []
+    header_enf = _as_policy_list(lower.get("content-security-policy"))
+    header_ro = _as_policy_list(lower.get("content-security-policy-report-only"))
     return {"enforcing": header_enf + meta_enf,
             "report_only": header_ro + meta_ro}
 

@@ -26,15 +26,26 @@ File format (``--scenarios`` / ``Scanner(scenario_file=...)``)::
 Placeholders substituted per run:
   * ``{token}``  unique verification token (verifier-confirmed)
   * ``{param}``  the reflected parameter name
+  * ``{self}``   path of the scanned URL (Phase 322) -- lets a scenario
+                 express "write and read back the SAME page" (the
+                 profile-edit self-echo shape) without knowing any
+                 app-specific endpoint; resolves against the scanned
+                 URL's path, so ``/profile?u=x`` -> ``/profile``.
 Scenario semantics:
   * steps run in order; a transport error aborts the scenario
   * after the LAST step the token is semantic-verified in that response
     (callers may also verify after any step via ``"verify": true``)
   * confirmed -> Finding(type="scenario", scenario_id=..., high/high)
+
+A formal, versioned corpus ships at ``data/scenarios.json`` (Phase 322);
+``Scanner(scenario_file="builtin")`` loads it by name.  Contributions
+follow the contract in that file's ``_meta`` block -- the example file
+(``scenarios.example.json``) stays as the minimal documented sample.
 """
 from __future__ import annotations
 
 import json
+import os
 import secrets
 import threading
 
@@ -44,13 +55,24 @@ from .logger import get_logger
 
 _log = get_logger("scenarios")
 
+_DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
+
+#: ``Scanner(scenario_file="builtin")`` / ``--scenarios builtin`` loads
+#: the formal, versioned corpus shipped at ``data/scenarios.json``.
+BUILTIN_SCENARIOS_FILE = os.path.join(_DATA_DIR, "scenarios.json")
+
 _cache: dict | None = None
 _cache_lock = threading.Lock()
 
 
 def load_scenarios(path: str) -> list[dict]:
-    """Load + validate a scenario file.  Returns the scenarios list."""
+    """Load + validate a scenario file.  Returns the scenarios list.
+
+    ``path="builtin"`` resolves to the packaged ``data/scenarios.json``.
+    """
     global _cache
+    if path == "builtin":
+        path = BUILTIN_SCENARIOS_FILE
     with _cache_lock:
         if _cache is not None and _cache.get("path") == path:
             return _cache["scenarios"]
@@ -95,11 +117,13 @@ def run_scenario(scanner, req, base_url: str, param: str, is_body: bool,
     from urllib.parse import urlparse
     p = urlparse(base_url)
     origin = f"{p.scheme}://{p.netloc}"
+    self_path = p.path or "/"
     last_resp = None
     last_text = ""
     for st in sc.get("steps", []):
         method = str(st.get("method", "GET")).upper()
-        path = str(st.get("path", "/")).replace("{param}", param)
+        path = str(st.get("path", "/")).replace("{param}", param) \
+            .replace("{self}", self_path)
         url = origin + path
         payload = str(st.get("payload", "{token}")).replace(
             "{token}", token).replace("{param}", param)

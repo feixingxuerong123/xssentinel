@@ -1,0 +1,6 @@
+# The repo stores text as LF (that is what every platform's checkout builds
+# on -- CI runs ubuntu, tests parse files line-by-line).  Local Windows boxes
+# with core.autocrlf=true still get CRLF in the working tree, which is fine;
+# this file only pins the *repository* side so behavior no longer depends on
+# each contributor's local git config.
+* text=auto

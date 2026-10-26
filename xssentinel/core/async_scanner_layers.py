@@ -691,26 +691,34 @@ class AsyncDetectionLayersMixin:
             # the response header AND a `<meta http-equiv=...>`, while
             # Report-Only enforces nothing and is therefore not a protection
             # we can claim to bypass.
-            policy = ""
-            for candidate in csp_mod.policies(resp_headers, html)["enforcing"]:
-                policy = candidate
-                break
-            if not policy:
+            # Phase 323 (dalfox v3.2.4 parity: "CSP analysis merges every
+            # enforcing policy"): "bypassable" requires EVERY enforcing
+            # policy to be bypassable -- the break-on-first reported a
+            # bypassable header policy on a page whose strict <meta> policy
+            # blocked the claimed path (FP class, same fix as sync).
+            enforcing = csp_mod.policies(resp_headers, html)["enforcing"]
+            if not enforcing:
                 return
-            # Run CSP analysis in a thread.
-            report = await asyncio.to_thread(csp_mod.analyze, policy)
-            if not report.bypassable:
-                return
-            best = await asyncio.to_thread(csp_mod.best_bypass, policy) or {}
+            weak_all: list = []
+            best: dict = {}
+            for policy in enforcing:
+                # Run CSP analysis in a thread.
+                report = await asyncio.to_thread(csp_mod.analyze, policy)
+                if not report.bypassable:
+                    return          # one strict policy kills the claim
+                weak_all.extend(report.weak)
+                if not best:
+                    best = await asyncio.to_thread(csp_mod.best_bypass,
+                                                  policy) or {}
             yield Finding(
                 url=url, method="GET", param="(header)",
                 context="csp_header",
                 payload=best.get("payload", ""),
                 severity="medium",
-                evidence="; ".join(report.weak),
+                evidence="; ".join(weak_all),
                 type="csp_bypass",
                 confidence="medium",
-                csp_header=policy,
+                csp_header=" || ".join(enforcing),
                 bypass_type=best.get("type", ""),
                 bypass_reason=best.get("reason", ""),
                 evidence_class=EVIDENCE_NO_BROWSER,
@@ -1644,6 +1652,21 @@ class AsyncDetectionLayersMixin:
                         _seen.add(p)
                         families[p] = _xc
                         cands.append(p)
+        # Phase 322: custom-payload channel parity with sync
+        # (_build_candidates) -- operator wordlist / --nuclei-dast bridge.
+        # LEADS the queue (operator intent outranks the ladder; the
+        # per-param budget still caps spend), execution-point gate (an
+        # unarmed payload can reflect but never confirm, so it is budget
+        # waste).
+        if self._custom_payloads and not marker_escaped:
+            from .verifier import has_execution_point
+            _custom = [cp for cp in self._custom_payloads
+                       if has_execution_point(cp)]
+            if _custom:
+                _cset = set(_custom)
+                cands = _custom + [c for c in cands if c not in _cset]
+                for cp in _custom:
+                    families[cp] = "custom"
 
         # Phase 37: reflection profile + generative payloads (sync parity).
         # One sandwich probe reveals surviving characters; payloads whose

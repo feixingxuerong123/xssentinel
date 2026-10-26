@@ -105,7 +105,7 @@ class TestBenignCorpus(unittest.TestCase):
         self.assertIsNotNone(wafmod._BLOCK_BODY_HINTS.search("access denied"))
 
 
-import re as _re
+import re as _re  # noqa: E402  (verbatim pre-294 mutation-control block)
 
 # Mutation control: the PRE-Phase-294 hint table, verbatim.  If this does
 # not fire on the corpus, the corpus proves nothing -- it would pass on the

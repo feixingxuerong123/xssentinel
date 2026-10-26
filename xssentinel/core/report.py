@@ -6,6 +6,7 @@ import json
 import re
 
 from .findings import EVIDENCE_OOB
+from .fsutil import secure_write_text
 from .logger import get_logger
 from .report_theme import (BRAND_SVG, base_css, interactive_js,
                            theme_boot_script, theme_toggle_button)
@@ -1468,16 +1469,14 @@ def write_poc_dir(findings: list, target: str, meta: dict,
         links = []
         if html:
             path = os.path.join(out_dir, stem + ".html")
-            with open(path, "w", encoding="utf-8") as fh:
-                fh.write(html)
+            secure_write_text(path, html)
             written.append(path)
             links.append(f"[`{stem}.html`]({stem}.html)")
         if curl:
             path = os.path.join(out_dir, stem + ".sh")
-            with open(path, "w", encoding="utf-8") as fh:
-                fh.write("#!/bin/sh\n"
-                         "# Auto-generated PoC replay (XSSentinel).\n"
-                         + curl + "\n")
+            secure_write_text(path, "#!/bin/sh\n"
+                                    "# Auto-generated PoC replay (XSSentinel).\n"
+                                    + curl + "\n")
             written.append(path)
             links.append(f"[`{stem}.sh`]({stem}.sh)")
         rows.append("| {t} | {s} | {v} | `{p}` | {a} |".format(
@@ -1503,8 +1502,7 @@ def write_poc_dir(findings: list, target: str, meta: dict,
                   f"{skipped} finding(s) carry no PoC (audit-style "
                   f"observations, e.g. a missing header) -- expected."]
     idx = os.path.join(out_dir, "INDEX.md")
-    with open(idx, "w", encoding="utf-8") as fh:
-        fh.write("\n".join(index) + "\n")
+    secure_write_text(idx, "\n".join(index) + "\n")
     written.append(idx)
     return written
 
@@ -1525,7 +1523,6 @@ def write_nuclei_dir(findings: list, target: str, meta: dict,
         seen[tid] = n + 1
         fname = f"{tid}-{n + 1}.yaml" if n else f"{tid}.yaml"
         path = os.path.join(out_dir, fname)
-        with open(path, "w", encoding="utf-8") as fh:
-            fh.write(t["yaml"])
+        secure_write_text(path, t["yaml"])
         written.append(path)
     return written

@@ -21,6 +21,8 @@ import threading
 import time
 from typing import Callable
 
+from .term_safe import SanitizedStream
+
 
 # Type alias for a progress callback.
 ProgressCallback = Callable[[str, dict], None]
@@ -90,8 +92,14 @@ class ConsoleProgress(ProgressReporter):
 
     def __init__(self, stream=None, show_bar: bool = True):
         super().__init__(callback=self._render)
-        self._stream = stream or sys.stderr
-        self._is_tty = hasattr(self._stream, "isatty") and self._stream.isatty()
+        # Phase 323: the progress bar renders finding URLs -- target-derived
+        # data -- into the terminal, so the write side is ANSI-stripped at
+        # this sink; TTY detection still reads the inner stream.
+        self._raw_stream = stream or sys.stderr
+        self._stream = SanitizedStream(self._raw_stream)
+        self._is_tty = hasattr(self._raw_stream, "isatty") \
+            and self._raw_stream.isatty()
+        self._show_bar = show_bar and self._is_tty
         self._show_bar = show_bar and self._is_tty
 
     def _render(self, event: str, data: dict) -> None:

@@ -17,7 +17,6 @@ against the range7 attribute face and asserts the two engines agree on
 """
 from __future__ import annotations
 
-import http.client
 import importlib.util
 import json
 import os
@@ -26,7 +25,6 @@ import subprocess
 import sys
 import tempfile
 import threading
-import urllib.parse
 from pathlib import Path
 
 import pytest

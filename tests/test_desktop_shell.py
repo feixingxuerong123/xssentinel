@@ -46,15 +46,57 @@ class TestUiAsset:
 
         Phase 260: the page grew a selected-task detail strip (options +
         coverage), an evidence-class filter, an AI-narrative button and
-        adaptive polling.  Each is one string the page cannot work without,
-        so the gate stays cheap and honest.
+        adaptive polling.  Phase 264 adds triage-focused evidence filters,
+        pagination and PoC actions; each is one string the page cannot work
+        without, so the gate stays cheap and honest.
         """
         html = load_ui_html()
         assert "/api/v1/scans/" in html          # detail / findings / report
         assert "coverage_summary" in html        # the coverage matrix card
         assert "ai=" in html                     # report?ai=1 (AI narrative)
-        assert "onlyExecuted" in html            # browser-executed-only filter
+        assert "evidenceF" in html               # evidence-class triage filter
+        assert "pageSize" in html                # findings pagination
+        assert "browser-refuted" in html          # browser refutation is visible
+        assert "dom_sink_reachability" in html   # Phase 265 delivery-only class
+        assert "未观测到执行" in html             # delivery-only DOM findings labelled
         assert "POLL_FAST" in html and "POLL_IDLE" in html
+
+    def test_ui_has_both_themes(self):
+        """A light theme is a real operator need (projector/daylight), and it
+        must not depend on an external stylesheet."""
+        html = load_ui_html()
+        assert 'data-theme="dark"' in html
+        assert 'data-theme="light"' in html
+        assert "prefers-color-scheme" in html
+        assert 'id="themeBtn"' in html
+
+    def test_ui_exposes_only_api_supported_options(self):
+        """Every form control must map to a field the REST handler reads.
+
+        The console is not allowed to grow decorative controls: a budget or
+        scope field that the API silently ignores is worse than no field.
+        """
+        html = load_ui_html()
+        for field in (
+            "id=\"timeout\"", "id=\"rateLimit\"", "id=\"maxPayloads\"",
+            "id=\"maxTransforms\"", "id=\"scope\"", "id=\"proxy\"",
+            "id=\"verifySsl\"", "id=\"crawlEngine\"", "id=\"customPayloads\"",
+        ):
+            assert field in html, field
+        # These are CLI-only surfaces; the console must not pretend otherwise.
+        assert 'id="oob"' not in html
+        assert 'id="discover"' not in html
+
+    def test_ui_has_poc_actions_and_no_inline_handlers(self):
+        """Findings must be actionable (copy curl/URL), while the page keeps
+        event wiring out of markup -- that is the same rule that keeps
+        scanner output from becoming executable markup."""
+        html = load_ui_html()
+        assert 'data-copy-kind="curl"' in html
+        assert 'data-copy-kind="url"' in html
+        assert 'data-open-kind="url"' in html
+        for attr in ("onclick=", "onchange=", "onload=", "onerror="):
+            assert attr not in html.lower(), attr
 
     def test_ui_is_not_an_xss_carrier(self):
         """The tool's own output must not become a payload.
@@ -186,6 +228,32 @@ class TestUiRoute:
         assert resp.status == 200
         assert "text/html" in resp.headers.get("Content-Type", "")
         assert b"XSSentinel" in resp.body
+
+    def test_console_response_is_hardened(self):
+        """The console renders untrusted scanner output and may hold a key.
+
+        CSP/XFO/nosniff are cheap here and expensive to notice missing: a
+        later refactor that switches back to ``Response.text`` would keep all
+        functional tests green while silently dropping them.
+        """
+        srv = desktop_app.build_server(port=0)
+        srv.start_in_thread()
+        try:
+            with urlopen(srv.base_url + "/", timeout=15) as r:
+                headers = {k.lower(): v for k, v in r.headers.items()}
+                body = r.read()
+        finally:
+            srv._httpd.shutdown()
+            srv._httpd.server_close()
+        csp = headers.get("content-security-policy", "")
+        assert "default-src 'self'" in csp
+        assert "frame-ancestors 'none'" in csp
+        assert "object-src 'none'" in csp
+        assert headers.get("x-frame-options") == "DENY"
+        assert headers.get("x-content-type-options") == "nosniff"
+        assert headers.get("referrer-policy") == "no-referrer"
+        assert headers.get("cache-control") == "no-store"
+        assert b"XSSentinel" in body
 
 
 # ---------------------------------------------------------------------------

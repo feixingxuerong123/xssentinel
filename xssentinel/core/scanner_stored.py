@@ -505,14 +505,22 @@ class StoredBlindMixin:
                    f"({'json' if json_body else 'form+json'})"
                    f"{' archive_entry=' + repr(archive_entry) if archive_entry else ''}")
 
-        bases: list = []
+        # Phase 285: a stored write face is often SANITIZED, and the generic
+        # corpus order (a first-wins probe budget shared with every other
+        # layer) does not know that.  Measuring the Juice Shop legacy profile
+        # page found the corpus had no shape that survives a homegrown RegEx
+        # sanitizer; inserting one at the FRONT of the corpus moved other
+        # cases' probe budgets and the sync gate went FN=8, so the stored
+        # path now curates by TAG instead of by position: payloads tagged
+        # `sanitizer_bypass` are probed first, whatever their corpus index.
+        pooled: list = []
         for ctx_name in ("html_element", "svg_context"):
-            for base in payloads.by_context(ctx_name):
-                bases.append(base)
-                if len(bases) >= _STORED_DOM_PROBE_BASES:
-                    break
-            if len(bases) >= _STORED_DOM_PROBE_BASES:
-                break
+            pooled.extend(payloads.by_context(ctx_name))
+        _bypass = [b for b in pooled
+                   if "sanitizer_bypass" in (b.get("tags") or [])]
+        _seen = {id(b) for b in _bypass}
+        bases: list = list(_bypass) + [b for b in pooled if id(b) not in _seen]
+        del bases[_STORED_DOM_PROBE_BASES:]
         # Phase 280: order the probe so the shapes that EXECUTE through
         # innerHTML come first.  Corpus order puts the inert
         # `<<script>...iframe` polyglot and `<script>` first; an inline

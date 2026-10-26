@@ -23,6 +23,7 @@ Run:  pytest tests/test_dom_dynamic_evidence.py
 """
 from __future__ import annotations
 
+import json
 import os
 import re
 import sys
@@ -33,8 +34,10 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
 from xssentinel.core.findings import (  # noqa: E402
+    DOM_DELIVERY_TYPE,
     EVIDENCE_BROWSER_EXECUTED,
     dom_dynamic_evidence,
+    dom_dynamic_finding,
 )
 
 _CORE = os.path.join(ROOT, "xssentinel", "core")
@@ -98,6 +101,101 @@ class TestContractStates:
         assert "severity" not in ev
 
 
+class TestFindingClass:
+    """Phase 265: execution versus delivery is a CLASS distinction.
+
+    A delivery-only row used to be a high `dom_dynamic` with a low confidence
+    and a bare marker in `proof`; range6 measured the canonical safe pattern
+    (DOMPurify 3.4.17 -> innerHTML) as a high false positive because of it.
+    The class chooser is now one function, so neither engine can drift back.
+    """
+
+    def test_executed_row_is_high_dom_dynamic_with_proof(self):
+        got = dom_dynamic_finding({
+            "executed": True, "confidence": "medium",
+            "detail": "carrier=html", "snippet": "xssentinel_dom_abcd"})
+        assert got["type"] == "dom_dynamic"
+        assert got["severity"] == "high"
+        assert got["proof"] == "xssentinel_dom_abcd"
+        assert got["evidence_class"] == EVIDENCE_BROWSER_EXECUTED
+
+    def test_delivery_only_is_low_reachability_without_proof(self):
+        got = dom_dynamic_finding({
+            "executed": False, "confidence": "medium",
+            "detail": "carrier=none", "snippet": "xssentinel_dom_abcd"})
+        assert got["type"] == DOM_DELIVERY_TYPE == "dom_sink_reachability"
+        assert got["severity"] == "low"
+        assert got["proof"] is None, \
+            "a bare probe marker must not masquerade as execution proof"
+        assert got["confidence"] == "low"
+        assert got["evidence_class"] == "browser-refuted"
+
+    def test_legacy_high_row_keeps_the_confirmed_class(self):
+        got = dom_dynamic_finding({"confidence": "high", "snippet": "M"})
+        assert got["type"] == "dom_dynamic"
+        assert got["severity"] == "high"
+        assert got["proof"] == "M"
+
+    def test_legacy_medium_row_becomes_reachability(self):
+        got = dom_dynamic_finding({"confidence": "medium", "snippet": "M"})
+        assert got["type"] == DOM_DELIVERY_TYPE
+        assert got["severity"] == "low"
+        assert got["proof"] is None
+
+
+class TestDeliveryTypeIsWired:
+    """A new finding type is only honest if its delivery surfaces agree.
+
+    Phase 207's lesson: type_rule / type_name / interop / fix_advice /
+    compliance are separate tables, and a type missing from one of them
+    renders as a generic slug or an error-level finding.  Pin the new class
+    at the same time as the class itself.
+    """
+
+    def test_api_accepts_the_type(self):
+        from xssentinel.api.validation import _VALID_TYPES
+        assert DOM_DELIVERY_TYPE in _VALID_TYPES
+
+    def test_sarif_has_a_distinct_note_rule(self):
+        from xssentinel.core.report import build_sarif
+        doc = json.loads(build_sarif([{
+            "type": DOM_DELIVERY_TYPE, "severity": "low",
+            "confidence": "low", "url": "http://h/p", "method": "GET",
+            "param": "q", "context": "innerHTML", "payload": "marker",
+            "detail": "delivery evidence only",
+        }], "http://h", {}))
+        rules = doc["runs"][0]["tool"]["driver"]["rules"]
+        assert any(r["id"] == "XSSENTINEL-DOM-SINK-REACHABILITY"
+                   for r in rules), [r.get("id") for r in rules]
+        assert doc["runs"][0]["results"][0]["level"] == "note"
+
+    def test_fix_advice_and_compliance_have_entries(self):
+        from xssentinel.core.fix_advice import get_advice
+        adv = get_advice(DOM_DELIVERY_TYPE)
+        assert adv and "Verify" in adv["headline"]
+        with open(os.path.join(ROOT, "xssentinel", "data",
+                               "compliance.json"), encoding="utf-8") as fh:
+            comp = json.load(fh)
+        entries = comp["finding_type_map"][DOM_DELIVERY_TYPE]
+        assert entries and all(len(e) == 4 for e in entries)
+
+    def test_delivery_type_gets_no_active_poc(self):
+        from xssentinel.core.poc import build_poc
+        p = build_poc({"type": DOM_DELIVERY_TYPE, "url": "http://h/p",
+                       "param": "q", "payload": "marker"})
+        assert p == {"curl": "", "url": "", "html": ""}
+
+    def test_mxss_carrier_is_the_measured_range6_shape(self):
+        """range6's positive page only regains browser-executed evidence
+        because this carrier survives DOMPurify 2.0.7.  A later cleanup that
+        drops it must fail here, not in a distant gate."""
+        from xssentinel.core.dom_engine import _CARRIER_SHAPES
+        shapes = dict(_CARRIER_SHAPES)
+        assert "mxss" in shapes
+        assert "mglyph" in shapes["mxss"]
+        assert "alert(%d)" in shapes["mxss"]
+
+
 class TestLegacyRows:
     """A row without ``executed`` (pre-Phase 226, or hand-built).
 
@@ -133,14 +231,19 @@ class TestOneDefinition:
     emit re-creates the parity divergence without touching this function."""
 
     @pytest.mark.parametrize("which", sorted(_SITES))
-    def test_site_calls_the_shared_contract(self, which):
-        assert "dom_dynamic_evidence(d)" in _src(which)
+    def test_site_calls_the_shared_class_chooser(self, which):
+        assert "dom_dynamic_finding(d)" in _src(which)
 
     @pytest.mark.parametrize("which", sorted(_SITES))
     def test_site_reads_the_contract_not_a_literal(self, which):
-        """The emission must take its evidence class from the contract, not
-        from a constant written at the call site."""
-        assert '_ev["evidence_class"]' in _src(which)
+        """The emission must take its class/evidence from the contract, not
+        from constants written at the call site."""
+        src = _src(which)
+        assert '_emit["evidence_class"]' in src
+        assert '_emit["type"]' in src
+        assert '_emit["severity"]' in src
+        assert '"type": "dom_dynamic"' not in src
+        assert '"severity": "high", "confidence": _emit' not in src
 
     @pytest.mark.parametrize("which", sorted(_SITES))
     def test_site_hard_codes_no_fired_outcome(self, which):
@@ -153,3 +256,4 @@ class TestOneDefinition:
                "detail": "location.hash -> innerHTML", "sink": "innerHTML",
                "snippet": "#<img src=x onerror=alert(1)>"}
         assert dom_dynamic_evidence(row) == dom_dynamic_evidence(dict(row))
+        assert dom_dynamic_finding(row) == dom_dynamic_finding(dict(row))

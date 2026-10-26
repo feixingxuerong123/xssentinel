@@ -135,3 +135,113 @@ class TestDocumentedParamPlaceholder:
         hits = [f for f in sc.findings if f.data.get("type") == "scenario"]
         assert hits, ("a scenario written with the documented {param} "
                       "placeholder must post under the real field name")
+
+
+# ---------------------------------------------------------------------------
+# Phase 322: formal corpus (data/scenarios.json) + {self} placeholder
+# ---------------------------------------------------------------------------
+
+class TestBuiltinCorpus:
+    def test_builtin_alias_loads_the_shipped_corpus(self):
+        out = sc_mod.load_scenarios("builtin")
+        with open(sc_mod.BUILTIN_SCENARIOS_FILE, encoding="utf-8") as f:
+            raw = json.load(f)
+        # nothing was silently skipped by validation: what ships is what
+        # runs (a skipped scenario in the FORMAL corpus would be a
+        # contribution bug, not a runtime nicety)
+        assert len(out) == len(raw["scenarios"])
+        assert len(out) >= 2
+        ids = [s["id"] for s in out]
+        assert len(ids) == len(set(ids)), "scenario ids must be unique"
+        for s in out:
+            assert s.get("title")
+            assert isinstance(s.get("match", {}), dict)
+            for st in s["steps"]:
+                assert "method" in st and "path" in st
+
+    def test_meta_placeholders_match_what_the_engine_expands(self):
+        """Doc/code closure (Phase 190 discipline): every placeholder the
+        corpus _meta advertises is actually substituted in run_scenario,
+        and no substitution exists that _meta fails to list."""
+        import inspect
+        with open(sc_mod.BUILTIN_SCENARIOS_FILE, encoding="utf-8") as f:
+            meta = json.load(f)["_meta"]
+        advertised = set(meta["placeholders"])
+        assert advertised == {"{token}", "{param}", "{self}"}
+        src = inspect.getsource(sc_mod.run_scenario)
+        for ph in advertised:
+            assert f'"{ph}"' in src, f"{ph} advertised but never expanded"
+
+
+class _SelfEchoHandler:
+    """Stores the q param per path (POST body or GET query) and renders
+    it back on GET -- the profile-edit self-echo shape {self} targets."""
+
+    def __init__(self):
+        self.store = {}
+        from http.server import BaseHTTPRequestHandler
+
+        outer = self
+
+        class H(BaseHTTPRequestHandler):
+            def _respond(self, body: bytes):
+                self.send_response(200)
+                self.send_header("Content-Type",
+                                 "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def do_POST(self):
+                from urllib.parse import urlparse, parse_qs
+                n = int(self.headers.get("Content-Length") or 0)
+                body = self.rfile.read(n).decode("utf-8", "replace")
+                path = urlparse(self.path).path
+                outer.store[path] = (parse_qs(body).get("q") or [""])[0]
+                self._respond(b"ok")
+
+            def do_GET(self):
+                from urllib.parse import urlparse
+                u = urlparse(self.path)
+                # only POST persists state; GET renders it (the read step
+                # re-sends the param carrying the bare token, which must
+                # NOT overwrite the stored payload)
+                val = outer.store.get(u.path, "")
+                self._respond(
+                    f"<html><body><div>{val}</div></body></html>".encode())
+
+            def log_message(self, *a):
+                pass
+        self.handler = H
+
+
+class TestSelfPlaceholder:
+    def test_self_echo_scenario_confirms(self):
+        from tests.conftest import loopback_healthy
+        if not loopback_healthy():
+            pytest.skip("loopback degraded mid-session")
+        import threading
+        import time
+        from http.server import ThreadingHTTPServer
+        echo = _SelfEchoHandler()
+        srv = ThreadingHTTPServer(("127.0.0.1", 0), echo.handler)
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        time.sleep(0.2)
+        base = f"http://127.0.0.1:{srv.server_address[1]}"
+        try:
+            sc = Scanner(requester=Requester(timeout=8), verbose=False,
+                         max_payloads=4, max_transforms=2,
+                         scenario_file="builtin")
+            # /profile is NOT any path written in the corpus -- {self}
+            # must resolve it from the scanned URL itself
+            sc.scan_target(f"{base}/profile", method="GET",
+                           params={"q": "probe"})
+            hits = [f for f in sc.findings
+                    if f.data.get("type") == "scenario"]
+            assert hits, ("self-echo scenario must write to and read back "
+                          "the scanned page's own path")
+            assert any("self-echo" in str(f.data.get("transform"))
+                       for f in hits)
+        finally:
+            srv.shutdown()
+            srv.server_close()

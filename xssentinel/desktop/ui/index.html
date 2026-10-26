@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -9,7 +9,23 @@
     --bg: #0f1419; --panel: #161d26; --panel2: #1c2530; --line: #2a3644;
     --fg: #d7e0ea; --dim: #8b9bab; --acc: #4da3ff; --ok: #3ecf8e;
     --warn: #ffb454; --bad: #ff6b6b; --info: #7aa2c8; --chip: #243244;
+    --tline: var(--tline); --xrow: #131b24; --sel: #1d2b3a; --hover: #1a2330;
   }
+  /* 亮色主题：投影仪/白天机房的真实需求。变量同一套名字，换值即可；
+     首次打开跟随系统（见脚本里的 prefers-color-scheme），之后记忆
+     用户手选的那一档（sessionStorage，与 API 密钥同生命周期）。 */
+  html[data-theme="light"] {
+    --bg: #f4f6f9; --panel: #ffffff; --panel2: #eef1f5; --line: #d4dbe4;
+    --fg: #1c2530; --dim: #5b6b7c; --acc: #0b6fd0; --ok: #14855a;
+    --warn: #b06f00; --bad: #c23737; --info: #4a7096; --chip: #e6ebf1;
+    --tline: #e2e7ee; --xrow: #f0f3f7; --sel: #dceafa; --hover: #e8eef6;
+  }
+  html[data-theme="light"] td { border-bottom: 1px solid var(--tline); }
+  html[data-theme="light"] tr.sel td { background: var(--sel); }
+  html[data-theme="light"] tr.clickable:hover td { background: var(--hover); }
+  html[data-theme="light"] tr.xrow td { background: var(--xrow); }
+  html[data-theme="light"] pre.payload { background: #f7f9fb; color: var(--fg); }
+  html[data-theme="light"] button { color: #ffffff; }
   * { box-sizing: border-box; }
   body {
     margin: 0; background: var(--bg); color: var(--fg);
@@ -58,11 +74,11 @@
   th.sortable { cursor: pointer; user-select: none; }
   th.sortable:hover { color: var(--fg); }
   th .arrow { color: var(--acc); font-size: 10px; }
-  td { padding: 6px 8px; border-bottom: 1px solid #1e2733; vertical-align: top; }
-  tr.sel td { background: #1d2b3a; }
+  td { padding: 6px 8px; border-bottom: 1px solid var(--tline); vertical-align: top; }
+  tr.sel td { background: var(--sel); }
   tr.clickable { cursor: pointer; }
-  tr.clickable:hover td { background: #1a2330; }
-  tr.xrow td { background: #131b24; border-bottom: 1px solid var(--line); }
+  tr.clickable:hover td { background: var(--hover); }
+  tr.xrow td { background: var(--xrow); border-bottom: 1px solid var(--line); }
   .scroll { overflow: auto; min-height: 0; }
   #scanList { max-height: 30vh; }
   #findingRows { max-height: 42vh; }
@@ -108,7 +124,7 @@
 
   /* --- severity bar --- */
   .bar { display: flex; height: 10px; border-radius: 5px; overflow: hidden;
-         background: #1e2733; min-width: 120px; flex: 1; }
+         background: var(--tline); min-width: 120px; flex: 1; }
   .bar i { display: block; height: 100%; }
   .bar .high { background: var(--bad); }
   .bar .medium { background: var(--warn); }
@@ -119,7 +135,7 @@
 
   /* --- filters --- */
   .filters { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center;
-             padding: 8px 0 4px; border-top: 1px solid #1e2733; margin-top: 6px; }
+             padding: 8px 0 4px; border-top: 1px solid var(--tline); margin-top: 6px; }
   .filters label { display: flex; align-items: center; gap: 5px; margin: 0;
                    color: var(--fg); font-size: 12px; }
   .filters select { width: auto; padding: 4px 6px; font-size: 12px; }
@@ -132,11 +148,18 @@
   .codes { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 6px; }
 
   /* --- coverage --- */
+  .covring { display: inline-flex; width: 36px; height: 36px; border-radius: 50%;
+             align-items: center; justify-content: center; vertical-align: middle;
+             background: conic-gradient(var(--ok) var(--pct, 0%), var(--tline) 0); }
+  .covring[hidden] { display: none; }   /* 作者 display 会盖过 UA 的 [hidden] */
+  .covring b { width: 26px; height: 26px; border-radius: 50%; background: var(--panel);
+               display: flex; align-items: center; justify-content: center;
+               font-size: 9px; color: var(--ok); font-family: Consolas, monospace; }
   .lbars { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
   .lrow { display: grid; grid-template-columns: 118px 1fr 128px; gap: 8px; align-items: center;
           font-size: 12px; }
   .lrow .lid { font-family: Consolas, monospace; color: #bed3e8; }
-  .lrow .lbar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; background: #1e2733; }
+  .lrow .lbar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; background: var(--tline); }
   .lrow .lbar i { display: block; height: 100%; }
   .lrow .lbar .ran { background: var(--ok); }
   .lrow .lbar .failed { background: var(--bad); }
@@ -153,10 +176,12 @@
   <span class="dot" id="apiDot"></span>
   <h1>XSSentinel 桌面控制台</h1>
   <span class="ver" id="verInfo">…</span>
-  <input id="apiKey" type="password" spellcheck="false" placeholder="X-API-Key"
-         title="若 API 以 --api-key 启动：把密钥粘在这里。只存在本标签页的 sessionStorage，不会写回服务器。">
+  <span class="tick" id="apiState">API 检测中</span>
   <span class="spacer"></span>
   <span class="tick" id="pollInfo">—</span>
+  <input id="apiKey" type="password" spellcheck="false" placeholder="X-API-Key"
+         title="若 API 以 --api-key 启动：把密钥粘在这里。只存在本标签页的 sessionStorage，不会写回服务器。">
+  <button class="ghost small" id="themeBtn" title="在深色 / 亮色主题间切换">主题</button>
   <button class="ghost small" id="refreshBtn">刷新</button>
 </header>
 
@@ -167,6 +192,14 @@
       <h2>新建扫描</h2>
       <label for="url">目标 URL *</label>
       <input id="url" placeholder="https://target.example/search?q=test" spellcheck="false">
+      <div class="row" style="margin-top:8px">
+        <button class="ghost small" data-preset="quick"
+                title="载荷 8 / 变形 4 / 超时 12s——最快拿结论">预设：快速</button>
+        <button class="ghost small" data-preset="normal"
+                title="载荷 14 / 变形 12 / 超时 15s——与 API 默认一致">常规</button>
+        <button class="ghost small" data-preset="deep"
+                title="载荷 30 / 变形 16 / 超时 20s">深度</button>
+      </div>
       <div class="row">
         <div>
           <label for="method">方法</label>
@@ -205,6 +238,49 @@
           <input id="crawlDepth" type="number" value="2" min="0" max="6">
         </div>
       </div>
+      <!-- Phase 264：预算/范围三件套——每个控件都对应 REST 处理器真读的
+           一个字段（api/server.py 的 body.get(...)），控制台不做装饰性控件。 -->
+      <div class="row">
+        <div>
+          <label for="maxPayloads">载荷预算</label>
+          <input id="maxPayloads" type="number" value="14" min="1" max="200">
+        </div>
+        <div>
+          <label for="maxTransforms">变形预算</label>
+          <input id="maxTransforms" type="number" value="12" min="1" max="32">
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label for="timeout">超时（秒）</label>
+          <input id="timeout" type="number" value="15" min="1" max="300">
+        </div>
+        <div>
+          <label for="rateLimit">限速（req/s，0 = 不限）</label>
+          <input id="rateLimit" type="number" value="0" min="0" step="0.5">
+        </div>
+      </div>
+      <label for="scope">scope 域约束（可空，逗号分隔）</label>
+      <input id="scope" placeholder="example.com,cdn.example.com" spellcheck="false">
+      <label for="proxy">代理（可空）</label>
+      <input id="proxy" placeholder="http://127.0.0.1:8080" spellcheck="false">
+      <div class="row">
+        <div>
+          <label for="crawlEngine">爬取引擎</label>
+          <select id="crawlEngine">
+            <option value="auto">auto</option>
+            <option value="spa">spa</option>
+            <option value="static">static</option>
+          </select>
+        </div>
+        <div style="display:flex;align-items:flex-end;padding-bottom:6px">
+          <label style="margin:0"><input type="checkbox" id="verifySsl" checked>
+            校验 TLS 证书</label>
+        </div>
+      </div>
+      <label for="customPayloads">自定义载荷（可空，每行一条，追加进载荷队列）</label>
+      <textarea id="customPayloads" spellcheck="false"
+                placeholder="&lt;script&gt;alert(1)&lt;/script&gt;"></textarea>
       <div style="margin-top:12px">
         <button id="startBtn" style="width:100%">开始扫描</button>
       </div>
@@ -246,8 +322,25 @@
         <label><input type="checkbox" class="sevF" value="info" checked> info</label>
         <label title="只显示证据类为 browser-executed 的发现（真浏览器确认执行的）">
           <input type="checkbox" id="onlyExecuted"> 仅浏览器已执行</label>
+        <select id="evidenceF" title="按证据类分诊：执行 / 否证 / 模型判定">
+          <option value="">全部证据类</option>
+          <option value="browser-executed">browser-executed（已执行）</option>
+          <option value="browser-refuted">browser-refuted（已否证）</option>
+          <option value="model-only">model-only（模型判定）</option>
+          <option value="browser-unavailable">browser-unavailable（无浏览器）</option>
+          <option value="oob-confirmed">oob-confirmed（盲打回调）</option>
+        </select>
         <select id="typeF" title="按类型过滤"><option value="">全部类型</option></select>
         <input type="search" id="textF" placeholder="搜索 参数/上下文/载荷/说明" spellcheck="false">
+        <select id="pageSize" title="每页显示条数">
+          <option value="20">20 条/页</option>
+          <option value="50" selected>50 条/页</option>
+          <option value="100">100 条/页</option>
+          <option value="0">全部</option>
+        </select>
+        <button class="ghost small" id="pagePrev" disabled title="上一页">‹</button>
+        <span class="mini muted" id="pageInfo"></span>
+        <button class="ghost small" id="pageNext" disabled title="下一页">›</button>
         <span class="spacer"></span>
         <span class="mini muted" id="filteredCount"></span>
       </div>
@@ -255,7 +348,8 @@
     </div>
 
     <div class="card" id="coverageCard">
-      <h2>覆盖率 <span class="spacer"></span><span class="mini muted" id="covGen"></span></h2>
+      <h2>覆盖率 <span id="covRing" class="covring" hidden
+          title="已确认反射 / 已反射参数。空任务时整个环隐藏，不显示误导性的 0%。"></span><span class="spacer"></span><span class="mini muted" id="covGen"></span></h2>
       <div class="strip" id="covTotals"><span class="muted mini">扫描完成或取消后可看覆盖率矩阵</span></div>
       <div class="lbars" id="covLayers"></div>
       <div class="scroll" id="covEndpoints" style="margin-top:10px"></div>
@@ -274,6 +368,7 @@ var findings = [];         // 选中任务的发现
 var pollTimer = null;
 var POLL_FAST = 1200, POLL_IDLE = 4000;
 var sortKey = "sev", sortDir = -1;   // 默认：严重度降序
+var page = 1;                        // 发现表分页（pageSize=0 表示全部）
 var expanded = {};                   // finding 行展开状态
 var lastLive = {};                   // 选中任务上一次的 (state, finding_count)
 var lastIdsSig = "";                 // 任务集合签名：变了才重建行
@@ -393,9 +488,25 @@ function startScan() {
       crawl: $("crawl").checked,
       crawl_depth: parseInt($("crawlDepth").value, 10) || 0,
       threads: parseInt($("threads").value, 10) || 4,
-      ai_report: $("aiReport").checked
+      ai_report: $("aiReport").checked,
+      // Phase 264：预算/范围三件套，全部映射 api/server.py 真读的字段。
+      max_payloads: parseInt($("maxPayloads").value, 10) || 14,
+      max_transforms: parseInt($("maxTransforms").value, 10) || 12,
+      timeout: parseInt($("timeout").value, 10) || 15,
+      rate_limit: parseFloat($("rateLimit").value) || 0,
+      verify_ssl: $("verifySsl").checked,
+      crawl_engine: $("crawlEngine").value
     };
   } catch (e) { return; }
+  // 空值不覆盖 API 默认：scope/proxy/customPayloads 只在填了的情况下发送。
+  if ($("scope").value.trim()) body.scope = $("scope").value.trim();
+  if ($("proxy").value.trim()) body.proxy = $("proxy").value.trim();
+  var customPl = [];
+  $("customPayloads").value.split("\n").forEach(function (line) {
+    var t = line.trim();
+    if (t) customPl.push(t);
+  });
+  if (customPl.length) body.custom_payloads = customPl;
   $("startBtn").disabled = true;
   api("/api/v1/scans", {
     method: "POST", headers: {"Content-Type": "application/json"},
@@ -686,12 +797,14 @@ function activeSevs() {
 function filteredFindings() {
   var sevs = activeSevs();
   var onlyExec = $("onlyExecuted").checked;
+  var evClass = $("evidenceF").value;
   var type = $("typeF").value;
   var text = $("textF").value.trim().toLowerCase();
   var rows = findings.filter(function (f) {
     var s = String(f.severity || "low").toLowerCase();
     if (sevs.indexOf(s) < 0 && !(s === "critical" && sevs.indexOf("high") >= 0)) return false;
     if (onlyExec && f.evidence_class !== "browser-executed") return false;
+    if (evClass && String(f.evidence_class || "") !== evClass) return false;
     if (type && (f.type || "(无)") !== type) return false;
     if (text) {
       var hay = [f.param, f.context, f.detail, f.payload, f.type, f.evidence_class,
@@ -724,12 +837,29 @@ function renderFindingRows() {
     ? ("显示 " + rows.length + " / " + findings.length) : "";
   if (!findings.length) {
     $("findingRows").innerHTML = '<div class="empty">该任务没有发现</div>';
+    $("pageInfo").textContent = "";
+    $("pagePrev").disabled = true;
+    $("pageNext").disabled = true;
     return;
   }
   if (!rows.length) {
     $("findingRows").innerHTML = '<div class="empty">当前过滤条件下没有发现</div>';
+    $("pageInfo").textContent = "";
+    $("pagePrev").disabled = true;
+    $("pageNext").disabled = true;
     return;
   }
+  // 分页：pageSize=0 表示全部（页码恒为 1）。过滤条件变化时回到第一页，
+  // 否则第 3 页上的 2 行结果会把人留在空白页上。
+  var size = parseInt($("pageSize").value, 10) || 0;
+  var pages = size > 0 ? Math.max(1, Math.ceil(rows.length / size)) : 1;
+  if (page > pages) page = pages;
+  if (page < 1) page = 1;
+  var slice = size > 0 ? rows.slice((page - 1) * size, page * size) : rows;
+  $("pageInfo").textContent = pages > 1
+    ? (page + " / " + pages + " 页") : "";
+  $("pagePrev").disabled = page <= 1;
+  $("pageNext").disabled = page >= pages;
   var html = "<table><thead><tr>"
     + '<th class="sortable" data-sort="type">类型' + arrow("type") + "</th>"
     + '<th class="sortable" data-sort="sev">严重度' + arrow("sev") + "</th>"
@@ -738,13 +868,18 @@ function renderFindingRows() {
     + '<th class="sortable" data-sort="context">上下文' + arrow("context") + "</th>"
     + '<th class="sortable" data-sort="evidence_class">证据' + arrow("evidence_class") + "</th>"
     + "<th>说明</th></tr></thead><tbody>";
-  rows.forEach(function (f) {
+  slice.forEach(function (f) {
     var sev = String(f.severity || "low").toLowerCase();
     var key = String(f.url || "") + "|" + String(f.param || "") + "|"
       + String(f.type || "") + "|" + String(f.payload || "").length;
     var isOpen = !!expanded[key];
+    // Phase 265 拆分后的投递线索类：到达 sink 但未观测到执行，必须让人
+    // 一眼看出它不是已确认 XSS，也不该被当成高危处理。
+    var typeCell = esc(f.type) + (f.type === "dom_sink_reachability"
+      ? ' <span class="pill" title="只证明载荷投递到了 sink；未观测到执行，证据类不是 browser-executed">未观测到执行</span>'
+      : "");
     html += '<tr class="clickable' + (isOpen ? " sel" : "") + '" data-x="' + esc(key) + '">'
-      + "<td>" + esc(f.type) + "</td>"
+      + "<td>" + typeCell + "</td>"
       + '<td class="sev-' + esc(sev) + '">' + esc(f.severity) + "</td>"
       + "<td>" + esc(f.confidence || "-") + "</td>"
       + '<td class="mono">' + esc(f.param || "-") + "</td>"
@@ -770,7 +905,13 @@ function findingDetailRow(f, key) {
   var body = '<div class="codes">' + codes.map(function (c) {
     return '<span class="chip">' + c + "</span>";
   }).join("") + '<span class="spacer" style="flex:1"></span>'
-    + '<button class="ghost small" data-copy="' + esc(key) + '">复制载荷</button></div>';
+    // Phase 264：PoC 动作。复制走剪贴板；「打开」是普通 http(s) 跳新标签页
+    // ——与报告里的 PoC 同源，控制台自己不发明第二种载荷语义。
+    + '<button class="ghost small" data-copy-kind="curl" data-x="' + esc(key) + '">复制 curl</button> '
+    + '<button class="ghost small" data-copy-kind="url" data-x="' + esc(key) + '">复制 URL</button> '
+    + '<button class="ghost small" data-copy-kind="payload" data-x="' + esc(key) + '">复制载荷</button> '
+    + '<button class="ghost small" data-open-kind="url" data-x="' + esc(key) + '">打开 URL</button>'
+    + "</div>";
   if (f.url) {
     body += '<div class="mini mono muted" style="margin-top:6px">' + esc(f.method || "GET")
       + " " + esc(f.url) + "</div>";
@@ -790,15 +931,50 @@ function findingDetailRow(f, key) {
   }
   return '<tr class="xrow"><td colspan="7">' + body + "</td></tr>";
 }
+function findingByKey(k) {
+  return findings.filter(function (f) {
+    return (String(f.url || "") + "|" + String(f.param || "") + "|"
+      + String(f.type || "") + "|" + String(f.payload || "").length) === k;
+  })[0];
+}
+/* 由 finding 字段现场构造可复制的 PoC。GET/query 参数直接拼进 URL 并做
+   百分号编码；body 参数走 --data-urlencode。这里只做「可粘贴的起点」，
+   权威 PoC 永远在 HTML 报告里（服务端按同一判定生成）。 */
+function pocUrl(f) {
+  try {
+    var u = new URL(f.url || BASE, BASE);
+    if (f.param && f.payload != null && (f.param_in || "query") === "query") {
+      u.searchParams.set(f.param, String(f.payload));
+    }
+    return u.href;
+  } catch (err) { return String(f.url || ""); }
+}
+function pocCurl(f) {
+  var m = String(f.method || "GET").toUpperCase();
+  var bodyRidden = f.param && f.payload != null
+    && (f.param_in || "query") !== "query";
+  if (bodyRidden) {
+    return "curl -X " + m + " --data-urlencode "
+      + JSON.stringify(String(f.param) + "=" + String(f.payload))
+      + " " + JSON.stringify(String(f.url || ""));
+  }
+  return "curl " + JSON.stringify(pocUrl(f));
+}
 $("findingRows").addEventListener("click", function (e) {
-  var copyBtn = e.target.closest("[data-copy]");
+  var copyBtn = e.target.closest("[data-copy-kind]");
   if (copyBtn) {
-    var k = copyBtn.getAttribute("data-copy");
-    var row = findings.filter(function (f) {
-      return (String(f.url || "") + "|" + String(f.param || "") + "|"
-        + String(f.type || "") + "|" + String(f.payload || "").length) === k;
-    })[0];
-    copyText(row ? (row.payload || "") : "");
+    var f = findingByKey(copyBtn.getAttribute("data-x"));
+    if (!f) return;
+    var kind = copyBtn.getAttribute("data-copy-kind");
+    if (kind === "curl") copyText(pocCurl(f));
+    else if (kind === "url") copyText(pocUrl(f));
+    else copyText(f.payload || "");
+    return;
+  }
+  var openBtn = e.target.closest("[data-open-kind]");
+  if (openBtn) {
+    var f2 = findingByKey(openBtn.getAttribute("data-x"));
+    if (f2 && f2.url) window.open(pocUrl(f2), "_blank");
     return;
   }
   var head = e.target.closest("th[data-sort]");
@@ -814,13 +990,21 @@ $("findingRows").addEventListener("click", function (e) {
   if (expanded[key]) delete expanded[key]; else expanded[key] = true;
   renderFindingRows();
 });
-["onlyExecuted", "typeF"].forEach(function (id) {
-  $(id).addEventListener("change", renderFindingRows);
+["onlyExecuted", "evidenceF", "typeF"].forEach(function (id) {
+  $(id).addEventListener("change", function () { page = 1; renderFindingRows(); });
 });
 Array.prototype.forEach.call(document.querySelectorAll(".sevF"), function (el) {
-  el.addEventListener("change", renderFindingRows);
+  el.addEventListener("change", function () { page = 1; renderFindingRows(); });
 });
-$("textF").addEventListener("input", renderFindingRows);
+$("textF").addEventListener("input", function () { page = 1; renderFindingRows(); });
+$("pageSize").addEventListener("change", function () { page = 1; renderFindingRows(); });
+$("pagePrev").addEventListener("click", function () {
+  if (page > 1) { page -= 1; renderFindingRows(); }
+});
+$("pageNext").addEventListener("click", function () {
+  page += 1;                       // renderFindingRows 会把越界页夹回最后一页
+  renderFindingRows();
+});
 
 /* ---------- 报告 ---------- */
 function reportUrl(fmt, ai) {
@@ -879,9 +1063,17 @@ function renderCoverage(cov) {
     $("covLayers").innerHTML = "";
     $("covEndpoints").innerHTML = "";
     $("covGen").textContent = "";
+    $("covRing").hidden = true;          // 空任务必须藏环：0% 的环是噪音
     return;
   }
   var t = cov.totals;
+  var reflected = t.reflected || 0;
+  var pct = reflected > 0
+    ? Math.round(100 * (t.confirmed || 0) / reflected) : 0;
+  var ring = $("covRing");
+  ring.style.setProperty("--pct", Math.max(0, Math.min(100, pct)) + "%");
+  ring.innerHTML = "<b>" + esc(pct) + "%</b>";
+  ring.hidden = false;
   $("covGen").textContent = cov.generated ? ("生成于 " + cov.generated.replace("T", " ")) : "";
   var kv = [
     ["端点", t.endpoints], ["参数", t.parameters], ["已反射", t.reflected],
@@ -951,6 +1143,8 @@ function renderCoverage(cov) {
 /* ---------- 自适应轮询 ---------- */
 function checkApi(ok) {
   $("apiDot").className = "dot" + (ok ? "" : " off");
+  var chipEl = $("apiState");
+  if (chipEl) chipEl.textContent = ok ? "API 在线" : "API 离线";
 }
 function poll() {
   clearTimeout(pollTimer);
@@ -981,6 +1175,20 @@ $("refreshBtn").addEventListener("click", function () { poll(); toast("已刷新
 $("startBtn").addEventListener("click", startScan);
 $("url").addEventListener("keydown", function (e) { if (e.key === "Enter") startScan(); });
 
+/* ---------- 预设（Phase 264）----------
+   一键填预算三件套；显式点击的预设就是显式预算，覆盖表单当前值。
+   e2e 断言：点 quick 之后 #maxPayloads 的值必须是 "8"。 */
+var PRESETS = {quick: [8, 4, 12], normal: [14, 12, 15], deep: [30, 16, 20]};
+Array.prototype.forEach.call(document.querySelectorAll("[data-preset]"),
+  function (btn) {
+    btn.addEventListener("click", function () {
+      var p = PRESETS[btn.getAttribute("data-preset")] || PRESETS.normal;
+      $("maxPayloads").value = p[0];
+      $("maxTransforms").value = p[1];
+      $("timeout").value = p[2];
+    });
+  });
+
 /* ---------- API 密钥输入框 ---------- */
 (function () {
   var el = $("apiKey");
@@ -992,6 +1200,26 @@ $("url").addEventListener("keydown", function (e) { if (e.key === "Enter") start
     try { sessionStorage.setItem(KEY_STORE, apiKey); } catch (e) {}
   });
   el.addEventListener("change", function () { poll(); });  // 填完立刻重拉，不等下一次轮询
+})();
+
+/* ---------- 主题（Phase 264）----------
+   首次打开跟随系统 prefers-color-scheme；用户点过之后以手选为准，
+   存 sessionStorage（与密钥同生命周期，不跨标签页、不落盘）。 */
+(function () {
+  var THEME_STORE = "xssentinel.theme";
+  var saved = null;
+  try { saved = sessionStorage.getItem(THEME_STORE); } catch (e) { saved = null; }
+  if (saved === "dark" || saved === "light") {
+    document.documentElement.dataset.theme = saved;
+  } else if (window.matchMedia
+             && window.matchMedia("(prefers-color-scheme: light)").matches) {
+    document.documentElement.dataset.theme = "light";
+  }
+  $("themeBtn").addEventListener("click", function () {
+    var next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+    document.documentElement.dataset.theme = next;
+    try { sessionStorage.setItem(THEME_STORE, next); } catch (e) { /* 忽略 */ }
+  });
 })();
 
 /* ---------- 初始化 ---------- */

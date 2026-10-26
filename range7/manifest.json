@@ -37,6 +37,16 @@
   {"id": "r7-neg-second", "gt": "safe", "path": "/settings-safe", "param": "name",
    "method": "POST", "stored_inject": "/settings-safe", "stored_view": "/admin-safe",
    "stored_param": "name", "engines": ["sync"],
-   "note": "same flow, escaped on the admin view"}
+   "note": "same flow, escaped on the admin view"},
+  {"id": "r7-pos-md", "gt": "vulnerable", "path": "/md", "param": "body",
+   "note": "mini markdown renderer: linkify only, so other HTML in the body survives"},
+  {"id": "r7-neg-md", "gt": "safe", "path": "/md-safe", "param": "body",
+   "note": "escape first, then linkify -- what a renderer with a sanitiser does"},
+  {"id": "r7-pos-auth", "gt": "vulnerable", "path": "/dashboard", "param": "q",
+   "auth": true,
+   "note": "reflection behind a session cookie; 401 without it"},
+  {"id": "r7-neg-auth", "gt": "safe", "path": "/dashboard-safe", "param": "q",
+   "auth": true,
+   "note": "same reflection behind the session, escaped"}
  ]
 }

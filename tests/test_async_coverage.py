@@ -26,7 +26,6 @@ from __future__ import annotations
 
 import asyncio
 
-import pytest
 
 from xssentinel.core import async_scanner as a
 from xssentinel.core.async_scanner_common import _AsyncScannerShim

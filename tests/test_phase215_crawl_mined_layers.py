@@ -161,14 +161,19 @@ def _dyn_on(found, path: str, require_executed: bool = True) -> list:
     count/dedupe assertions need that: Phase 260 measured this lab with
     dev/_p260_recorder.py and the engine discriminates by SOURCE --
     ``innerHTML = location.hash`` pages (/ and /dup) come back with
-    ``executed=False`` (marker delivered to the sink, no execution observed,
-    so the honest grade is browser-refuted), while the ``?v=`` pages (/fa,
-    /sink) come back ``executed=True, carrier=html`` and grade
-    browser-executed.  Filtering on browser-executed therefore counted "did
-    the sink execute", not "was this page-layered exactly once".
+    ``executed=False`` (marker delivered to the sink, no execution observed),
+    while the ``?v=`` pages (/fa, /sink) come back
+    ``executed=True, carrier=html`` and grade browser-executed.  Filtering on
+    browser-executed therefore counted "did the sink execute", not "was this
+    page-layered exactly once".
+
+    Phase 265: delivery-only rows are emitted as
+    ``dom_sink_reachability`` (low, no proof), a separate class from
+    ``dom_dynamic``.  A page-layering/dedupe assertion must count both; the
+    ``require_executed`` flag still means "browser-executed only".
     """
     return [f for f in found
-            if f.get("type") == "dom_dynamic"
+            if f.get("type") in ("dom_dynamic", "dom_sink_reachability")
             and (not require_executed
                  or f.get("evidence_class") == "browser-executed")
             and str(f.get("url", "")).split("?")[0].split("#")[0]

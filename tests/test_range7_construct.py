@@ -116,7 +116,9 @@ def test_json_config_block_face(base):
     assert payload in raw, "vulnerable JSON block must allow closing the element"
     _, safe = _get(base, f"/preview-safe?name={q}")
     assert payload not in safe
-    assert "\\u003c/script" in safe, "safe twin must JSON-escape '<'"
+    assert "&lt;/script" in safe, (
+        "safe twin must escape for the SINK (innerHTML) -- \\u003c would be "
+        "turned back into '<' by JSON.parse and still execute")
 
 
 def test_second_order_face(base):
@@ -128,3 +130,46 @@ def test_second_order_face(base):
     assert MARK not in safe
     assert "&lt;svg" in safe
     assert "nm" in safe, "an empty admin page would make the TN fiction"
+
+
+def test_markdown_face(base):
+    q = urllib.parse.quote(MARK)
+    _, raw = _get(base, f"/md?body={q}")
+    assert MARK in raw, "vulnerable renderer must leave other HTML intact"
+    _, safe = _get(base, f"/md-safe?body={q}")
+    assert MARK not in safe
+    assert "&lt;svg" in safe
+
+
+def test_auth_face_is_gated_by_the_session(base):
+    # no cookie -> the page is not there at all: an unauthenticated scan
+    # cannot even see the sink, which is the point of an auth-aware crawl.
+    code, body = _get(base, "/dashboard?q=x")
+    assert code == 401, "dashboard must be unreachable without the session"
+    assert "Sign in" in body
+    # with the session the reflection is reachable -- and raw on the
+    # vulnerable twin, escaped on the safe one.
+    u = urllib.parse.urlsplit(base)
+    conn = http.client.HTTPConnection(u.hostname, u.port, timeout=10)
+    conn.request("GET", "/login")
+    r = conn.getresponse()
+    r.read()
+    cookie = (r.getheader("Set-Cookie") or "").split(";")[0]
+    conn.close()
+    assert cookie.startswith("sid="), cookie
+
+    conn = http.client.HTTPConnection(u.hostname, u.port, timeout=10)
+    conn.request("GET", "/dashboard?q=" + urllib.parse.quote(MARK),
+                 headers={"Cookie": cookie})
+    r = conn.getresponse()
+    raw = r.read().decode("utf-8", "replace")
+    conn.close()
+    assert MARK in raw, "signed-in dashboard must reflect the bytes raw"
+    conn = http.client.HTTPConnection(u.hostname, u.port, timeout=10)
+    conn.request("GET", "/dashboard-safe?q=" + urllib.parse.quote(MARK),
+                 headers={"Cookie": cookie})
+    r = conn.getresponse()
+    safe = r.read().decode("utf-8", "replace")
+    conn.close()
+    assert MARK not in safe
+    assert "&lt;svg" in safe

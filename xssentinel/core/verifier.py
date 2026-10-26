@@ -70,6 +70,22 @@ _ON_HANDLER_RE = re.compile(
 _JS_URI_RE = re.compile(r"javascript\s*:[^\s\"'>]*", re.I)
 
 
+def has_execution_point(payload: str) -> bool:
+    """Whether :func:`mark` can actually stamp a token into this payload.
+
+    ``mark`` arms exactly three shapes -- an ``alert(...)`` call (plain or
+    tagged-template), an ``on*=`` handler value, a ``javascript:`` URI.
+    A payload with none of them is returned unchanged, so the token never
+    enters the request and the payload can never be CONFIRMED as executed
+    (Phase 322: the custom-payload channel filters on this so an operator
+    wordlist of inert strings cannot burn probe budget on unconfirmable
+    shots).
+    """
+    return bool(_ALERT_CALL_RE.search(payload)
+                or _ON_HANDLER_RE.search(payload)
+                or _JS_URI_RE.search(payload))
+
+
 def mark(payload: str, token: str, style: str = "plain") -> str:
     """Inject `token` into the payload's alert() call so we can track it.
 

@@ -987,6 +987,38 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
             # CSS context: also try the dedicated CSS exfiltration payloads.
             if context == "css_context":
                 candidates = candidates + _sample("css_exfil", 3)
+            # Phase 322: the custom-payload channel (operator wordlist,
+            # --nuclei-dast bridge).  This used to be a dead wire -- the
+            # CLI loaded the file, Scanner stored it, and NOTHING consumed
+            # it (found while wiring the nuclei bridge).  Custom payloads
+            # LEAD the queue: an operator who names payloads states
+            # explicit intent, which outranks the context ladder; the
+            # per-param budget (max_payloads) still caps total spend, and
+            # the reflection-profile reorder below can still sink entries
+            # whose characters the filter provably strips.  Payloads with
+            # no execution point are dropped with a debug note: mark()
+            # cannot stamp them, so they could reflect but never confirm,
+            # which is pure budget waste.
+            if self._custom_payloads:
+                from .verifier import has_execution_point
+                _custom_dicts = []
+                for cp in self._custom_payloads:
+                    if not has_execution_point(cp):
+                        if self.verbose:
+                            _log.debug("custom payload dropped (no "
+                                       "execution point): %r", cp[:60])
+                        continue
+                    _custom_dicts.append({
+                        "id": "custom", "context": context,
+                        "tags": ["custom"], "confidence": "high",
+                        "payload": cp,
+                        "note": "operator/nuclei-dast supplied",
+                    })
+                if _custom_dicts:
+                    _seen = {c.get("payload") for c in _custom_dicts}
+                    candidates = _custom_dicts + [
+                        c for c in candidates
+                        if c.get("payload") not in _seen]
         polies = [p for p in payloads.all_polyglots()
                   if context in p.get("contexts", [])]
         return candidates, polies

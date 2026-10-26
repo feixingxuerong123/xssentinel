@@ -60,6 +60,10 @@ CASES = [
     ("r7-neg-second", "/admin-safe", "post", "name", '<img src=x onerror=__x()>'),
     ("r7-pos-dom", "/profile", "fragment", "", '<img src=x onerror=__x()>'),
     ("r7-neg-dom", "/profile-safe", "fragment", "", '<img src=x onerror=__x()>'),
+    ("r7-pos-md", "/md", "query", "body", '<img src=x onerror=__x()>'),
+    ("r7-neg-md", "/md-safe", "query", "body", '<img src=x onerror=__x()>'),
+    ("r7-pos-auth", "/dashboard", "auth", "q", '" ><img src=x onerror=__x()>'),
+    ("r7-neg-auth", "/dashboard-safe", "auth", "q", '" ><img src=x onerror=__x()>'),
 ]
 
 # which POST endpoint seeds each stored/second-order view
@@ -92,7 +96,7 @@ def browser(base):
     the browser boots in a worker, and every page call is submitted there.
     """
     import queue
-    import benchmark.browser_dom_oracle as O
+    import benchmark.browser_dom_oracle as oracle
     from playwright.sync_api import sync_playwright
 
     ready = threading.Event()
@@ -102,7 +106,7 @@ def browser(base):
         p = sync_playwright().start()
         b = p.chromium.launch()
         ctx = b.new_context()
-        ctx.add_init_script(O._INIT_STAMP)   # defines __x() + the stamp
+        ctx.add_init_script(oracle._INIT_STAMP)   # defines __x() + the stamp
         page = ctx.new_page()
         ready.set()
         while True:
@@ -132,14 +136,14 @@ def browser(base):
         return out.get("value")
 
     try:
-        yield O, run
+        yield oracle, run
     finally:
         ops.put(None)
         worker.join(timeout=20)
 
 
 def _url(base, path, kind, param, payload):
-    if kind == "query":
+    if kind in ("query", "auth"):
         return f"{base}{path}?{param}={urllib.parse.quote(payload)}"
     if kind == "fragment":
         return f"{base}{path}#{urllib.parse.quote(payload)}"
@@ -161,7 +165,7 @@ def _seed(base, path, param, payload):
                          [c for c in CASES if "-neg-" in c[0]])
 def test_safe_twin_does_not_execute(base, browser, cid, path, kind, param,
                                     payload):
-    O, run = browser
+    oracle, run = browser
     if kind == "post":
         _seed(base, path, param, payload)
     url = _url(base, path, kind, param, payload)
@@ -171,12 +175,17 @@ def test_safe_twin_does_not_execute(base, browser, cid, path, kind, param,
         # then load the payload URL -- otherwise a previous case's hit stays
         # readable and every later case looks green.
         page.goto(f"{base}/", wait_until="commit")
-        O._wait_load(page)
-        O._clear(page)
+        oracle._wait_load(page)
+        oracle._clear(page)
+        if kind == "auth":
+            # GET /login sets the session cookie (the runner POSTs); without
+            # it the dashboard is a 401 and there is no sink to measure.
+            page.goto(f"{base}/login", wait_until="commit")
+            oracle._wait_load(page)
         page.goto(url, wait_until="commit")
-        O._wait_load(page)
+        oracle._wait_load(page)
         page.wait_for_timeout(500)
-        return O._read_stamp(page)
+        return oracle._read_stamp(page)
 
     stamp = run(_measure)
     assert stamp is None, (
@@ -190,19 +199,24 @@ def test_safe_twin_does_not_execute(base, browser, cid, path, kind, param,
 def test_vulnerable_twin_executes(base, browser, cid, path, kind, param,
                                   payload):
     """Recorded, not gated by default (see the module docstring)."""
-    O, run = browser
+    oracle, run = browser
     if kind == "post":
         _seed(base, path, param, payload)
     url = _url(base, path, kind, param, payload)
 
     def _measure(page):
         page.goto(f"{base}/", wait_until="commit")
-        O._wait_load(page)
-        O._clear(page)
+        oracle._wait_load(page)
+        oracle._clear(page)
+        if kind == "auth":
+            # GET /login sets the session cookie (the runner POSTs); without
+            # it the dashboard is a 401 and there is no sink to measure.
+            page.goto(f"{base}/login", wait_until="commit")
+            oracle._wait_load(page)
         page.goto(url, wait_until="commit")
-        O._wait_load(page)
+        oracle._wait_load(page)
         page.wait_for_timeout(500)
-        return O._read_stamp(page)
+        return oracle._read_stamp(page)
 
     stamp = run(_measure)
     print(f"[range7-construct] {cid}: stamp={stamp!r}")

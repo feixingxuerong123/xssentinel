@@ -167,9 +167,17 @@ def m_raw_double_decode(v: str) -> tuple:
 # ---------------------------------------------------------------------------
 
 def m_dom_hash_innerhtml(v: str) -> tuple:
+    # Phase 265: decode the fragment before parsing.  Chromium percent-encodes
+    # '<' / '>' / spaces in location.hash, so the old
+    # ``innerHTML = location.hash.slice(1)`` received ``%3Cimg...%3E`` as
+    # TEXT and never executed.  The previous high finding was the DOM
+    # engine's self-alert, not page execution.  Measured in Chromium:
+    # location.hash == "#%3Cimg...%3E"; decodeURIComponent restores the live
+    # element and the dialog fires.
     return _page_raw("""<!DOCTYPE html><html><body>
 <div id="out"></div>
-<script>document.getElementById('out').innerHTML = location.hash.slice(1);</script>
+<script>document.getElementById('out').innerHTML =
+  decodeURIComponent(location.hash.slice(1));</script>
 </body></html>""")
 
 # ---------------------------------------------------------------------------
@@ -294,15 +302,19 @@ def m_dom_postmessage(v: str) -> tuple:
 </body></html>""")
 
 def m_dom_hash_docwrite(v: str) -> tuple:
+    # Same Phase 265 fragment-encoding correction as m_dom_hash_innerhtml.
     return _page_raw("""<!DOCTYPE html><html><body>
-<script>document.write(location.hash.slice(1));</script>
+<script>document.write(decodeURIComponent(location.hash.slice(1)));</script>
 </body></html>""")
 
 def m_dom_jquery_html(v: str) -> tuple:
+    # Phase 265: use the vendored jQuery (offline) and decode the fragment;
+    # the CDN version could never load in the benchmark's no-egress
+    # environment, and the un-decoded hash was inert text even when it did.
     return _page_raw("""<!DOCTYPE html><html><body>
 <div id="out"></div>
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script>$('#out').html(location.hash.slice(1));</script>
+<script src="/vendor/jquery.min.js"></script>
+<script>$('#out').html(decodeURIComponent(location.hash.slice(1)));</script>
 </body></html>""")
 
 def m_dom_hash_settimeout(v: str) -> tuple:
@@ -2500,6 +2512,25 @@ class BenchmarkHandler(BaseHTTPRequestHandler):
         # Health check
         if path == "/health":
             self._respond(200, {"Content-Type": "text/plain"}, "ok")
+            return
+
+        # Phase 265: the jQuery fixture must not depend on CDN egress.  Serve
+        # the repository's vendored build so the DOM engine can actually
+        # execute .html() offline.
+        if path == "/vendor/jquery.min.js":
+            fp = os.path.join(_HERE, "vendor", "jquery.min.js")
+            try:
+                with open(fp, "rb") as fh:
+                    data = fh.read()
+            except OSError:
+                self._respond(404, {"Content-Type": "text/plain"},
+                              "vendored jquery missing")
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", "application/javascript; charset=utf-8")
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
             return
 
         case = self.routes.get(path)

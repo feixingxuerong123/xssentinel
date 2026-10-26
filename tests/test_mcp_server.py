@@ -17,6 +17,7 @@ import subprocess
 import sys
 import threading
 import time
+import contextlib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -57,11 +58,22 @@ class TestProtocol:
     def test_tools_list_catalogue(self):
         (resp,) = _session(MCPServer(), {**REQ, "method": "tools/list"})
         tools = resp["result"]["tools"]
-        assert [t["name"] for t in tools] == ["xssentinel_scan",
-                                              "xssentinel_discover",
-                                              "xssentinel_profile"]
+        assert [t["name"] for t in tools] == [
+            "xssentinel_scan",
+            "xssentinel_discover",
+            "xssentinel_profile",
+            "xssentinel_verify",
+            "xssentinel_param_mine",
+            "xssentinel_csp_analyze",
+            "xssentinel_propose",
+        ]
         assert tools[0]["inputSchema"]["required"] == ["url"]
         assert tools[2]["inputSchema"]["required"] == ["url", "param"]
+        # Phase 322: the mid-scan granularity tools carry bounded,
+        # agent-facing schemas.
+        assert tools[3]["inputSchema"]["required"] == ["url", "param",
+                                                       "payload"]
+        assert tools[5]["inputSchema"]["required"] == ["url"]
 
     def test_ping_and_notification_silence(self):
         resps = _session(MCPServer(),
@@ -230,3 +242,190 @@ def test_mcp_subprocess_end_to_end():
     finally:
         server.shutdown()
         server.server_close()
+
+
+# ---------------------------------------------------------------------------
+# Phase 322: mid-scan granularity tools (verify / param_mine / csp_analyze)
+# ---------------------------------------------------------------------------
+
+def _loopback(handler):
+    """(base_url, shutdown) -- start a loopback server or skip the test."""
+    from tests.conftest import loopback_healthy
+    if not loopback_healthy():
+        import pytest
+        pytest.skip("loopback degraded mid-session")
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    time.sleep(0.2)
+
+    @contextlib.contextmanager
+    def _cm():
+        try:
+            yield f"http://127.0.0.1:{server.server_address[1]}"
+        finally:
+            server.shutdown()
+            server.server_close()
+    return _cm()
+
+
+class _EchoQHandler(BaseHTTPRequestHandler):
+    """Reflects the q param RAW (verifiable) and nothing else."""
+
+    def do_GET(self):
+        from urllib.parse import urlparse, parse_qs
+        u = urlparse(self.path)
+        q = (parse_qs(u.query).get("q") or [""])[0]
+        body = f"<html><body><div>{q}</div></body></html>".encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, *a):
+        pass
+
+
+class _DebugEchoHandler(BaseHTTPRequestHandler):
+    """Echoes only the `search` param value -> param mining sees it.
+
+    `search` sits in the front of param_miner's built-in candidate list,
+    so a small max_params still reaches it.
+    """
+
+    def do_GET(self):
+        from urllib.parse import urlparse, parse_qs
+        u = urlparse(self.path)
+        q = parse_qs(u.query)
+        val = (q.get("search") or [""])[0]
+        body = (f"<html><body>{'FOUND:' + val if val else 'plain'}"
+                f"</body></html>").encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, *a):
+        pass
+
+
+class _CspHeaderHandler(BaseHTTPRequestHandler):
+    """Serves a page under an enforcing script-src 'self' header CSP."""
+
+    def do_GET(self):
+        body = b"<html><body><div>hi</div></body></html>"
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Security-Policy",
+                         "script-src 'self'; object-src 'none'")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, *a):
+        pass
+
+
+class _CspMetaHandler(BaseHTTPRequestHandler):
+    """Same policy, but delivered through the <meta> channel only."""
+
+    def do_GET(self):
+        body = (b"<html><head><meta http-equiv='Content-Security-Policy' "
+                b"content=\"script-src 'self'\"></head>"
+                b"<body><div>hi</div></body></html>")
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, *a):
+        pass
+
+
+class TestVerifyTool:
+    def test_raw_reflection_confirms_model_only(self):
+        with _loopback(_EchoQHandler) as base:
+            res = mcp_server.run_verify_tool({
+                "url": base + "/", "param": "q",
+                "payload": "<script>alert('x')</script>"})
+            assert not res.get("isError")
+            out = json.loads(res["content"][0]["text"])
+            assert out["reflected"] is True
+            # the classifier's honest answer for a token sitting inside
+            # alert('tok') of the injected <script> is the script-string
+            # context, not the surrounding element body
+            assert out["context"]
+            assert out["confirmed"] is True
+            assert out["evidence_class"] == "model-only"
+            assert out["note"] is None
+
+    def test_payload_without_execution_point_is_honest(self):
+        with _loopback(_EchoQHandler) as base:
+            res = mcp_server.run_verify_tool({
+                "url": base + "/", "param": "q",
+                "payload": "hello plain text"})
+            assert not res.get("isError")
+            out = json.loads(res["content"][0]["text"])
+            # no alert()/handler/URI -> the token never entered the
+            # request, so token reflection is structurally impossible;
+            # the tool must say so and offer only the weak string signal
+            assert out["reflected"] is False
+            assert out["payload_reflected"] is True
+            assert out["confirmed"] is False
+            assert "no execution point" in out["note"]
+
+    def test_missing_args_are_errors(self):
+        res = mcp_server.run_verify_tool({"url": "http://t/", "param": "q"})
+        assert res.get("isError") is True
+        res = mcp_server.run_verify_tool({"param": "q", "payload": "x"})
+        assert res.get("isError") is True
+
+
+class TestParamMineTool:
+    def test_discovers_rendered_param(self):
+        with _loopback(_DebugEchoHandler) as base:
+            res = mcp_server.run_param_mine_tool({"url": base + "/",
+                                                  "max_params": 20})
+            assert not res.get("isError")
+            out = json.loads(res["content"][0]["text"])
+            names = [r["name"] for r in out["discovered"]]
+            assert "search" in names
+            row = next(r for r in out["discovered"] if r["name"] == "search")
+            assert row.get("reflected") is True
+
+    def test_bad_url_is_error(self):
+        res = mcp_server.run_param_mine_tool({"url": "nope"})
+        assert res.get("isError") is True
+
+
+class TestCspAnalyzeTool:
+    def test_header_channel_families(self):
+        with _loopback(_CspHeaderHandler) as base:
+            res = mcp_server.run_csp_analyze_tool({"url": base + "/"})
+            assert not res.get("isError")
+            out = json.loads(res["content"][0]["text"])
+            assert out["has_csp"] is True
+            assert out["channels"]["header"] is True
+            assert out["channels"]["meta"] is False
+            assert out["enforcing_policy_count"] == 1
+            # script-src 'self' (no unsafe-inline) blocks BOTH families
+            assert out["families"]["script_src_elem"]["inline_allowed"] \
+                is False
+            assert out["families"]["script_src_attr"]["inline_allowed"] \
+                is False
+
+    def test_meta_channel_is_read_too(self):
+        # Phase 196b contract: <meta http-equiv> CSP is enforced by
+        # browsers exactly like the header; a tool that only read headers
+        # would report "no CSP" here.
+        with _loopback(_CspMetaHandler) as base:
+            res = mcp_server.run_csp_analyze_tool({"url": base + "/"})
+            assert not res.get("isError")
+            out = json.loads(res["content"][0]["text"])
+            assert out["has_csp"] is True
+            assert out["channels"]["meta"] is True
+            assert out["channels"]["header"] is False
+            assert out["families"]["script_src_elem"]["inline_allowed"] \
+                is False

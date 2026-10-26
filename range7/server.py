@@ -91,6 +91,10 @@ def page_index() -> str:
         ("Preview (safe)", "/preview-safe?name=ada"),
         ("Admin", "/admin"),
         ("Admin (safe)", "/admin-safe"),
+        ("Notes", "/md?body=hello"),
+        ("Notes (safe)", "/md-safe?body=hello"),
+        ("Dashboard (auth)", "/dashboard?q=day"),
+        ("Dashboard (auth, safe)", "/dashboard-safe?q=day"),
     ]
     body = "<ul>" + "".join(
         f'<li><a href="{u}">{_esc(t)}</a></li>' for t, u in links) + "</ul>"
@@ -159,6 +163,45 @@ def page_admin(kind: str, safe: bool) -> str:
     return PAGE.format(title="Admin", body=items or "<p>no profile</p>")
 
 
+#: One fixed session id: the range is a target, not a login product.
+SESSION = "range7-session"
+SESSIONS = {SESSION}
+
+
+def _authed(headers) -> bool:
+    cookie = (headers.get("Cookie") or "")
+    return any(part.strip().split("=")[-1] in SESSIONS
+               for part in cookie.split(";") if part.strip())
+
+
+def page_dashboard(q: str, safe: bool) -> str:
+    """Reflection behind a session: no cookie, no page (401)."""
+    val = _esc(q) if safe else (q or "")
+    return PAGE.format(
+        title="Dashboard",
+        body=(f'<input name="q" value="{val}">'
+              f'<p>Signed in as <b>{val}</b></p>'))
+
+
+def _linkify(body: str) -> str:
+    """Naive markdown: only [text](url) becomes a link."""
+    import re as _re
+    return _re.sub(r"\[([^\]]+)\]\(([^)]+)\)",
+                   r'<a href="\2">\1</a>', body or "")
+
+
+def page_md(body: str, safe: bool) -> str:
+    """A mini markdown renderer.
+
+    Vulnerable twin: linkify first, so any other HTML in the body survives
+    into the document.  Safe twin: escape the HTML first, then linkify --
+    which is what a real renderer with a sanitiser does.
+    """
+    if safe:
+        body = _esc(body)
+    return PAGE.format(title="Notes", body=_linkify(body))
+
+
 def page_thread(kind: str, safe: bool) -> str:
     items = "".join(
         f"<div class=cm>{_esc(t) if safe else t}</div>"
@@ -197,8 +240,13 @@ class Handler(BaseHTTPRequestHandler):
         val = (q.get("q") or [""])[0]
         cfg = (q.get("cfg") or [""])[0]
         name = (q.get("name") or [""])[0]
+        body = (q.get("body") or [""])[0]
         routes = {
             "/": lambda: self._send(200, page_index()),
+            "/login": lambda: self._send(302, "",
+                                         {"Location": "/dashboard",
+                                          "Set-Cookie":
+                                              f"sid={SESSION}; Path=/"}),
             "/search": lambda: self._send(200, page_search(val, False)),
             "/search-safe": lambda: self._send(200, page_search(val, True)),
             "/widget": lambda: self._send(200, page_widget(cfg, False)),
@@ -209,9 +257,19 @@ class Handler(BaseHTTPRequestHandler):
             "/preview-safe": lambda: self._send(200, page_preview(name, True)),
             "/admin": lambda: self._send(200, page_admin("profile", False)),
             "/admin-safe": lambda: self._send(200, page_admin("profile_safe", True)),
+            "/md": lambda: self._send(200, page_md(body, False)),
+            "/md-safe": lambda: self._send(200, page_md(body, True)),
             "/profile": lambda: self._send(200, page_profile(False)),
             "/profile-safe": lambda: self._send(200, page_profile(True)),
         }
+        if u.path in ("/dashboard", "/dashboard-safe"):
+            if not _authed(self.headers):
+                self._send(401, PAGE.format(title="Sign in",
+                                            body="session required"))
+                return
+            self._send(200, page_dashboard(
+                val, u.path == "/dashboard-safe"))
+            return
         fn = routes.get(u.path)
         if fn is None:
             self._send(404, PAGE.format(title="404", body="not found"))
@@ -232,6 +290,10 @@ class Handler(BaseHTTPRequestHandler):
         if u.path == "/comment-safe":
             _add_comment("safe", text)
             self._redirect("/thread-safe")
+            return
+        if u.path == "/login":
+            self._send(302, "", {"Location": "/dashboard",
+                                 "Set-Cookie": f"sid={SESSION}; Path=/"})
             return
         if u.path == "/settings":
             _add_comment("profile", text)

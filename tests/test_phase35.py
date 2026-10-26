@@ -23,9 +23,15 @@ class TestStrictInline:
         h = "script-src 'self' 'unsafe-inline'"
         assert csp_mod.is_strict_inline(h) is False
 
-    def test_unsafe_eval_not_strict(self):
+    def test_unsafe_eval_is_strict(self):
+        # Phase 278 flipped this expectation.  'unsafe-eval' does NOT enable
+        # inline <script> / on* handlers, so inline really is blocked and the
+        # budget gate is right to treat the policy as strict.  The old
+        # assertion encoded the same conflation that produced the XSSMaze
+        # ``csp-bypass-level3`` / ``cspbypass-level3`` false positives.
         h = "script-src 'self' 'unsafe-eval'"
-        assert csp_mod.is_strict_inline(h) is False
+        assert csp_mod.is_strict_inline(h) is True
+        assert csp_mod.inline_blocked(h) is True
 
     def test_self_only_is_strict(self):
         assert csp_mod.is_strict_inline("script-src 'self'") is True

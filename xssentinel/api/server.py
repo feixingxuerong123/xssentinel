@@ -478,6 +478,36 @@ class Response:
         return cls(status, body, content_type="application/json")
 
 
+class StreamResponse:
+    """A response whose body is produced incrementally (an event stream).
+
+    A route handler may return one of these instead of :class:`Response`.
+    The type lives here, beside the shared route table, for the same reason
+    that table does: **both** front-ends must honour it, and two hand-kept
+    notions of "a streamed response" is exactly the drift this module was
+    split to prevent.  The stdlib front-end writes each chunk straight to
+    the socket; the Flask front-end hands the same iterable to Werkzeug.
+
+    ``chunks`` is an iterable of ``bytes``, consumed lazily -- so a handler
+    can generate from live state instead of materialising a body.  That is
+    the whole point: a buffered event stream is just a slow polling
+    response with extra machinery.
+    """
+
+    def __init__(self, status: int = 200, chunks: Any = None,
+                 headers: dict | None = None,
+                 content_type: str = "text/event-stream") -> None:
+        self.status = status
+        self.chunks = chunks or iter(())
+        self.headers = dict(headers or {})
+        self.headers.setdefault("Content-Type", content_type)
+        self.content_type = content_type
+        # Deliberately empty: a streamed response has no buffered payload,
+        # and an empty body keeps a front-end that reaches for `.body` from
+        # mis-reading a stream as "nothing was sent".
+        self.body = b""
+
+
 # Route handlers --------------------------------------------------------
 def _handle_health(ctx, m, body, query) -> Response:
     return Response.json(200, {
@@ -833,6 +863,69 @@ def _handle_diff(ctx, m, body, query) -> Response:
     })
 
 
+# ---------------------------------------------------------------------------
+# Phase 324: MCP Streamable HTTP transport (POST /mcp)
+# ---------------------------------------------------------------------------
+# The same JSON-RPC dispatch the stdio ``--mcp`` mode serves, exposed on the
+# REST API so agent platforms that attach tools by URL (ARTEX/Claude/Cursor
+# style) can use the scanner without spawning a process.  Stateless by
+# design: no session id is issued, so a client can post every message
+# independently -- the tools are stateless too, so a session would only be
+# state that can go stale.  Auth reuses the API server's ``--api-key``; the
+# shared same-origin gate (Phase 70/196) already polices browser callers.
+def _handle_mcp(ctx, m, body, query) -> Response:
+    """One JSON-RPC message (or batch) -> one JSON-RPC response."""
+    if not ctx.api_key_valid:
+        return Response.error(401, "unauthorized", "missing or invalid API key")
+    from .mcp_server import dispatch_message
+
+    # The shared dispatch layer answers malformed JSON with HTTP 400 for
+    # the REST routes; MCP says a parse error must be a JSON-RPC error
+    # (-32700) instead, so ``_dispatch`` hands the marker through to us.
+    if isinstance(body, dict) and body.get("_invalid_json"):
+        return Response.json(200, {
+            "jsonrpc": "2.0", "id": None,
+            "error": {"code": -32700,
+                      "message": f"parse error: {body['_invalid_json']}"},
+        })
+
+    batch = isinstance(body, list)
+    msgs = body if batch else [body]
+    responses: list = []
+    for msg in msgs:
+        if not isinstance(msg, dict):
+            responses.append({"jsonrpc": "2.0", "id": None,
+                              "error": {"code": -32600,
+                                        "message": ("invalid request: "
+                                                    "expected object")}})
+            continue
+        resp = dispatch_message(msg)
+        if resp is not None:                  # notifications never answer
+            responses.append(resp)
+    if not responses:
+        # Notifications only: JSON-RPC forbids a response body; the
+        # Streamable HTTP transport answers 202 Accepted.
+        return Response(202, None)
+    return Response.json(200, responses if batch else responses[0])
+
+
+def _handle_mcp_unsupported(ctx, m, body, query) -> Response:
+    """GET/DELETE ``/mcp``: this transport is POST-only.
+
+    No SSE stream is offered (the server produces one response per
+    request), and there is no session to terminate -- the spec's 405 for
+    both.  Answered explicitly so a client probing for an SSE upgrade
+    gets a clear "not here" instead of a generic 404.
+    """
+    resp = Response.error(
+        405, "method_not_allowed",
+        "MCP Streamable HTTP endpoint is POST-only: post a JSON-RPC "
+        "message to /mcp")
+    resp.headers["Allow"] = "POST"
+    return resp
+
+
+
 # Route table ----------------------------------------------------------
 # Order matters: more specific routes first.
 _ROUTES: list[tuple[str, re.Pattern, Callable]] = [
@@ -851,6 +944,10 @@ _ROUTES: list[tuple[str, re.Pattern, Callable]] = [
               _handle_cancel_scan),
     ("POST",   re.compile(r"^/api/v1/verify-fix/?$"),             _handle_verify_fix),
     ("POST",   re.compile(r"^/api/v1/diff/?$"),                   _handle_diff),
+    # Phase 324: MCP Streamable HTTP transport (POST-only; GET/DELETE 405).
+    ("POST",   re.compile(r"^/mcp/?$"),                           _handle_mcp),
+    ("GET",    re.compile(r"^/mcp/?$"),                           _handle_mcp_unsupported),
+    ("DELETE", re.compile(r"^/mcp/?$"),                           _handle_mcp_unsupported),
 ]
 
 
@@ -973,7 +1070,11 @@ class _StdlibHandler(BaseHTTPRequestHandler):
         body = None
         if method in ("POST", "PUT", "PATCH"):
             body = self._parse_json_body()
-            if isinstance(body, dict) and body.get("_invalid_json"):
+            # Phase 324: /mcp answers malformed JSON with the JSON-RPC
+            # parse error (-32700) the MCP spec requires -- the generic
+            # HTTP 400 marker is for the REST routes only.
+            if (isinstance(body, dict) and body.get("_invalid_json")
+                    and path.rstrip("/") != "/mcp"):
                 self._send_response(Response.error(
                     400, "invalid_json", body["_invalid_json"]))
                 return
@@ -1290,11 +1391,22 @@ class FlaskServer:
             ("POST",   "/api/v1/scans/<id>/cancel", _handle_cancel_scan),
             ("POST",   "/api/v1/verify-fix",        _handle_verify_fix),
             ("POST",   "/api/v1/diff",              _handle_diff),
+            # Phase 324: MCP Streamable HTTP transport (same handlers).
+            ("POST",   "/mcp",                      _handle_mcp),
+            ("GET",    "/mcp",                      _handle_mcp_unsupported),
+            ("DELETE", "/mcp",                      _handle_mcp_unsupported),
         ]
         for method, rule, handler in routes:
             view = self._wrap(handler)
             view.__name__ = handler.__name__
-            self.app.add_url_rule(rule, endpoint=handler.__name__,
+            # Phase 324: one handler can own two rules (GET/DELETE /mcp ->
+            # 405).  ``_wrap`` returns a NEW closure per call, so Flask's
+            # "same endpoint must be the same view function" assertion would
+            # fire on a shared endpoint name -- suffix the second one.
+            endpoint = handler.__name__
+            if endpoint in self.app.view_functions:
+                endpoint = f"{endpoint}_{method.lower()}"
+            self.app.add_url_rule(rule, endpoint=endpoint,
                                   view_func=view, methods=[method, "OPTIONS"])
 
     def register_as_blueprint(self, parent_app, url_prefix: str = "") -> None:

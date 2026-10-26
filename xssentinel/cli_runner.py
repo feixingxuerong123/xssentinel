@@ -410,11 +410,7 @@ def _run_scan(args, url: str, requester, oob, progress, checkpoint,
                 params.setdefault(k, v)
         dup_params = {k for k, n in seen_counts.items() if n > 1}
 
-    custom_pl = []
-    if args.custom_payloads and os.path.isfile(args.custom_payloads):
-        with open(args.custom_payloads, "r", encoding="utf-8") as f:
-            custom_pl = [line.strip() for line in f
-                         if line.strip() and not line.startswith("#")]
+    custom_pl = _operator_custom_payloads(args)
 
     # Phase 33: apply the scan-policy preset (explicit flags already set
     # win; the preset only fills unset policy-managed parameters).
@@ -818,6 +814,31 @@ def _operator_skip_params(args) -> set:
     return {p.strip().lower() for p in str(raw).split(",") if p.strip()}
 
 
+def _operator_custom_payloads(args) -> list[str]:
+    """--custom-payloads file + --nuclei-dast bridge, merged once.
+
+    Shared by the sync and both async construction sites (Phase 320).
+    Merge order = priority order: the operator wordlist outranks community
+    imports; in the engine the merged list LEADS the candidate queue
+    (explicit operator intent), bounded by the per-param budget.
+    """
+    custom: list[str] = []
+    path = getattr(args, "custom_payloads", None)
+    if path and os.path.isfile(path):
+        with open(path, "r", encoding="utf-8") as f:
+            custom = [line.strip() for line in f
+                      if line.strip() and not line.startswith("#")]
+    nd = getattr(args, "nuclei_dast", None)
+    if nd:
+        from .core.nuclei_import import extract_payloads, merge_into_custom
+        extracted = extract_payloads(nd)
+        custom = merge_into_custom(custom, extracted)
+        print(f"[nuclei-dast] {extracted['templates']} templates scanned, "
+              f"{len(extracted['payloads'])} payloads imported "
+              f"(skipped: {extracted['skipped']})", file=sys.stderr)
+    return custom
+
+
 def _run_async_scan(args, url: str, oob, progress, checkpoint,
                     auth_state=None):
     # Phase 85: async mode does not implement these sync-only features;
@@ -944,6 +965,8 @@ def _run_async_scan(args, url: str, oob, progress, checkpoint,
         # bounded by headless_concurrency).
         use_headless=getattr(args, "headless", False),
         skip_params=_operator_skip_params(args),
+        # Phase 320: custom-payload channel parity with sync.
+        custom_payloads=_operator_custom_payloads(args),
     )
 
     # Blind/OOB: pending injections are batch-collected at the end of
@@ -1137,6 +1160,8 @@ def _run_async_batch(args, urls: list[str], requester, oob, progress,
         # bounded by headless_concurrency).
         use_headless=getattr(args, "headless", False),
         skip_params=_operator_skip_params(args),
+        # Phase 320: custom-payload channel parity with sync.
+        custom_payloads=_operator_custom_payloads(args),
     )
 
     # Pre-parse each URL into (base_url, method, params, data) so the
@@ -1458,6 +1483,8 @@ def _write_report(scanner, target_url, output_path, fmt, meta=None):
         if not output_path.endswith(".html"):
             output_path += ".html"
 
-    with open(output_path, "w", encoding="utf-8") as f:
-        f.write(out)
+    # Phase 326: report artifacts carry target URLs, parameters and live
+    # payloads -- write them owner-only on POSIX (dalfox v3.2.4 parity).
+    from .core.fsutil import secure_write_text
+    secure_write_text(output_path, out)
     return output_path

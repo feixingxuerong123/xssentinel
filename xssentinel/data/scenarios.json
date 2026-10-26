@@ -1,0 +1,72 @@
+{
+  "_meta": {
+    "description": "Formal scenario corpus (Phase 322). A scenario chains HTTP steps into a detection flow the plain reflect-probe loop cannot express; the canonical shape is stored XSS (write a token-marked payload, read it back, semantically verify the token rendered).",
+    "format": "See the xssentinel/core/scenarios.py module docstring -- this file is validated by the same loader (scenarios missing id/steps or carrying an incomplete step are skipped with a warning, not silently mis-run).",
+    "load_with": "--scenarios builtin   (or pass this file's path to --scenarios)",
+    "placeholders": [
+      "{token}",
+      "{param}",
+      "{self}"
+    ],
+    "contribution_contract": [
+      "Every scenario needs: id (unique), title, match (may be {}), steps (>=1).",
+      "Every step needs: method + path; optional name/param/payload/verify.",
+      "Prefer match.param_names filtering over guessing app-specific paths -- a scenario whose write path does not exist on the target costs two requests and confirms nothing.",
+      "Use {self} for write-and-read-back-same-page flows instead of hardcoding a path.",
+      "The payload should carry an execution point (alert(...) / on*= / javascript:) so verify_semantic can prove execution, not just reflection."
+    ],
+    "non_goals": [
+      "GET-write self-echo: a read step re-sends the param carrying the bare token, so a stateful GET page overwrites its own write; a stateless reflecting GET is the main probe loop's job with better evidence. Measured on a live fixture (Phase 322 tests)."
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "self-echo-stored-post",
+      "title": "Stored XSS: POST to the scanned page and read it back",
+      "match": {},
+      "steps": [
+        {
+          "name": "write",
+          "method": "POST",
+          "path": "{self}",
+          "param": "{param}",
+          "payload": "<script>alert('{token}')</script>"
+        },
+        {
+          "name": "read",
+          "method": "GET",
+          "path": "{self}",
+          "verify": true
+        }
+      ]
+    },
+    {
+      "id": "comment-stored-xss",
+      "title": "Stored XSS via a comment/message/content field",
+      "match": {
+        "param_names": [
+          "comment",
+          "message",
+          "content",
+          "text",
+          "body",
+          "note"
+        ]
+      },
+      "steps": [
+        {
+          "name": "inject",
+          "method": "POST",
+          "path": "/comment",
+          "param": "{param}",
+          "payload": "<script>alert('{token}')</script>"
+        },
+        {
+          "name": "check",
+          "method": "GET",
+          "path": "/comments"
+        }
+      ]
+    }
+  ]
+}

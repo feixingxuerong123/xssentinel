@@ -227,7 +227,12 @@ def test_linked_nonfragment_page_gets_its_dom_layer(lab, engine):
     # the browser-executed rows therefore answered "did the sink execute",
     # not the "was the seed page-layered exactly once" question this
     # assertion asks.
-    all_dyn = [f for f in found if f.get("type") == "dom_dynamic"]
+    # Phase 265: the seed row is now the dedicated low-severity
+    # dom_sink_reachability class (delivery-only, no proof).  Both DOM
+    # classes describe "this page produced a DOM row", which is what the
+    # dedupe assertion counts.
+    all_dyn = [f for f in found
+               if f.get("type") in ("dom_dynamic", "dom_sink_reachability")]
     # Sync re-attaches the endpoint's params to the DOM layer's URL
     # (scanner.py), so the finding url can carry the query -- match on the
     # path, not the raw string.

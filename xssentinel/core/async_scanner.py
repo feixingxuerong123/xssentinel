@@ -231,7 +231,12 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
                  auth_local_storage: dict | None = None,
                  use_headless: bool = False,
                  headless_concurrency: int = 1,
-                 skip_params: set | None = None):
+                 skip_params: set | None = None,
+                 custom_payloads: list[str] | None = None):
+        # Phase 322: custom-payload channel parity with sync (operator
+        # wordlist / --nuclei-dast bridge).  Consumed by
+        # _build_probe_candidates with the same queue-tail semantics.
+        self._custom_payloads = list(custom_payloads or [])
         # Phase 183 (option B): headless confirmation wiring.  The pool
         # itself is created lazily on first verification (see _verify_pool)
         # so __new__-built test scanners and non-headless scans never pay

@@ -1,5 +1,8 @@
 [build-system]
-requires = ["setuptools>=61"]
+# >=77: first line that supports PEP 639 `license` as an SPDX expression
+# string (the old `license = { text = ... }` table is deprecated and will be
+# removed by 2027-Feb).
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -10,11 +13,14 @@ name = "xssentinel"
 dynamic = ["version"]
 description = "Comprehensive, multi-layer XSS detection framework (reflected + context-aware + WAF-evasion + DOM taint + optional headless confirmation)"
 readme = "README.md"
-license = { text = "MIT" }
+# PEP 639 SPDX expression; the matching `License ::` classifier is removed
+# (deprecated in the same PEP).
+license = "MIT"
+authors = [{ name = "XSSentinel authors and contributors" }]
+keywords = ["xss", "security", "scanner", "dast", "web-security", "vulnerability-scanner"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Information Technology",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.9",
@@ -25,6 +31,12 @@ classifiers = [
 ]
 requires-python = ">=3.9"
 dependencies = ["requests>=2.28", "beautifulsoup4>=4.11", "lxml>=4.9"]
+
+[project.urls]
+Homepage = "https://github.com/feixingxuerong123/xssentinel"
+Repository = "https://github.com/feixingxuerong123/xssentinel"
+Issues = "https://github.com/feixingxuerong123/xssentinel/issues"
+Changelog = "https://github.com/feixingxuerong123/xssentinel/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 async = ["aiohttp>=3.9"]

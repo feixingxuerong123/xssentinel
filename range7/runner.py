@@ -39,9 +39,24 @@ from server import run_server  # noqa: E402
 PORT = 19707
 
 
+def login(base: str) -> str:
+    """POST /login and hand back the session cookie the scanner must carry.
+
+    Auth-aware scanning is a documented capability; on a range it has to be
+    exercised with a REAL session, not with a page that anyone can read --
+    otherwise 'auth-aware' is a flag nobody proved.
+    """
+    r = requests.post(f"{base}/login", data={"user": "ada"}, timeout=5,
+                      allow_redirects=False)
+    assert r.status_code == 302, f"login failed: {r.status_code}"
+    cookie = r.headers.get("Set-Cookie") or ""
+    assert "sid=" in cookie, f"no session cookie in {r.headers!r}"
+    return cookie.split(";")[0]
+
+
 def _invoke_scanner(url: str, timeout: int, max_payloads: int,
                     max_transforms: int, engine: str, headless: bool,
-                    stored: dict | None) -> tuple[dict | None, float, str]:
+                    stored: dict | None, cookie: str | None) -> tuple[dict | None, float, str]:
     out_path = os.path.join(tempfile.gettempdir(), f"r7_poc_{os.getpid()}.json")
     cmd = [sys.executable, "-m", "xssentinel",
            "-u", url, "-f", "json", "-o", out_path,
@@ -51,6 +66,8 @@ def _invoke_scanner(url: str, timeout: int, max_payloads: int,
            "--timeout", "10"]
     if headless:
         cmd.append("--headless")
+    if cookie:
+        cmd += ["-b", cookie]
     if stored:
         cmd += ["--stored-inject", stored["inject"],
                 "--stored-view", stored["view"],
@@ -127,7 +144,8 @@ def main() -> int:
     base = f"http://127.0.0.1:{PORT}"
     r = requests.get(f"{base}/", timeout=5)
     assert r.status_code == 200 and "Range7" in r.text, "probe failed"
-    print(f"[*] Range7 ready on {base}")
+    session = login(base)
+    print(f"[*] Range7 ready on {base} (session: {session})")
 
     manifest = json.loads((Path(__file__).parent / "manifest.json")
                           .read_text(encoding="utf-8"))
@@ -157,7 +175,8 @@ def main() -> int:
             report, elapsed, err, attempts = invoke_with_retries(
                 _invoke_scanner, url, timeout=args.timeout, max_payloads=mp,
                 max_transforms=mt, engine=eng,
-                headless=bool(case.get("headless")), stored=stored)
+                headless=bool(case.get("headless")), stored=stored,
+                cookie=(session if case.get("auth") else None))
             verdict = "ERROR" if (err and report is None) else score(report, case)
             counts[verdict] += 1
             detail = []

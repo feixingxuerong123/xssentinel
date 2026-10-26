@@ -397,8 +397,9 @@ def _run_verify_fix(args):
         if not out_path.endswith(".html"):
             out_path += ".html"
 
-    with open(out_path, "w", encoding="utf-8") as f:
-        f.write(out)
+    # Phase 326: owner-only artifacts on POSIX (payloads/URLs inside).
+    from .core.fsutil import secure_write_text
+    secure_write_text(out_path, out)
     print(f"\n[+] Verify-fix report written to: {out_path}")
 
     # Exit non-zero if any finding is still vulnerable (CI gate).
@@ -469,8 +470,9 @@ def _run_diff(args):
         if not out_path.endswith(".html"):
             out_path += ".html"
 
-    with open(out_path, "w", encoding="utf-8") as f:
-        f.write(out)
+    # Phase 326: owner-only artifacts on POSIX (payloads/URLs inside).
+    from .core.fsutil import secure_write_text
+    secure_write_text(out_path, out)
     print(f"\n[+] Diff report written to: {out_path}")
 
     # CI gate: fail if new or regressed findings.
