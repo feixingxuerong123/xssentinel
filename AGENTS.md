@@ -4558,5 +4558,6 @@ sitemap 与子 sitemap 两个解析点都走它。AST 守卫钉死"全文件只�
 - 额外两把尺子:3.9 venv 安装被 pip 拒绝(`3.9.4 not in '>=3.10'`);
   构建 wheel 的 METADATA 实测 `Requires-Python: >=3.10` + 六个运行时下限
   逐项在场(requests/urllib3/soupsieve/aiohttp/flask/werkzeug)。
-- **未跑**:全量 192 矩阵与全量分批套件;quick strict 双引擎在后台跑,
-  结果另记。3.9 自此不再支持(不是"暂不覆盖")。
+- **未跑**:全量 192 矩阵、全量分批套件与 quick strict 双引擎(本轮不启动
+  长门;228 例定向已覆盖新版本传输面,含 egress/MCP/API/async)。3.9 自此
+  不再支持(不是"暂不覆盖")。
