@@ -5,6 +5,16 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Python 3.9 支持移除 + 依赖下限抬到修复版(Phase 328d)**:3.9 无法安装
+  requests≥2.33 / urllib3≥2.8 / aiohttp≥3.14.4 / soupsieve≥2.9 的修复版
+  (均要求 Python≥3.10)。`requires-python` 改为 `>=3.10`,classifier、
+  README 徽章/说明与 SECURITY 同步;运行时下限抬到上述修复版,API 额外要求
+  Flask≥3.1.3 / Werkzeug≥3.1.9。CI 新增 3.10 下限冒烟 job。3.12 + 新下限
+  验证 **228 passed**、`pip-audit` **0 条直接依赖告警**;全量矩阵与全量套件
+  尚未在新环境下复跑。
+
 ### Fixed
 
 - **恶意 sitemap 的实体膨胀(Phase 328b)**:stdlib `xml.etree` 会展开内部实体,

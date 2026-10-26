@@ -4538,3 +4538,22 @@ sitemap 与子 sitemap 两个解析点都走它。AST 守卫钉死"全文件只�
   README(中英)/SECURITY 写明 3.9 不受依赖修复覆盖;是否抬到 `>=3.10`
   (推荐)或 `>=3.11`(对齐 CI)**待操作者拍板**,本轮未改 `pyproject`。
   `docs/DEPENDENCY_AUDIT.md` 已补两张全新安装对照表。
+
+## Phase 328d:Python 下限抬到 3.10 + 依赖下限抬到修复版(拍板落地)
+
+328c 的隔离对照把根因钉在 Python 下限:3.9 上修复版全部
+`Requires-Python>=3.10`。拍板"改",落地:
+
+- `requires-python = ">=3.10"`;classifier 去掉 3.9;README 徽章/说明与
+  SECURITY 同步。运行时下限抬到最低修复版:`requests>=2.33.0`、
+  `urllib3>=2.8.0`、`soupsieve>=2.9.0`、`aiohttp>=3.14.4`、
+  `Flask>=3.1.3`、`Werkzeug>=3.1.9`。dev 的 `pytest` 下限**刻意不动**:
+  advisory 仅 dev-only、全新安装本就解析到修复版,且不为它声称全量
+  pytest 9 兼容。
+- CI 新增 `min-python` job(3.10 安装 + CLI + egress/MCP/API 门/sitemap
+  冒烟),主 job 仍 3.11;YAML 复核 **5 个 job**。
+- 验证(3.12 + 新下限):**228 passed**(egress、MCP 子进程 e2e、
+  `test_p27_api` + AI 报告、328 两套、sitemap、async 解码/层/headless/
+  参数覆盖);`pip check` 干净、`pip-audit` **0 条直接依赖告警**。
+- **未跑**:全量 192 矩阵与全量分批套件;quick strict 双引擎在后台跑,
+  结果另记。3.9 自此不再支持(不是"暂不覆盖")。

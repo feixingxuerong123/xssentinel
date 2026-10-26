@@ -2,7 +2,7 @@
 
 ![CI](https://github.com/feixingxuerong123/xssentinel/actions/workflows/ci.yml/badge.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue)
-![Python](https://img.shields.io/badge/python-3.9%2B-blue)
+![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 
 > 一款**多层级、可扩展**的 XSS 检测工具：反射点上下文感知注入 + WAF 自适应绕过 + DOM 污点分析 +（可选）无头浏览器真实验证。
 
@@ -212,10 +212,10 @@ pip install -e .                                   # 依赖：requests, beautifu
 pip install playwright && playwright install chromium
 ```
 
-> **Python 3.9 安全提示**：3.9 已 EOL，且 requests / urllib3 / aiohttp /
+> **需要 Python 3.10+**：3.9 已 EOL，且 requests / urllib3 / aiohttp /
 > soupsieve 的修复版均要求 Python ≥3.10；在 3.9 上全新安装仍会解析到带已知
 > advisory 的旧版本（实测见 [docs/DEPENDENCY_AUDIT.md](docs/DEPENDENCY_AUDIT.md)）。
-> 建议使用 Python 3.10+（CI 使用 3.11）。
+> 自 Phase 328d 起不再支持 3.9（CI 使用 3.11，另有 3.10 下限冒烟门）。
 
 ---
 

@@ -2,7 +2,7 @@
 
 ![CI](https://github.com/feixingxuerong123/xssentinel/actions/workflows/ci.yml/badge.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue)
-![Python](https://img.shields.io/badge/python-3.9%2B-blue)
+![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 
 > A multi-layer, extensible XSS scanner: context-aware reflected injection +
 > adaptive WAF evasion + DOM taint analysis + (optional) real headless-browser
@@ -126,11 +126,11 @@ pip install playwright && playwright install chromium
 
 Optional JS AST data-flow: `pip install xssentinel[ast]`.
 
-> **Python 3.9 security note**: 3.9 is EOL and the fixed releases of
+> **Python 3.10+ required**: 3.9 is EOL and the fixed releases of
 > requests / urllib3 / aiohttp / soupsieve all require Python >=3.10; a fresh
 > 3.9 install still resolves versions with known advisories (measured in
-> [docs/DEPENDENCY_AUDIT.md](docs/DEPENDENCY_AUDIT.md)). Use Python 3.10+
-> (CI uses 3.11).
+> [docs/DEPENDENCY_AUDIT.md](docs/DEPENDENCY_AUDIT.md)). 3.9 support was
+> dropped in Phase 328d (CI uses 3.11, with a 3.10 floor smoke job).
 
 ---
 

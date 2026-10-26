@@ -59,9 +59,9 @@ rooms separate "old local environment" from "the project's declared range":
 
 `pip install --dry-run requests==2.33.0` (likewise urllib3 2.8.0,
 soupsieve 2.9.0, aiohttp 3.14.4) on Python 3.9 reports
-`Requires-Python >=3.10` for every fixed release.  The blocker is the
-**Python floor**, not a stale pin: `requires-python = ">=3.9"` makes the
-fixed versions uninstallable on a supported interpreter.
+`Requires-Python >=3.10` for every fixed release.  The blocker was the
+**Python floor**, not a stale pin: `requires-python = ">=3.9"` made the
+fixed versions uninstallable on a supported interpreter (until Phase 328d).
 
 Compatibility under 3.12 + the fixed versions: **71 passed** —
 `test_egress_guard.py` (aiohttp cookie/redirect behavior),
@@ -72,35 +72,34 @@ sitemap tests.
 Raw artifacts (ignored): `dev/_pip_audit_fresh.json` (3.9),
 `dev/_pip_audit_312.json` (3.12).
 
-## Python floor decision (pending operator)
+## Decision (2026-10-26): Python floor raised to >=3.10 (Phase 328d)
 
-The project still declares `requires-python = ">=3.9"` and its classifiers
-list 3.9.  The measured options are:
+Applied:
 
-* **Raise to `>=3.10`** (recommended): fixed dependency versions become
-  installable; Python 3.9 is already EOL (2025-10).  Requires updating
-  classifiers, README, and re-running the CI gate on 3.11.
-* **Raise to `>=3.11`** (matches the CI interpreter): same benefit, but
-  drops 3.10 as well.
-* **Keep 3.9**: no breaking change, but 3.9 installs remain exposed.  The
-  README/SECURITY warning added in Phase 328c is the minimum honest
-  position; the audit job must stay report-only for 3.9.
+* `requires-python = ">=3.10"`; the 3.9 classifier is removed; README
+  badges/notes and SECURITY are updated.  3.9 is no longer supported.
+* Runtime floors are the lowest fixed releases: `requests>=2.33.0`,
+  `urllib3>=2.8.0`, `soupsieve>=2.9.0`, `aiohttp>=3.14.4`,
+  `Flask>=3.1.3`, `Werkzeug>=3.1.9`.
+* The dev `pytest` floor is deliberately left at `>=7.0`: the advisory is
+  dev-only, a fresh install already resolves the fixed release, and a full
+  pytest-9 compatibility round is not claimed here.
+* CI gains a `min-python` job (Python 3.10 install + CLI + egress/MCP/API/
+  sitemap smoke); the main job stays on 3.11.
 
-No `pyproject.toml` change is made until this decision.  The CI job runs
-on 3.11, where a fresh install audits clean today.
+Verification under Python 3.12 + the new floors: **228 passed** — egress,
+MCP subprocess e2e, `test_p27_api.py` + AI report, both Phase 328 suites,
+sitemap, async decode/layers/headless/param coverage.  `pip check` clean,
+`pip-audit` **0 direct advisories**.
 
-## Next round (planned, not done)
+## Remaining verification
 
-1. Decide the Python floor (above).
-2. If raised: update `requires-python`, classifiers, README; add direct
-   constraints for `requests>=2.33.0`, `urllib3>=2.8.0`,
-   `aiohttp>=3.14.4`, `Flask>=3.1.3`, `soupsieve>=2.9.0` (and the dev
-   `pytest>=9.0.3` floor).
-3. Re-run: `test_egress_guard.py`, the async transport/budget suites,
-   `test_p27_api.py`, `test_phase196_api_gate.py`, MCP suites, and
-   `python -m xssentinel --self-test`; then the strict 64-case slice.
-4. Only if all green: regenerate the audit artifact and flip the nightly
-   audit job from non-blocking to blocking.
+1. The full 192-case matrix and the full file-by-file suite have not run
+   under the new floors; the quick strict slice is the next measurement.
+2. Flip the nightly `dependency-audit` job from report-only to blocking
+   only after the main CI job passes on 3.10/3.11 with these floors.
+3. Python 3.9 is intentionally unsupported; do not reintroduce a 3.9 path
+   that silently resolves the vulnerable releases.
 
 `dev/_pip_audit_p328b.json` is the raw local artifact (ignored, not
 committed); this document is the durable record.

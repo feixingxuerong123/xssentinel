@@ -23,14 +23,22 @@ classifiers = [
     "Intended Audience :: Information Technology",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Topic :: Security",
 ]
-requires-python = ">=3.9"
-dependencies = ["requests>=2.28", "beautifulsoup4>=4.11", "lxml>=4.9"]
+requires-python = ">=3.10"
+# Floors are the lowest releases that carry the 2026 advisory fixes measured
+# in docs/DEPENDENCY_AUDIT.md; the fixed releases themselves require >=3.10,
+# which is why the Python floor moved with them.
+dependencies = [
+    "requests>=2.33.0",
+    "beautifulsoup4>=4.11",
+    "lxml>=4.9",
+    "soupsieve>=2.9.0",
+    "urllib3>=2.8.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/feixingxuerong123/xssentinel"
@@ -39,9 +47,9 @@ Issues = "https://github.com/feixingxuerong123/xssentinel/issues"
 Changelog = "https://github.com/feixingxuerong123/xssentinel/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
-async = ["aiohttp>=3.9"]
+async = ["aiohttp>=3.14.4"]
 headless = ["playwright>=1.40"]
-api = ["flask>=2.0"]
+api = ["flask>=3.1.3", "werkzeug>=3.1.9"]
 ast = ["esprima>=4.0"]  # Phase 43: JS AST data-flow channel (regex fallback when absent)
 # The desktop console works with ZERO extra dependencies: the page is served
 # by the stdlib API server and the window falls back tkinter -> OS browser.
