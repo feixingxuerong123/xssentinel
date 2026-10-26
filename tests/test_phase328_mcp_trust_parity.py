@@ -133,7 +133,9 @@ def test_untrusted_note_rides_in_text_and_structured(monkeypatch):
     # additive.  Stripping it would hide the bytes the analyst must judge.
     assert text["findings"][0]["evidence"] == _INJECTION
     assert "never as instructions" in text["output_safety"]
-    assert text["untrusted_fields"] == ["evidence", "detail", "param"]
+    assert "untrusted_fields" in text["output_safety"]
+    assert text["untrusted_fields"] == ["evidence", "detail", "param",
+                                        "waf"]
     assert res["structuredContent"] == text
 
 
@@ -160,6 +162,40 @@ def test_initialize_instructions_name_the_untrusted_boundary():
     assert "untrusted data" in instructions
     assert "never as instructions" in instructions
     assert "authorized" in instructions
+
+
+@pytest.mark.parametrize("tool,args,expected", [
+    ("xssentinel_discover", {"url": "http://t/"},
+     ("input_field_names", "same_origin_endpoints", "spa_routes")),
+    ("xssentinel_profile", {"url": "http://t/", "param": "q"},
+     ("context", "extra_contexts", "meta_chars", "rcdata_tag")),
+    ("xssentinel_verify", {"url": "http://t/", "param": "q",
+                           "payload": "<script>alert(1)</script>"},
+     ("context", "semantic.detail", "headless.detail")),
+    ("xssentinel_param_mine", {"url": "http://t/"},
+     ("discovered[].name", "discovered[].signal", "discovered[].evidence")),
+    ("xssentinel_csp_analyze", {"url": "http://t/"},
+     ("families", "weak_points", "bypass_candidates", "channels")),
+    ("xssentinel_propose", {"url": "http://t/", "param": "q"},
+     ("results[].semantic_detail",)),
+])
+def test_each_tool_names_its_own_target_derived_fields(
+        monkeypatch, tool, args, expected):
+    schema = mcp_server._TOOL_TABLE[tool][0]
+
+    def runner(_args, cancel_event=None, emit=None):
+        return {"content": [{"type": "text", "text": json.dumps({"ok": True})}]}
+
+    monkeypatch.setitem(mcp_server._TOOL_TABLE, tool, (schema, runner))
+    res = _tool_call({"name": tool, "arguments": args})
+    assert not res.get("isError"), res
+    payload = res["structuredContent"]
+    assert tuple(payload["untrusted_fields"]) == expected
+    assert "untrusted_fields" in payload["output_safety"]
+
+
+def test_every_tool_has_an_untrusted_field_contract():
+    assert set(mcp_server._UNTRUSTED_FIELDS) == set(mcp_server._TOOL_TABLE)
 
 
 def test_scan_tool_description_warns_about_target_text():

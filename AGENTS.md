@@ -4560,6 +4560,22 @@ sitemap 与子 sitemap 两个解析点都走它。AST 守卫钉死"全文件只�
   逐项在场(requests/urllib3/soupsieve/aiohttp/flask/werkzeug)。
 - 契约守卫 `tests/test_phase328d_python_floor.py` **4 例**(pyproject 下限/
   classifier/六个依赖下限/README 徽章/SECURITY 文案),防未来静默回退。
-- **未跑**:全量 192 矩阵、全量分批套件与 quick strict 双引擎(本轮不启动
-  长门;228 例定向已覆盖新版本传输面,含 egress/MCP/API/async)。3.9 自此
-  不再支持(不是"暂不覆盖")。
+- quick strict 双引擎(3.12 + 新下限 + 缓存的 Chromium 151):**sync
+  TP36/FP0/TN28/FN0/ERR0**(64,0 SKIP,414.1s)、**async
+  TP36/FP0/TN27/FN0/ERR0**(63,1 SKIP,392.2s),双 F1=1.0,与 Phase 190
+  基线逐项相同;产物 `benchmark/results/phase328d_quick_{sync,async}.json`。
+- **未跑**:全量 192 矩阵与全量分批套件。3.9 自此不再支持(不是"暂不覆盖")。
+
+## Phase 328e:MCP `untrusted_fields` 按工具补全(信任边界收尾)
+
+Phase 328 把 `untrusted_fields` 落成全局三元组 `evidence/detail/param`,只
+覆盖 scan。只读审计发现 discover/profile/verify/param_mine/csp/propose 也回
+目标派生字段(`spa_routes`、`meta_chars`、`context`、`discovered`、`families`
+等),Agent 会被欠告知。改为 `_UNTRUSTED_FIELDS` **per-tool map**(嵌套字段用
+点/方括号路径),`output_safety` 文案改为"以 untrusted_fields 为准";7 个工具
+逐一断言,并加"每个 `_TOOL_TABLE` 工具必须有字段契约"的集合守卫。数据/证据
+不删,只标注。
+
+门禁:`tests/test_phase328_mcp_trust_parity.py` **16 passed**(原 9 + 7);
+ruff 零告警。MCP 输出元数据改动,检测语义零变化;quick gate 已在改动前
+双引擎 F1=1.0。

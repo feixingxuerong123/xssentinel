@@ -96,8 +96,10 @@ is rejected by pip (`3.9.4 not in '>=3.10'`), and the built wheel's
 
 ## Remaining verification
 
-1. The full 192-case matrix and the full file-by-file suite have not run
-   under the new floors; the quick strict slice is the next measurement.
+1. The quick strict slice passed under the new floors: sync TP36/FP0/TN28/
+   FN0/ERR0 (64, 0 SKIP, 414.1s) and async TP36/FP0/TN27/FN0/ERR0 (63,
+   1 SKIP, 392.2s), F1=1.0 both, matching the Phase 190 baseline.  The full
+   192-case matrix and the full file-by-file suite have not run yet.
 2. Flip the nightly `dependency-audit` job from report-only to blocking
    only after the main CI job passes on 3.10/3.11 with these floors.
 3. Python 3.9 is intentionally unsupported; do not reintroduce a 3.9 path

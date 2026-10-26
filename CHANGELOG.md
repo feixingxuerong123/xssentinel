@@ -14,9 +14,16 @@
   Flask≥3.1.3 / Werkzeug≥3.1.9。CI 新增 3.10 下限冒烟 job。3.12 + 新下限
   验证 **228 passed**、`pip-audit` **0 条直接依赖告警**;3.9 安装被 pip 拒绝,
   wheel METADATA 实测 `Requires-Python: >=3.10` 且六个运行时下限在场。
-  全量矩阵与全量套件尚未在新环境下复跑。
+  quick strict 双引擎在新环境下 **F1=1.0**(sync TP36/FP0/TN28/FN0/ERR0 414.1s,
+  async TP36/FP0/TN27/FN0/ERR0 392.2s,1 SKIP);全量矩阵与全量套件尚未复跑。
 
 ### Fixed
+
+- **MCP `untrusted_fields` 按工具补全(Phase 328e)**:原先只列
+  `evidence/detail/param`,discover/profile/verify/param_mine/csp/propose 的
+  目标派生字段未标注。现在每个工具有自己的字段契约(嵌套路径),
+  `output_safety` 指向该列表;7 工具逐一断言 + `_TOOL_TABLE` 全覆盖守卫。
+  16 例通过,ruff 零告警。
 
 - **恶意 sitemap 的实体膨胀(Phase 328b)**:stdlib `xml.etree` 会展开内部实体,
   585 字节的 billion-laughs sitemap 实测 >720 MB RSS(8 MB 文档上限无效),
