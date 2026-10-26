@@ -37,3 +37,8 @@ XSSentinel 是一款授权测试专用的 XSS 漏洞自动化扫描工具。**�
 ## 支持版本
 
 仅最新 main 分支接收安全修复;发布 tag 请以 CHANGELOG 为准。
+
+**Python 3.9 不受依赖修复覆盖**:3.9 已 EOL,而 requests≥2.33 / urllib3≥2.7 /
+aiohttp≥3.14 / soupsieve≥2.9 均要求 Python≥3.10。实测 3.9 全新安装仍会解析到
+带已知 advisory 的旧版本(见 [docs/DEPENDENCY_AUDIT.md](docs/DEPENDENCY_AUDIT.md));
+安全部署请使用 Python 3.10+(CI 为 3.11)。

@@ -212,6 +212,11 @@ pip install -e .                                   # 依赖：requests, beautifu
 pip install playwright && playwright install chromium
 ```
 
+> **Python 3.9 安全提示**：3.9 已 EOL，且 requests / urllib3 / aiohttp /
+> soupsieve 的修复版均要求 Python ≥3.10；在 3.9 上全新安装仍会解析到带已知
+> advisory 的旧版本（实测见 [docs/DEPENDENCY_AUDIT.md](docs/DEPENDENCY_AUDIT.md)）。
+> 建议使用 Python 3.10+（CI 使用 3.11）。
+
 ---
 
 ## 快速使用

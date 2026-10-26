@@ -21,7 +21,9 @@
   soupsieve 2.8.4、Flask 2.2.5、werkzeug 3.1.8、pytest 8.4.2)。未盲升——aiohttp
   的跨源重定向/解压修复与本仓 egress、brotli 兼容面重叠,Flask 3.x 需 API 回归;
   已落 [docs/DEPENDENCY_AUDIT.md](docs/DEPENDENCY_AUDIT.md) 与 nightly 非阻断
-  审计作业,隔离环境验证后再收紧版本下限并把审计改为阻断。
+  审计作业。**隔离 venv 对照**:3.9 全新安装仍 31 条/5 包(修复版均
+  `Requires-Python>=3.10`),3.12 全新安装 **0 条**且兼容批 71 passed;
+  README(中英)/SECURITY 已写明 3.9 风险,Python 下限是否抬到 3.10+ 待决策。
 
 - **MCP 默认值对齐 + 输出信任边界(Phase 328)**:① **默认值**:`xssentinel_scan`
   此前强制 `dom_engine="off"`(除 `headless`)并硬编码 `max_transforms=8`,而 CLI

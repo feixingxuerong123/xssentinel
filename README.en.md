@@ -126,6 +126,12 @@ pip install playwright && playwright install chromium
 
 Optional JS AST data-flow: `pip install xssentinel[ast]`.
 
+> **Python 3.9 security note**: 3.9 is EOL and the fixed releases of
+> requests / urllib3 / aiohttp / soupsieve all require Python >=3.10; a fresh
+> 3.9 install still resolves versions with known advisories (measured in
+> [docs/DEPENDENCY_AUDIT.md](docs/DEPENDENCY_AUDIT.md)). Use Python 3.10+
+> (CI uses 3.11).
+
 ---
 
 ## Quick start

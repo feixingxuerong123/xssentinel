@@ -4522,3 +4522,19 @@ sitemap 与子 sitemap 两个解析点都走它。AST 守卫钉死"全文件只�
 切片后再抬 `pyproject` 下限并把该作业改为阻断。YAML 已用 PyYAML 解析复核
 (4 个 job / 5 steps)。`pip check` 的 4 条冲突全在无关全局包
 (django/httpcore/langsmith/py7zr),不计入本仓依赖。
+
+**同日续:隔离 venv 对照——根因是 Python 下限,不是陈旧 pin**:
+
+- **Python 3.9 全新 venv**(`pip install -e ".[dev,async,ast,api]"`):
+  aiohttp 3.13.5 / requests 2.32.5 / urllib3 2.6.3 / soupsieve 2.8.4 →
+  **31 条 / 5 个直接包**。`pip install --dry-run` 证实 requests 2.33、
+  urllib3 2.7、aiohttp 3.14、soupsieve 2.9 的修复版**全部**
+  `Requires-Python >=3.10`。
+- **Python 3.12 全新 venv**:aiohttp 3.14.5 / requests 2.34.2 /
+  urllib3 2.8.0 / soupsieve 3.0.4 → **0 条直接依赖 advisory**;兼容批
+  (egress + MCP 子进程 e2e + Flask API 门 + 328 两套 + sitemap)
+  **71 passed**。
+- 结论:`requires-python>=3.9` 让受支持的 3.9 拿不到修复版。已在
+  README(中英)/SECURITY 写明 3.9 不受依赖修复覆盖;是否抬到 `>=3.10`
+  (推荐)或 `>=3.11`(对齐 CI)**待操作者拍板**,本轮未改 `pyproject`。
+  `docs/DEPENDENCY_AUDIT.md` 已补两张全新安装对照表。
