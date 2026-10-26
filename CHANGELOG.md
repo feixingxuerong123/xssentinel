@@ -12,8 +12,9 @@
   (均要求 Python≥3.10)。`requires-python` 改为 `>=3.10`,classifier、
   README 徽章/说明与 SECURITY 同步;运行时下限抬到上述修复版,API 额外要求
   Flask≥3.1.3 / Werkzeug≥3.1.9。CI 新增 3.10 下限冒烟 job。3.12 + 新下限
-  验证 **228 passed**、`pip-audit` **0 条直接依赖告警**;全量矩阵与全量套件
-  尚未在新环境下复跑。
+  验证 **228 passed**、`pip-audit` **0 条直接依赖告警**;3.9 安装被 pip 拒绝,
+  wheel METADATA 实测 `Requires-Python: >=3.10` 且六个运行时下限在场。
+  全量矩阵与全量套件尚未在新环境下复跑。
 
 ### Fixed
 

@@ -90,7 +90,9 @@ Applied:
 Verification under Python 3.12 + the new floors: **228 passed** — egress,
 MCP subprocess e2e, `test_p27_api.py` + AI report, both Phase 328 suites,
 sitemap, async decode/layers/headless/param coverage.  `pip check` clean,
-`pip-audit` **0 direct advisories**.
+`pip-audit` **0 direct advisories**.  Two additional rulers: a 3.9 install
+is rejected by pip (`3.9.4 not in '>=3.10'`), and the built wheel's
+`METADATA` carries `Requires-Python: >=3.10` plus all six runtime floors.
 
 ## Remaining verification
 

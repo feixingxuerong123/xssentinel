@@ -4555,5 +4555,8 @@ sitemap 与子 sitemap 两个解析点都走它。AST 守卫钉死"全文件只�
 - 验证(3.12 + 新下限):**228 passed**(egress、MCP 子进程 e2e、
   `test_p27_api` + AI 报告、328 两套、sitemap、async 解码/层/headless/
   参数覆盖);`pip check` 干净、`pip-audit` **0 条直接依赖告警**。
+- 额外两把尺子:3.9 venv 安装被 pip 拒绝(`3.9.4 not in '>=3.10'`);
+  构建 wheel 的 METADATA 实测 `Requires-Python: >=3.10` + 六个运行时下限
+  逐项在场(requests/urllib3/soupsieve/aiohttp/flask/werkzeug)。
 - **未跑**:全量 192 矩阵与全量分批套件;quick strict 双引擎在后台跑,
   结果另记。3.9 自此不再支持(不是"暂不覆盖")。
