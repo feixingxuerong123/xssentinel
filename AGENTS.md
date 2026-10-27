@@ -4781,3 +4781,35 @@ in-process 复跑 `waf_name=None`(未复现)。`waf.py` 的 Edgecast 规则是
 扫描器自己的随机十六进制 token 就有概率命中,属"随机 token 触发厂商指纹"的
 可疑路径。**本轮只记录、不改判定**(WAF 命中会改变载荷选择,按 209/294 的规矩
 要单独测量);下轮候选:把 `ecd` 收紧到 header/cookie 上下文或加词边界。
+
+## Phase 330:Edgecast WAF 指纹误报收口(329 addendum 的未归因观测 → 实测定罪并修复)
+
+Phase 329 记账的那次未复现 `WAF detected: Edgecast` 本轮归因并修复。WAF 命中会切换
+载荷梯子,按 209/294 的规矩单独一轮测量:
+
+**定罪(dev/_p330_waf_edgecast_probe.py,修复前树上实测)**:
+- 扫描器自己的 8-hex marker token 含 `ecd` **7/5000 = 0.14%**——一次反射就够让
+  扫描自称 WAF detected: Edgecast 并切换载荷梯子;
+- 更糟的形态:marker 反射进**响应头**(如 `Location: /next?t=<token>`)时,header
+  pass 把同一条 body 形态的规则扫在所有头值上,`high` 置信命中;
+- 每个加密 bundle 都有 ECDSA/ECDH,普通文本即触发;
+- 同时真实 Edgecast 指纹 `Server: ECD|ECS|ECAcc (dca/…)` 与 `X-EC-*` CDN 头
+  **从未被识别过**——旧规则在两个方向上都是错的。
+
+**修复**:`edgecast|ecd`(any)退役;厂商词 `edgecast` 保留为 body 可见指纹
+(medium);新增 header-only 规则 `x-ec-[a-z]|server:\s*(?:ecd|ecs|ecacc)\s*\(`
+——带括号的机房形态是锚(AWS ECS 产品名不匹配),header-only 是有意的:body 里
+出现这些串是厂商提及,不是"响应经过了 Edgecast"的证据。
+
+**测试**:`tests/test_phase330_waf_edgecast.py` 18 例(FP 族 5 + 真实指纹 6 +
+marker 随机 token 沉默 3 + **变异对照** 3——旧规则逐字钉在 `_OLD_EDGECAST`,
+断言它必命中误报样本与随机 token 集,FP 断言因此不可能在旧规则上通过 +
+async `detect_from_raw` 对齐 1);`tests/test_waf_benign_corpus.py` 补 3 条
+良性语料(ECDSA/ECDH、含 ecd 的 marker、AWS ECS 产品名)。
+
+**门禁(冻结树,3.12 venv `D:/qoder/venvs/xs312`)**:受影响面 9 文件
+**151 passed**(35.7s;PATH python 仍是 3.9.4,证据按 Phase 322 的规矩取自
+受支持栈);全量矩阵 strict gate——sync **TP113/FP0/TN81/FN0/ERR0**(194 例,
+0 SKIP,exit 0)、async **TP107/FP0/TN75/FN0/ERR0**(194 例,12 SKIP = manifest
+sync-only,exit 0),与 1.2.2 发布基线(p322c)**逐项相同,零漂移**。产物
+`benchmark/results/phase330_full_{sync,async}.json`。

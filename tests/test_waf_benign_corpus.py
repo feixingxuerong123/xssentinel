@@ -10,6 +10,9 @@ ordinary text.
     (waf / cloudflare / firewall / request id / 攻击 / 防火墙 ...), so
     ordinary pages -- including EVERY Cloudflare-fronted site's allowed
     200 response -- were "blocked", and blocked discards payloads.
+  * Phase 330: the bare ``ecd`` Edgecast alternative matched any three hex
+    characters (0.14% of the scanner's own marker tokens, and ECDSA in
+    every crypto bundle).
 
 Each fix was found by hand, one measurement at a time.  This test is the
 net that should have caught both: a corpus of ordinary front-end text
@@ -70,6 +73,14 @@ CORPUS = [
     ("json api", '{"id":7,"name":"apple","price":0.99,"tags":["fruit"]}', False),
     ("graphql error",
      '{"errors":[{"message":"Cannot query field","locations":[{"line":2}]}]}',
+     False),
+    # --- Phase 330: the bare-``ecd`` Edgecast shape ---
+    ("ecdsa crypto identifiers",
+     "<script>const alg='ECDSA';crypto.subtle.importKey('ECDH')</script>",
+     False),
+    ("marker token containing ecd",
+     '<div id="out">xssentinel_dom_abecd123</div>', False),
+    ("aws ecs product name", "<p>Our ECS cluster runs in us-east-1.</p>",
      False),
     # --- vendor mentions (contract 1 only) ---
     ("cf ray comment",

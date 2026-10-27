@@ -123,7 +123,22 @@ _WAF_SIGNATURES: list[tuple[str, "re.Pattern[str]", str]] = [
 
     # --- Edgecast / Fastly / Qrator / Distil ---
     ("Edgecast",
-     re.compile(r"edgecast|ecd", re.I), "any"),
+     # Phase 330: the old ``edgecast|ecd`` alternative matched ANY three hex
+     # characters.  The scanner's own 8-hex marker tokens carry "ecd" 0.14%
+     # of the time (7/5000 measured), every crypto bundle says ECDSA/ECDH,
+     # and a token reflected into a response header matched the header pass
+     # at high confidence -- one reflected response could self-declare an
+     # Edgecast WAF and switch the payload ladder.  Only the unique vendor
+     # word stays a body-visible fingerprint.
+     re.compile(r"edgecast", re.I), "any"),
+    ("Edgecast",
+     # Edgecast CDN fingerprints that were never matched before: the real
+     # ``Server: ECD|ECS|ECAcc (dca/...)`` form (the parenthesised datacenter
+     # part is what makes it a fingerprint) and the ``X-EC-*`` CDN headers.
+     # Header-only on purpose: a body carrying these strings is a vendor
+     # mention, not evidence the response came through Edgecast.
+     re.compile(r"x-ec-[a-z]|server:\s*(?:ecd|ecs|ecacc)\s*\(", re.I),
+     "header"),
     ("Fastly",
      re.compile(r"fastly|x-served-by.*cache|cache-control.*fastly", re.I), "any"),
     ("Qrator",

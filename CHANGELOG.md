@@ -5,6 +5,17 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Edgecast WAF 指纹误报收紧(Phase 330)**:旧规则 `edgecast|ecd` 的三字符
+  `ecd` 备选会命中扫描器自身的 8-hex marker token(实测 5000 中 7 次 = 0.14%)
+  与 ECDSA/ECDH 等普通加密文本——marker 一旦反射进响应(含响应头,high 置信)
+  就能让扫描自称"检测到 Edgecast WAF"并切换载荷梯子。现厂商词 `edgecast`
+  保留为 body 可见指纹(medium),真实 CDN 指纹 `Server: ECD|ECS|ECAcc (dca/…)`
+  (带括号机房形态,防 AWS ECS 等产品名)与 `X-EC-*` 头新增为 header-only
+  (high)——此前从未被识别。测试带变异对照钉住旧规则必命中误报样本
+  (`tests/test_phase330_waf_edgecast.py`)。
+
 ## [1.2.2] - 2026-10-27
 
 交付收口:Agent 接面(MCP 七工具 / Streamable HTTP / 进度与取消)、判定顺序修复
