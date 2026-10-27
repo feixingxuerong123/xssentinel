@@ -472,10 +472,30 @@ polyglot / 0 confirmed)→ 既有 sync 缺口,不是交付轮引入。取证脚�
   缺口修复即撤回)。测试 `tests/test_phase331_candidate_head.py` 6 例,含
   变异对照(旧步长在测试内对当前语料重算,断言裸 script 不在其窗口——
   stash 实测:旧代码 5 failed / 恢复后全绿)。
-- **顺带量到的新缺口(本轮不修,记账)**:`<img/src=x/onerror=alert('tok')//>`
+- ~~**顺带量到的新缺口(本轮不修,记账)**:`<img/src=x/onerror=alert('tok')//>`
   在 /legacy 上**逐字反射在场**却被 `verify_semantic` 以 `ctx=url_href`
   拒绝——未加引号、斜杠分隔的属性形态被上下文分类器误分类;该形态在浏览器
-  会执行,属真实验证器分类缺口,候选下一轮(动分类器要配对照矩阵)。
+  会执行,属真实验证器分类缺口~~
+  **Phase 332 勘误:上面这条记账是错的,已用浏览器 oracle 撤回**
+  (`dev/_p332_img_slash_probe.py`,真 Chromium 148 实测)。HTML5 tokenizer
+  在**未引号属性值内不终止于 `/`**——`<img/src=x/onerror=…>` 里
+  `src` 的值是 `x/onerror=…`,token 根本不在事件处理器里;实测**不弹 dialog**,
+  `verify_semantic` 的 `ctx=url_href` 拒绝是**正确的**。而会执行的引号形态
+  `<img/src="x"/onerror=…//>` 实测弹 dialog,`verify_semantic` 也给
+  `confirmed=True, ctx=event_handler`。三态契约已钉进
+  `tests/test_phase332_verifier_img_slash.py`(派生守卫:语料里每个
+  `<img/src=` 未引号形态反射在场必须被拒;引号形态与普通形态必须被确认)。
+  **当时写记账前没跑浏览器 oracle,违反了"先测浏览器再改判定"——记为教训。**
+- **真测量出来的语料缺口(Phase 332,候选下一轮,动语料要全量复测)**:
+  html_element 语料的 `<img/src=x/onerror=…>` 家族共 **15 条**(index
+  172-190,同构未引号形态)在 Chromium 148 **全部惰性**(结构论证:首属性
+  `src=` 的未引号值吞掉其后全部字符直到空白/引号,`onerror` 从未被解析为
+  属性)——该家族占着的"无空格 img"生态位实际交付不了执行;而**会执行的**
+  无空格形态 `<img/src="x"/onerror=…`(引号 src)**语料里不存在**
+  (`quoted-src present=False`)。修法候选:家族内就地改写为引号形态
+  (索引不变、不违无位移纪律)或尾追加引号形态;无论哪种都是判定面变更,
+  需对照矩阵 + 全量 194 双引擎复测,且可能翻出"靶场时基陈旧"型假 TN
+  (raw echo 的 safe fixture 若存在,换上会执行的形态就不再是 safe)。
 
 **门禁(2026-10-28,3.12 venv)**:受影响面 9 文件 **133 passed**;对等门
 **4/4 绿**(339.7s);range3 双引擎 **exit 0**——sync **TP19/TN7/SKIP0**

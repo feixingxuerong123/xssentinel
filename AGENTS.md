@@ -4874,3 +4874,27 @@ scanner.py 导入 Finding/json_leaf_paths/_set_json_leaf)。产物
 反射在场却被 `verify_semantic` 误分类为 `ctx=url_href` 拒绝——未加引号斜杠
 分隔属性形态的分类缺口,浏览器会执行;详见 OPTIMIZATION.md 2.1.4 结账段。
 候选②(每候选变体记账)经测量对本缺口不必要,保留为一般性待办。
+
+## Phase 332:勘误 —— 331 记账的 img_slash"验证器分类缺口"被浏览器 oracle 撤回
+
+Phase 331 末尾记账的 `<img/src=x/onerror=…//>` "逐字反射在场却被
+`ctx=url_href` 拒绝,真实验证器分类缺口"**是错的**,本轮用真 Chromium 撤回
+(`dev/_p332_img_slash_probe.py`,四形态弹窗对照)。HTML5 tokenizer 在**未引号
+属性值内不终止于 `/`**:`<img/src=x/onerror=…>` 的 `src` 未引号值吞掉
+`x/onerror=…` 全部,token 从未落在事件处理器里,实测**不弹 dialog**——
+`verify_semantic` 的拒绝是**正确的**;会执行的引号形态
+`<img/src="x"/onerror=…//>` 实测弹 dialog,验证器也正确给
+`confirmed=True, ctx=event_handler`。三态契约钉进
+`tests/test_phase332_verifier_img_slash.py` 4 例(派生守卫:语料中每个
+`<img/src=` 形态反射在场必须被拒 + 引号/普通形态必须被确认 + 语料缺口哨兵)。
+**过程教训记一笔:331 写那条记账前没跑浏览器 oracle,违反了本项目"先测浏览器
+再改判定"的纪律——幸好只记账未改码;动判定面前,oracle 先行不是流程装饰。**
+
+**顺带的真测量(候选下一轮,不动语料)**:html_element 的
+`<img/src=x/onerror=…>` 未引号家族 **15 条**(index 172-190)在 Chromium 148
+**全部惰性**(结构论证:首属性未引号值吞掉后续),该家族占据的"无空格 img"
+生态位交付不了执行;而会执行的 `<img/src="x"/onerror=…>`(引号 src)语料
+**不存在**。修法候选(就地改写引号形态,索引不变不违无位移纪律;或尾追加)
+属判定面变更,需对照矩阵 + 全量 194 双引擎复测,且可能翻出 raw-echo safe
+fixture 的时基陈旧——独立成轮,哨兵测试已就位。详见 OPTIMIZATION.md 2.1.4
+勘误段。
