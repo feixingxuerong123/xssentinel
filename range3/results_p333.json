@@ -1,0 +1,1121 @@
+{
+ "meta": {
+  "range": "range3",
+  "generated": "2026-10-28 05:03:11",
+  "engines": [
+   "sync",
+   "async"
+  ],
+  "max_payloads": 10,
+  "max_transforms": 6,
+  "per_case_timeout": 90
+ },
+ "counts": {
+  "sync": {
+   "TP": 19,
+   "FP": 0,
+   "TN": 7,
+   "FN": 0,
+   "SKIP": 0,
+   "ERROR": 0
+  },
+  "async": {
+   "TP": 17,
+   "FP": 0,
+   "TN": 7,
+   "FN": 0,
+   "SKIP": 2,
+   "ERROR": 0
+  }
+ },
+ "rows": [
+  {
+   "engine": "sync",
+   "case_id": "r3-pos-q-raw",
+   "verdict": "TP",
+   "findings": 1,
+   "confirmed": 0,
+   "retries": 0,
+   "findings_detail": [
+    {
+     "type": "reflected",
+     "severity": "high",
+     "context": "html_element",
+     "headless_outcome": null
+    }
+   ],
+   "error": "",
+   "elapsed": 1.0
+  },
+  {
+   "engine": "sync",
+   "case_id": "r3-pos-multictx",
+   "verdict": "TP",
+   "findings": 1,
+   "confirmed": 0,
+   "retries": 0,
+   "findings_detail": [
+    {
+     "type": "reflected",
+     "severity": "high",
+     "context": "script_string_sq",
+     "headless_outcome": null
+    }
+   ],
+   "error": "",
+   "elapsed": 1.0
+  },
+  {
+   "engine": "sync",
+   "case_id": "r3-pos-rcdata",
+   "verdict": "TP",
+   "findings": 1,
+   "confirmed": 0,
+   "retries": 0,
+   "findings_detail": [
+    {
+     "type": "reflected",
+     "severity": "high",
+     "context": "html_element",
+     "headless_outcome": null
+    }
+   ],
+   "error": "",
+   "elapsed": 0.9
+  },
+  {
+   "engine": "sync",
+   "case_id": "r3-pos-attr",
+   "verdict": "TP",
+   "findings": 1,
+   "confirmed": 0,
+   "retries": 0,
+   "findings_detail": [
+    {
+     "type": "reflected",
+     "severity": "high",
+     "context": "url_href",
+     "headless_outcome": null
+    }
+   ],
+   "error": "",
+   "elapsed": 1.0
+  },
+  {
+   "engine": "sync",
+   "case_id": "r3-pos-path",
+   "verdict": "TP",
+   "findings": 11,
+   "confirmed": 0,
+   "retries": 0,
+   "findings_detail": [
+    {
+     "type": "reflected",
+     "severity": "high",
+     "context": "html_element",
+     "headless_outcome": null
+    },
+    {
+     "type": "reflected",
+     "severity": "high",
+     "context": "html_element",
+     "headless_outcome": null
+    },
+    {
+     "type": "reflected",
+     "severity": "high",
+     "context": "html_element",
+     "headless_outcome": null
+    },
+    {
+     "type": "reflected",
+     "severity": "high",
+     "context": "html_element",
+     "headless_outcome": null
+    },
+    {
+     "type": "reflected",
+     "severity": "high",
+     "context": "html_element",
+     "headless_outcome": null
+    },
+    {
+     "type": "reflected",
+     "severity": "high",
+     "context": "html_element",
+     "headless_outcome": null
+    },
+    {
+     "type": "reflected",
+     "severity": "high",
+     "context": "html_element",
+     "headless_outcome": null
+    },
+    {
+     "type": "reflected",
+     "severity": "high",
+     "context": "html_element",
+     "headless_outcome": null
+    },
+    {
+     "type": "reflected",
+     "severity": "high",
+     "context": "html_element",
+     "headless_outcome": null
+    },
+    {
+     "type": "reflected",
+     "severity": "high",
+     "context": "html_element",
+     "headless_outcome": null
+    },
+    {
+     "type": "path_xss",
+     "severity": "medium",
+     "context": "text",
+     "headless_outcome": null
+    }
+   ],
+   "error": "",
+   "elapsed": 1.2
+  },
+  {
+   "engine": "sync",
+   "case_id": "r3-pos-header",
+   "verdict": "TP",
+   "findings": 1,
+   "confirmed": 0,
+   "retries": 0,
+   "findings_detail": [
+    {
+     "type": "header_xss",
+     "severity": "medium",
+     "context": "text",
+     "headless_outcome": null
+    }
+   ],
+   "error": "",
+   "elapsed": 1.0
+  },
+  {
+   "engine": "sync",
+   "case_id": "r3-pos-cookie",
+   "verdict": "TP",
+   "findings": 1,
+   "confirmed": 0,
+   "retries": 0,
+   "findings_detail": [
+    {
+     "type": "cookie_xss",
+     "severity": "medium",
+     "context": "event_handler",
+     "headless_outcome": null
+    }
+   ],
+   "error": "",
+   "elapsed": 1.0
+  },
+  {
+   "engine": "sync",
+   "case_id": "r3-pos-b64",
+   "verdict": "TP",
+   "findings": 1,
+   "confirmed": 0,
+   "retries": 0,
+   "findings_detail": [
+    {
+     "type": "reflected",
+     "severity": "high",
+     "context": "html_element",
+     "headless_outcome": null
+    }
+   ],
+   "error": "",
+   "elapsed": 0.9
+  },
+  {
+   "engine": "sync",
+   "case_id": "r3-pos-jwt",
+   "verdict": "TP",
+   "findings": 1,
+   "confirmed": 0,
+   "retries": 0,
+   "findings_detail": [
+    {
+     "type": "reflected",
+     "severity": "high",
+     "context": "html_element",
+     "headless_outcome": null
+    }
+   ],
+   "error": "",
+   "elapsed": 1.0
+  },
+  {
+   "engine": "sync",
+   "case_id": "r3-pos-dom",
+   "verdict": "TP",
+   "findings": 4,
+   "confirmed": 0,
+   "retries": 0,
+   "findings_detail": [
+    {
+     "type": "dom_sink_reachability",
+     "severity": "low",
+     "context": "Element.innerHTML",
+     "headless_outcome": "not-fired"
+    },
+    {
+     "type": "trusted_types_taint_flow",
+     "severity": "medium",
+     "context": "trusted_types_innerHTML",
+     "headless_outcome": null
+    },
+    {
+     "type": "trusted_types_no_policy",
+     "severity": "medium",
+     "context": "trusted_types_innerHTML",
+     "headless_outcome": null
+    },
+    {
+     "type": "unsanitized_innerhtml_user_source",
+     "severity": "medium",
+     "context": "sanitizer_unsanitized_innerhtml_user_source",
+     "headless_outcome": null
+    }
+   ],
+   "error": "",
+   "elapsed": 13.6
+  },
+  {
+   "engine": "sync",
+   "case_id": "r3-pos-cspnonce",
+   "verdict": "TP",
+   "findings": 1,
+   "confirmed": 0,
+   "retries": 0,
+   "findings_detail": [
+    {
+     "type": "reflected",
+     "severity": "high",
+     "context": "html_attribute_dq",
+     "headless_outcome": null
+    }
+   ],
+   "error": "",
+   "elapsed": 0.9
+  },
+  {
+   "engine": "sync",
+   "case_id": "r3-pos-upload",
+   "verdict": "TP",
+   "findings": 1,
+   "confirmed": 0,
+   "retries": 0,
+   "findings_detail": [
+    {
+     "type": "upload_xss",
+     "severity": "high",
+     "context": "multipart_filename",
+     "headless_outcome": null
+    }
+   ],
+   "error": "",
+   "elapsed": 1.0
+  },
+  {
+   "engine": "sync",
+   "case_id": "r3-pos-stored",
+   "verdict": "TP",
+   "findings": 1,
+   "confirmed": 0,
+   "retries": 0,
+   "findings_detail": [
+    {
+     "type": "stored",
+     "severity": "high",
+     "context": "stored_view",
+     "headless_outcome": null
+    }
+   ],
+   "error": "",
+   "elapsed": 0.9
+  },
+  {
+   "engine": "sync",
+   "case_id": "r3-pos-so2",
+   "verdict": "TP",
+   "findings": 1,
+   "confirmed": 0,
+   "retries": 0,
+   "findings_detail": [
+    {
+     "type": "second_order",
+     "severity": "high",
+     "context": "event_handler",
+     "headless_outcome": null
+    }
+   ],
+   "error": "",
+   "elapsed": 1.2
+  },
+  {
+   "engine": "sync",
+   "case_id": "r3-pos-auth-q",
+   "verdict": "TP",
+   "findings": 1,
+   "confirmed": 0,
+   "retries": 0,
+   "findings_detail": [
+    {
+     "type": "reflected",
+     "severity": "high",
+     "context": "html_element",
+     "headless_outcome": null
+    }
+   ],
+   "error": "",
+   "elapsed": 0.9
+  },
+  {
+   "engine": "sync",
+   "case_id": "r3-pos-xss-medium",
+   "verdict": "TP",
+   "findings": 1,
+   "confirmed": 0,
+   "retries": 0,
+   "findings_detail": [
+    {
+     "type": "reflected",
+     "severity": "high",
+     "context": "html_element",
+     "headless_outcome": null
+    }
+   ],
+   "error": "",
+   "elapsed": 1.0
+  },
+  {
+   "engine": "sync",
+   "case_id": "r3-pos-xss-high",
+   "verdict": "TP",
+   "findings": 1,
+   "confirmed": 0,
+   "retries": 0,
+   "findings_detail": [
+    {
+     "type": "reflected",
+     "severity": "high",
+     "context": "html_element",
+     "headless_outcome": null
+    }
+   ],
+   "error": "",
+   "elapsed": 0.9
+  },
+  {
+   "engine": "sync",
+   "case_id": "r3-neg-xss-impossible",
+   "verdict": "TN",
+   "findings": 0,
+   "confirmed": 0,
+   "retries": 0,
+   "findings_detail": [],
+   "error": "",
+   "elapsed": 0.9
+  },
+  {
+   "engine": "sync",
+   "case_id": "r3-pos-utf7",
+   "verdict": "TP",
+   "findings": 11,
+   "confirmed": 11,
+   "retries": 0,
+   "findings_detail": [
+    {
+     "type": "reflected",
+     "severity": "high",
+     "context": "html_element",
+     "headless_outcome": "fired"
+    },
+    {
+     "type": "reflected",
+     "severity": "high",
+     "context": "html_element",
+     "headless_outcome": "fired"
+    },
+    {
+     "type": "reflected",
+     "severity": "high",
+     "context": "html_element",
+     "headless_outcome": "fired"
+    },
+    {
+     "type": "reflected",
+     "severity": "high",
+     "context": "html_element",
+     "headless_outcome": "fired"
+    },
+    {
+     "type": "reflected",
+     "severity": "high",
+     "context": "html_element",
+     "headless_outcome": "fired"
+    },
+    {
+     "type": "reflected",
+     "severity": "high",
+     "context": "html_element",
+     "headless_outcome": "fired"
+    },
+    {
+     "type": "reflected",
+     "severity": "high",
+     "context": "html_element",
+     "headless_outcome": "fired"
+    },
+    {
+     "type": "reflected",
+     "severity": "high",
+     "context": "html_element",
+     "headless_outcome": "fired"
+    },
+    {
+     "type": "reflected",
+     "severity": "high",
+     "context": "html_element",
+     "headless_outcome": "fired"
+    },
+    {
+     "type": "reflected",
+     "severity": "high",
+     "context": "html_element",
+     "headless_outcome": "fired"
+    },
+    {
+     "type": "reflected",
+     "severity": "high",
+     "context": "html_element",
+     "headless_outcome": "fired"
+    }
+   ],
+   "error": "",
+   "elapsed": 5.1
+  },
+  {
+   "engine": "sync",
+   "case_id": "r3-pos-scenario-msg",
+   "verdict": "TP",
+   "findings": 1,
+   "confirmed": 0,
+   "retries": 0,
+   "findings_detail": [
+    {
+     "type": "reflected",
+     "severity": "high",
+     "context": "html_element",
+     "headless_outcome": null
+    }
+   ],
+   "error": "",
+   "elapsed": 1.0
+  },
+  {
+   "engine": "sync",
+   "case_id": "r3-neg-escaped",
+   "verdict": "TN",
+   "findings": 0,
+   "confirmed": 0,
+   "retries": 0,
+   "findings_detail": [],
+   "error": "",
+   "elapsed": 1.0
+  },
+  {
+   "engine": "sync",
+   "case_id": "r3-neg-scare",
+   "verdict": "TN",
+   "findings": 0,
+   "confirmed": 0,
+   "retries": 0,
+   "findings_detail": [],
+   "error": "",
+   "elapsed": 14.7
+  },
+  {
+   "engine": "sync",
+   "case_id": "r3-neg-cspstrict",
+   "verdict": "TN",
+   "findings": 0,
+   "confirmed": 0,
+   "retries": 0,
+   "findings_detail": [],
+   "error": "",
+   "elapsed": 1.1
+  },
+  {
+   "engine": "sync",
+   "case_id": "r3-neg-static",
+   "verdict": "TN",
+   "findings": 0,
+   "confirmed": 0,
+   "retries": 0,
+   "findings_detail": [],
+   "error": "",
+   "elapsed": 0.9
+  },
+  {
+   "engine": "sync",
+   "case_id": "r3-neg-unauth",
+   "verdict": "TN",
+   "findings": 0,
+   "confirmed": 0,
+   "retries": 0,
+   "findings_detail": [],
+   "error": "",
+   "elapsed": 1.0
+  },
+  {
+   "engine": "sync",
+   "case_id": "r3-neg-json-echo",
+   "verdict": "TN",
+   "findings": 0,
+   "confirmed": 0,
+   "retries": 0,
+   "findings_detail": [],
+   "error": "",
+   "elapsed": 1.0
+  },
+  {
+   "engine": "async",
+   "case_id": "r3-pos-q-raw",
+   "verdict": "TP",
+   "findings": 1,
+   "confirmed": 0,
+   "retries": 0,
+   "findings_detail": [
+    {
+     "type": "reflected",
+     "severity": "high",
+     "context": "html_element",
+     "headless_outcome": null
+    }
+   ],
+   "error": "",
+   "elapsed": 1.1
+  },
+  {
+   "engine": "async",
+   "case_id": "r3-pos-multictx",
+   "verdict": "TP",
+   "findings": 1,
+   "confirmed": 0,
+   "retries": 0,
+   "findings_detail": [
+    {
+     "type": "reflected",
+     "severity": "high",
+     "context": "script_string_sq",
+     "headless_outcome": null
+    }
+   ],
+   "error": "",
+   "elapsed": 1.2
+  },
+  {
+   "engine": "async",
+   "case_id": "r3-pos-rcdata",
+   "verdict": "TP",
+   "findings": 1,
+   "confirmed": 0,
+   "retries": 0,
+   "findings_detail": [
+    {
+     "type": "reflected",
+     "severity": "high",
+     "context": "html_element",
+     "headless_outcome": null
+    }
+   ],
+   "error": "",
+   "elapsed": 1.2
+  },
+  {
+   "engine": "async",
+   "case_id": "r3-pos-attr",
+   "verdict": "TP",
+   "findings": 1,
+   "confirmed": 0,
+   "retries": 0,
+   "findings_detail": [
+    {
+     "type": "reflected",
+     "severity": "high",
+     "context": "url_href",
+     "headless_outcome": null
+    }
+   ],
+   "error": "",
+   "elapsed": 1.2
+  },
+  {
+   "engine": "async",
+   "case_id": "r3-pos-path",
+   "verdict": "TP",
+   "findings": 11,
+   "confirmed": 0,
+   "retries": 0,
+   "findings_detail": [
+    {
+     "type": "path_xss",
+     "severity": "medium",
+     "context": "text",
+     "headless_outcome": null
+    },
+    {
+     "type": "polyglot_reflection",
+     "severity": "medium",
+     "context": "event_handler",
+     "headless_outcome": null
+    },
+    {
+     "type": "polyglot_reflection",
+     "severity": "medium",
+     "context": "event_handler",
+     "headless_outcome": null
+    },
+    {
+     "type": "polyglot_reflection",
+     "severity": "medium",
+     "context": "event_handler",
+     "headless_outcome": null
+    },
+    {
+     "type": "polyglot_reflection",
+     "severity": "medium",
+     "context": "event_handler",
+     "headless_outcome": null
+    },
+    {
+     "type": "polyglot_reflection",
+     "severity": "medium",
+     "context": "event_handler",
+     "headless_outcome": null
+    },
+    {
+     "type": "polyglot_reflection",
+     "severity": "medium",
+     "context": "event_handler",
+     "headless_outcome": null
+    },
+    {
+     "type": "polyglot_reflection",
+     "severity": "medium",
+     "context": "event_handler",
+     "headless_outcome": null
+    },
+    {
+     "type": "polyglot_reflection",
+     "severity": "medium",
+     "context": "event_handler",
+     "headless_outcome": null
+    },
+    {
+     "type": "polyglot_reflection",
+     "severity": "medium",
+     "context": "event_handler",
+     "headless_outcome": null
+    },
+    {
+     "type": "polyglot_reflection",
+     "severity": "medium",
+     "context": "event_handler",
+     "headless_outcome": null
+    }
+   ],
+   "error": "",
+   "elapsed": 2.5
+  },
+  {
+   "engine": "async",
+   "case_id": "r3-pos-header",
+   "verdict": "TP",
+   "findings": 1,
+   "confirmed": 0,
+   "retries": 0,
+   "findings_detail": [
+    {
+     "type": "header_xss",
+     "severity": "medium",
+     "context": "text",
+     "headless_outcome": null
+    }
+   ],
+   "error": "",
+   "elapsed": 1.2
+  },
+  {
+   "engine": "async",
+   "case_id": "r3-pos-cookie",
+   "verdict": "TP",
+   "findings": 1,
+   "confirmed": 0,
+   "retries": 0,
+   "findings_detail": [
+    {
+     "type": "cookie_xss",
+     "severity": "medium",
+     "context": "event_handler",
+     "headless_outcome": null
+    }
+   ],
+   "error": "",
+   "elapsed": 1.2
+  },
+  {
+   "engine": "async",
+   "case_id": "r3-pos-b64",
+   "verdict": "TP",
+   "findings": 1,
+   "confirmed": 0,
+   "retries": 0,
+   "findings_detail": [
+    {
+     "type": "reflected",
+     "severity": "high",
+     "context": "html_element",
+     "headless_outcome": null
+    }
+   ],
+   "error": "",
+   "elapsed": 1.2
+  },
+  {
+   "engine": "async",
+   "case_id": "r3-pos-jwt",
+   "verdict": "TP",
+   "findings": 1,
+   "confirmed": 0,
+   "retries": 0,
+   "findings_detail": [
+    {
+     "type": "reflected",
+     "severity": "high",
+     "context": "html_element",
+     "headless_outcome": null
+    }
+   ],
+   "error": "",
+   "elapsed": 1.1
+  },
+  {
+   "engine": "async",
+   "case_id": "r3-pos-dom",
+   "verdict": "TP",
+   "findings": 4,
+   "confirmed": 0,
+   "retries": 0,
+   "findings_detail": [
+    {
+     "type": "trusted_types_taint_flow",
+     "severity": "medium",
+     "context": "trusted_types_innerHTML",
+     "headless_outcome": null
+    },
+    {
+     "type": "trusted_types_no_policy",
+     "severity": "medium",
+     "context": "trusted_types_innerHTML",
+     "headless_outcome": null
+    },
+    {
+     "type": "unsanitized_innerhtml_user_source",
+     "severity": "medium",
+     "context": "sanitizer_unsanitized_innerhtml_user_source",
+     "headless_outcome": null
+    },
+    {
+     "type": "dom_sink_reachability",
+     "severity": "low",
+     "context": "Element.innerHTML",
+     "headless_outcome": "not-fired"
+    }
+   ],
+   "error": "",
+   "elapsed": 13.8
+  },
+  {
+   "engine": "async",
+   "case_id": "r3-pos-cspnonce",
+   "verdict": "TP",
+   "findings": 1,
+   "confirmed": 0,
+   "retries": 0,
+   "findings_detail": [
+    {
+     "type": "reflected",
+     "severity": "high",
+     "context": "html_attribute_dq",
+     "headless_outcome": null
+    }
+   ],
+   "error": "",
+   "elapsed": 2.6
+  },
+  {
+   "engine": "async",
+   "case_id": "r3-pos-upload",
+   "verdict": "TP",
+   "findings": 1,
+   "confirmed": 0,
+   "retries": 0,
+   "findings_detail": [
+    {
+     "type": "upload_xss",
+     "severity": "high",
+     "context": "multipart_filename",
+     "headless_outcome": null
+    }
+   ],
+   "error": "",
+   "elapsed": 1.2
+  },
+  {
+   "engine": "async",
+   "case_id": "r3-pos-stored",
+   "verdict": "SKIP"
+  },
+  {
+   "engine": "async",
+   "case_id": "r3-pos-so2",
+   "verdict": "SKIP"
+  },
+  {
+   "engine": "async",
+   "case_id": "r3-pos-auth-q",
+   "verdict": "TP",
+   "findings": 1,
+   "confirmed": 0,
+   "retries": 0,
+   "findings_detail": [
+    {
+     "type": "reflected",
+     "severity": "high",
+     "context": "html_element",
+     "headless_outcome": null
+    }
+   ],
+   "error": "",
+   "elapsed": 1.2
+  },
+  {
+   "engine": "async",
+   "case_id": "r3-pos-xss-medium",
+   "verdict": "TP",
+   "findings": 1,
+   "confirmed": 0,
+   "retries": 0,
+   "findings_detail": [
+    {
+     "type": "reflected",
+     "severity": "high",
+     "context": "html_element",
+     "headless_outcome": null
+    }
+   ],
+   "error": "",
+   "elapsed": 1.1
+  },
+  {
+   "engine": "async",
+   "case_id": "r3-pos-xss-high",
+   "verdict": "TP",
+   "findings": 1,
+   "confirmed": 0,
+   "retries": 0,
+   "findings_detail": [
+    {
+     "type": "reflected",
+     "severity": "high",
+     "context": "html_element",
+     "headless_outcome": null
+    }
+   ],
+   "error": "",
+   "elapsed": 1.2
+  },
+  {
+   "engine": "async",
+   "case_id": "r3-neg-xss-impossible",
+   "verdict": "TN",
+   "findings": 0,
+   "confirmed": 0,
+   "retries": 0,
+   "findings_detail": [],
+   "error": "",
+   "elapsed": 1.3
+  },
+  {
+   "engine": "async",
+   "case_id": "r3-pos-utf7",
+   "verdict": "TP",
+   "findings": 11,
+   "confirmed": 11,
+   "retries": 0,
+   "findings_detail": [
+    {
+     "type": "reflected",
+     "severity": "high",
+     "context": "html_element",
+     "headless_outcome": "fired"
+    },
+    {
+     "type": "reflected",
+     "severity": "high",
+     "context": "html_element",
+     "headless_outcome": "fired"
+    },
+    {
+     "type": "reflected",
+     "severity": "high",
+     "context": "html_element",
+     "headless_outcome": "fired"
+    },
+    {
+     "type": "reflected",
+     "severity": "high",
+     "context": "html_element",
+     "headless_outcome": "fired"
+    },
+    {
+     "type": "reflected",
+     "severity": "high",
+     "context": "html_element",
+     "headless_outcome": "fired"
+    },
+    {
+     "type": "reflected",
+     "severity": "high",
+     "context": "html_element",
+     "headless_outcome": "fired"
+    },
+    {
+     "type": "reflected",
+     "severity": "high",
+     "context": "html_element",
+     "headless_outcome": "fired"
+    },
+    {
+     "type": "reflected",
+     "severity": "high",
+     "context": "html_element",
+     "headless_outcome": "fired"
+    },
+    {
+     "type": "reflected",
+     "severity": "high",
+     "context": "html_element",
+     "headless_outcome": "fired"
+    },
+    {
+     "type": "reflected",
+     "severity": "high",
+     "context": "html_element",
+     "headless_outcome": "fired"
+    },
+    {
+     "type": "reflected",
+     "severity": "high",
+     "context": "html_element",
+     "headless_outcome": "fired"
+    }
+   ],
+   "error": "",
+   "elapsed": 8.1
+  },
+  {
+   "engine": "async",
+   "case_id": "r3-pos-scenario-msg",
+   "verdict": "TP",
+   "findings": 1,
+   "confirmed": 0,
+   "retries": 0,
+   "findings_detail": [
+    {
+     "type": "reflected",
+     "severity": "high",
+     "context": "html_element",
+     "headless_outcome": null
+    }
+   ],
+   "error": "",
+   "elapsed": 1.2
+  },
+  {
+   "engine": "async",
+   "case_id": "r3-neg-escaped",
+   "verdict": "TN",
+   "findings": 0,
+   "confirmed": 0,
+   "retries": 0,
+   "findings_detail": [],
+   "error": "",
+   "elapsed": 1.3
+  },
+  {
+   "engine": "async",
+   "case_id": "r3-neg-scare",
+   "verdict": "TN",
+   "findings": 0,
+   "confirmed": 0,
+   "retries": 0,
+   "findings_detail": [],
+   "error": "",
+   "elapsed": 14.9
+  },
+  {
+   "engine": "async",
+   "case_id": "r3-neg-cspstrict",
+   "verdict": "TN",
+   "findings": 0,
+   "confirmed": 0,
+   "retries": 0,
+   "findings_detail": [],
+   "error": "",
+   "elapsed": 1.4
+  },
+  {
+   "engine": "async",
+   "case_id": "r3-neg-static",
+   "verdict": "TN",
+   "findings": 0,
+   "confirmed": 0,
+   "retries": 0,
+   "findings_detail": [],
+   "error": "",
+   "elapsed": 1.4
+  },
+  {
+   "engine": "async",
+   "case_id": "r3-neg-unauth",
+   "verdict": "TN",
+   "findings": 0,
+   "confirmed": 0,
+   "retries": 0,
+   "findings_detail": [],
+   "error": "",
+   "elapsed": 1.3
+  },
+  {
+   "engine": "async",
+   "case_id": "r3-neg-json-echo",
+   "verdict": "TN",
+   "findings": 0,
+   "confirmed": 0,
+   "retries": 0,
+   "findings_detail": [],
+   "error": "",
+   "elapsed": 1.2
+  }
+ ]
+}

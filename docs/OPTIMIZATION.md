@@ -512,6 +512,46 @@ scanner.py 导入 `Finding`/`json_leaf_paths`/`_set_json_leaf`,不经过
 `_build_candidates`。产物 `benchmark/results/phase331_*`(含三次失败尝试,
 名字即次序)。
 
+**Phase 333(2026-10-28)结账 —— 可达性测量再修正一次,交换落地**:
+
+对本条上面记的"15 条惰性家族"再量两刀,修正两处:
+
+1. **条数勘误**:该家族是 **19 条**(html_element 家族 index 172-190,JSON
+   扁平索引 882-900),Phase 332 记账写 15 是数错。
+2. **可达性勘误**:"家族占据生态位"也不成立——Phase 331 头取之后,主窗口是
+   head[:6](0-5 全是实测能力槽),兄弟语料(svg/math n=4)步长落点
+   0/52/104/156,**172-190 对两个引擎完全不可达**,是纯死重。真正空的生态位
+   在**主窗口 slot 0**:p173-probe(`<<script>Foo</script>iframe
+   src="javascript:alert(1)">`,note 自记 TEMPORARY)——未过滤页面解析出的是
+   文本+script[Foo]+裸文本,根本没有 iframe;过滤后才造出 iframe,而
+   iframe-src-javascript 在现代 Chromium 不执行,Phase 331 插桩实测该槽
+   恒被拒——**每次 html_element 扫描的第一个探针位是保证浪费的**。
+   (该形态另以包裹形态活在 polyglots 语料,由 L7 polyglot 层发出,与本交换
+   无关。)
+3. **交换(判定面变更,全量复测)**:p173-probe **就地替换**为
+   `<img/src="x"/onerror=alert(1)//>`(id `nospace-img-001`,索引零位移)——
+   失去一个测过无法确认的死槽,得到 Phase 332 浏览器实测会执行的无空格
+   向量(空格剥离/UTF-7 页面上存活)。进程内实测:/legacy 上 slot 0 率先
+   确认(event_handler),每参数探针数 20→17。main 窗口原 slot 0 曾是它
+   的唯一可停靠位;引号形态缺席问题就此收口。
+4. **窗口死槽审计(方法论教训)**:初版"全上下文 head 窗口过 raw-echo"
+   审计有缺陷——把上下文专用载荷(script_block 的 JS、url_href 的 URI)丢进
+   元素体里测,对它们不公平;唯一有效读数是 html_element 窗口(反射点就是
+   元素体):6 槽中 1 死(p173-probe),已由本交换清零。其余 39 个上下文的
+   窗口审计需要逐上下文搭忠实反射 harness,记为后续候选。
+5. 未引号家族 172-190 与 error_page 的 3 条同前缀形态维持原状(不可达/
+   各自上下文,另行记账);派生守卫改为按引号区分双向契约
+   (`tests/test_phase332_verifier_img_slash.py`)。
+
+**门禁(2026-10-28,3.12 venv)**:契约测试 15 例绿(332 文件 4 + 331 文件 6 +
+portswigger 语料 5);对等门 **4/4 绿(340.3s)**;range3 双引擎 **exit 0**
+(sync TP19/TN7/SKIP0、async TP17/TN7/SKIP2,utf7 双 TP,与 331 逐项相同);
+strict quick 切片 sync **TP36/FP0/FN0/ERR0(0 SKIP)**、async 复跑
+**TP36/FP0/FN0/ERR0(1 SKIP;首跑 pos-ctoss-01 90s timeout = 同机
+vuln-agent 评测负载的连接重置形态)**;全量 194 strict——sync
+**TP113/FP0/TN81/FN0/ERR0(0 SKIP)**、async **TP107/FP0/TN75/FN0/ERR0
+(12 SKIP)**,与 1.2.2 基线逐项相同、零漂移。产物
+`benchmark/results/phase333_*` + `range3/results_p333.json`。
 ### 2.2 报告层性能
 
 [report.py](file:///d:/qoder/xssentinel/xssentinel/core/report.py) **1428 行**,

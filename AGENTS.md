@@ -4898,3 +4898,39 @@ Phase 331 末尾记账的 `<img/src=x/onerror=…//>` "逐字反射在场却被
 属判定面变更,需对照矩阵 + 全量 194 双引擎复测,且可能翻出 raw-echo safe
 fixture 的时基陈旧——独立成轮,哨兵测试已就位。详见 OPTIMIZATION.md 2.1.4
 勘误段。
+
+## Phase 333:语料交换 —— p173 死槽让位给会执行的无空格 img 向量
+
+接 Phase 332 记账的语料缺口,两刀再测量后落地(全程记进 OPTIMIZATION.md
+2.1.4 结账段):
+
+**测量修正了记账两次**:①惰性家族是 **19 条**非 15;②**家族对两引擎完全
+不可达**(主窗口 head[:6] 全是实测能力槽,兄弟步长落点 0/52/104/156),
+"占据生态位"不成立——真死槽是主窗口 **slot 0** 的 p173-probe(note 自记
+TEMPORARY;未过滤页解析不出 iframe,过滤后 iframe-src-javascript 在现代
+Chromium 也不执行,Phase 331 插桩实测恒拒)= 每次 html_element 扫描的
+第一个探针位保证浪费。该形态的引擎角色由 polyglots 语料的包裹形态承担
+(L7 polyglot 层),与本交换无关。
+
+**交换**:p173-probe **就地替换**为 `<img/src="x"/onerror=alert(1)//>`
+(id `nospace-img-001`,family index 0,零位移):失去一个测过无法确认的
+死槽,得到 Phase 332 浏览器实测会执行的无空格向量(空格剥离/UTF-7 页面
+存活)。进程内实测 /legacy:slot 0 率先确认(event_handler),每参数探针
+20→17。原打算换掉主窗口 slot 5 的大写 img(`html-tagcase-001`),读 note
+后发现那是 Phase 316 在 XSSMaze chain-level4 **实测过**的大小写绕过形态
+——**换成拆实测能力,作罢**;这决定本身也是本轮产出:主窗口没有空槽,
+每条都被实测能力占着。
+
+**测试**:`tests/test_phase332_verifier_img_slash.py` 契约翻新(派生守卫按
+引号区分双向:未引号族必须拒、引号形态必须确认并领衔主窗口、p173 死形态
+回归哨兵);契约测试 15 例绿。**顺带记审计方法论教训**:全上下文窗口
+raw-echo 审计的初版把上下文专用载荷丢进元素体测,读数无效——逐上下文搭
+忠实反射 harness 记为后续候选(html_element 窗口的有效读数:6 槽 1 死,
+本交换清零)。
+
+**门禁(3.12 venv)**:对等门 **4/4 绿(340.3s)**;range3 双引擎 exit 0
+(utf7 双 TP);strict quick 切片 sync 0 SKIP 全绿、async 复跑绿(首跑
+pos-ctoss-01 timeout = 同机 vuln-agent 评测负载);全量 194 strict——sync
+**TP113/FP0/TN81/FN0/ERR0(0 SKIP)**、async **TP107/FP0/TN75/FN0/ERR0
+(12 SKIP)**,与 1.2.2 基线逐项相同、零漂移。产物 `benchmark/results/
+phase333_*` + `range3/results_p333.json`。
