@@ -4813,3 +4813,12 @@ async `detect_from_raw` 对齐 1);`tests/test_waf_benign_corpus.py` 补 3 条
 0 SKIP,exit 0)、async **TP107/FP0/TN75/FN0/ERR0**(194 例,12 SKIP = manifest
 sync-only,exit 0),与 1.2.2 发布基线(p322c)**逐项相同,零漂移**。产物
 `benchmark/results/phase330_full_{sync,async}.json`。
+
+**独立复核(2026-10-28,同树的另一 session 实测)**:受影响集按本 session 的口径
+重跑 8 文件 **82 passed**(13.7s;WAF 五件套 + phase33/35 + fixes);mutation
+control 复跑 baseline 18 passed → mutated 8 failed → restored 18 passed(sha256
+逐字节还原);quick 严格切片双引擎 **sync TP36/FP0/TN28/FN0/ERR0(64 例,0 SKIP,
+427.6s)、async TP36/FP0/TN27/FN0/ERR0(63 例计分,1 SKIP,398.0s)**;全量双引擎
+**独立复跑** sync TP113/FP0/TN81/FN0/ERR0(813.6s)、async TP107/FP0/TN75/FN0/ERR0
+(760.7s),与提交内的 `phase330_full_*` 逐项相同。quick 产物入库
+`benchmark/results/phase330_quick_{sync,async}.json`。
