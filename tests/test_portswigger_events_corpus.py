@@ -12,8 +12,10 @@ Contracts pinned here:
     _build_candidates + async _CROSS_CONTEXT);
   * the primary `html_element` family is UNCHANGED (205 entries) -- the new
     payloads ride leftover budget only.  Appending into html_element would
-    silently shift the stride-sampled queue and invalidate every measured
-    benchmark verdict; if you must touch it, re-measure first.
+    silently shift the sampled queue and invalidate every measured
+    benchmark verdict (the primary slice is corpus-HEAD based since
+    Phase 331, so a tail append no longer moves it -- but the sibling
+    stride slices still shift); if you must touch it, re-measure first.
 """
 from __future__ import annotations
 
@@ -34,8 +36,9 @@ _EXPECTED_FAMILY_SIZE = 48
 # against the OWASP Juice Shop legacy-profile RegEx sanitizer, browser
 # dialog carried the probe token) was appended at the TAIL.  Same
 # rule: the corpus is the newer artefact.  Note a tail append still
-# shifts sync's stride sample (len feeds the step), which is why
-# Phase 285 re-measured the gate in this state.
+# shifts sync's sibling stride slices (len feeds the step); the PRIMARY
+# slice is corpus-head based since Phase 331, so it no longer moves.
+# Phase 285 re-measured the gate in the pre-331 state.
 _EXPECTED_HTML_ELEMENT_SIZE = 209
 
 
@@ -66,7 +69,7 @@ def test_key_vectors_present():
 
 def test_both_engines_draw_the_family():
     # sync: _build_candidates samples the family for html_element (mirror of
-    # the wiring; the sample call is exercised via the stride helper shape)
+    # the wiring; the primary slice is corpus-head based since Phase 331)
     sync_fam = payloads.by_context("portswigger_events")
     assert sync_fam
     # async: the cross-context matrix routes html_element to the family

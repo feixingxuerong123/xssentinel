@@ -929,7 +929,20 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
             primary_budget = 2  # minimal probe set for encoded reflections
         else:
             primary_budget = max(6, self.max_payloads // 2)
-        candidates = _sample(context, primary_budget)
+        # Phase 331: the PRIMARY slice comes from the corpus HEAD, not an
+        # even stride.  The corpus is ordered by real-world yield, and the
+        # stride skipped the basic confirmation payloads at the head:
+        # on range3 /legacy (r3-pos-utf7) the bare <script> sits at corpus
+        # index 1 while the stride picked javascript:-URI shapes that the
+        # verifier must refuse, so every budget slot died without one
+        # executable probe and the param fell back to L7 polyglot
+        # (medium/model-only) where async confirmed high.  The shared
+        # sampler takes the head for exactly this reason -- its docstring
+        # records the same budget=3 regression on the async side; sync
+        # never got that fix.  Sibling corpora keep the stride, same as
+        # the shared sampler.
+        candidates = [p for p in payloads.by_context(context)[:primary_budget]
+                      if p.get("payload")]
         if not marker_escaped:
             # A reflection in an href/src attribute can also be exploited
             # with a javascript: URI, so try those too.

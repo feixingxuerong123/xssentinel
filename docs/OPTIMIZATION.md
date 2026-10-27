@@ -444,6 +444,54 @@ polyglot / 0 confirmed)→ 既有 sync 缺口,不是交付轮引入。取证脚�
 下一轮候选改法:① 候选按"可执行 token 位置"排序(把裸 `<script>` 提前);
 ② 或把变体预算记账从"每变换一次"改为"每候选一次",避免一个厚候选饿死后续。
 
+**Phase 331(2026-10-28)结账 —— 机制修正 + 候选①落地**:
+
+本条目的原机制描述被复现测量**部分推翻**,先修正账本再记修复:
+
+- **不是"变体预算被吃满"**。进程内插桩(`dev/_p331_inproc.py`)显示每个
+  候选实际只花了 ~1 个请求:重写 token 的变换被 Phase 157 的 "token not in
+  variant" 守卫在发送前跳过,非重写变换在该上下文几乎不产生变体。真正约束是
+  `effective_max=10` 个**槽位**全被验证器必须拒绝的形态占满——裸
+  `<script>`(语料 index 1)根本不在窗口内。候选②(每候选记账)对本缺口
+  **不必要**,保留为一般性厚候选饿死问题的待办。
+- **三类拒绝逐一归因**(微测 `verify_semantic` 对确切 marked payload):
+  位置 0-2 的 `javascript:` URI 形态、位置 3 的 tag-soup 形态 = 验证器
+  **正确**拒绝;含空格的形态(`<img src=x onerror=…>`、`<details …
+  ontoggle=…>`)= 页面声明 `charset=UTF-7` 而 requests 按声明字符集解码
+  响应体,空格经 urlencode 变 `+`、UTF-7 解码器把 `+` 序列吃成乱码 ⇒
+  反射不在场——**真浏览器同样如此,拒绝是对的**;async 能确认正是因为裸
+  script 无空格,字节存活。
+- **根因在双引擎选样策略分歧**:sync `_build_candidates` 对主语料做**步长
+  采样**,而共享采样器(async 在用)`cross_context_candidates_tagged` 取
+  **语料头部**——其 docstring 早已记录过同一教训("步长采样在小预算下跳过
+  头部的基础确认载荷",async L1 budget=3 曾因此回归到零发现)。sync 漏掉了
+  这个修复,与"async 漏 sync 修复"互为镜像。
+- **修复**:`_build_candidates` 主切片改为语料头 `[:max(6, max_payloads//2)]`
+  (兄弟语料保持步长,与共享采样器逐字同语义);`range3/manifest.json` 的
+  `r3-pos-utf7` 翻回双引擎(Phase 322 的 engine-scoping 是诚实性临时措施,
+  缺口修复即撤回)。测试 `tests/test_phase331_candidate_head.py` 6 例,含
+  变异对照(旧步长在测试内对当前语料重算,断言裸 script 不在其窗口——
+  stash 实测:旧代码 5 failed / 恢复后全绿)。
+- **顺带量到的新缺口(本轮不修,记账)**:`<img/src=x/onerror=alert('tok')//>`
+  在 /legacy 上**逐字反射在场**却被 `verify_semantic` 以 `ctx=url_href`
+  拒绝——未加引号、斜杠分隔的属性形态被上下文分类器误分类;该形态在浏览器
+  会执行,属真实验证器分类缺口,候选下一轮(动分类器要配对照矩阵)。
+
+**门禁(2026-10-28,3.12 venv)**:受影响面 9 文件 **133 passed**;对等门
+**4/4 绿**(339.7s);range3 双引擎 **exit 0**——sync **TP19/TN7/SKIP0**
+(r3-pos-utf7 **TP**,11 findings 浏览器确认;SKIP 1→0)、async TP17/TN7/
+SKIP2(不变);strict quick 切片 sync 64 例 0 SKIP **TP36/FP0/FN0/ERR0**、
+async 63 例 1 SKIP 同形状(首跑 `neg-header-01` timeout 为外源负载形态,
+单独复跑绿);全量 194 双引擎 strict——sync **TP113/FP0/TN81/FN0/ERR0**
+(0 SKIP)、async **TP107/FP0/TN75/FN0/ERR0**(12 SKIP),与 1.2.2 基线
+(p322c)逐项相同。async 全量**首三跑各死于不同用例**(neg-ws-01 timeout
++ 7 DOM FN / neg-redirect-01 无响应 / pos-worker-01 FN),每次的失败用例在
+其他次全部通过(三次并集 = 194/194),第四次干净通过——同机并行会话负载
+的争用形态(187/200/201 记账同款),与本轮改动无因果路径:async 只从
+scanner.py 导入 `Finding`/`json_leaf_paths`/`_set_json_leaf`,不经过
+`_build_candidates`。产物 `benchmark/results/phase331_*`(含三次失败尝试,
+名字即次序)。
+
 ### 2.2 报告层性能
 
 [report.py](file:///d:/qoder/xssentinel/xssentinel/core/report.py) **1428 行**,

@@ -4832,3 +4832,45 @@ TP18/TN7/SKIP1、async TP17/TN7/SKIP2、FP0/FN0/ERR0** exit 0
 (`range3/results_p330.json`)——三项均与 1.2.2 发布基线(p322c §3-4)逐项
 相同。至此 Phase 330 的门禁证据与 1.2.2 发布同级:benchmark 全量双引擎 +
 self-test + range3/4。
+
+## Phase 331:sync 主候选切片头取 —— 2.1.4 UTF-7 对等缺口收口(账本候选①落地)
+
+OPTIMIZATION.md 2.1.4 记账的"range3 r3-pos-utf7 sync 只到 polyglot"本轮修复并
+结账。**先修正账本再修代码**:复现测量(dev/_p331_inproc.py 进程内插桩 + 对
+确切 marked payload 的 verify_semantic 微测)推翻了原机制描述——不是"变体预算
+被一个厚候选的 6 个变换吃满"(每候选实际 ~1 请求,重写 token 的变换被 Phase 157
+守卫在发送前跳过),而是 `effective_max=10` 个**槽位**全被验证器必须拒绝的形态
+占满:三条 `javascript:` URI + 一条 tag-soup(验证器正确)+ 含空格形态在声明
+`charset=UTF-7` 的页面上被 UTF-7 解码吃成乱码(真浏览器同样,拒绝正确)——裸
+`<script>`(语料 index 1)根本不在窗口内,而微测证明它发出去就能语义确认。
+**根因是双引擎选样策略分歧**:sync 步长采样主语料,共享采样器(async 在用)
+取语料头部——其 docstring 早就记录过同一教训,与"async 漏 sync 修复"互为镜像。
+
+**修复**(一处,判定面按纪律全量复测):`scanner.py _build_candidates` 主切片
+改语料头 `[:max(6, max_payloads//2)]`,兄弟语料保持步长(与共享采样器逐字同
+语义);`range3/manifest.json` 的 r3-pos-utf7 翻回双引擎(Phase 322 的
+engine-scoping 是诚实性临时措施,缺口修复即撤回)。**测试**
+`tests/test_phase331_candidate_head.py` 6 例:头取契约/裸 script 位次/与共享
+采样器逐字对等/escaped 路径 2 候选/**变异对照**(旧步长在测试内对当前语料
+重算,断言裸 script 不在窗口;stash 实测旧代码 **5 failed** / 恢复绿)/活体
+端到端(/legacy sync 确认 reflected/high)。顺带记一个测试基建 gotcha:fixture
+里裸 `from server import …` 会撞上 benchmark/server.py(sys.modules 缓存,
+收集期先行导入)——实测起错了服务器(18777 的 banner 在 8901 的探针上炸),
+改 `spec_from_file_location` 按路径导入。
+
+**门禁(冻结树→提交树,3.12 venv)**:受影响面 9 文件 **133 passed**;对等门
+**4/4 绿(339.7s)**;range3 双引擎 **exit 0**(sync TP19/TN7/SKIP0、async
+TP17/TN7/SKIP2,**utf7 双引擎 TP**);strict quick 切片 sync 64 例 0 SKIP、
+async 63 例 1 SKIP,双 **TP36/FP0/FN0/ERR0 exit 0**(async 首跑
+neg-header-01 timeout 为外源负载形态,单独复跑绿);全量 194 strict——sync
+**TP113/FP0/TN81/FN0/ERR0(0 SKIP)**、async **TP107/FP0/TN75/FN0/ERR0
+(12 SKIP)**,与 1.2.2 基线逐项相同、零漂移。async 全量首三跑各死于**不同**
+用例(neg-ws-01+7 DOM FN / neg-redirect-01 / pos-worker-01),失败用例在他次
+全过、第四次干净通过——并行会话负载争用形态(async 运行时无因果路径:只从
+scanner.py 导入 Finding/json_leaf_paths/_set_json_leaf)。产物
+`benchmark/results/phase331_*`(8 个,含失败尝试)。ruff 零债。
+
+**本轮新记账(不修,候选下一轮)**:`<img/src=x/onerror=alert('tok')//>` 逐字
+反射在场却被 `verify_semantic` 误分类为 `ctx=url_href` 拒绝——未加引号斜杠
+分隔属性形态的分类缺口,浏览器会执行;详见 OPTIMIZATION.md 2.1.4 结账段。
+候选②(每候选变体记账)经测量对本缺口不必要,保留为一般性待办。
