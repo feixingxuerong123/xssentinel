@@ -52,6 +52,8 @@ tests/batch_reports/
 
 # benchmark 运行临时文件
 benchmark/results/tmp*.json
+# 被 kill 的运行遗留的 tmp 文件归档区（Phase 255 起人工清理时移入）
+benchmark/results/_stale/
 .coverage*
 .coverage_report.txt
 

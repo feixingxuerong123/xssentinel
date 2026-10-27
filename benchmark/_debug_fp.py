@@ -1,9 +1,10 @@
 """Debug remaining FPs: CSP + JSONP."""
-import sys, os
+import sys
+import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.stdout = open(sys.stdout.fileno(), mode='w', encoding='utf-8', buffering=1)
 
-from xssentinel.core import verifier
+from xssentinel.core import verifier  # noqa: E402  (sys.path shim above)
 
 # CSP cases
 print("=== CSP Cases ===")

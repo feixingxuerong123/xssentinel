@@ -1,5 +1,8 @@
 """Check latest benchmark results."""
-import json, glob, sys, os
+import json
+import glob
+import sys
+import os
 sys.stdout = open(sys.stdout.fileno(), mode='w', encoding='utf-8', buffering=1)
 os.chdir(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 

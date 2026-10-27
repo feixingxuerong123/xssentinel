@@ -15,7 +15,7 @@ import io
 import json
 import os
 
-ROOT = "D:/qoder/xssentinel"
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # layer -> the manifest modes that exercise it (or None if nothing does).
 # Derived by reading the layer's detection module and grepping the modes.

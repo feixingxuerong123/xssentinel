@@ -1,0 +1,266 @@
+{
+ "meta": {
+  "generated": "2026-10-17 01:03:30",
+  "endpoint": "/fuzz/render",
+  "budgets": {
+   "max_payloads": 14,
+   "max_transforms": 12
+  },
+  "top": 3,
+  "engine": "sync",
+  "sinks": [
+   "none",
+   "dom"
+  ]
+ },
+ "summary": {
+  "covered": 0,
+  "fn_candidates": 0,
+  "fp_candidates": 0,
+  "neutralised": 22
+ },
+ "rows": [
+  {
+   "ctx": "svg",
+   "esc": "raw",
+   "sink": "none",
+   "verified": false,
+   "payload": null,
+   "findings": -1,
+   "types": [
+    "ERROR:exit=3: 2026-10-17 01:03:07 [ERROR] xsse"
+   ]
+  },
+  {
+   "ctx": "svg",
+   "esc": "html",
+   "sink": "none",
+   "verified": false,
+   "payload": null,
+   "findings": -1,
+   "types": [
+    "ERROR:exit=3: 2026-10-17 01:03:08 [ERROR] xsse"
+   ]
+  },
+  {
+   "ctx": "svg",
+   "esc": "attr",
+   "sink": "none",
+   "verified": false,
+   "payload": null,
+   "findings": -1,
+   "types": [
+    "ERROR:exit=3: 2026-10-17 01:03:09 [ERROR] xsse"
+   ]
+  },
+  {
+   "ctx": "svg",
+   "esc": "strip_script",
+   "sink": "none",
+   "verified": false,
+   "payload": null,
+   "findings": -1,
+   "types": [
+    "ERROR:exit=3: 2026-10-17 01:03:10 [ERROR] xsse"
+   ]
+  },
+  {
+   "ctx": "svg",
+   "esc": "encode_angles",
+   "sink": "none",
+   "verified": false,
+   "payload": null,
+   "findings": -1,
+   "types": [
+    "ERROR:exit=3: 2026-10-17 01:03:11 [ERROR] xsse"
+   ]
+  },
+  {
+   "ctx": "svg",
+   "esc": "encode_quotes",
+   "sink": "none",
+   "verified": false,
+   "payload": null,
+   "findings": -1,
+   "types": [
+    "ERROR:exit=3: 2026-10-17 01:03:12 [ERROR] xsse"
+   ]
+  },
+  {
+   "ctx": "svg",
+   "esc": "strip_tags",
+   "sink": "none",
+   "verified": false,
+   "payload": null,
+   "findings": -1,
+   "types": [
+    "ERROR:exit=3: 2026-10-17 01:03:13 [ERROR] xsse"
+   ]
+  },
+  {
+   "ctx": "svg",
+   "esc": "strip_handlers",
+   "sink": "none",
+   "verified": false,
+   "payload": null,
+   "findings": -1,
+   "types": [
+    "ERROR:exit=3: 2026-10-17 01:03:14 [ERROR] xsse"
+   ]
+  },
+  {
+   "ctx": "svg",
+   "esc": "entity_decode",
+   "sink": "none",
+   "verified": false,
+   "payload": null,
+   "findings": -1,
+   "types": [
+    "ERROR:exit=3: 2026-10-17 01:03:15 [ERROR] xsse"
+   ]
+  },
+  {
+   "ctx": "svg",
+   "esc": "escape_lt_only",
+   "sink": "none",
+   "verified": false,
+   "payload": null,
+   "findings": -1,
+   "types": [
+    "ERROR:exit=3: 2026-10-17 01:03:17 [ERROR] xsse"
+   ]
+  },
+  {
+   "ctx": "svg",
+   "esc": "strip_script_recursive",
+   "sink": "none",
+   "verified": false,
+   "payload": null,
+   "findings": -1,
+   "types": [
+    "ERROR:exit=3: 2026-10-17 01:03:18 [ERROR] xsse"
+   ]
+  },
+  {
+   "ctx": "svg",
+   "esc": "raw",
+   "sink": "dom",
+   "verified": false,
+   "payload": null,
+   "findings": -1,
+   "types": [
+    "ERROR:exit=3: 2026-10-17 01:03:19 [ERROR] xsse"
+   ]
+  },
+  {
+   "ctx": "svg",
+   "esc": "html",
+   "sink": "dom",
+   "verified": false,
+   "payload": null,
+   "findings": -1,
+   "types": [
+    "ERROR:exit=3: 2026-10-17 01:03:20 [ERROR] xsse"
+   ]
+  },
+  {
+   "ctx": "svg",
+   "esc": "attr",
+   "sink": "dom",
+   "verified": false,
+   "payload": null,
+   "findings": -1,
+   "types": [
+    "ERROR:exit=3: 2026-10-17 01:03:21 [ERROR] xsse"
+   ]
+  },
+  {
+   "ctx": "svg",
+   "esc": "strip_script",
+   "sink": "dom",
+   "verified": false,
+   "payload": null,
+   "findings": -1,
+   "types": [
+    "ERROR:exit=3: 2026-10-17 01:03:22 [ERROR] xsse"
+   ]
+  },
+  {
+   "ctx": "svg",
+   "esc": "encode_angles",
+   "sink": "dom",
+   "verified": false,
+   "payload": null,
+   "findings": -1,
+   "types": [
+    "ERROR:exit=3: 2026-10-17 01:03:23 [ERROR] xsse"
+   ]
+  },
+  {
+   "ctx": "svg",
+   "esc": "encode_quotes",
+   "sink": "dom",
+   "verified": false,
+   "payload": null,
+   "findings": -1,
+   "types": [
+    "ERROR:exit=3: 2026-10-17 01:03:24 [ERROR] xsse"
+   ]
+  },
+  {
+   "ctx": "svg",
+   "esc": "strip_tags",
+   "sink": "dom",
+   "verified": false,
+   "payload": null,
+   "findings": -1,
+   "types": [
+    "ERROR:exit=3: 2026-10-17 01:03:25 [ERROR] xsse"
+   ]
+  },
+  {
+   "ctx": "svg",
+   "esc": "strip_handlers",
+   "sink": "dom",
+   "verified": false,
+   "payload": null,
+   "findings": -1,
+   "types": [
+    "ERROR:exit=3: 2026-10-17 01:03:27 [ERROR] xsse"
+   ]
+  },
+  {
+   "ctx": "svg",
+   "esc": "entity_decode",
+   "sink": "dom",
+   "verified": false,
+   "payload": null,
+   "findings": -1,
+   "types": [
+    "ERROR:exit=3: 2026-10-17 01:03:28 [ERROR] xsse"
+   ]
+  },
+  {
+   "ctx": "svg",
+   "esc": "escape_lt_only",
+   "sink": "dom",
+   "verified": false,
+   "payload": null,
+   "findings": -1,
+   "types": [
+    "ERROR:exit=3: 2026-10-17 01:03:29 [ERROR] xsse"
+   ]
+  },
+  {
+   "ctx": "svg",
+   "esc": "strip_script_recursive",
+   "sink": "dom",
+   "verified": false,
+   "payload": null,
+   "findings": -1,
+   "types": [
+    "ERROR:exit=3: 2026-10-17 01:03:30 [ERROR] xsse"
+   ]
+  }
+ ]
+}

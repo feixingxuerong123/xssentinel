@@ -1,5 +1,7 @@
 """Dump FP/FN details from the latest benchmark result."""
-import json, sys, os
+import json
+import sys
+import os
 sys.stdout = open(sys.stdout.fileno(), mode='w', encoding='utf-8', buffering=1)
 
 results_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "results")

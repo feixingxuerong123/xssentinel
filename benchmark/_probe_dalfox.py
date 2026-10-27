@@ -5,7 +5,7 @@ import sys
 import threading
 
 sys.path.insert(0, "benchmark")
-from server import run_server, load_routes  # noqa: E402
+from server import run_server  # noqa: E402
 
 PORT = 8907
 base = f"http://127.0.0.1:{PORT}"

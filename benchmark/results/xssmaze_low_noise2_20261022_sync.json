@@ -1,0 +1,4619 @@
+{
+  "tool": "XSSentinel",
+  "engine": "sync",
+  "timestamp": "2026-10-23 13:26:03",
+  "total_cases": 194,
+  "total_time_s": 677.08,
+  "tp": 113,
+  "fp": 0,
+  "tn": 81,
+  "fn": 0,
+  "errors": 0,
+  "recall": 1.0,
+  "precision": 1.0,
+  "fpr": 0.0,
+  "f1": 1.0,
+  "cases": [
+    {
+      "case_id": "pos-elem-01",
+      "path": "/r/elem01",
+      "param": "q",
+      "mode": "raw_element",
+      "ground_truth": "vulnerable",
+      "context": "html_element",
+      "difficulty": "easy",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 0.992,
+      "findings_count": 1,
+      "requests": 68,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "<img src=x\\ onerror=alert('xssv_46f7c3e0')>",
+          "context": "html_element",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-elem-02",
+      "path": "/r/elem02",
+      "param": "q",
+      "mode": "raw_element_table",
+      "ground_truth": "vulnerable",
+      "context": "html_element",
+      "difficulty": "easy",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 1.004,
+      "findings_count": 1,
+      "requests": 68,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "<img src=x\\ onerror=alert('xssv_ac872db2')>",
+          "context": "html_element",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-elem-03",
+      "path": "/r/elem03",
+      "param": "q",
+      "mode": "raw_element_nested",
+      "ground_truth": "vulnerable",
+      "context": "html_element",
+      "difficulty": "easy",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 1.044,
+      "findings_count": 1,
+      "requests": 69,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "<img src=x\\ onerror=alert('xssv_32d4162a')>",
+          "context": "html_element",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-elem-04",
+      "path": "/r/elem04",
+      "param": "q",
+      "mode": "raw_element_span",
+      "ground_truth": "vulnerable",
+      "context": "html_element",
+      "difficulty": "easy",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 0.998,
+      "findings_count": 1,
+      "requests": 68,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "<img src=x\\ onerror=alert('xssv_c1a0d102')>",
+          "context": "html_element",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-elem-05",
+      "path": "/r/elem05",
+      "param": "q",
+      "mode": "raw_element_li",
+      "ground_truth": "vulnerable",
+      "context": "html_element",
+      "difficulty": "easy",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 1.008,
+      "findings_count": 1,
+      "requests": 69,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "<img src=x\\ onerror=alert('xssv_5e24d267')>",
+          "context": "html_element",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-attr-01",
+      "path": "/r/attr01",
+      "param": "q",
+      "mode": "raw_attr_dq",
+      "ground_truth": "vulnerable",
+      "context": "html_attribute_dq",
+      "difficulty": "easy",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 0.98,
+      "findings_count": 1,
+      "requests": 59,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "\"><script>alert('xssv_55596892')</script>",
+          "context": "html_attribute_dq",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-attr-02",
+      "path": "/r/attr02",
+      "param": "q",
+      "mode": "raw_attr_sq",
+      "ground_truth": "vulnerable",
+      "context": "html_attribute_sq",
+      "difficulty": "easy",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 1.017,
+      "findings_count": 1,
+      "requests": 59,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "'><script>alert('xssv_213df931')</script>",
+          "context": "html_attribute_sq",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-attr-03",
+      "path": "/r/attr03",
+      "param": "q",
+      "mode": "raw_attr_nq",
+      "ground_truth": "vulnerable",
+      "context": "html_attribute_noquote",
+      "difficulty": "medium",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 1.084,
+      "findings_count": 1,
+      "requests": 95,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "data:text/html,<img src=x onerror=alert('xssv_04c73c95')>",
+          "context": "url_href",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-attr-04",
+      "path": "/r/attr04",
+      "param": "q",
+      "mode": "raw_attr_dq_href",
+      "ground_truth": "vulnerable",
+      "context": "url_href",
+      "difficulty": "easy",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 1.009,
+      "findings_count": 2,
+      "requests": 61,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "javascript:alert('xssv_fecf8467')",
+          "context": "url_href",
+          "severity": "high",
+          "confidence": "high"
+        },
+        {
+          "type": "markdown_xss",
+          "payload": "![x](x\" onerror=alert(\"xsmd_dc136b\"))",
+          "context": "markdown_render",
+          "severity": "medium",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-attr-05",
+      "path": "/r/attr05",
+      "param": "q",
+      "mode": "raw_attr_dq_src",
+      "ground_truth": "vulnerable",
+      "context": "html_attribute_dq",
+      "difficulty": "medium",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 1.158,
+      "findings_count": 1,
+      "requests": 121,
+      "finding_details": [
+        {
+          "type": "polyglot_reflection",
+          "payload": "\">\"</script></style>-->><details open ontoggle=alert('xss_poly_14855da9')>",
+          "context": "event_handler",
+          "severity": "medium",
+          "confidence": "medium"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-attr-06",
+      "path": "/r/attr06",
+      "param": "q",
+      "mode": "raw_attr_dq_action",
+      "ground_truth": "vulnerable",
+      "context": "url_href",
+      "difficulty": "medium",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 0.956,
+      "findings_count": 1,
+      "requests": 59,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "\"><script>alert('xssv_9e48d6df')</script>",
+          "context": "html_attribute_dq",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-attr-07",
+      "path": "/r/attr07",
+      "param": "q",
+      "mode": "raw_attr_dq_event",
+      "ground_truth": "vulnerable",
+      "context": "event_handler",
+      "difficulty": "easy",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 11.419,
+      "findings_count": 1,
+      "requests": 59,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "alert('xssv_05e459a2')",
+          "context": "event_handler",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-attr-08",
+      "path": "/r/attr08",
+      "param": "q",
+      "mode": "raw_attr_dq_style",
+      "ground_truth": "vulnerable",
+      "context": "css_context",
+      "difficulty": "hard",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 0.995,
+      "findings_count": 1,
+      "requests": 59,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "background:url(javascript:alert('xssv_8808f663'))",
+          "context": "css_context",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-attr-09",
+      "path": "/r/attr09",
+      "param": "q",
+      "mode": "raw_attr_dq_formaction",
+      "ground_truth": "vulnerable",
+      "context": "url_href",
+      "difficulty": "medium",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 0.968,
+      "findings_count": 1,
+      "requests": 59,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "\"><script>alert('xssv_6aa6ad2f')</script>",
+          "context": "html_attribute_dq",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-attr-10",
+      "path": "/r/attr10",
+      "param": "q",
+      "mode": "raw_attr_dq_data",
+      "ground_truth": "vulnerable",
+      "context": "url_href",
+      "difficulty": "medium",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 0.966,
+      "findings_count": 1,
+      "requests": 59,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "\"><script>alert('xssv_f2b727a4')</script>",
+          "context": "html_attribute_dq",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-script-01",
+      "path": "/r/scr01",
+      "param": "q",
+      "mode": "raw_script_string_dq",
+      "ground_truth": "vulnerable",
+      "context": "script_string_dq",
+      "difficulty": "easy",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 1.005,
+      "findings_count": 1,
+      "requests": 59,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "\"></script><script>alert('xssv_2459d487')</script>",
+          "context": "script_string_dq",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-script-02",
+      "path": "/r/scr02",
+      "param": "q",
+      "mode": "raw_script_string_sq",
+      "ground_truth": "vulnerable",
+      "context": "script_string_sq",
+      "difficulty": "easy",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 0.993,
+      "findings_count": 1,
+      "requests": 59,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "';alert('xssv_ec8d2286');//",
+          "context": "script_string_sq",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-script-03",
+      "path": "/r/scr03",
+      "param": "q",
+      "mode": "raw_script_block",
+      "ground_truth": "vulnerable",
+      "context": "script_block",
+      "difficulty": "easy",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 0.994,
+      "findings_count": 1,
+      "requests": 59,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "alert('xssv_cfae7b1e')",
+          "context": "script_block",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-script-04",
+      "path": "/r/scr04",
+      "param": "q",
+      "mode": "raw_script_template",
+      "ground_truth": "vulnerable",
+      "context": "script_template",
+      "difficulty": "medium",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 0.989,
+      "findings_count": 1,
+      "requests": 59,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "${alert('xssv_1033867f')}",
+          "context": "script_template",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-script-05",
+      "path": "/r/scr05",
+      "param": "q",
+      "mode": "raw_script_comment",
+      "ground_truth": "vulnerable",
+      "context": "script_block",
+      "difficulty": "medium",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 1.251,
+      "findings_count": 1,
+      "requests": 148,
+      "finding_details": [
+        {
+          "type": "polyglot_reflection",
+          "payload": "\">\"</script></style>-->><img src=x onerror=alert('xss_poly_d2e623d5')>",
+          "context": "event_handler",
+          "severity": "medium",
+          "confidence": "medium"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-script-06",
+      "path": "/r/scr06",
+      "param": "q",
+      "mode": "raw_script_close",
+      "ground_truth": "vulnerable",
+      "context": "script_block",
+      "difficulty": "easy",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 0.986,
+      "findings_count": 1,
+      "requests": 59,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "\"></script><script>alert('xssv_a7d1add6')</script>",
+          "context": "script_string_dq",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-svg-01",
+      "path": "/r/svg01",
+      "param": "q",
+      "mode": "raw_svg",
+      "ground_truth": "vulnerable",
+      "context": "svg_context",
+      "difficulty": "easy",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 1.008,
+      "findings_count": 1,
+      "requests": 59,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "<svg/onload=alert('xssv_572bfa29')>",
+          "context": "svg_context",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-svg-02",
+      "path": "/r/svg02",
+      "param": "q",
+      "mode": "raw_svg_attr",
+      "ground_truth": "vulnerable",
+      "context": "html_attribute_dq",
+      "difficulty": "medium",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 0.994,
+      "findings_count": 1,
+      "requests": 59,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "\"><script>alert('xssv_f0c4732c')</script>",
+          "context": "html_attribute_dq",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-svg-03",
+      "path": "/r/svg03",
+      "param": "q",
+      "mode": "raw_svg_onload",
+      "ground_truth": "vulnerable",
+      "context": "event_handler",
+      "difficulty": "easy",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 10.243,
+      "findings_count": 1,
+      "requests": 59,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "alert('xssv_3338f81c')",
+          "context": "event_handler",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-svg-04",
+      "path": "/r/svg04",
+      "param": "q",
+      "mode": "raw_svg_animate",
+      "ground_truth": "vulnerable",
+      "context": "svg_context",
+      "difficulty": "hard",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 0.988,
+      "findings_count": 1,
+      "requests": 59,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "<svg/onload=alert('xssv_95a11122')>",
+          "context": "svg_context",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-math-01",
+      "path": "/r/math01",
+      "param": "q",
+      "mode": "raw_math",
+      "ground_truth": "vulnerable",
+      "context": "math_context",
+      "difficulty": "medium",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 1.009,
+      "findings_count": 1,
+      "requests": 77,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "<math><mtext><img src=x onerror=alert('xssv_afaa63b8')>",
+          "context": "math_context",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-math-02",
+      "path": "/r/math02",
+      "param": "q",
+      "mode": "raw_math_href",
+      "ground_truth": "vulnerable",
+      "context": "math_context",
+      "difficulty": "hard",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 1.065,
+      "findings_count": 1,
+      "requests": 77,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "\"><img src=x onerror=alert('xssv_df81b295')>",
+          "context": "html_attribute_dq",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-url-01",
+      "path": "/r/url01",
+      "param": "q",
+      "mode": "raw_href_js",
+      "ground_truth": "vulnerable",
+      "context": "url_javascript",
+      "difficulty": "easy",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 0.993,
+      "findings_count": 2,
+      "requests": 61,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "javascript:alert('xssv_05d65689')",
+          "context": "url_href",
+          "severity": "high",
+          "confidence": "high"
+        },
+        {
+          "type": "markdown_xss",
+          "payload": "![x](x\" onerror=alert(\"xsmd_4178a9\"))",
+          "context": "markdown_render",
+          "severity": "medium",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-url-02",
+      "path": "/r/url02",
+      "param": "q",
+      "mode": "raw_href_data",
+      "ground_truth": "vulnerable",
+      "context": "url_href",
+      "difficulty": "medium",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 0.995,
+      "findings_count": 2,
+      "requests": 61,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "javascript:alert('xssv_72b88cb8')",
+          "context": "url_href",
+          "severity": "high",
+          "confidence": "high"
+        },
+        {
+          "type": "markdown_xss",
+          "payload": "![x](x\" onerror=alert(\"xsmd_b42107\"))",
+          "context": "markdown_render",
+          "severity": "medium",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-url-03",
+      "path": "/r/url03",
+      "param": "q",
+      "mode": "raw_meta_refresh",
+      "ground_truth": "vulnerable",
+      "context": "meta_refresh",
+      "difficulty": "medium",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 1.274,
+      "findings_count": 1,
+      "requests": 148,
+      "finding_details": [
+        {
+          "type": "polyglot_reflection",
+          "payload": "\">\"</script></style>-->><img src=x onerror=alert('xss_poly_43234681')>",
+          "context": "event_handler",
+          "severity": "medium",
+          "confidence": "medium"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-url-04",
+      "path": "/r/url04",
+      "param": "q",
+      "mode": "raw_iframe_src",
+      "ground_truth": "vulnerable",
+      "context": "url_href",
+      "difficulty": "medium",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 0.999,
+      "findings_count": 1,
+      "requests": 59,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "javascript:alert('xssv_798e8d46')",
+          "context": "url_href",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-url-05",
+      "path": "/r/url05",
+      "param": "q",
+      "mode": "raw_iframe_srcdoc",
+      "ground_truth": "vulnerable",
+      "context": "html_attribute_dq",
+      "difficulty": "medium",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 0.995,
+      "findings_count": 1,
+      "requests": 60,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "&quot;&gt;&lt;script&gt;alert&#40;&apos;xssv_0c4f56b4&apos;&#41;&lt;&#x2F;script&gt;",
+          "context": "html_attribute_dq",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-url-06",
+      "path": "/r/url06",
+      "param": "q",
+      "mode": "raw_base_href",
+      "ground_truth": "vulnerable",
+      "context": "url_href",
+      "difficulty": "hard",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 1.142,
+      "findings_count": 1,
+      "requests": 121,
+      "finding_details": [
+        {
+          "type": "polyglot_reflection",
+          "payload": "\">\"</script></style>-->><body onload=alert('xss_poly_b682b636')>",
+          "context": "event_handler",
+          "severity": "medium",
+          "confidence": "medium"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-url-03",
+      "path": "/s/url03",
+      "param": "q",
+      "mode": "escape_meta_refresh_js",
+      "ground_truth": "safe",
+      "context": "meta_refresh",
+      "difficulty": "medium",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 1.253,
+      "findings_count": 0,
+      "requests": 150,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-style-01",
+      "path": "/r/sty01",
+      "param": "q",
+      "mode": "raw_style_block",
+      "ground_truth": "vulnerable",
+      "context": "css_context",
+      "difficulty": "hard",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 0.965,
+      "findings_count": 1,
+      "requests": 59,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "background:url(javascript:alert('xssv_330a0bba'))",
+          "context": "css_context",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-comment-01",
+      "path": "/r/cmt01",
+      "param": "q",
+      "mode": "raw_comment",
+      "ground_truth": "vulnerable",
+      "context": "html_comment",
+      "difficulty": "medium",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 0.961,
+      "findings_count": 1,
+      "requests": 59,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "--><script>alert('xssv_b341903d')</script>",
+          "context": "html_comment",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-cdata-01",
+      "path": "/r/cdata01",
+      "param": "q",
+      "mode": "raw_cdata",
+      "ground_truth": "vulnerable",
+      "context": "cdata",
+      "difficulty": "hard",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 0.948,
+      "findings_count": 1,
+      "requests": 59,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "]]></script><script>alert('xssv_088df3e5')</script><![CDATA[",
+          "context": "cdata",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-tpl-01",
+      "path": "/r/tpl01",
+      "param": "q",
+      "mode": "raw_template",
+      "ground_truth": "vulnerable",
+      "context": "template_angular",
+      "difficulty": "medium",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 0.957,
+      "findings_count": 1,
+      "requests": 59,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "{{constructor.constructor('alert('xssv_f9bb6100')')()}}",
+          "context": "template_angular",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-tpl-02",
+      "path": "/r/tpl02",
+      "param": "q",
+      "mode": "raw_template_vue",
+      "ground_truth": "vulnerable",
+      "context": "template_angular",
+      "difficulty": "medium",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 0.965,
+      "findings_count": 1,
+      "requests": 59,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "{{constructor.constructor('alert('xssv_e9d58f1d')')()}}",
+          "context": "template_angular",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-embed-01",
+      "path": "/r/emb01",
+      "param": "q",
+      "mode": "raw_element_embed",
+      "ground_truth": "vulnerable",
+      "context": "html_element",
+      "difficulty": "medium",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 1.005,
+      "findings_count": 1,
+      "requests": 68,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "<img src=x\\ onerror=alert('xssv_48f22835')>",
+          "context": "html_element",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-form-01",
+      "path": "/r/form01",
+      "param": "q",
+      "mode": "raw_element_form",
+      "ground_truth": "vulnerable",
+      "context": "html_element",
+      "difficulty": "medium",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 0.996,
+      "findings_count": 1,
+      "requests": 68,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "<img src=x\\ onerror=alert('xssv_8e29d37d')>",
+          "context": "html_element",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-input-01",
+      "path": "/r/inp01",
+      "param": "q",
+      "mode": "raw_element_input",
+      "ground_truth": "vulnerable",
+      "context": "html_element",
+      "difficulty": "easy",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 0.998,
+      "findings_count": 1,
+      "requests": 68,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "<img src=x\\ onerror=alert('xssv_a3c5f599')>",
+          "context": "html_element",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-select-01",
+      "path": "/r/sel01",
+      "param": "q",
+      "mode": "raw_element_select",
+      "ground_truth": "vulnerable",
+      "context": "html_element",
+      "difficulty": "easy",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 0.983,
+      "findings_count": 1,
+      "requests": 68,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "<img src=x\\ onerror=alert('xssv_462b4d5b')>",
+          "context": "html_element",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-details-01",
+      "path": "/r/det01",
+      "param": "q",
+      "mode": "raw_element_details",
+      "ground_truth": "vulnerable",
+      "context": "html_element",
+      "difficulty": "easy",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 1.004,
+      "findings_count": 1,
+      "requests": 68,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "<img src=x\\ onerror=alert('xssv_15fc3643')>",
+          "context": "html_element",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-video-01",
+      "path": "/r/vid01",
+      "param": "q",
+      "mode": "raw_element_video",
+      "ground_truth": "vulnerable",
+      "context": "html_element",
+      "difficulty": "easy",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 0.988,
+      "findings_count": 1,
+      "requests": 68,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "<img src=x\\ onerror=alert('xssv_20de6024')>",
+          "context": "html_element",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-body-01",
+      "path": "/r/body01",
+      "param": "q",
+      "mode": "raw_element_body",
+      "ground_truth": "vulnerable",
+      "context": "event_handler",
+      "difficulty": "easy",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 0.977,
+      "findings_count": 1,
+      "requests": 68,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "<img src=x\\ onerror=alert('xssv_6461bade')>",
+          "context": "html_element",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-a-01",
+      "path": "/r/a01",
+      "param": "q",
+      "mode": "raw_element_a",
+      "ground_truth": "vulnerable",
+      "context": "html_element",
+      "difficulty": "easy",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 1.017,
+      "findings_count": 1,
+      "requests": 68,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "<img src=x\\ onerror=alert('xssv_22b376e6')>",
+          "context": "html_element",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-div-tab-01",
+      "path": "/r/tab01",
+      "param": "q",
+      "mode": "raw_element_div_tabindex",
+      "ground_truth": "vulnerable",
+      "context": "html_element",
+      "difficulty": "medium",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 1.0,
+      "findings_count": 1,
+      "requests": 68,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "<img src=x\\ onerror=alert('xssv_e073a5ae')>",
+          "context": "html_element",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-foreign-01",
+      "path": "/r/for01",
+      "param": "q",
+      "mode": "raw_svg_foreignobject",
+      "ground_truth": "vulnerable",
+      "context": "svg_context",
+      "difficulty": "hard",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 0.976,
+      "findings_count": 1,
+      "requests": 59,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "<svg/onload=alert('xssv_2ab70693')>",
+          "context": "svg_context",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-encode-01",
+      "path": "/r/enc01",
+      "param": "q",
+      "mode": "raw_url_decode",
+      "ground_truth": "vulnerable",
+      "context": "html_element",
+      "difficulty": "medium",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 1.004,
+      "findings_count": 1,
+      "requests": 68,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "<img src=x\\ onerror=alert('xssv_db2c493c')>",
+          "context": "html_element",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-encode-02",
+      "path": "/r/enc02",
+      "param": "q",
+      "mode": "raw_double_decode",
+      "ground_truth": "vulnerable",
+      "context": "html_element",
+      "difficulty": "hard",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 0.981,
+      "findings_count": 1,
+      "requests": 68,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "<img src=x\\ onerror=alert('xssv_4c4a214a')>",
+          "context": "html_element",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-dom-01",
+      "path": "/dom/hash-innerhtml",
+      "param": "",
+      "mode": "dom_hash_innerhtml",
+      "ground_truth": "vulnerable",
+      "context": "dom_xss",
+      "difficulty": "easy",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 10.016,
+      "findings_count": 1,
+      "requests": 52,
+      "finding_details": [
+        {
+          "type": "dom_dynamic",
+          "payload": "xssentinel_dom_f6611c65",
+          "context": "Element.innerHTML",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-dom-02",
+      "path": "/dom/search-eval",
+      "param": "x",
+      "mode": "dom_search_eval",
+      "ground_truth": "vulnerable",
+      "context": "dom_xss",
+      "difficulty": "medium",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 12.128,
+      "findings_count": 1,
+      "requests": 53,
+      "finding_details": [
+        {
+          "type": "dom_dynamic",
+          "payload": "xssentinel_dom_a54b4382",
+          "context": "eval",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-dom-03",
+      "path": "/dom/postmsg",
+      "param": "",
+      "mode": "dom_postmessage",
+      "ground_truth": "vulnerable",
+      "context": "dom_xss",
+      "difficulty": "medium",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 10.266,
+      "findings_count": 1,
+      "requests": 53,
+      "finding_details": [
+        {
+          "type": "dom_dynamic",
+          "payload": "xssentinel_dom_4a47fd2a",
+          "context": "Element.innerHTML",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-dom-04",
+      "path": "/dom/hash-docwrite",
+      "param": "",
+      "mode": "dom_hash_docwrite",
+      "ground_truth": "vulnerable",
+      "context": "dom_xss",
+      "difficulty": "easy",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 10.088,
+      "findings_count": 1,
+      "requests": 52,
+      "finding_details": [
+        {
+          "type": "dom_dynamic",
+          "payload": "xssentinel_dom_cec00bca",
+          "context": "document.write",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-dom-05",
+      "path": "/dom/jquery-html",
+      "param": "",
+      "mode": "dom_jquery_html",
+      "ground_truth": "vulnerable",
+      "context": "dom_xss",
+      "difficulty": "medium",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 10.059,
+      "findings_count": 2,
+      "requests": 52,
+      "finding_details": [
+        {
+          "type": "dom_dynamic",
+          "payload": "xssentinel_dom_48e32d1e",
+          "context": "jQuery.html",
+          "severity": "high",
+          "confidence": "high"
+        },
+        {
+          "type": "dom_dynamic",
+          "payload": "xssentinel_dom_48e32d1e",
+          "context": "Element.innerHTML",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-dom-06",
+      "path": "/dom/hash-settimeout",
+      "param": "",
+      "mode": "dom_hash_settimeout",
+      "ground_truth": "vulnerable",
+      "context": "dom_xss",
+      "difficulty": "hard",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 11.223,
+      "findings_count": 1,
+      "requests": 52,
+      "finding_details": [
+        {
+          "type": "dom_dynamic",
+          "payload": "xssentinel_dom_b9a25085",
+          "context": "setTimeout",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-dom-07",
+      "path": "/dom/hash-route#/route",
+      "param": "q",
+      "mode": "dom_hash_route_innerhtml",
+      "ground_truth": "vulnerable",
+      "context": "dom_xss",
+      "difficulty": "medium",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 11.363,
+      "findings_count": 1,
+      "requests": 52,
+      "finding_details": [
+        {
+          "type": "dom_dynamic",
+          "payload": "xssentinel_dom_37c7721a",
+          "context": "Element.innerHTML",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-dom-07",
+      "path": "/dom/hash-route-safe#/route",
+      "param": "q",
+      "mode": "dom_hash_route_safe",
+      "ground_truth": "safe",
+      "context": "dom_xss",
+      "difficulty": "medium",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 10.321,
+      "findings_count": 0,
+      "requests": 52,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-dom-08",
+      "path": "/dom/tt-innerhtml#/route",
+      "param": "q",
+      "mode": "dom_tt_wrapper_innerhtml",
+      "ground_truth": "vulnerable",
+      "context": "dom_xss",
+      "difficulty": "hard",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 11.462,
+      "findings_count": 1,
+      "requests": 52,
+      "finding_details": [
+        {
+          "type": "dom_dynamic",
+          "payload": "xssentinel_dom_7474ae64",
+          "context": "Element.innerHTML",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-dom-08",
+      "path": "/dom/tt-innerhtml-safe#/route",
+      "param": "q",
+      "mode": "dom_tt_wrapper_safe",
+      "ground_truth": "safe",
+      "context": "dom_xss",
+      "difficulty": "hard",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 10.258,
+      "findings_count": 0,
+      "requests": 52,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-stored-02",
+      "path": "/r/st02",
+      "param": "comment",
+      "mode": "stored_api_write",
+      "ground_truth": "vulnerable",
+      "context": "html_element",
+      "difficulty": "hard",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 6.923,
+      "findings_count": 1,
+      "requests": 72,
+      "finding_details": [
+        {
+          "type": "stored_dom",
+          "payload": "<img src=x onerror=alert('xssv_f9c9f344')>",
+          "context": "stored_dom_view",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-stored-02",
+      "path": "/s/st02",
+      "param": "comment",
+      "mode": "stored_api_write_escaped",
+      "ground_truth": "safe",
+      "context": "html_element",
+      "difficulty": "hard",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 8.065,
+      "findings_count": 0,
+      "requests": 80,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-polyglot-01",
+      "path": "/r/poly01",
+      "param": "q",
+      "mode": "raw_element",
+      "ground_truth": "vulnerable",
+      "context": "html_element",
+      "difficulty": "hard",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 1.025,
+      "findings_count": 1,
+      "requests": 68,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "<img src=x\\ onerror=alert('xssv_dfafbd57')>",
+          "context": "html_element",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-marquee-01",
+      "path": "/r/marq01",
+      "param": "q",
+      "mode": "raw_element_marquee",
+      "ground_truth": "vulnerable",
+      "context": "html_element",
+      "difficulty": "easy",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 1.006,
+      "findings_count": 1,
+      "requests": 68,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "<img src=x\\ onerror=alert('xssv_fb72eb4d')>",
+          "context": "html_element",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-audio-01",
+      "path": "/r/aud01",
+      "param": "q",
+      "mode": "raw_element_audio",
+      "ground_truth": "vulnerable",
+      "context": "html_element",
+      "difficulty": "easy",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 1.001,
+      "findings_count": 1,
+      "requests": 68,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "<img src=x\\ onerror=alert('xssv_916a0c32')>",
+          "context": "html_element",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-escape-01",
+      "path": "/s/esc01",
+      "param": "q",
+      "mode": "escape_element",
+      "ground_truth": "safe",
+      "context": "html_element",
+      "difficulty": "easy",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 1.013,
+      "findings_count": 0,
+      "requests": 68,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-escape-02",
+      "path": "/s/esc02",
+      "param": "q",
+      "mode": "escape_attr_dq",
+      "ground_truth": "safe",
+      "context": "html_attribute_dq",
+      "difficulty": "easy",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 0.998,
+      "findings_count": 0,
+      "requests": 68,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-escape-03",
+      "path": "/s/esc03",
+      "param": "q",
+      "mode": "escape_attr_sq",
+      "ground_truth": "safe",
+      "context": "html_attribute_sq",
+      "difficulty": "easy",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 0.999,
+      "findings_count": 0,
+      "requests": 69,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-escape-04",
+      "path": "/s/esc04",
+      "param": "q",
+      "mode": "escape_script_string",
+      "ground_truth": "safe",
+      "context": "script_string_dq",
+      "difficulty": "medium",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 1.362,
+      "findings_count": 0,
+      "requests": 165,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-escape-05",
+      "path": "/s/esc05",
+      "param": "q",
+      "mode": "escape_href",
+      "ground_truth": "safe",
+      "context": "url_href",
+      "difficulty": "medium",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 1.144,
+      "findings_count": 0,
+      "requests": 124,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-escape-06",
+      "path": "/s/esc06",
+      "param": "q",
+      "mode": "escape_attr_nq",
+      "ground_truth": "safe",
+      "context": "html_attribute_noquote",
+      "difficulty": "medium",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 1.022,
+      "findings_count": 0,
+      "requests": 84,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-rcdata-01",
+      "path": "/s/rcd01",
+      "param": "q",
+      "mode": "rcdata_textarea",
+      "ground_truth": "vulnerable",
+      "context": "html_element",
+      "difficulty": "medium",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 0.994,
+      "findings_count": 1,
+      "requests": 68,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "</textarea><img src=x\\ onerror=alert('xssv_b6f418ef')>",
+          "context": "html_element",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-rcdata-02",
+      "path": "/s/rcd02",
+      "param": "q",
+      "mode": "rcdata_title",
+      "ground_truth": "vulnerable",
+      "context": "html_element",
+      "difficulty": "medium",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 1.003,
+      "findings_count": 1,
+      "requests": 69,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "</title><img src=x\\ onerror=alert('xssv_b0b864c9')>",
+          "context": "html_element",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-rcdata-03",
+      "path": "/s/rcd03",
+      "param": "q",
+      "mode": "rcdata_xmp",
+      "ground_truth": "vulnerable",
+      "context": "html_element",
+      "difficulty": "hard",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 0.998,
+      "findings_count": 1,
+      "requests": 68,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "</xmp><img src=x\\ onerror=alert('xssv_dd3dc525')>",
+          "context": "html_element",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-rcdata-04",
+      "path": "/s/rcd04",
+      "param": "q",
+      "mode": "rcdata_textarea_script",
+      "ground_truth": "vulnerable",
+      "context": "html_element",
+      "difficulty": "hard",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 0.994,
+      "findings_count": 1,
+      "requests": 68,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "</textarea><img src=x\\ onerror=alert('xssv_304f1dd5')>",
+          "context": "html_element",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-comment-01",
+      "path": "/s/cmt01",
+      "param": "q",
+      "mode": "comment_stripped",
+      "ground_truth": "safe",
+      "context": "html_comment",
+      "difficulty": "medium",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 1.069,
+      "findings_count": 0,
+      "requests": 108,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-comment-02",
+      "path": "/s/cmt02",
+      "param": "q",
+      "mode": "comment_encoded",
+      "ground_truth": "safe",
+      "context": "html_comment",
+      "difficulty": "easy",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 1.099,
+      "findings_count": 0,
+      "requests": 114,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-attr-01",
+      "path": "/s/attr01",
+      "param": "q",
+      "mode": "attr_quotes_stripped",
+      "ground_truth": "safe",
+      "context": "html_attribute_dq",
+      "difficulty": "medium",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 1.245,
+      "findings_count": 0,
+      "requests": 151,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-attr-02",
+      "path": "/s/attr02",
+      "param": "q",
+      "mode": "attr_alnum_whitelist",
+      "ground_truth": "safe",
+      "context": "html_attribute_dq",
+      "difficulty": "easy",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 1.196,
+      "findings_count": 0,
+      "requests": 151,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-attr-03",
+      "path": "/s/attr03",
+      "param": "q",
+      "mode": "attr_data_escaped",
+      "ground_truth": "safe",
+      "context": "html_attribute_dq",
+      "difficulty": "easy",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 0.979,
+      "findings_count": 0,
+      "requests": 68,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-attr-04",
+      "path": "/s/attr04",
+      "param": "q",
+      "mode": "attr_angle_stripped",
+      "ground_truth": "safe",
+      "context": "html_attribute_dq",
+      "difficulty": "medium",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 1.174,
+      "findings_count": 0,
+      "requests": 151,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-csp-01",
+      "path": "/s/csp01",
+      "param": "q",
+      "mode": "csp_strict_element",
+      "ground_truth": "safe",
+      "context": "html_element",
+      "difficulty": "hard",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 1.06,
+      "findings_count": 0,
+      "requests": 96,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-csp-02",
+      "path": "/s/csp02",
+      "param": "q",
+      "mode": "csp_strict_href",
+      "ground_truth": "safe",
+      "context": "url_href",
+      "difficulty": "hard",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 1.042,
+      "findings_count": 0,
+      "requests": 88,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-csp-03",
+      "path": "/s/csp03",
+      "param": "q",
+      "mode": "csp_nonce_element",
+      "ground_truth": "safe",
+      "context": "html_element",
+      "difficulty": "hard",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 1.268,
+      "findings_count": 0,
+      "requests": 168,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-csp-04",
+      "path": "/s/csp04",
+      "param": "q",
+      "mode": "csp_strict_attr",
+      "ground_truth": "safe",
+      "context": "html_attribute_dq",
+      "difficulty": "hard",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 1.062,
+      "findings_count": 0,
+      "requests": 96,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-jsonp-01",
+      "path": "/s/jsonp01",
+      "param": "callback",
+      "mode": "jsonp_whitelist",
+      "ground_truth": "safe",
+      "context": "script_block",
+      "difficulty": "medium",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 1.214,
+      "findings_count": 0,
+      "requests": 170,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-jsonp-02",
+      "path": "/s/jsonp02",
+      "param": "callback",
+      "mode": "jsonp_wrapped",
+      "ground_truth": "safe",
+      "context": "script_block",
+      "difficulty": "medium",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 1.223,
+      "findings_count": 0,
+      "requests": 169,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-filter-01",
+      "path": "/s/flt01",
+      "param": "q",
+      "mode": "filter_script_tag",
+      "ground_truth": "vulnerable",
+      "context": "html_element",
+      "difficulty": "hard",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 1.118,
+      "findings_count": 1,
+      "requests": 122,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "<a id=x href=javascript:alert('xssv_673d22ba')>",
+          "context": "html_element",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-filter-02",
+      "path": "/s/flt02",
+      "param": "q",
+      "mode": "filter_event_handlers",
+      "ground_truth": "vulnerable",
+      "context": "html_element",
+      "difficulty": "hard",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 1.168,
+      "findings_count": 1,
+      "requests": 122,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "<a id=x href=javascript:alert('xssv_bb674873')>",
+          "context": "html_element",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-filter-03",
+      "path": "/s/flt03",
+      "param": "q",
+      "mode": "filter_javascript_uri",
+      "ground_truth": "vulnerable",
+      "context": "url_href",
+      "difficulty": "hard",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 1.246,
+      "findings_count": 2,
+      "requests": 123,
+      "finding_details": [
+        {
+          "type": "polyglot_reflection",
+          "payload": "\">\"</script></style>-->><img src=x onerror=alert('xss_poly_3f0e312b')>",
+          "context": "event_handler",
+          "severity": "medium",
+          "confidence": "medium"
+        },
+        {
+          "type": "markdown_xss",
+          "payload": "![x](x\" onerror=alert(\"xsmd_f5a9ff\"))",
+          "context": "markdown_render",
+          "severity": "medium",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-filter-04",
+      "path": "/s/flt04",
+      "param": "q",
+      "mode": "filter_angle_brackets",
+      "ground_truth": "safe",
+      "context": "html_element",
+      "difficulty": "easy",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 1.232,
+      "findings_count": 0,
+      "requests": 143,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-filter-05",
+      "path": "/s/flt05",
+      "param": "q",
+      "mode": "filter_keywords",
+      "ground_truth": "vulnerable",
+      "context": "html_element",
+      "difficulty": "hard",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 1.168,
+      "findings_count": 1,
+      "requests": 129,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "<a id=x href=javascript:window['ale'+'rt']('xssv_7cb236eb')>",
+          "context": "html_element",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-filter-06",
+      "path": "/s/flt06",
+      "param": "q",
+      "mode": "filter_recursive_script",
+      "ground_truth": "vulnerable",
+      "context": "html_element",
+      "difficulty": "hard",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 1.145,
+      "findings_count": 1,
+      "requests": 122,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "<a id=x href=javascript:alert('xssv_a3ad494f')>",
+          "context": "html_element",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-encode-01",
+      "path": "/s/enc01",
+      "param": "q",
+      "mode": "output_urlencoded",
+      "ground_truth": "safe",
+      "context": "html_element",
+      "difficulty": "medium",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 1.02,
+      "findings_count": 0,
+      "requests": 68,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-encode-02",
+      "path": "/s/enc02",
+      "param": "q",
+      "mode": "output_base64",
+      "ground_truth": "safe",
+      "context": "html_element",
+      "difficulty": "easy",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 0.469,
+      "findings_count": 0,
+      "requests": 53,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-encode-03",
+      "path": "/s/enc03",
+      "param": "q",
+      "mode": "double_encode_safe",
+      "ground_truth": "safe",
+      "context": "html_element",
+      "difficulty": "medium",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 1.024,
+      "findings_count": 0,
+      "requests": 68,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-encode-04",
+      "path": "/s/enc04",
+      "param": "q",
+      "mode": "case_lower_strip",
+      "ground_truth": "safe",
+      "context": "html_element",
+      "difficulty": "medium",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 1.241,
+      "findings_count": 0,
+      "requests": 151,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-json-01",
+      "path": "/s/json01",
+      "param": "q",
+      "mode": "json_string_escaped",
+      "ground_truth": "safe",
+      "context": "script_string_dq",
+      "difficulty": "medium",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 1.364,
+      "findings_count": 0,
+      "requests": 151,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-json-02",
+      "path": "/s/json02",
+      "param": "q",
+      "mode": "json_object_value",
+      "ground_truth": "safe",
+      "context": "script_block",
+      "difficulty": "medium",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 1.344,
+      "findings_count": 0,
+      "requests": 151,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-jsonct-raw-01",
+      "path": "/r/jsonct01",
+      "param": "q",
+      "mode": "jsonct_raw",
+      "ground_truth": "safe",
+      "context": "script_string_dq",
+      "difficulty": "medium",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 1.113,
+      "findings_count": 0,
+      "requests": 97,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-jsonct-01",
+      "path": "/s/jsonct01",
+      "param": "q",
+      "mode": "jsonct_escaped",
+      "ground_truth": "safe",
+      "context": "script_string_dq",
+      "difficulty": "medium",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 1.189,
+      "findings_count": 0,
+      "requests": 143,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-header-01",
+      "path": "/s/hdr01",
+      "param": "q",
+      "mode": "header_only",
+      "ground_truth": "safe",
+      "context": "header_reflection",
+      "difficulty": "easy",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 0.451,
+      "findings_count": 0,
+      "requests": 53,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-hdr-01",
+      "path": "/s/hdr02",
+      "param": "q",
+      "mode": "late_header_reflect",
+      "ground_truth": "vulnerable",
+      "context": "header_reflection",
+      "difficulty": "easy",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 0.892,
+      "findings_count": 1,
+      "requests": 42,
+      "finding_details": [
+        {
+          "type": "header_xss",
+          "payload": "<svg/onload=alert('xsshd_6c73de')>",
+          "context": "text",
+          "severity": "medium",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-hdr-02",
+      "path": "/s/hdr03",
+      "param": "q",
+      "mode": "late_header_reflect_escaped",
+      "ground_truth": "safe",
+      "context": "header_reflection",
+      "difficulty": "easy",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 0.953,
+      "findings_count": 0,
+      "requests": 53,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-js-01",
+      "path": "/s/js01",
+      "param": "q",
+      "mode": "js_textcontent",
+      "ground_truth": "safe",
+      "context": "script_string_dq",
+      "difficulty": "medium",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 11.089,
+      "findings_count": 0,
+      "requests": 165,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-js-02",
+      "path": "/s/js02",
+      "param": "q",
+      "mode": "js_console_log",
+      "ground_truth": "safe",
+      "context": "script_string_dq",
+      "difficulty": "easy",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 11.146,
+      "findings_count": 0,
+      "requests": 165,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-select-01",
+      "path": "/s/sel01",
+      "param": "q",
+      "mode": "select_option_escaped",
+      "ground_truth": "safe",
+      "context": "html_element",
+      "difficulty": "easy",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 1.012,
+      "findings_count": 0,
+      "requests": 68,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-null-01",
+      "path": "/s/null01",
+      "param": "q",
+      "mode": "null_byte_strip",
+      "ground_truth": "safe",
+      "context": "html_element",
+      "difficulty": "hard",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 1.218,
+      "findings_count": 0,
+      "requests": 151,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-rcdata-05",
+      "path": "/s/rcd05",
+      "param": "q",
+      "mode": "escape_rcdata_textarea",
+      "ground_truth": "safe",
+      "context": "html_element",
+      "difficulty": "medium",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 0.957,
+      "findings_count": 0,
+      "requests": 68,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-rcdata-06",
+      "path": "/s/rcd06",
+      "param": "q",
+      "mode": "escape_rcdata_title",
+      "ground_truth": "safe",
+      "context": "html_element",
+      "difficulty": "medium",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 0.968,
+      "findings_count": 0,
+      "requests": 69,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-rcdata-07",
+      "path": "/s/rcd07",
+      "param": "q",
+      "mode": "escape_rcdata_xmp",
+      "ground_truth": "safe",
+      "context": "html_element",
+      "difficulty": "hard",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 0.975,
+      "findings_count": 0,
+      "requests": 68,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-rcdata-08",
+      "path": "/s/rcd08",
+      "param": "q",
+      "mode": "escape_rcdata_textarea_script",
+      "ground_truth": "safe",
+      "context": "html_element",
+      "difficulty": "hard",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 0.996,
+      "findings_count": 0,
+      "requests": 68,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-csp-05",
+      "path": "/s/csp05",
+      "param": "q",
+      "mode": "csp_nonce_ui_element",
+      "ground_truth": "safe",
+      "context": "html_element",
+      "difficulty": "hard",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 1.328,
+      "findings_count": 0,
+      "requests": 168,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-csp-01",
+      "path": "/r/csp06",
+      "param": "q",
+      "mode": "csp_nonce_ui_leak",
+      "ground_truth": "vulnerable",
+      "context": "html_element",
+      "difficulty": "hard",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 0.968,
+      "findings_count": 1,
+      "requests": 59,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "<script nonce='k8Fj3x9Qm2Rw7Yp4'>alert('xssv_e1c3be4e')</script>",
+          "context": "html_element",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-csp-02",
+      "path": "/r/csp07",
+      "param": "q",
+      "mode": "csp_ui_element",
+      "ground_truth": "vulnerable",
+      "context": "html_element",
+      "difficulty": "medium",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 1.004,
+      "findings_count": 1,
+      "requests": 68,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "<img src=x\\ onerror=alert('xssv_c83c5135')>",
+          "context": "html_element",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-multi-01",
+      "path": "/r/mr01",
+      "param": "q",
+      "mode": "multi_escaped_then_raw",
+      "ground_truth": "vulnerable",
+      "context": "html_element",
+      "difficulty": "hard",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 0.985,
+      "findings_count": 1,
+      "requests": 66,
+      "finding_details": [
+        {
+          "type": "polyglot_reflection",
+          "payload": "\">\"</script></style>-->><img src=x onerror=alert('xss_poly_6f9159ca')>",
+          "context": "event_handler",
+          "severity": "medium",
+          "confidence": "medium"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-multi-02",
+      "path": "/r/mr02",
+      "param": "q",
+      "mode": "multi_textarea_then_raw",
+      "ground_truth": "vulnerable",
+      "context": "html_element",
+      "difficulty": "hard",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 1.023,
+      "findings_count": 1,
+      "requests": 68,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "</textarea><img src=x\\ onerror=alert('xssv_3194f200')>",
+          "context": "html_element",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-cookie-01",
+      "path": "/r/ck01",
+      "param": "q",
+      "mode": "cookie_echo",
+      "ground_truth": "vulnerable",
+      "context": "html_element",
+      "difficulty": "medium",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 0.91,
+      "findings_count": 1,
+      "requests": 52,
+      "finding_details": [
+        {
+          "type": "cookie_xss",
+          "payload": "<script>alert('xsck_032330')</script>",
+          "context": "script_block",
+          "severity": "medium",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-cookie-01",
+      "path": "/s/ck01",
+      "param": "q",
+      "mode": "cookie_echo_escaped",
+      "ground_truth": "safe",
+      "context": "html_element",
+      "difficulty": "medium",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 0.975,
+      "findings_count": 0,
+      "requests": 67,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-ctoss-01",
+      "path": "/r/ctoss01",
+      "param": "q",
+      "mode": "cookie_toss_parent",
+      "ground_truth": "vulnerable",
+      "context": "header",
+      "difficulty": "medium",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 4.654,
+      "findings_count": 1,
+      "requests": 53,
+      "finding_details": [
+        {
+          "type": "cookie_tossing_set_cookie",
+          "payload": "(cookie tossing: cookie_tossing_set_cookie)",
+          "context": "cookie_tossing_cookie_tossing_set_cookie",
+          "severity": "medium",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-ctoss-01",
+      "path": "/s/ctoss01",
+      "param": "q",
+      "mode": "cookie_toss_self",
+      "ground_truth": "safe",
+      "context": "header",
+      "difficulty": "medium",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 4.54,
+      "findings_count": 0,
+      "requests": 53,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-path-01",
+      "path": "/r/pth01/*",
+      "param": "q",
+      "mode": "path_echo",
+      "ground_truth": "vulnerable",
+      "context": "html_element",
+      "difficulty": "medium",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 0.892,
+      "findings_count": 1,
+      "requests": 42,
+      "finding_details": [
+        {
+          "type": "path_xss",
+          "payload": "<script>alert('xspath_a0e2ed')</script>",
+          "context": "text",
+          "severity": "medium",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-path-01",
+      "path": "/s/pth01/*",
+      "param": "q",
+      "mode": "path_echo_escaped",
+      "ground_truth": "safe",
+      "context": "html_element",
+      "difficulty": "medium",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 0.931,
+      "findings_count": 0,
+      "requests": 53,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-error-01",
+      "path": "/r/err01/*",
+      "param": "q",
+      "mode": "error_echo",
+      "ground_truth": "vulnerable",
+      "context": "html_element",
+      "difficulty": "medium",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 0.924,
+      "findings_count": 1,
+      "requests": 42,
+      "finding_details": [
+        {
+          "type": "error_page_xss",
+          "payload": "<svg/onload=alert('xserr_d2363e')>",
+          "context": "text",
+          "severity": "medium",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-error-01",
+      "path": "/s/err01/*",
+      "param": "q",
+      "mode": "error_echo_escaped",
+      "ground_truth": "safe",
+      "context": "html_element",
+      "difficulty": "medium",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 0.95,
+      "findings_count": 0,
+      "requests": 53,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-cors-01",
+      "path": "/r/cors01",
+      "param": "q",
+      "mode": "cors_reflect",
+      "ground_truth": "vulnerable",
+      "context": "header",
+      "difficulty": "medium",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 0.431,
+      "findings_count": 1,
+      "requests": 52,
+      "finding_details": [
+        {
+          "type": "cors_misconfig",
+          "payload": "https://xssentinel-cors.invalid",
+          "context": "cors_header",
+          "severity": "high",
+          "confidence": "firm"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-cors-01",
+      "path": "/s/cors01",
+      "param": "q",
+      "mode": "cors_whitelist",
+      "ground_truth": "safe",
+      "context": "header",
+      "difficulty": "medium",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 0.443,
+      "findings_count": 0,
+      "requests": 53,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-markdown-01",
+      "path": "/r/md01",
+      "param": "q",
+      "mode": "markdown_raw",
+      "ground_truth": "vulnerable",
+      "context": "html_attribute",
+      "difficulty": "hard",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 0.968,
+      "findings_count": 1,
+      "requests": 68,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "<img src=x\\ onerror=alert('xssv_f0108511')>",
+          "context": "html_element",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-markdown-01",
+      "path": "/s/md01",
+      "param": "q",
+      "mode": "markdown_filtered",
+      "ground_truth": "safe",
+      "context": "html_attribute",
+      "difficulty": "hard",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 0.992,
+      "findings_count": 0,
+      "requests": 68,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-stored-01",
+      "path": "/r/st01",
+      "param": "q",
+      "mode": "stored_write",
+      "ground_truth": "vulnerable",
+      "context": "html_element",
+      "difficulty": "hard",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 1.039,
+      "findings_count": 1,
+      "requests": 82,
+      "finding_details": [
+        {
+          "type": "stored",
+          "payload": "<script>alert('xssv_7f733ad2')</script>",
+          "context": "stored_view",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-stored-01",
+      "path": "/s/st01",
+      "param": "q",
+      "mode": "stored_write_escaped",
+      "ground_truth": "safe",
+      "context": "html_element",
+      "difficulty": "hard",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 3.897,
+      "findings_count": 0,
+      "requests": 476,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-upload-01",
+      "path": "/r/up01",
+      "param": "q",
+      "mode": "upload_echo",
+      "ground_truth": "vulnerable",
+      "context": "html_element",
+      "difficulty": "hard",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 0.938,
+      "findings_count": 1,
+      "requests": 53,
+      "finding_details": [
+        {
+          "type": "upload_xss",
+          "payload": "<svg/onload=alert('xssup_e564')>.svg",
+          "context": "multipart_filename",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-upload-01",
+      "path": "/s/up01",
+      "param": "q",
+      "mode": "upload_echo_escaped",
+      "ground_truth": "safe",
+      "context": "html_element",
+      "difficulty": "hard",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 0.991,
+      "findings_count": 0,
+      "requests": 53,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-upload-02",
+      "path": "/r/up-zip",
+      "param": "file",
+      "mode": "upload_zip_slip",
+      "ground_truth": "vulnerable",
+      "context": "html_element",
+      "difficulty": "hard",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 2.335,
+      "findings_count": 1,
+      "requests": 54,
+      "finding_details": [
+        {
+          "type": "stored_dom",
+          "payload": "</script><script>alert('xssv_2cedd0e1')</script>",
+          "context": "stored_dom_view",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-upload-02",
+      "path": "/s/up-zip",
+      "param": "file",
+      "mode": "upload_zip_slip_safe",
+      "ground_truth": "safe",
+      "context": "html_element",
+      "difficulty": "hard",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 8.505,
+      "findings_count": 0,
+      "requests": 60,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-redirect-01",
+      "path": "/r/red01",
+      "param": "q",
+      "mode": "redirect_vuln",
+      "ground_truth": "vulnerable",
+      "context": "redirect",
+      "difficulty": "medium",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 10.244,
+      "findings_count": 1,
+      "requests": 55,
+      "finding_details": [
+        {
+          "type": "open_redirect_xss",
+          "payload": "javascript:alert(1)//",
+          "context": "dom_open_redirect",
+          "severity": "medium",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-redirect-01",
+      "path": "/s/red01",
+      "param": "q",
+      "mode": "redirect_safe",
+      "ground_truth": "safe",
+      "context": "redirect",
+      "difficulty": "medium",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 9.265,
+      "findings_count": 0,
+      "requests": 53,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-proto-01",
+      "path": "/r/prt01",
+      "param": "q",
+      "mode": "prototype_vuln",
+      "ground_truth": "vulnerable",
+      "context": "dom_prototype",
+      "difficulty": "hard",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 10.21,
+      "findings_count": 1,
+      "requests": 54,
+      "finding_details": [
+        {
+          "type": "prototype_pollution",
+          "payload": "(prototype pollution)",
+          "context": "dom_prototype",
+          "severity": "medium",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-proto-01",
+      "path": "/s/prt01",
+      "param": "q",
+      "mode": "prototype_safe",
+      "ground_truth": "safe",
+      "context": "dom_prototype",
+      "difficulty": "hard",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 10.237,
+      "findings_count": 0,
+      "requests": 53,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-sw-01",
+      "path": "/r/sw01",
+      "param": "q",
+      "mode": "sw_vuln",
+      "ground_truth": "vulnerable",
+      "context": "service_worker",
+      "difficulty": "hard",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 10.241,
+      "findings_count": 1,
+      "requests": 53,
+      "finding_details": [
+        {
+          "type": "service_worker_xss",
+          "payload": "(SW register: )",
+          "context": "dom_service_worker",
+          "severity": "medium",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-sw-01",
+      "path": "/s/sw01",
+      "param": "q",
+      "mode": "sw_safe",
+      "ground_truth": "safe",
+      "context": "service_worker",
+      "difficulty": "hard",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 10.205,
+      "findings_count": 0,
+      "requests": 53,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-worker-01",
+      "path": "/r/wk01",
+      "param": "q",
+      "mode": "worker_vuln",
+      "ground_truth": "vulnerable",
+      "context": "web_worker",
+      "difficulty": "hard",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 10.204,
+      "findings_count": 1,
+      "requests": 53,
+      "finding_details": [
+        {
+          "type": "web_worker_xss",
+          "payload": "(new Worker: )",
+          "context": "dom_web_worker",
+          "severity": "medium",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-worker-01",
+      "path": "/s/wk01",
+      "param": "q",
+      "mode": "worker_safe",
+      "ground_truth": "safe",
+      "context": "web_worker",
+      "difficulty": "hard",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 10.195,
+      "findings_count": 0,
+      "requests": 53,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-dangle-01",
+      "path": "/r/dgl01",
+      "param": "q",
+      "mode": "dangling_vuln",
+      "ground_truth": "vulnerable",
+      "context": "attribute",
+      "difficulty": "hard",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 0.947,
+      "findings_count": 1,
+      "requests": 59,
+      "finding_details": [
+        {
+          "type": "dangling_markup_potential",
+          "payload": "(DanglingMarkup: dangling_markup_potential)",
+          "context": "dangling_dangling_markup_potential",
+          "severity": "medium",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-dangle-01",
+      "path": "/s/dgl01",
+      "param": "q",
+      "mode": "dangling_safe",
+      "ground_truth": "safe",
+      "context": "attribute",
+      "difficulty": "hard",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 0.975,
+      "findings_count": 0,
+      "requests": 68,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-importmap-01",
+      "path": "/r/imp01",
+      "param": "q",
+      "mode": "importmap_vuln",
+      "ground_truth": "vulnerable",
+      "context": "import_map",
+      "difficulty": "hard",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 10.256,
+      "findings_count": 1,
+      "requests": 59,
+      "finding_details": [
+        {
+          "type": "import_map_cross_origin",
+          "payload": "(ImportMap: import_map_cross_origin)",
+          "context": "import_map_import_map_cross_origin",
+          "severity": "medium",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-importmap-01",
+      "path": "/s/imp01",
+      "param": "q",
+      "mode": "importmap_safe",
+      "ground_truth": "safe",
+      "context": "import_map",
+      "difficulty": "hard",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 10.216,
+      "findings_count": 0,
+      "requests": 53,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-sri-01",
+      "path": "/r/sri01",
+      "param": "q",
+      "mode": "sri_vuln",
+      "ground_truth": "vulnerable",
+      "context": "sri",
+      "difficulty": "hard",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 10.234,
+      "findings_count": 1,
+      "requests": 68,
+      "finding_details": [
+        {
+          "type": "sri_missing_script",
+          "payload": "(SRI: sri_missing_script)",
+          "context": "sri_sri_missing_script",
+          "severity": "medium",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-sri-01",
+      "path": "/s/sri01",
+      "param": "q",
+      "mode": "sri_safe",
+      "ground_truth": "safe",
+      "context": "sri",
+      "difficulty": "hard",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 10.269,
+      "findings_count": 0,
+      "requests": 68,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-tt-01",
+      "path": "/r/tt01",
+      "param": "q",
+      "mode": "tt_vuln",
+      "ground_truth": "vulnerable",
+      "context": "trusted_types",
+      "difficulty": "hard",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 10.266,
+      "findings_count": 1,
+      "requests": 61,
+      "finding_details": [
+        {
+          "type": "trusted_types_policy_bypass",
+          "payload": "(TT: tt_policy_bypass)",
+          "context": "trusted_types_page",
+          "severity": "medium",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-tt-01",
+      "path": "/s/tt01",
+      "param": "q",
+      "mode": "tt_safe",
+      "ground_truth": "safe",
+      "context": "trusted_types",
+      "difficulty": "hard",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 11.217,
+      "findings_count": 0,
+      "requests": 151,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-ws-01",
+      "path": "/r/wss01",
+      "param": "q",
+      "mode": "ws_vuln",
+      "ground_truth": "vulnerable",
+      "context": "websocket",
+      "difficulty": "hard",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 10.196,
+      "findings_count": 1,
+      "requests": 54,
+      "finding_details": [
+        {
+          "type": "websocket_xss",
+          "payload": "(WebSocket onmessage sink)",
+          "context": "dom_websocket",
+          "severity": "medium",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-ws-01",
+      "path": "/s/wss01",
+      "param": "q",
+      "mode": "ws_safe",
+      "ground_truth": "safe",
+      "context": "websocket",
+      "difficulty": "hard",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 10.215,
+      "findings_count": 0,
+      "requests": 53,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-sanitizer-01",
+      "path": "/r/san01",
+      "param": "q",
+      "mode": "sanitizer_vuln",
+      "ground_truth": "vulnerable",
+      "context": "sanitizer",
+      "difficulty": "hard",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 10.25,
+      "findings_count": 2,
+      "requests": 61,
+      "finding_details": [
+        {
+          "type": "sanitizer_vulnerable_version",
+          "payload": "(Sanitizer: sanitizer_vulnerable_version)",
+          "context": "sanitizer_sanitizer_vulnerable_version",
+          "severity": "medium",
+          "confidence": "high"
+        },
+        {
+          "type": "sanitizer_output_to_innerhtml",
+          "payload": "(Sanitizer: sanitizer_output_to_innerhtml)",
+          "context": "sanitizer_sanitizer_output_to_innerhtml",
+          "severity": "medium",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-sanitizer-01",
+      "path": "/s/san01",
+      "param": "q",
+      "mode": "sanitizer_safe",
+      "ground_truth": "safe",
+      "context": "sanitizer",
+      "difficulty": "hard",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 11.133,
+      "findings_count": 0,
+      "requests": 151,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-graphql-01",
+      "path": "/r/gql01",
+      "param": "q",
+      "mode": "graphql_vuln",
+      "ground_truth": "vulnerable",
+      "context": "graphql",
+      "difficulty": "hard",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 10.252,
+      "findings_count": 1,
+      "requests": 57,
+      "finding_details": [
+        {
+          "type": "graphql_xss",
+          "payload": "(GraphQL data sink)",
+          "context": "graphql_inner_html",
+          "severity": "medium",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-graphql-01",
+      "path": "/s/gql01",
+      "param": "q",
+      "mode": "graphql_safe",
+      "ground_truth": "safe",
+      "context": "graphql",
+      "difficulty": "hard",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 10.279,
+      "findings_count": 0,
+      "requests": 56,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-waf-01",
+      "path": "/r/waf01",
+      "param": "q",
+      "mode": "waf_naive",
+      "ground_truth": "vulnerable",
+      "context": "html_element",
+      "difficulty": "hard",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 0.998,
+      "findings_count": 1,
+      "requests": 68,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "<img src=x\\ onerror=alert('xssv_8567deb8')>",
+          "context": "html_element",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-waf-01",
+      "path": "/s/waf01",
+      "param": "q",
+      "mode": "waf_strict",
+      "ground_truth": "safe",
+      "context": "html_element",
+      "difficulty": "hard",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 1.197,
+      "findings_count": 0,
+      "requests": 185,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-formmine-01",
+      "path": "/r/crawl01",
+      "param": "q",
+      "mode": "crawl_form_vuln",
+      "ground_truth": "vulnerable",
+      "context": "html_element",
+      "difficulty": "hard",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 3.005,
+      "findings_count": 1,
+      "requests": 230,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "<img src=x\\ onerror=alert('xssv_9bc5122f')>",
+          "context": "html_element",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-formmine-01",
+      "path": "/s/crawl01",
+      "param": "q",
+      "mode": "crawl_form_safe",
+      "ground_truth": "safe",
+      "context": "html_element",
+      "difficulty": "hard",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 3.074,
+      "findings_count": 0,
+      "requests": 231,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-jsmine-01",
+      "path": "/r/crawl02",
+      "param": "q",
+      "mode": "crawl_js_vuln",
+      "ground_truth": "vulnerable",
+      "context": "html_element",
+      "difficulty": "hard",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 11.828,
+      "findings_count": 1,
+      "requests": 168,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "<img src=x\\ onerror=alert('xssv_777a063b')>",
+          "context": "html_element",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-jsmine-01",
+      "path": "/s/crawl02",
+      "param": "q",
+      "mode": "crawl_js_safe",
+      "ground_truth": "safe",
+      "context": "html_element",
+      "difficulty": "hard",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 11.858,
+      "findings_count": 0,
+      "requests": 167,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-pmmine-01",
+      "path": "/r/pm01",
+      "param": "",
+      "mode": "pm_vuln",
+      "ground_truth": "vulnerable",
+      "context": "script_string_dq",
+      "difficulty": "hard",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 0.939,
+      "findings_count": 1,
+      "requests": 60,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "\"></script><script>alert('xssv_2ef3d203')</script>",
+          "context": "script_string_dq",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-pmmine-01",
+      "path": "/s/pm01",
+      "param": "",
+      "mode": "pm_safe",
+      "ground_truth": "safe",
+      "context": "script_string_dq",
+      "difficulty": "hard",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 1.008,
+      "findings_count": 0,
+      "requests": 70,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-cssi-01",
+      "path": "/r/cssi01",
+      "param": "",
+      "mode": "cssi_vuln",
+      "ground_truth": "vulnerable",
+      "context": "css_context",
+      "difficulty": "medium",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 0.473,
+      "findings_count": 1,
+      "requests": 52,
+      "finding_details": [
+        {
+          "type": "css_import_injection",
+          "payload": "(CSSI: css_import_injection)",
+          "context": "cssi_css_import_injection",
+          "severity": "medium",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-cssi-01",
+      "path": "/s/cssi01",
+      "param": "",
+      "mode": "cssi_safe",
+      "ground_truth": "safe",
+      "context": "css_context",
+      "difficulty": "medium",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 0.423,
+      "findings_count": 0,
+      "requests": 52,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-cssi-02",
+      "path": "/s/cssi02",
+      "param": "",
+      "mode": "cssi_gfonts_safe",
+      "ground_truth": "safe",
+      "context": "css_context",
+      "difficulty": "medium",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 0.445,
+      "findings_count": 0,
+      "requests": 52,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-preenc-01",
+      "path": "/r/pe01",
+      "param": "data",
+      "mode": "pe_vuln",
+      "ground_truth": "vulnerable",
+      "context": "html_element",
+      "difficulty": "hard",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 0.964,
+      "findings_count": 1,
+      "requests": 59,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "eyJwYWdlIjogIjxzY3JpcHQ+YWxlcnQoJ3hzc3ZfMDk5ZjViNTEnKTwvc2NyaXB0PiIsICJ4c3NlbnRpbmVsIjogIjxzY3JpcHQ+YWxlcnQoJ3hzc3ZfMDk5",
+          "context": "html_element",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-preenc-01",
+      "path": "/s/pe01",
+      "param": "data",
+      "mode": "pe_safe",
+      "ground_truth": "safe",
+      "context": "html_element",
+      "difficulty": "hard",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 0.985,
+      "findings_count": 0,
+      "requests": 71,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-pshift-01",
+      "path": "/r/ps01",
+      "param": "q",
+      "mode": "pshift_vuln",
+      "ground_truth": "vulnerable",
+      "context": "html_element",
+      "difficulty": "hard",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 1.123,
+      "findings_count": 1,
+      "requests": 174,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "<img src=x\\ onerror=alert('xssv_e03027ee')>",
+          "context": "html_element",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-pshift-01",
+      "path": "/s/ps01",
+      "param": "q",
+      "mode": "pshift_safe",
+      "ground_truth": "safe",
+      "context": "html_element",
+      "difficulty": "hard",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 1.156,
+      "findings_count": 0,
+      "requests": 185,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-clobber-01",
+      "path": "/r/clob01",
+      "param": "q",
+      "mode": "clobber_vuln",
+      "ground_truth": "vulnerable",
+      "context": "html_element",
+      "difficulty": "hard",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 10.247,
+      "findings_count": 1,
+      "requests": 69,
+      "finding_details": [
+        {
+          "type": "dom_clobber",
+          "payload": "<a id=xclob_702d97 name=xclob_702d97 href=\"javascript:alert(1)\">x</a>",
+          "context": "html_element",
+          "severity": "high",
+          "confidence": ""
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-clobber-01",
+      "path": "/s/clob01",
+      "param": "q",
+      "mode": "clobber_safe",
+      "ground_truth": "safe",
+      "context": "html_element",
+      "difficulty": "hard",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 11.068,
+      "findings_count": 0,
+      "requests": 151,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-clobber-02",
+      "path": "/s/clob02",
+      "param": "q",
+      "mode": "clobber_escaped",
+      "ground_truth": "safe",
+      "context": "html_element",
+      "difficulty": "hard",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 10.241,
+      "findings_count": 0,
+      "requests": 68,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-blind-01",
+      "path": "/r/bo01",
+      "param": "q",
+      "mode": "blind_vuln",
+      "ground_truth": "vulnerable",
+      "context": "blind_oob",
+      "difficulty": "hard",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 2.369,
+      "findings_count": 1,
+      "requests": 71,
+      "finding_details": [
+        {
+          "type": "blind",
+          "payload": "<script>try{var q='?c='+encodeURIComponent(document.cookie)+'&l='+encodeURIComponent((window.localStorage&&JSON.stringif",
+          "context": "blind_oob",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-blind-01",
+      "path": "/s/bo01",
+      "param": "q",
+      "mode": "blind_safe",
+      "ground_truth": "safe",
+      "context": "blind_oob",
+      "difficulty": "hard",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 19.679,
+      "findings_count": 0,
+      "requests": 78,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-tb-01",
+      "path": "/r/tb01",
+      "param": "q",
+      "mode": "tb_vuln",
+      "ground_truth": "vulnerable",
+      "context": "time_based_css_import",
+      "difficulty": "hard",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 5.575,
+      "findings_count": 1,
+      "requests": 99,
+      "finding_details": [
+        {
+          "type": "time_based_xss",
+          "payload": "<style>@import url('http://127.0.0.1:8900/tb_92d4a037');</style>",
+          "context": "time_based_css_import",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-tb-01",
+      "path": "/s/tb01",
+      "param": "q",
+      "mode": "tb_safe",
+      "ground_truth": "safe",
+      "context": "time_based_css_import",
+      "difficulty": "hard",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 19.598,
+      "findings_count": 0,
+      "requests": 78,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-so2-01",
+      "path": "/r/so2in01",
+      "param": "q",
+      "mode": "so2_write",
+      "ground_truth": "vulnerable",
+      "context": "html_element",
+      "difficulty": "hard",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 1.005,
+      "findings_count": 1,
+      "requests": 70,
+      "finding_details": [
+        {
+          "type": "second_order",
+          "payload": "<img src=x onerror=alert('xsso_86f60b96')>",
+          "context": "event_handler",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-so2-01",
+      "path": "/s/so2in01",
+      "param": "q",
+      "mode": "so2_write_escaped",
+      "ground_truth": "safe",
+      "context": "html_element",
+      "difficulty": "hard",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 1.037,
+      "findings_count": 0,
+      "requests": 84,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-scn-01",
+      "path": "/r/scin01",
+      "param": "comment",
+      "mode": "sc_write",
+      "ground_truth": "vulnerable",
+      "context": "html_element",
+      "difficulty": "hard",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 1.027,
+      "findings_count": 1,
+      "requests": 70,
+      "finding_details": [
+        {
+          "type": "scenario",
+          "payload": "xssv_b40f3c85",
+          "context": "event_handler",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-scn-01",
+      "path": "/s/scin01",
+      "param": "note",
+      "mode": "sc_write_escaped",
+      "ground_truth": "safe",
+      "context": "html_element",
+      "difficulty": "hard",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 0.989,
+      "findings_count": 0,
+      "requests": 70,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-xs-01",
+      "path": "/r/xs01",
+      "param": "q",
+      "mode": "xs_vuln",
+      "ground_truth": "vulnerable",
+      "context": "response_headers",
+      "difficulty": "medium",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 0.457,
+      "findings_count": 1,
+      "requests": 53,
+      "finding_details": [
+        {
+          "type": "xs_leak_surface",
+          "payload": "",
+          "context": "response_headers",
+          "severity": "low",
+          "confidence": "firm"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-xs-01",
+      "path": "/s/xs01",
+      "param": "q",
+      "mode": "xs_safe",
+      "ground_truth": "safe",
+      "context": "response_headers",
+      "difficulty": "medium",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 0.444,
+      "findings_count": 0,
+      "requests": 53,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-mx-01",
+      "path": "/r/mx01",
+      "param": "q",
+      "mode": "mx_vuln",
+      "ground_truth": "vulnerable",
+      "context": "html_element",
+      "difficulty": "hard",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 10.313,
+      "findings_count": 1,
+      "requests": 69,
+      "finding_details": [
+        {
+          "type": "mutation_xss",
+          "payload": "<svg><style><img src=x onerror=alert(1)></style>",
+          "context": "html_element",
+          "severity": "high",
+          "confidence": ""
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-mx-01",
+      "path": "/s/mx01",
+      "param": "q",
+      "mode": "mx_safe",
+      "ground_truth": "safe",
+      "context": "html_element",
+      "difficulty": "hard",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 10.284,
+      "findings_count": 0,
+      "requests": 68,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "aux-r-formecho01",
+      "path": "/r/formecho01",
+      "param": "q",
+      "mode": "formecho_raw",
+      "ground_truth": "vulnerable",
+      "context": "html_element",
+      "difficulty": "easy",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 1.002,
+      "findings_count": 1,
+      "requests": 68,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "<img src=x\\ onerror=alert('xssv_ff421f28')>",
+          "context": "html_element",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "aux-s-formecho01",
+      "path": "/s/formecho01",
+      "param": "q",
+      "mode": "formecho_safe",
+      "ground_truth": "safe",
+      "context": "html_element",
+      "difficulty": "easy",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 0.964,
+      "findings_count": 0,
+      "requests": 68,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "aux-r-jsecho01",
+      "path": "/r/jsecho01",
+      "param": "q",
+      "mode": "formecho_raw",
+      "ground_truth": "vulnerable",
+      "context": "html_element",
+      "difficulty": "easy",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 0.963,
+      "findings_count": 1,
+      "requests": 68,
+      "finding_details": [
+        {
+          "type": "reflected",
+          "payload": "<img src=x\\ onerror=alert('xssv_791ea69b')>",
+          "context": "html_element",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "aux-s-jsecho01",
+      "path": "/s/jsecho01",
+      "param": "q",
+      "mode": "formecho_safe",
+      "ground_truth": "safe",
+      "context": "html_element",
+      "difficulty": "easy",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 0.969,
+      "findings_count": 0,
+      "requests": 68,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-stored-03",
+      "path": "/r/st03",
+      "param": "email",
+      "mode": "stored_api_user_write",
+      "ground_truth": "vulnerable",
+      "context": "html_element",
+      "difficulty": "hard",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 6.319,
+      "findings_count": 1,
+      "requests": 57,
+      "finding_details": [
+        {
+          "type": "stored_dom",
+          "payload": "<img src=x onerror=alert('xssv_0e18ffa2')>",
+          "context": "stored_dom_view",
+          "severity": "high",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "neg-stored-03",
+      "path": "/s/st03",
+      "param": "email",
+      "mode": "stored_api_user_write_escaped",
+      "ground_truth": "safe",
+      "context": "html_element",
+      "difficulty": "hard",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 7.472,
+      "findings_count": 0,
+      "requests": 65,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    }
+  ],
+  "by_context": {
+    "html_element": {
+      "tp": 49,
+      "fp": 0,
+      "tn": 35,
+      "fn": 0,
+      "error": 0,
+      "skip": 0,
+      "total": 84
+    },
+    "html_attribute_dq": {
+      "tp": 4,
+      "fp": 0,
+      "tn": 6,
+      "fn": 0,
+      "error": 0,
+      "skip": 0,
+      "total": 10
+    },
+    "html_attribute_sq": {
+      "tp": 1,
+      "fp": 0,
+      "tn": 1,
+      "fn": 0,
+      "error": 0,
+      "skip": 0,
+      "total": 2
+    },
+    "html_attribute_noquote": {
+      "tp": 1,
+      "fp": 0,
+      "tn": 1,
+      "fn": 0,
+      "error": 0,
+      "skip": 0,
+      "total": 2
+    },
+    "url_href": {
+      "tp": 8,
+      "fp": 0,
+      "tn": 2,
+      "fn": 0,
+      "error": 0,
+      "skip": 0,
+      "total": 10
+    },
+    "event_handler": {
+      "tp": 3,
+      "fp": 0,
+      "tn": 0,
+      "fn": 0,
+      "error": 0,
+      "skip": 0,
+      "total": 3
+    },
+    "css_context": {
+      "tp": 3,
+      "fp": 0,
+      "tn": 2,
+      "fn": 0,
+      "error": 0,
+      "skip": 0,
+      "total": 5
+    },
+    "script_string_dq": {
+      "tp": 2,
+      "fp": 0,
+      "tn": 7,
+      "fn": 0,
+      "error": 0,
+      "skip": 0,
+      "total": 9
+    },
+    "script_string_sq": {
+      "tp": 1,
+      "fp": 0,
+      "tn": 0,
+      "fn": 0,
+      "error": 0,
+      "skip": 0,
+      "total": 1
+    },
+    "script_block": {
+      "tp": 3,
+      "fp": 0,
+      "tn": 3,
+      "fn": 0,
+      "error": 0,
+      "skip": 0,
+      "total": 6
+    },
+    "script_template": {
+      "tp": 1,
+      "fp": 0,
+      "tn": 0,
+      "fn": 0,
+      "error": 0,
+      "skip": 0,
+      "total": 1
+    },
+    "svg_context": {
+      "tp": 3,
+      "fp": 0,
+      "tn": 0,
+      "fn": 0,
+      "error": 0,
+      "skip": 0,
+      "total": 3
+    },
+    "math_context": {
+      "tp": 2,
+      "fp": 0,
+      "tn": 0,
+      "fn": 0,
+      "error": 0,
+      "skip": 0,
+      "total": 2
+    },
+    "url_javascript": {
+      "tp": 1,
+      "fp": 0,
+      "tn": 0,
+      "fn": 0,
+      "error": 0,
+      "skip": 0,
+      "total": 1
+    },
+    "meta_refresh": {
+      "tp": 1,
+      "fp": 0,
+      "tn": 1,
+      "fn": 0,
+      "error": 0,
+      "skip": 0,
+      "total": 2
+    },
+    "html_comment": {
+      "tp": 1,
+      "fp": 0,
+      "tn": 2,
+      "fn": 0,
+      "error": 0,
+      "skip": 0,
+      "total": 3
+    },
+    "cdata": {
+      "tp": 1,
+      "fp": 0,
+      "tn": 0,
+      "fn": 0,
+      "error": 0,
+      "skip": 0,
+      "total": 1
+    },
+    "template_angular": {
+      "tp": 2,
+      "fp": 0,
+      "tn": 0,
+      "fn": 0,
+      "error": 0,
+      "skip": 0,
+      "total": 2
+    },
+    "dom_xss": {
+      "tp": 8,
+      "fp": 0,
+      "tn": 2,
+      "fn": 0,
+      "error": 0,
+      "skip": 0,
+      "total": 10
+    },
+    "header_reflection": {
+      "tp": 1,
+      "fp": 0,
+      "tn": 2,
+      "fn": 0,
+      "error": 0,
+      "skip": 0,
+      "total": 3
+    },
+    "header": {
+      "tp": 2,
+      "fp": 0,
+      "tn": 2,
+      "fn": 0,
+      "error": 0,
+      "skip": 0,
+      "total": 4
+    },
+    "html_attribute": {
+      "tp": 1,
+      "fp": 0,
+      "tn": 1,
+      "fn": 0,
+      "error": 0,
+      "skip": 0,
+      "total": 2
+    },
+    "redirect": {
+      "tp": 1,
+      "fp": 0,
+      "tn": 1,
+      "fn": 0,
+      "error": 0,
+      "skip": 0,
+      "total": 2
+    },
+    "dom_prototype": {
+      "tp": 1,
+      "fp": 0,
+      "tn": 1,
+      "fn": 0,
+      "error": 0,
+      "skip": 0,
+      "total": 2
+    },
+    "service_worker": {
+      "tp": 1,
+      "fp": 0,
+      "tn": 1,
+      "fn": 0,
+      "error": 0,
+      "skip": 0,
+      "total": 2
+    },
+    "web_worker": {
+      "tp": 1,
+      "fp": 0,
+      "tn": 1,
+      "fn": 0,
+      "error": 0,
+      "skip": 0,
+      "total": 2
+    },
+    "attribute": {
+      "tp": 1,
+      "fp": 0,
+      "tn": 1,
+      "fn": 0,
+      "error": 0,
+      "skip": 0,
+      "total": 2
+    },
+    "import_map": {
+      "tp": 1,
+      "fp": 0,
+      "tn": 1,
+      "fn": 0,
+      "error": 0,
+      "skip": 0,
+      "total": 2
+    },
+    "sri": {
+      "tp": 1,
+      "fp": 0,
+      "tn": 1,
+      "fn": 0,
+      "error": 0,
+      "skip": 0,
+      "total": 2
+    },
+    "trusted_types": {
+      "tp": 1,
+      "fp": 0,
+      "tn": 1,
+      "fn": 0,
+      "error": 0,
+      "skip": 0,
+      "total": 2
+    },
+    "websocket": {
+      "tp": 1,
+      "fp": 0,
+      "tn": 1,
+      "fn": 0,
+      "error": 0,
+      "skip": 0,
+      "total": 2
+    },
+    "sanitizer": {
+      "tp": 1,
+      "fp": 0,
+      "tn": 1,
+      "fn": 0,
+      "error": 0,
+      "skip": 0,
+      "total": 2
+    },
+    "graphql": {
+      "tp": 1,
+      "fp": 0,
+      "tn": 1,
+      "fn": 0,
+      "error": 0,
+      "skip": 0,
+      "total": 2
+    },
+    "blind_oob": {
+      "tp": 1,
+      "fp": 0,
+      "tn": 1,
+      "fn": 0,
+      "error": 0,
+      "skip": 0,
+      "total": 2
+    },
+    "time_based_css_import": {
+      "tp": 1,
+      "fp": 0,
+      "tn": 1,
+      "fn": 0,
+      "error": 0,
+      "skip": 0,
+      "total": 2
+    },
+    "response_headers": {
+      "tp": 1,
+      "fp": 0,
+      "tn": 1,
+      "fn": 0,
+      "error": 0,
+      "skip": 0,
+      "total": 2
+    }
+  },
+  "by_difficulty": {
+    "easy": {
+      "tp": 29,
+      "fp": 0,
+      "tn": 14,
+      "fn": 0,
+      "error": 0,
+      "skip": 0,
+      "total": 43
+    },
+    "medium": {
+      "tp": 35,
+      "fp": 0,
+      "tn": 29,
+      "fn": 0,
+      "error": 0,
+      "skip": 0,
+      "total": 64
+    },
+    "hard": {
+      "tp": 49,
+      "fp": 0,
+      "tn": 38,
+      "fn": 0,
+      "error": 0,
+      "skip": 0,
+      "total": 87
+    }
+  },
+  "false_positives": [],
+  "false_negatives": []
+}

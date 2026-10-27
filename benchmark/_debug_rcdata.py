@@ -1,10 +1,11 @@
 """Debug RCDATA parsing."""
-import sys, os
+import sys
+import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.stdout = open(sys.stdout.fileno(), mode='w', encoding='utf-8', buffering=1)
 
-from bs4 import BeautifulSoup
-from xssentinel.core.parser_utils import bs_parser
+from bs4 import BeautifulSoup  # noqa: E402  (sys.path shim above)
+from xssentinel.core.parser_utils import bs_parser  # noqa: E402  (sys.path shim above)
 
 # Test how BS4 parses script inside textarea
 html_text = '<textarea><script>alert("tok_y")</script></textarea>'
@@ -54,7 +55,7 @@ except Exception as e:
     print(f"html5lib not available: {e}")
 
 # Test the verifier's _is_in_rcdata
-from xssentinel.core.verifier import _is_in_rcdata
+from xssentinel.core.verifier import _is_in_rcdata  # noqa: E402  (probe imports after its setup)
 print()
 print("Testing _is_in_rcdata:")
 for s in soup.find_all("script"):

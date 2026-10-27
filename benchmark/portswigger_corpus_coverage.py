@@ -57,9 +57,7 @@ import sys
 
 # ---------------------------------------------------------------- 数据来源
 
-DEFAULT_HTML = os.environ.get(
-    "PORTSWIGGER_CHEATSHEET", r"D:/qoder/tools/pw_cheatsheet.html"
-)
+DEFAULT_HTML = os.environ.get("PORTSWIGGER_CHEATSHEET", "")
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _ROOT = os.path.dirname(_HERE)

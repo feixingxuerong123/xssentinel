@@ -1,9 +1,10 @@
 """Quick verification of verifier fixes."""
-import sys, os
+import sys
+import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.stdout = open(sys.stdout.fileno(), mode='w', encoding='utf-8', buffering=1)
 
-from xssentinel.core import verifier
+from xssentinel.core import verifier  # noqa: E402  (sys.path shim above)
 
 # Test 1: Normal script block should still confirm
 r = verifier.verify_semantic('<script>alert("tok_x")</script>', 'tok_x')
@@ -36,7 +37,7 @@ print(f"PASS: CSP nonce blocks: {r['detail']}")
 r = verifier.verify_semantic('<script>alert("tok_ok")</script>', 'tok_ok',
                              {"Content-Type": "text/html"})
 assert r["confirmed"] is True, f"FAIL: no CSP should confirm: {r}"
-print(f"PASS: no CSP confirms normally")
+print("PASS: no CSP confirms normally")
 
 # Test 7: JS string trapping should NOT confirm
 script = 'var x = "\\"\\"><\\/script><script>alert(\'tok_js\')<\\/script>";'
@@ -58,12 +59,12 @@ print(f"PASS: javascript URI confirms: {r['context']}")
 # Test 10: html.escape'd should NOT confirm (existing behavior)
 r = verifier.verify_semantic('&lt;svg/onload=alert(\'tok_esc\')&gt;', 'tok_esc')
 assert r["confirmed"] is False, f"FAIL: escaped should not confirm: {r}"
-print(f"PASS: escaped payload not confirmed")
+print("PASS: escaped payload not confirmed")
 
 # Test 11: CSP with unsafe-inline SHOULD confirm (not blocking)
 r = verifier.verify_semantic('<script>alert("tok_ui")</script>', 'tok_ui',
                              {"Content-Security-Policy": "script-src 'self' 'unsafe-inline'"})
 assert r["confirmed"] is True, f"FAIL: CSP unsafe-inline should confirm: {r}"
-print(f"PASS: CSP unsafe-inline allows execution")
+print("PASS: CSP unsafe-inline allows execution")
 
 print("\n=== ALL VERIFIER TESTS PASS ===")
