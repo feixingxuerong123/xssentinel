@@ -4693,3 +4693,82 @@ noqa 理由、profile_convergence getattr——251 文件等于全绿(250 跑绿
 取决于哪个测试恰好要写临时文件——`No space left on device` 会出现在 pytest
 输出里但 runner 的失败汇总只显示测试名。下轮门禁前置检查除进程表外加一条:
 `df -h /c`(可用空间阈值留 >5G 余量)。
+
+## Phase 329:交付收口(1.2.2)—— 修复轮入库、仓库卫生、3.12 全量门禁、发版
+
+本轮的起点是"这个项目能交付了吗"的评估:判定面证据早已齐备,阻断项全在**仓库状态**
+与**门禁环境**上,于是按四步收口。
+
+### 1. 修复轮入库(`19b04cf`)
+
+Phase 322 的修复轮此前只存在于工作树(17 个已改文件,含核心判定面):
+
+- **HPP 双序确认移回 ordering 循环内**(Phase 315 重构的遗留):只在循环外判最后一次
+  ordering,原始的"先过滤后渲染"形状在第一次 ordering 渲染 raw 却从未被看见;两次
+  传输均失败时 `resp` 未绑定(UnboundLocalError 被层内 except 吞成"HPP 没跑")。
+  每个 ordering 现在独立判定并点名真正渲染 raw 的那次。
+- **`verify_semantic` 抑制 `XMLParsedAsHTMLWarning`**:pytest 的
+  `error::UserWarning` 让 bs4 解析抛异常,被宽 except 吞掉后所有 text/xml 响应都
+  退化成 raw fallback —— 判定只在 pytest 下变质,独立进程不复现。
+- `getattr(self, "_custom_payloads", None)` 兼容 `__new__` 直构 fixture;假 DOM 引擎
+  补 `page_text`(签名漂移会被吞成"层没跑");`nuclei` extra + 可执行的 PyYAML 提示。
+
+### 2. 仓库卫生(`4aa3b0e`)
+
+45 件验证产物入库(Phase 251–322 的矩阵/网/XSSMaze 门跑证据 + `dev/fn_net_run.py`);
+`benchmark/results/_stale/`(491 个被 kill 运行的 tmp)进 ignore;`layer_coverage.py`
+的 `ROOT` 从 `D:/qoder/xssentinel` 改为从 `__file__` 派生;PortSwigger 语料工具不再
+默认指向本机路径(只认 env / `--html`,缺失时给下载提示);根目录两份 scratch 驱动
+(`passive_drive_tmp.py`/`sqli_proxy_drive.py`)与 `tests/_probe_import.py` 移出仓库
+(本地留在 ignored 的 `dev/attic/`)。
+
+### 3. 门禁(冻结树,Python 3.12 + 新依赖下限)
+
+| 门 | 结果 |
+|---|---|
+| benchmark 全量 194 sync | **TP113 / FP0 / TN81 / FN0 / ERR0**,f1=1.000,814.9s |
+| benchmark 全量 194 async | **TP107 / FP0 / TN75 / FN0 / ERR0**(12 SKIP = manifest sync-only),f1=1.000,750.1s |
+| `--self-test` | **ALL CHECKS PASSED**(exit 0) |
+| range3 | sync TP18/TN7/SKIP1、async TP17/TN7/SKIP2 |
+| range4/5/6 | 双引擎 TP/FP0/TN/FN0,门 exit 0 |
+
+产物 `benchmark/results/p322c_full_{sync,async}.json`;range 产物在 `dev/`(按 Phase 201
+教训用 `--out`/`-o`,不覆写入库结果)。全量矩阵是**修复后的第一次**双引擎复跑
+(00:28/00:41 那两次在 HPP 重构之前,quick 切片又不含 WAF 对,覆盖不到 HPP 路径)。
+
+**环境两则(都实测)**:
+
+1. **PATH 的 `python` 是 3.9.4,低于声明的 3.10 下限** —— 首次全量跑在 3.9 上启动,
+   发现后终止,改用 `D:\qoder\venvs\xs312`(3.12.10 + aiohttp 3.14.5 /
+   requests 2.34.2 / urllib3 2.8.0 / soupsieve 3.0.4 / Flask 3.1.3)重跑。门禁证据
+   必须在受支持的栈上取。
+2. **Playwright 1.64 需要的 Chromium 1248 下载不通**,本机缓存只有 1223–1234;
+   按缓存把 venv 内 playwright 钉到 **1.60.0**(仍满足 `>=1.40`),浏览器实测
+   Chromium 148、页面内联 `onerror` 执行正常。DOM 用例先做单例烟测
+   (`pos-dom-01` browser-executed / `pos-waf-01` reflected / `neg-waf-01` 静默)
+   再开全量。
+
+### 4. range3 门的两处既有红(交付时才被跑到)
+
+- **`r3-neg-json-echo` 的 `gt: low` 是 2026-10-09 的旧契约**:Phase 304(`91a98d3`)
+  起数据型媒体(JSON/plain)的 low 反射不再发射(`pos-jsonct-01` 同轮改名
+  `neg-jsonct-raw-01`),而 range3 自 Phase 304 后没再跑过。该端点确实是
+  `application/json` 回显、markup 不会渲染 ⇒ 期望改为 `safe`。
+- **`r3-pos-utf7` 的 sync 臂只到 polyglot**(async 11 条 reflected/fired;sync 11 条
+  `polyglot_reflection` medium/model-only)。逐层量到:sync 的 marker 确实反射在
+  `html_element`,但该层第一个语料候选的 token 落在 `javascript:` URI(验证器
+  **正确**拒绝),变体预算被这个候选的变换吃满,裸 `<script>` 候选没再发出。
+  **在 `513fd21` 干净 worktree 上复跑形状逐项相同 ⇒ 既有 sync 缺口,不是本轮引入。**
+  不改判定(候选排序/预算记账都是判定面),门禁侧把用例 `engines: ["async"]` ——
+  不让 range3 声称 sync 拿到了它没有的浏览器证据;缺口记入
+  `docs/OPTIMIZATION.md` 2.1.4(下一轮两条候选改法)。
+
+### 5. 发版
+
+`CHANGELOG` 的 Unreleased(1.2.1 之后约 1000 行)切成 **`[1.2.2] - 2026-10-27`**,
+`__version__` 1.2.1 → 1.2.2;补打 **v1.2.1**(`1a4560e` 是 1.2.1 的发布提交,但当年
+从未打 tag),再打 **v1.2.2**;wheel 构建并校验 METADATA。
+
+**仍然待操作者拍板**:`origin` 是本地 bundle(`D:/qoder/xssentinel_backup_20260923c.bundle`),
+README 的 CI 徽章指向的 GitHub 仓库 404,5 个 CI job 从未在托管环境跑过 —— 发布渠道
+(新建远端 / 只出离线包 / 保持本地)不是代码问题,是分发决策。

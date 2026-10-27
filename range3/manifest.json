@@ -144,7 +144,10 @@
    "path": "/legacy",
    "param": "q",
    "headless": true,
-   "note": "charset=UTF-7 + raw echo; only a real browser can confirm"
+   "engines": [
+    "async"
+   ],
+   "note": "charset=UTF-7 + raw echo; only a real browser can confirm. async reaches the raw <script> candidate and browser-fires. sync classifies the reflection as html_element but spends its variant budget on the first corpus candidate (token inside a javascript: URI, correctly refuted) and falls back to L7 polyglot medium/model-only -- measured identical at 513fd21 (pre-existing sync parity gap, tracked in docs/OPTIMIZATION.md 2.1; engine-scoped so the gate does not claim a browser verification sync does not have)."
   },
   {
    "id": "r3-pos-scenario-msg",
@@ -186,7 +189,8 @@
   },
   {
    "id": "r3-neg-json-echo",
-   "gt": "low",
+   "gt": "safe",
+   "note": "application/json echo: markup cannot render. Phase 304 (91a98d3) retired the old 'report low JSON reflections' contract (same decision as benchmark pos-jsonct-01 -> neg-jsonct-raw-01); this expectation was still the 2026-10-09 one.",
    "path": "/api/echo",
    "param": "msg",
    "method": "POST",

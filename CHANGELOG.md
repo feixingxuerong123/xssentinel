@@ -5,6 +5,14 @@
 
 ## [Unreleased]
 
+## [1.2.2] - 2026-10-27
+
+交付收口:Agent 接面(MCP 七工具 / Streamable HTTP / 进度与取消)、判定顺序修复
+(HPP 双序、XML 判决)、Python ≥3.10 与依赖修复版下限、恶意 sitemap 实体防护。
+外部靶官方口径 XSSMaze server **946/67/0**(replay 948/65)、client 24/0/0,
+控制例 0 FP;本机 3.12 + 新下限全量 194 双引擎 **FP0/FN0/ERR0**,range3/4/5/6
+双引擎门全绿,`--self-test` ALL CHECKS PASSED。
+
 ### Changed
 
 - **Python 3.9 支持移除 + 依赖下限抬到修复版(Phase 328d)**:3.9 无法安装
@@ -18,6 +26,21 @@
   async TP36/FP0/TN27/FN0/ERR0 392.2s,1 SKIP);全量矩阵与全量套件尚未复跑。
 
 ### Fixed
+
+- **HPP 双序判定回到 ordering 循环内(Phase 322 修复轮)**:Phase 315 的重构把确认
+  检查留在循环外,只判最后一次 ordering —— 原始"先过滤后渲染"形状在第一次 ordering
+  就渲染了 raw 却从未被看见;两次传输均失败时 `resp` 未绑定(UnboundLocalError
+  被层内 except 吞成"HPP 没跑")。现在每个 ordering 独立判定,并点名真正渲染 raw
+  的那一次。
+- **text/xml 判决在 warnings-as-errors 下不再静默降级(Phase 322 修复轮)**:
+  `verify_semantic` 的结构化解析抑制 bs4 的 `XMLParsedAsHTMLWarning`;此前
+  pytest 的 `error::UserWarning` 让解析抛异常,被宽 except 吞掉后所有 XML 响应
+  都退化成 raw fallback(实测 `a.href=javascript:` 的结构化确认只在 pytest 下
+  变成"已转义")。
+- **range3 门期望与产品契约对齐**:`r3-neg-json-echo` 的 `gt: low` 是 Phase 304
+  (`91a98d3`)之前"保留 low JSON 反射"的旧契约,改为 `safe`;`r3-pos-utf7`
+  限定 async 计分 —— sync 在该页只到 polyglot(medium/model-only),机制与
+  `513fd21` 对照实测见 [docs/OPTIMIZATION.md](docs/OPTIMIZATION.md) 2.1.4。
 
 - **MCP `untrusted_fields` 按工具补全(Phase 328e)**:原先只列
   `evidence/detail/param`,discover/profile/verify/param_mine/csp/propose 的
@@ -33,6 +56,14 @@
   HTML 侧实测为线性放大(100k 层嵌套/1.1 MB ≈1.09 s/67.7 MB),按已知边界记账。
 
 ### Verified
+
+- **交付门禁(2026-10-27,Python 3.12 + 新下限,冻结树)**:全量 194 双引擎
+  **sync TP113/FP0/TN81/FN0/ERR0(814.9s)、async TP107/FP0/TN75/FN0/ERR0
+  (750.1s,12 SKIP = manifest sync-only)**,严格门双绿;`--self-test`
+  **ALL CHECKS PASSED**;range3(sync TP18/TN7/SKIP1、async TP17/TN7/SKIP2)与
+  range4/5/6 双引擎均 TP/FP0/TN/FN0。环境注记:PATH 的 Python 3.9 低于声明
+  下限,门禁在 3.12 venv 跑;Playwright 1.64 需要的 Chromium 1248 下载不通,
+  按本机缓存钉 1.60.0(仍满足 >=1.40,浏览器实测 Chromium 148)。
 
 - **依赖审计基线(Phase 328c)**:本机 `pip-audit 2.9.0` 对 258 个已安装包量出
   **43 条 / 7 个直接或可选依赖**(aiohttp 3.13.3、urllib3 2.6.3、requests 2.32.5、

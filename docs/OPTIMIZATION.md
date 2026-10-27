@@ -417,6 +417,33 @@ mined 端点 / L8 + JSONP),门:`test_phase214_crawl_page_layers.py`、
 在 async 侧逐层接线。原因与本条 2026-10-09 记的一样 —— 抽共享入口会把
 async 爬取扫描的请求量按"端点数 × 页面层"放大,预算/超时/194 例 async
 基线都要重测;逐层接线让每条线各自可归因、各自带门。
+
+#### 2.1.4 实测新分歧(2026-10-27,交付收口时):sync 在 range3 UTF-7 用例上只到 polyglot
+
+`range3/manifest.json` 的 `r3-pos-utf7`(`/legacy`,声明 `charset=UTF-7` 且原样
+回显;用例本意是"只有真浏览器能确认")在交付门禁里双引擎结论不同:
+
+| 引擎 | 实测(3.12 + 新下限,2026-10-27) |
+|---|---|
+| async | 11 条 `reflected`/high,全部 `headless.outcome=fired` |
+| sync | 11 条 `polyglot_reflection`/medium、`evidence_class=model-only`,0 条浏览器证据 |
+
+逐层量到的机制(不是推断):sync 的 marker 探针**确实反射在 `html_element`**
+(debug 日志逐条可见),但该层第一个语料候选是
+`<<script>Foo</script>iframe src="javascript:alert(1)">`(`payloads.json`),
+标记化后 token 落在 `javascript:` URI 里 —— 验证器**正确地**判它不可执行;
+变体预算随后被这个候选的 6 个变换吃满,普通 `<script>alert(token)</script>`
+候选没有再被发出;最后只有 L7 polyglot 兜底(medium/model-only)。async 的候选
+顺序不同,直接打到了裸 `<script>` 并由页面自己的 dialog 兑现。
+
+**归因**:在 `513fd21` 的干净 worktree 上同一用例复跑,**形状逐项相同**(11
+polyglot / 0 confirmed)→ 既有 sync 缺口,不是交付轮引入。取证脚本留在
+`dev/`(未入库)。**本轮不改判定**(候选顺序/预算记账都属于判定面,要动就得
+配对照矩阵 + 全量 194 双引擎复测);门禁侧把该用例 `engines: ["async"]`,
+让 range3 不再声称 sync 拿到了它没有的浏览器证据,缺口本身记在这里。
+下一轮候选改法:① 候选按"可执行 token 位置"排序(把裸 `<script>` 提前);
+② 或把变体预算记账从"每变换一次"改为"每候选一次",避免一个厚候选饿死后续。
+
 ### 2.2 报告层性能
 
 [report.py](file:///d:/qoder/xssentinel/xssentinel/core/report.py) **1428 行**,
