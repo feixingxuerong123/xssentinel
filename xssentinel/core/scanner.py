@@ -998,8 +998,11 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
             # whose characters the filter provably strips.  Payloads with
             # no execution point are dropped with a debug note: mark()
             # cannot stamp them, so they could reflect but never confirm,
-            # which is pure budget waste.
-            if self._custom_payloads:
+            # which is pure budget waste.  getattr (not attribute
+            # access): __new__-built test scanners (the documented Phase
+            # 183 fixture pattern) never ran __init__, so the attribute
+            # may not exist.
+            if getattr(self, "_custom_payloads", None):
                 from .verifier import has_execution_point
                 _custom_dicts = []
                 for cp in self._custom_payloads:
@@ -1274,85 +1277,93 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
             detail=f"param='{param}' duplicated, both orderings probed: "
                    f"payload in the second occurrence (filter reads the "
                    f"first) and in the first (render takes the first)")
+        # Phase 322 fix (attribution: Phase 315's dual-ordering refactor
+        # moved the confirmation check OUTSIDE the ordering loop, so only
+        # the LAST ordering's response was ever judged -- the original
+        # filter-first shape (193) rendered raw on the first ordering and
+        # was never even looked at, and a double transport failure hit an
+        # unbound `resp` (UnboundLocalError, swallowed by the layer's
+        # try/except as "HPP did nothing").  Confirmation is now
+        # per-ordering: whichever duplicate lands raw gets judged, and
+        # both orderings failing transport degrades to plain False.
         for base in bases[:2]:
+            payload = base.get("payload") if isinstance(base, dict) else None
+            if not payload:
+                continue
+            probe = verifier.mark(payload, "xssv_probe_stamp")
+            if probe == payload:
+                continue              # nothing stampable -> no attributable proof
             for payload_first in (False, True):
                 self._check_cancel()
-                payload = base.get("payload") if isinstance(base, dict) else None
-                if not payload:
-                    continue
                 token = "xssv_" + secrets.token_hex(4)
                 marked = verifier.mark(payload, token)
-                if marked == payload:
-                    continue          # nothing stampable -> no attributable proof
                 dup_pairs = ([(param, marked), (param, "xsssafe")]
                              if payload_first
                              else [(param, "xsssafe"), (param, marked)])
-                if is_body:
-                    # Phase 196: form-body duplication -- a dict cannot carry
-                    # duplicate keys, so the body goes out as a raw urlencoded
-                    # string with an explicit Content-Type.
-                    from urllib.parse import urlencode
-                    body_pairs = [(k, v) for k, v in (data or {}).items()
-                                  if k != param]
-                    body_pairs.extend(dup_pairs)
-                    try:
+                try:
+                    if is_body:
+                        # Phase 196: form-body duplication -- a dict cannot
+                        # carry duplicate keys, so the body goes out as a
+                        # raw urlencoded string with an explicit Content-Type.
+                        from urllib.parse import urlencode
+                        body_pairs = [(k, v) for k, v in (data or {}).items()
+                                      if k != param]
+                        body_pairs.extend(dup_pairs)
                         resp = req.request(
-                            method, url, params=params, data=urlencode(body_pairs),
+                            method, url, params=params,
+                            data=urlencode(body_pairs),
                             headers={"Content-Type":
                                      "application/x-www-form-urlencoded"})
-                        self._bump()
-                        self.coverage.record_request(url, method)
-                    except Exception:
-                        continue
-                else:
-                    pairs = [(k, v) for k, v in (params or {}).items()
-                             if k != param]
-                    pairs.extend(dup_pairs)
-                    try:
+                    else:
+                        pairs = [(k, v) for k, v in (params or {}).items()
+                                 if k != param]
+                        pairs.extend(dup_pairs)
                         resp = req.request(method, url, params=pairs, data=data)
-                        self._bump()
-                        self.coverage.record_request(url, method)
-                    except Exception:
-                        continue
-            if resp is None or token not in (resp.text or ""):
-                continue
-            try:
-                nv = verifier.verify_semantic(
-                    resp.text or "", token,
-                    response_headers=dict(getattr(resp, "headers", None)
-                                          or {}))
-            except Exception:
-                continue
-            if not nv.get("confirmed"):
-                continue
-            _cls, _conf, _det = _grade_evidence(
-                None, "high",
-                ("HPP: the parameter was sent twice (payload occurrence "
-                 f"{'first' if payload_first else 'second'}, the other "
-                 "benign) and the payload-carrying occurrence is what the "
-                 "application rendered -- a filter inspecting only the "
-                 "other occurrence was bypassed"),
-                model_judged=True)
-            self._add(Finding(**{
-                "url": url, "method": method, "param": param,
-                "type": "reflected",
-                "context": nv.get("context") or context,
-                "payload": marked,
-                "transform": ["hpp"],
-                "severity": "high",
-                "confidence": _conf,
-                "detail": _det,
-                "evidence_class": _cls,
-                "headless": None,
-                # the position the payload actually went out in: a body probe
-                # recorded as "query" makes the PoC reproduce the wrong place
-                "param_in": "body" if is_body else "query",
-                "proof": _proof(resp, method, param, marked),
-            }))
-            self.coverage.record_finding(url, method)
-            if self.verbose:
-                _log.debug("    [+] HPP confirmed (%s)", param)
-            return True
+                    self._bump()
+                    self.coverage.record_request(url, method)
+                except Exception:
+                    continue
+                if resp is None or token not in (resp.text or ""):
+                    continue
+                try:
+                    nv = verifier.verify_semantic(
+                        resp.text or "", token,
+                        response_headers=dict(getattr(resp, "headers", None)
+                                              or {}))
+                except Exception:
+                    continue
+                if not nv.get("confirmed"):
+                    continue
+                _cls, _conf, _det = _grade_evidence(
+                    None, "high",
+                    ("HPP: the parameter was sent twice (payload occurrence "
+                     f"{'first' if payload_first else 'second'}, the other "
+                     "benign) and the payload-carrying occurrence is what the "
+                     "application rendered -- a filter inspecting only the "
+                     f"{'second' if payload_first else 'first'} occurrence "
+                     "was bypassed"),
+                    model_judged=True)
+                self._add(Finding(**{
+                    "url": url, "method": method, "param": param,
+                    "type": "reflected",
+                    "context": nv.get("context") or context,
+                    "payload": marked,
+                    "transform": ["hpp"],
+                    "severity": "high",
+                    "confidence": _conf,
+                    "detail": _det,
+                    "evidence_class": _cls,
+                    "headless": None,
+                    # the position the payload actually went out in: a body
+                    # probe recorded as "query" makes the PoC reproduce the
+                    # wrong place
+                    "param_in": "body" if is_body else "query",
+                    "proof": _proof(resp, method, param, marked),
+                }))
+                self.coverage.record_finding(url, method)
+                if self.verbose:
+                    _log.debug("    [+] HPP confirmed (%s)", param)
+                return True
         return False
 
     def _try_encoding_first(self, req, url, method, params, data, param,

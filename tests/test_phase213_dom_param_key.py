@@ -117,7 +117,8 @@ class _FakeEngine:
     def __init__(self, findings):
         self._f = findings
 
-    def analyze(self, url, marker=None, dialog_token=None):
+    def analyze(self, url, marker=None, dialog_token=None,
+                page_text=None):
         return self._f
 
 

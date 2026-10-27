@@ -68,7 +68,8 @@ def _load_yaml_file(path: str):
         import yaml
     except ImportError as e:                       # pragma: no cover
         raise NucleiImportError(
-            "PyYAML is required for --nuclei-dast (pip install pyyaml)"
+            "PyYAML is required for --nuclei-dast "
+            "(pip install 'xssentinel[nuclei]' or pip install pyyaml)"
         ) from e
     with open(path, "r", encoding="utf-8", errors="replace") as f:
         return yaml.safe_load(f)

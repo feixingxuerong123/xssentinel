@@ -327,7 +327,7 @@ def test_flask_front_end_registers_mcp():
     handler reachable.
     """
     try:
-        import flask  # noqa: F401
+        import flask  # noqa: F401 (imported only to probe availability; the skip below is the point)
     except ImportError:
         import pytest
         pytest.skip("Flask not installed")

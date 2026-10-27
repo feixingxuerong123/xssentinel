@@ -51,6 +51,7 @@ async = ["aiohttp>=3.14.4"]
 headless = ["playwright>=1.40"]
 api = ["flask>=3.1.3", "werkzeug>=3.1.9"]
 ast = ["esprima>=4.0"]  # Phase 43: JS AST data-flow channel (regex fallback when absent)
+nuclei = ["pyyaml>=6.0"]  # Phase 322: --nuclei-dast template bridge (clear NucleiImportError when absent)
 # The desktop console works with ZERO extra dependencies: the page is served
 # by the stdlib API server and the window falls back tkinter -> OS browser.
 # This extra only upgrades the window to a native one backed by the OS

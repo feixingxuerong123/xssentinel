@@ -1591,8 +1591,9 @@ class AsyncDetectionLayersMixin:
                         f"occurrence {'first' if _payload_first else 'second'}, "
                         "the other benign) and the payload-carrying "
                         "occurrence is what the application rendered -- a "
-                        "filter inspecting only the other occurrence was "
-                        "bypassed"),
+                        "filter inspecting only the "
+                        f"{'second' if _payload_first else 'first'} occurrence "
+                        "was bypassed"),
                 )
                 break
 
@@ -1658,7 +1659,7 @@ class AsyncDetectionLayersMixin:
         # per-param budget still caps spend), execution-point gate (an
         # unarmed payload can reflect but never confirm, so it is budget
         # waste).
-        if self._custom_payloads and not marker_escaped:
+        if getattr(self, "_custom_payloads", None) and not marker_escaped:
             from .verifier import has_execution_point
             _custom = [cp for cp in self._custom_payloads
                        if has_execution_point(cp)]

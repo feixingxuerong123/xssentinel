@@ -655,8 +655,21 @@ def _verify_semantic_impl(response_text: str, token: str,
     # -- Structural confirmation (authoritative) -------------------------
     token_attr_host = None
     try:
+        import warnings as _warnings
         from bs4 import BeautifulSoup
-        soup = BeautifulSoup(response_text, _bs_parser())
+        from bs4 import XMLParsedAsHTMLWarning
+        # XML documents (text/xml responses) make bs4 emit
+        # XMLParsedAsHTMLWarning, which is a UserWarning -- under any
+        # "warnings are errors" regime (the pytest config sets exactly
+        # that) the parse RAISED here and the `except Exception` below
+        # silently degraded every verdict on an XML response to the
+        # raw-text fallback (measured: the a.href=javascript: structural
+        # confirm became "escaped / non-executable" under pytest only).
+        # Suppress the warning around the parse -- the HTML-tolerant read
+        # is deliberate here (same pattern as sri_bypass).
+        with _warnings.catch_warnings():
+            _warnings.simplefilter("ignore", XMLParsedAsHTMLWarning)
+            soup = BeautifulSoup(response_text, _bs_parser())
         token_attr_host = _attribute_hosting_token(soup, token)
         verdict = _structural_confirm(soup, token, csp_blocks,
                                       response_headers, response_text)

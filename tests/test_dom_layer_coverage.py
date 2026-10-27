@@ -68,7 +68,7 @@ class _RaisingEngine:
     def available(self):
         return True
 
-    def analyze(self, url, marker=None):
+    def analyze(self, url, marker=None, page_text=None):
         self.calls += 1
         raise self._error
 
@@ -80,7 +80,7 @@ class _WorkingEngine:
     def available(self):
         return True
 
-    def analyze(self, url, marker=None):
+    def analyze(self, url, marker=None, page_text=None):
         self.calls += 1
         return []
 
