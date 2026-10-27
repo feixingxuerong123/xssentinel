@@ -4822,3 +4822,13 @@ control 复跑 baseline 18 passed → mutated 8 failed → restored 18 passed(sh
 **独立复跑** sync TP113/FP0/TN81/FN0/ERR0(813.6s)、async TP107/FP0/TN75/FN0/ERR0
 (760.7s),与提交内的 `phase330_full_*` 逐项相同。quick 产物入库
 `benchmark/results/phase330_quick_{sync,async}.json`。
+
+**发布门三件套补齐(2026-10-28,本 session,树 = `7f5ed61`)**:`--self-test`
+**ALL CHECKS PASSED(exit 0,日志 `dev/_p330_selftest_log.txt`,不入库)**;
+range4 双引擎门 **TP2/FP0/TN2/FN0/ERR0** exit 0(阳性 12 条全部
+browser-confirmed;`--out` 落 `range4/results_p330.json`,入库的
+`results.json` 逐字节未动,Phase 201 教训);range3 双引擎门 **sync
+TP18/TN7/SKIP1、async TP17/TN7/SKIP2、FP0/FN0/ERR0** exit 0
+(`range3/results_p330.json`)——三项均与 1.2.2 发布基线(p322c §3-4)逐项
+相同。至此 Phase 330 的门禁证据与 1.2.2 发布同级:benchmark 全量双引擎 +
+self-test + range3/4。
