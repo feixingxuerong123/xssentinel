@@ -4772,3 +4772,12 @@ Phase 322 的修复轮此前只存在于工作树(17 个已改文件,含核心�
 **仍然待操作者拍板**:`origin` 是本地 bundle(`D:/qoder/xssentinel_backup_20260923c.bundle`),
 README 的 CI 徽章指向的 GitHub 仓库 404,5 个 CI job 从未在托管环境跑过 —— 发布渠道
 (新建远端 / 只出离线包 / 保持本地)不是代码问题,是分发决策。
+
+### 附:同轮的一次未归因观测(WAF)
+
+range3 的 sync 调试跑里出现过一次 `[*] WAF detected: Edgecast`,而同一端点的
+in-process 复跑 `waf_name=None`(未复现)。`waf.py` 的 Edgecast 规则是
+`edgecast|ecd`、`kind="any"` —— 三字符的 `ecd` 会同时扫 headers 与 body,
+扫描器自己的随机十六进制 token 就有概率命中,属"随机 token 触发厂商指纹"的
+可疑路径。**本轮只记录、不改判定**(WAF 命中会改变载荷选择,按 209/294 的规矩
+要单独测量);下轮候选:把 `ecd` 收紧到 header/cookie 上下文或加词边界。
