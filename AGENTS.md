@@ -5073,3 +5073,25 @@ waf 语料契约);对等门 **4/4(335.4s)**;strict quick 切片双引擎全绿(s
 **TP113/FP0/TN81/FN0/ERR0(0 SKIP)**、async **TP107/FP0/TN75/FN0/ERR0
 (12 SKIP,一次通过)**,与 1.2.2 基线逐项相同、零漂移。产物
 `benchmark/results/phase337_*`。
+
+## Phase 338:表单填充值跟随 --marker-prefix(336 记账的潜在缺陷收口)
+
+336 死代码轮删掉的 `_text_value()` 是 form_miner 里 `_marker` 导入的唯一
+使用者——它是表单填充值的**懒读取访问器**(经 `stealth.marker()`,前缀覆盖
+时归因到本次扫描),而静态常量 `DEFAULT_TEXT_VALUE = "xssentinel_test"` 顶替
+了它的位置:两个引擎的表单挖掘路径(`scanner_crawl.py` /
+`async_scanner_crawl.py` → `forms_to_endpoints`)都以默认值调用,设了
+`--marker-prefix` 后填充值仍不带前缀,与 DOM/probe/sink 词干全部走
+`marker()` 的归因口径不一致。
+
+**修复**:恢复懒读取(`_form_fill_value()`)并接进 `fill_form` /
+`forms_to_endpoints` 的 None 默认路径——无前缀时字节等同历史常量(默认路径
+零行为变化),设前缀时填充值 = `<prefix>_`(与被删函数原作者语义一致)。
+显式 marker 参数仍然优先。
+
+**测试** `tests/test_phase338_form_fill_marker.py` 4 例(默认字节等同 /
+前缀跟随 / 显式参数优先 / fill_form 的 None 默认;autouse fixture 恢复
+stealth 模块全局,防前缀泄漏污染后续测试——191 的 `_EGRESS_JAR` 同款教训)。
+**变异对照**:stash 旧实现 → 2 failed(前缀两例),恢复全绿。
+**门禁**:消费方批 46 passed;strict quick 切片双引擎 exit 0;默认路径字节
+不变故全量矩阵不适用(变更仅在非默认的 --marker-prefix 路径上),如实记账。

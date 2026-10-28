@@ -27,6 +27,21 @@ from .parser_utils import bs_parser as _bs_parser
 
 # Default test value for empty text fields.
 DEFAULT_TEXT_VALUE = "xssentinel_test"
+
+
+def _form_fill_value() -> str:
+    """Test value for empty form fields; tracks --marker-prefix.
+
+    Without a prefix override this is byte-identical to
+    ``DEFAULT_TEXT_VALUE``; with ``--marker-prefix q`` every marker stem
+    becomes ``q_`` (stealth.marker), so the fill is attributed to this
+    scan like every other marker system.  Restores the lazy accessor
+    whose static constant replaced it (Phase 336 finding: the constant
+    does not follow the prefix).
+    """
+    from .stealth import marker as _stem_marker
+    return _stem_marker(DEFAULT_TEXT_VALUE)
+
 # Regex fallback when bs4 isn't available.
 FORM_RE = re.compile(
     r'<form\b([^>]*)>(.*?)</form>',
@@ -127,6 +142,8 @@ def fill_form(form: dict, marker: str | None = None) -> tuple[dict, dict]:
       - GET form: params dict, data = {}
       - POST form: params = {}, data dict
     """
+    if marker is None:
+        marker = _form_fill_value()
     params, data = {}, {}
     is_post = form["method"].upper() == "POST"
     for f in form["fields"]:
@@ -148,12 +165,14 @@ def fill_form(form: dict, marker: str | None = None) -> tuple[dict, dict]:
 
 
 def forms_to_endpoints(html: str, base_url: str,
-                       marker: str = DEFAULT_TEXT_VALUE
+                       marker: str | None = None
                        ) -> list[tuple[str, str, dict, dict]]:
     """Discover forms and produce (url, method, params, data) tuples.
 
     Each tuple is ready to pass to scanner.scan_target().
     """
+    if marker is None:
+        marker = _form_fill_value()
     out = []
     for form in extract_forms(html, base_url):
         params, data = fill_form(form, marker)

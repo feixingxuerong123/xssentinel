@@ -5,6 +5,15 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **表单填充值跟随 `--marker-prefix`(Phase 338)**:空表单字段的填充值原来是
+  静态常量 `"xssentinel_test"`,不随 `--marker-prefix` 跟随——而其余全部
+  marker 系统(DOM/probe/sink 词干)都经 `stealth.marker()` 归因到本次扫描。
+  恢复其被死代码清理轮(Phase 336)删掉的懒读取访问器并接进两个填充入口:
+  无前缀时字节等同历史常量(默认路径零行为变化),设前缀时填充值携带前缀
+  (`tests/test_phase338_form_fill_marker.py`,变异对照:旧实现 2 failed)。
+
 ### Changed
 
 - **语料死槽交换(Phase 337)**:把 Phase 334 定谳的 18 个窗口死槽(16 个
