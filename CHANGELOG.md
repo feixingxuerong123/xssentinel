@@ -5,6 +5,18 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **语料死槽交换(Phase 337)**:把 Phase 334 定谳的 18 个窗口死槽(16 个
+  审计定谳 + 活性网自己抓到的 2 个)就地替换为**浏览器 + 验证器双测活**的
+  向量,零删除、家族尺寸不变、兄弟步长采样点零位移。要点:math 语料的
+  HTML 集成点向量名**勘误**(`annotation` → `annotation-xml`,旧拼写是惰性
+  的 MathML 文本元素);sq 字符串上下文的反斜杠自挫形态、event_handler 的
+  2 条误归档 script-string 载荷、error_page/svg/css 的 legacy 死形态全部
+  换活;点击类向量引入 `interaction` 语料标签(测试契约按标签跳过,非
+  手写名单)。新增常驻回归 `tests/test_phase337_window_liveness.py`:
+  40 个上下文主窗口逐载荷的忠实 harness 活性契约——死槽再进窗口当场红。
+
 ### Fixed
 
 - **Edgecast WAF 指纹误报收紧(Phase 330)**:旧规则 `edgecast|ecd` 的三字符

@@ -5034,3 +5034,42 @@ mxss_verify 的三处悬空注释引用已改为自洽表述。
 param_miner/fix_advice/poc/template/polyglot/sandbox/mxss/upload/stealth/api
 server);strict quick 切片 **FP0/FN0/ERROR0 exit 0**(`phase336_quick_sync`)。
 行为零漂移:删除的全部是零调用定义。
+
+## Phase 337:窗口死槽交换 —— 18 槽全清 + 窗口活性常驻回归网
+
+Phase 334 定谳的死槽处置落地(编号顺延至 337)。**设计决定:全部就地替换、
+零删除**——家族尺寸不变、兄弟步长采样点零位移,Phase 333 担心的级联问题
+结构性消失。
+
+**换入向量全部先测后入**(dev/_p337_swap_probe.py:验证器忠实 harness +
+可盖章性 + 真 Chromium 弹窗,三连全过才允许进语料,16/16 LIVE)。要点:
+- **math 向量名勘误**:HTML 集成点是 `annotation-xml` 不是 `annotation`
+  (旧拼写是惰性 MathML 文本元素;annotation-xml 形态 334 已浏览器实测执行
+  且验证器确认)——4 个 maction/annotation 死槽全部换成 annotation-xml
+  集成点向量(img/svg/details 各一 + 原 script 意图的正确拼写);
+- error_page 的 isindex/background-js、svg 的 use+javascript: ×2、css 的
+  behavior:url(IE)、script_block 的嵌套 script、script_string_dq 的
+  转义插值、html_comment 的 CDATA 形态 ×2、event_handler 的 2 条误归档
+  ——各换本上下文已证活的形态;
+- 点击类向量引入 **`interaction` 语料标签**(svg-003),测试契约按标签跳过
+  ——派生而非手写名单,且断言标签至少被一个窗口载荷使用(防空转)。
+
+**活性网自己又抓到 2 个审计漏网的死槽(共 18)**:
+- script_string_sq 的反斜杠自挫形态(`';alert(1)//`——载荷自己的反斜杠把
+  引号逃逸掉,JS 字符串永不终止,浏览器实测不弹;换 `</script><svg/onload=…>`);
+- html_attribute_dq 的宿主依赖形态(input 宿主上 onerror 不触发;换
+  `"><svg/onload=…>` 宿主无关 breakout,顺带补上该条目缺失的 id)。全库
+  清点另有 4 条无 id 条目,只补 id 不动载荷(数据卫生)。
+
+**常驻回归**:`tests/test_phase337_window_liveness.py` —— 把 334 的审计
+升格为契约:每个有语义确认路径的上下文,主窗口逐载荷在忠实 harness 上
+必须确认(排除类按机制编码:层确认/点击/框架探针/无 harness,且排除集
+与语料上下文双向闭合——新增上下文必须配 harness 或书面排除,否则红)。
+死槽再进窗口当场红。
+
+**门禁(3.12 venv)**:契约测试 39 passed(337 网络窗 2 + 332/331/portswigger/
+waf 语料契约);对等门 **4/4(335.4s)**;strict quick 切片双引擎全绿(sync
+64 例 0 SKIP、async 63 例 1 SKIP);全量 194 strict——sync
+**TP113/FP0/TN81/FN0/ERR0(0 SKIP)**、async **TP107/FP0/TN75/FN0/ERR0
+(12 SKIP,一次通过)**,与 1.2.2 基线逐项相同、零漂移。产物
+`benchmark/results/phase337_*`。

