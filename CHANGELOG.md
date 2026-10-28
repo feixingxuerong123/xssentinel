@@ -5,6 +5,15 @@
 
 ## [Unreleased]
 
+## [1.2.3] - 2026-10-29
+
+质量与外部效度维护轮:Edgecast WAF 指纹误报收口、双引擎对等缺口修复、
+语料 18 个死槽全清 + 窗口活性常驻回归、死代码清理(净删约 810 行)、
+表单填充值跟随 --marker-prefix。全量 194 双引擎 strict **FP0/FN0/ERR0**
+与 1.2.2 基线逐项相同;外部靶 XSSMaze 官方口径 server **948/65/0**、
+client **24/0/0**、控制例 0 FP;分发落地(私有 GitHub 远端,CI 首跑的
+队列级失败定性为私有 Actions 额度,见 AGENTS.md Phase 339)。
+
 ### Fixed
 
 - **表单填充值跟随 `--marker-prefix`(Phase 338)**:空表单字段的填充值原来是
