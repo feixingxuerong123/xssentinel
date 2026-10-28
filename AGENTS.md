@@ -4963,3 +4963,38 @@ script_string 的 \${} 转义、html_comment 的 CDATA 形态、event_handler �
 **处置留下一轮(335)**:就地换活向量或删除,但删除移动家族尺寸会级联兄弟
 步长采样点(cdata→script_block+4 这类"谁在采样我"须逐家族先查),全量
 194 双引擎复测照例——一轮一个判定面改动,本轮零产品改动不欠门禁。
+
+## Phase 335:外部靶 XSSMaze 官方口径复测(当前树 401f0bd)—— 与 1.2.2 基线记分卡等价,零漂移
+
+1.2.2 发布后的两次判定面改动(331 sync 头取、333 语料交换)之后,重跑外部靶
+官方口径。靶:`ghcr.io/hahwul/xssmaze:main` v0.3.0(Docker Desktop 今天重启后
+容器自动恢复);官方 runner(`dev/_xssmaze/benchmark.py`)+ wrapper 桥
+(`XSSMAZE_TIMEOUT=100`,sync,server reach 不加 headless —— 发布证据引用的
+p319 形状);评分契约 322d 版(`benchmark/xssmaze_scoring.py`)。
+
+| 群体 | 本轮 | 1.2.2 基线(p319/p322) | 结论 |
+|---|---|---|---|
+| server(1013 例) | **TP948 / FN65 / FP0**,F1 0.967,4749.5s | p319 946/67/0、p322 947/66/0 | +1 TP,摆动全归因非树因 |
+| client(24 例,headless) | **TP24 / FN0 / FP0**,F1 1.000,508.7s | 24/0/0 | 逐项相同 |
+| 控制例 27 | **0 FP**(any-severity 与 high/med/crit 双口径) | 0 FP | 相同 |
+| 契约交叉检查 | **NONE**(xsleak 不在 FN 清单、控制例一致) | — | 上游分类未变 |
+
+**三条摆动逐例归因(四跑横向 + 2 轮重放)**:
+- `eventhandler/level4`(+1)、`level5`(+1):medium/polyglot_reflection ——
+  **polyglot 层跑间摆动**(p307 devlog 记过的同款):level4 命中史 p316 命中→
+  p319/322 不中→p335 命中(重放 0/2);level5 p319 命中→p322 不中→p335 命中
+  (重放 1/2)。
+- `edge/level1`(-1):**靶实例状态现象**——该页今天对一切载荷形状的 query
+  确定性返回 `Blocked`(实测 10/10,payload 与 script 形状各 10/10),而
+  Docker Desktop 今天重启、容器刚重建("Up 29 seconds");p319/p322 的
+  reflected/high 命中来自更早的容器实例。当前树对"全拦"页面扫不出东西是
+  正确行为。edge 类目测的正是这类服务器边缘行为。
+
+本轮 1040 例 **0 wrapper 超时**(中位 1.5s/例,max 63.2s;历史轮各有 3-4 条
+100s 超时靠单跑恢复,本轮是首个无噪声读数)。顺带:dev 的 attribute.py 接错
+官方 JSON 字段(`false_negatives` 是计数,FN URL 清单在 `missed`)已修;
+`ctype/level1` 有一条无害 bs4 stderr 警告(finding 正常计入)。
+
+**结论:331/333 对外部效度零回归零增益,记分卡与 1.2.2 发布基线等价**
+(净 +1 TP 在摆动带内)。产物 `dev/_xssmaze/server_p335.{json,md,tsv,run.log}`
++ `client_p335.*`(dev 惯例不入库),复跑命令同 DEVLOG。
