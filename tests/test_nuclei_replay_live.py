@@ -107,6 +107,8 @@ def _run_nuclei(template_path: str, base: str) -> bool:
     return any('"matched-at"' in ln for ln in r.stdout.splitlines())
 
 
+@pytest.mark.skipif(not _HAS_NUCLEI,
+            reason="nuclei binary not on PATH")
 class TestNucleiReplayLive:
     @pytest.fixture()
     def origin(self):

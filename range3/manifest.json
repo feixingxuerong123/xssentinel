@@ -144,10 +144,6 @@
    "path": "/legacy",
    "param": "q",
    "headless": true,
-   "engines": [
-    "sync",
-    "async"
-   ],
    "note": "charset=UTF-7 + raw echo; only a real browser can confirm. Both engines now reach the bare <script> candidate (corpus index 1) and browser-fire it. Phase 331: sync's primary candidate slice is corpus-HEAD based (was stride), which is what kept the bare script outside the effective_max window and dropped the param to L7 polyglot medium/model-only -- the gap was measured identical at 513fd21 (pre-existing sync parity gap, docs/OPTIMIZATION.md 2.1.4) and was engine-scoped until the fix so the gate never claimed a browser verification sync did not have."
   },
   {

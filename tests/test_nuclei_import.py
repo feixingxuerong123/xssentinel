@@ -22,6 +22,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pytest
 
+
+# The nuclei dast bridge requires the optional [nuclei] extra (PyYAML);
+# skip at the dependency site rather than failing on hosts without it.
+pytest.importorskip("yaml")
+
 from xssentinel.core.nuclei_import import (NucleiImportError,
                                            extract_payloads,
                                            merge_into_custom)

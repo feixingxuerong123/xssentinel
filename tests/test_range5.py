@@ -135,8 +135,20 @@ def test_score_gate_semantics():
 # ---------------------------------------------------------------------------
 
 def _dom_available() -> bool:
+    """The live pair needs a WORKING browser, not just the playwright
+    import: hosted CI pip-installs playwright without downloading a
+    chromium, and available() (import-only) then lies.  Probe-launch like
+    conftest._probe_socketpair does."""
     from xssentinel.core import dom_engine
-    return dom_engine.DynamicDomAnalyzer.available()
+    if not dom_engine.DynamicDomAnalyzer.available():
+        return False
+    try:
+        from playwright.sync_api import sync_playwright
+        with sync_playwright() as p:
+            p.chromium.launch(headless=True).close()
+        return True
+    except Exception:
+        return False
 
 
 needs_browser = pytest.mark.skipif(
