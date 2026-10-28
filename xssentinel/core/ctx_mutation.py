@@ -521,17 +521,3 @@ def best_mutation_for_context(context: str) -> tuple[str, Mutation] | None:
 def supported_contexts() -> list[str]:
     """Return the list of reflection contexts this engine understands."""
     return list(_CONTEXT_MUTATIONS.keys())
-
-
-def apply_mutation(payload: str, name: str) -> str:
-    """Apply a single named mutation to a payload.  Looks up the mutation
-    in any context's list (so callers don't need to know the context)."""
-    for muts in _CONTEXT_MUTATIONS.values():
-        for n, fn in muts:
-            if n == name:
-                try:
-                    return fn(payload)
-                except Exception:
-                    return payload
-    # Also check the transform registry (mutations can reference transforms).
-    return _t.apply(name, payload)

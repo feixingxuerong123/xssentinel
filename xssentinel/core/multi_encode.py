@@ -408,23 +408,6 @@ def chains_for_waf(waf_name: str | None) -> list[tuple[str, list[str], str]]:
         ]
     # Default: generic spread.
     return [(name, steps, why) for name, steps, why, _ in MULTI_ENCODE_CHAINS[:8]]
-
-
-def best_chain_for_context(context: str,
-                           waf_name: str | None = None) -> tuple[str, list[str], str] | None:
-    """Return the single best chain for the given context + WAF, or None.
-
-    Prefers WAF-specific chains when a WAF is known; otherwise picks the
-    first context-appropriate chain.
-    """
-    if waf_name:
-        chains = chains_for_waf(waf_name)
-        if chains:
-            return chains[0]
-    chains = chains_for_context(context)
-    return chains[0] if chains else None
-
-
 def all_chain_variants(payload: str,
                        context: str,
                        waf_name: str | None = None,
@@ -462,8 +445,3 @@ def all_chain_variants(payload: str,
 def supported_encoders() -> list[str]:
     """Return the list of encoder names."""
     return [n for n, _, _ in _ENCODERS]
-
-
-def supported_chains() -> list[str]:
-    """Return the list of chain names."""
-    return [name for name, _, _, _ in MULTI_ENCODE_CHAINS]

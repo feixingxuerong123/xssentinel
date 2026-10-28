@@ -5,7 +5,7 @@ Why this exists
 `verifier.verify_semantic` answers "is the token inside an executable context"
 from a BeautifulSoup tree plus hand-maintained sink tables.  `dom_engine` answers
 the same question by launching Chromium at ~5.6 s per probe page, and
-`mxss_verify` needs a browser for the parse->serialise->re-parse round-trip that
+proving mXSS needs a browser for the parse->serialise->re-parse round-trip that
 defines mutation XSS.  On an engagement that ordering is backwards twice over:
 the browser is the slow, fragile, sometimes-unavailable path, and the question
 "does `<img src=x onerror=...>` inside a `class="..."` value fire?" does not
@@ -319,22 +319,6 @@ FOCUSABLE_CONTROLS = frozenset({
 #: style name is not a handler at all; both must be rejected before they can be
 #: scored as an event.
 _HANDLER_NAME_RE = re.compile(r"^on[a-z]+$")
-
-
-
-def _svg_case(name: str) -> tuple[str, str]:
-    """Foreign content adjusts a handful of tag names and camel-cases SVG
-    elements.  Getting `foreignObject`/`annotation-xml` wrong changes whether a
-    subtree is HTML or foreign, i.e. whether a payload is live."""
-    low = name.lower()
-    if low in ("foreignobject",):
-        return "foreignObject", "svg"
-    if low in ("desc", "title"):
-        return low, "svg"
-    return low, "svg"
-
-
-
 def parse(html: str, fragment: bool = True) -> Doc:
     """Build a DOM from `html` the way a browser parser would.
 
@@ -359,19 +343,6 @@ def parse(html: str, fragment: bool = True) -> Doc:
     # than in the serialiser is what keeps the second round-trip honest.
     html = html.replace("\r\n", "\n").replace("\r", "\n")
     return _Parser(html, fragment=fragment).run()
-
-
-
-def _is_integration(node: Node) -> bool:
-    lname = node.name.lower()
-    if node.ns == "svg" and lname in SVG_HTML_INTEGRATION:
-        return True
-    if node.ns == "mathml" and lname in MATHML_TEXT_INTEGRATION:
-        return True
-    return False
-
-
-
 def _serialize_attr_value(v: str) -> str:
     # Exactly what Chromium escapes in an attribute value, measured character by
     # character across all three quoting styles
@@ -1255,8 +1226,8 @@ def judge_roundtrip(html: str, token: str = "", *,
 
     Each iteration is the real thing: parse -> serialise -> parse the
     serialisation.  A verdict that flips inert -> live at any depth is a
-    mutation vector; that flip is what `mxss_verify` currently pays a browser
-    launch for.
+    mutation vector; that flip is what a browser round-trip used to be
+    launched for (pre-sandbox harnesses).
     """
     cur = html
     best = Verdict("inert", "no round-trip produced a live node")

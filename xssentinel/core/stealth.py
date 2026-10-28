@@ -73,12 +73,6 @@ def marker(default_stem: str) -> str:
     if _marker_prefix:
         return _marker_prefix + "_"
     return default_stem
-
-
-def marker_override_active() -> bool:
-    return _marker_prefix is not None
-
-
 # ---------------------------------------------------------------------------
 # Phase 51: the remaining half of the pentest audit's "stealth" item --
 # no proxy pool, no header rotation, no request jitter.  All three are

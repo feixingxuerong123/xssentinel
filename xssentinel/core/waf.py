@@ -346,17 +346,6 @@ def detect_from_raw(status_code: int, headers: dict, body: str) -> dict:
     r.headers = headers
     r.text = body
     return detect(r)
-
-
-def list_known_wafs() -> list[str]:
-    """Return the list of WAF vendor names known to the detector."""
-    seen = []
-    for name, _, _ in _WAF_SIGNATURES:
-        if name not in seen:
-            seen.append(name)
-    return seen
-
-
 def is_waf_signature(text: str) -> str | None:
     """Quick check: does the given text contain any WAF signature?
 

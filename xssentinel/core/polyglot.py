@@ -358,8 +358,3 @@ def extract_token(payload: str) -> str | None:
     """Extract the polyglot token from a payload string."""
     m = POLYGLOT_TOKEN_RE.search(payload or "")
     return m.group(1) if m else None
-
-
-def is_polyglot(payload: str) -> bool:
-    """Whether a payload looks like one of our polyglots."""
-    return POLYGLOT_TOKEN_RE.search(payload or "") is not None

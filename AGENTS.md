@@ -4998,3 +4998,39 @@ p319 形状);评分契约 322d 版(`benchmark/xssmaze_scoring.py`)。
 **结论:331/333 对外部效度零回归零增益,记分卡与 1.2.2 发布基线等价**
 (净 +1 TP 在摆动带内)。产物 `dev/_xssmaze/server_p335.{json,md,tsv,run.log}`
 + `client_p335.*`(dev 惯例不入库),复跑命令同 DEVLOG。
+
+## Phase 336:工程质量轮 —— 死代码清理(27 个零引用定义 + 孤儿模块 mxss_verify)
+
+用户点名"无用文件 + 死代码清理"。按 Phase 191 的判死标准执行:**全仓文本交叉
+引用为零 + 本包为显式属性访问代码**(client_layers 等全部是 `mod.attr` 显式
+调用,无 dir()/getattr 按名派发)⇒ 文本扫描即可判死;每个候选逐一人工核验。
+
+**方法与三处自我修正**:
+1. 初版 AST 扫描混入 dev/ 里的 vendored venv(dev/_xssmaze/_venv_release,
+   不入库)与 unittest 类(发现机制误报)——收紧到 xssentinel/ 生产包;
+2. 孤儿模块检测器第一版是坏的(不解析相对导入,47 个假孤儿)——修正为
+   按 import 语句匹配后只剩 **1 个真孤儿**:`core/mxss_verify.py`(282 行,
+   Phase 91 浏览器 mXSS harness,注释自述已被 sandbox 取代;`--!>` 勘误轮
+   (332)之后它连"潜在缺口候选"的价值都没有了)——整文件删除;
+3. `_payloads` 是子串误报(237 个文件命中的是别的名字)、
+   `_shutdown_shared_browsers` 被 dev 探针调用(保留)、
+   `logger.is_configured` 与 `configure_logging` 是成对公共面(保留)、
+   `marker_in_exec_context` 的命中全是 verifier 里活着的下划线孪生
+   (测试钉住)。
+
+**删除**(27 定义 + 1 模块,名单见 CHANGELOG Unreleased/Removed):27 个
+全仓零引用的函数/类(bypass/csp/polyglot/waf/stealth/mxss 系工具面 + 六个
+场景模块各自的 `dangerous_payloads()`——六个文件同名零调用,早期 API 残留)
++ `StreamResponse`(api/server 自制类)。
+
+**顺带发现与处置**:form_miner 的 `_text_value` 是 `_marker` 导入的唯一
+使用者,删除后悬空导入已清;顺带记录一个潜在问题(不修):`DEFAULT_TEXT_VALUE`
+是静态串,注释声称"Includes a marker"但值里没有动态 marker——若 `--marker-prefix`
+自定义,表单填充值不跟随(此函数从未被调用过,所以行为无回归;候选下轮)。
+mxss_verify 的三处悬空注释引用已改为自洽表述。
+
+**验证**:全包 132 模块导入 OK;ruff 零债(含删除中新生的一处悬空导入);
+消费方测试批 320 passed(no_undefined_names + csp×5 + waf×2 + form_miner/
+param_miner/fix_advice/poc/template/polyglot/sandbox/mxss/upload/stealth/api
+server);strict quick 切片 **FP0/FN0/ERROR0 exit 0**(`phase336_quick_sync`)。
+行为零漂移:删除的全部是零调用定义。

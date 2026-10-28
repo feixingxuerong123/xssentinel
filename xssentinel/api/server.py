@@ -476,38 +476,6 @@ class Response:
         if detail:
             body["detail"] = detail
         return cls(status, body, content_type="application/json")
-
-
-class StreamResponse:
-    """A response whose body is produced incrementally (an event stream).
-
-    A route handler may return one of these instead of :class:`Response`.
-    The type lives here, beside the shared route table, for the same reason
-    that table does: **both** front-ends must honour it, and two hand-kept
-    notions of "a streamed response" is exactly the drift this module was
-    split to prevent.  The stdlib front-end writes each chunk straight to
-    the socket; the Flask front-end hands the same iterable to Werkzeug.
-
-    ``chunks`` is an iterable of ``bytes``, consumed lazily -- so a handler
-    can generate from live state instead of materialising a body.  That is
-    the whole point: a buffered event stream is just a slow polling
-    response with extra machinery.
-    """
-
-    def __init__(self, status: int = 200, chunks: Any = None,
-                 headers: dict | None = None,
-                 content_type: str = "text/event-stream") -> None:
-        self.status = status
-        self.chunks = chunks or iter(())
-        self.headers = dict(headers or {})
-        self.headers.setdefault("Content-Type", content_type)
-        self.content_type = content_type
-        # Deliberately empty: a streamed response has no buffered payload,
-        # and an empty body keeps a front-end that reaches for `.body` from
-        # mis-reading a stream as "nothing was sent".
-        self.body = b""
-
-
 # Route handlers --------------------------------------------------------
 def _handle_health(ctx, m, body, query) -> Response:
     return Response.json(200, {

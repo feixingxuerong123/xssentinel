@@ -95,19 +95,6 @@ def _content_candidates(marker: str) -> list[tuple[str, bytes, str]]:
         (f"x{marker}.html", img.encode("utf-8"), "text/html"),
         (f"x{marker}.html", body.encode("utf-8"), "text/html"),
     ]
-
-
-def _find_stored_url(text: str, marker: str, url: str) -> str | None:
-    """Return the first marker-bearing absolute URL in ``text`` (or
-    ``None``).  Reuses the path-embedding regex of the filename probe so
-    the two probes agree on what counts as an exposed store."""
-    stored_url = _first_url_with(text, marker)
-    if not stored_url:
-        return None
-    from urllib.parse import urljoin
-    return urljoin(url, stored_url)
-
-
 def probe_upload_content(requester, url: str, file_field: str,
                          data: dict | None = None,
                          params: dict | None = None,

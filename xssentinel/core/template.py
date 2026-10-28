@@ -117,16 +117,6 @@ TEMPLATES: list[tuple[str, str, str, str]] = [
 def probes() -> list[tuple[str, str, str]]:
     """Return [(framework, probe_payload, expected_value), ...]"""
     return [(fw, probe, val) for fw, probe, val, _ in TEMPLATES]
-
-
-def confirm_payload_for(framework: str) -> str | None:
-    """Return the XSS-triggering payload for a confirmed framework."""
-    for fw, _, _, confirm in TEMPLATES:
-        if fw == framework:
-            return confirm
-    return None
-
-
 #: A digits-free, template-free value to inject in the same parameter as a
 #: control (Phase 209).  See ``detect_rendered``.
 CONTROL_VALUE = "xssentinelcontrol"

@@ -197,19 +197,6 @@ def error_payloads() -> list[str]:
             seen.add(p)
             out.append(p)
     return out
-
-
-def error_indicators() -> list[str]:
-    """Return regex source strings that indicate an error page.
-
-    Each entry is the source pattern (not compiled) so callers can
-    embed them in their own regexes or compile with custom flags.
-    A response is considered an error page if its status code is
-    >= 400 OR any of these patterns match.
-    """
-    return [p.pattern for p, _ in _ERROR_INDICATOR_PATTERNS]
-
-
 def _classify_context(response_text: str, marker: str) -> str:
     """Classify the reflection context of ``marker`` in ``response_text``.
 

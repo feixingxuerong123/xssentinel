@@ -660,13 +660,6 @@ def analyze(csp_header: str) -> CSPReport:
             "(search/suggest/translate callback), CSP is bypassable")
 
     return rep
-
-
-def is_bypassable(csp_header: str) -> bool:
-    """Quick check whether the CSP is bypassable."""
-    return analyze(csp_header).bypassable
-
-
 # ---------------------------------------------------------------------------
 # Phase 187: executable gadget chains (absorbed from the nuclei csp-bypass
 # template family / renniepak CSPBypass corpus).

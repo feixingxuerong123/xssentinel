@@ -16,6 +16,24 @@
   (high)——此前从未被识别。测试带变异对照钉住旧规则必命中误报样本
   (`tests/test_phase330_waf_edgecast.py`)。
 
+### Removed
+
+- **死代码清理(Phase 336)**:删除 27 个全仓零引用的模块级函数/类与 1 个孤儿
+  模块 `core/mxss_verify.py`(282 行,Phase 91 的浏览器 mXSS 验证 harness,早已被
+  `core/sandbox.py` 的纯 Python 沙箱取代;本包为显式属性访问代码,全仓文本交叉
+  引用为零即判死)。删除名单:`StreamResponse`(api/server)、`_is_integration` /
+  `_svg_case`(sandbox)、`_reload`(fix_advice)、`_find_stored_url`(upload_probe)、
+  `_text_value`(form_miner)、`all_bypass_payloads` / `bypass_for_waf` /
+  `supported_wafs`(bypass)、`apply_mutation`(ctx_mutation)、
+  `best_chain_for_context` / `supported_chains`(multi_encode)、
+  `build_interactive_poc`(poc)、`build_pollution_payloads`(prototype)、
+  `confirm_payload_for`(template)、`dangerous_char_test`(jsonp)、
+  `error_indicators`(error_xss)、`is_bypassable`(csp)、`is_polyglot`(polyglot)、
+  `list_known_wafs`(waf)、`marker_override_active`(stealth)、
+  `dangerous_payloads` ×6(graphql_xss / postmessage / redirect_xss / sw_xss /
+  websocket_xss / worker_xss)。行为无变化(全包 132 模块导入 OK;消费方测试批
+  320 passed;strict quick 切片抽检)。
+
 ## [1.2.2] - 2026-10-27
 
 交付收口:Agent 接面(MCP 七工具 / Streamable HTTP / 进度与取消)、判定顺序修复

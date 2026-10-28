@@ -25,17 +25,8 @@ except ImportError:
 
 from .parser_utils import bs_parser as _bs_parser
 
-# Default test value for empty text fields.  Includes a marker so the
-# scanner can later verify reflection.
-from .stealth import marker as _marker
+# Default test value for empty text fields.
 DEFAULT_TEXT_VALUE = "xssentinel_test"
-
-
-def _text_value() -> str:
-    """Lazy: honors --marker-prefix set after import."""
-    return _marker("xssentinel_test")
-
-
 # Regex fallback when bs4 isn't available.
 FORM_RE = re.compile(
     r'<form\b([^>]*)>(.*?)</form>',

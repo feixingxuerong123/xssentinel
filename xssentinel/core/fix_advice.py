@@ -41,18 +41,6 @@ def _load() -> dict:
                     "default": raw.get("default_advice", {}),
                 }
     return _cache
-
-
-def _reload(path: str | None = None) -> None:
-    """Reload the corpus (custom JSON hook, mirrors payloads.reload)."""
-    global _cache, _DATA_FILE
-    with _cache_lock:
-        if path:
-            _DATA_FILE = path
-        _cache = None
-    _load()
-
-
 _ADVICE = _load()["advice"]
 _DEFAULT_ADVICE = _load()["default"]
 

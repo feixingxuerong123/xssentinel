@@ -107,11 +107,3 @@ def analyze_response(response_text: str, marker: str) -> dict:
         "exploitable": exploitable,
         "poc_payload": poc,
     }
-
-
-def dangerous_char_test(response_text: str, char: str) -> bool:
-    """Check whether a dangerous character survived into the callback name.
-
-    If yes, the endpoint does NO sanitization -> trivially exploitable.
-    """
-    return char in (response_text or "")
