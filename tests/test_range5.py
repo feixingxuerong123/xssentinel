@@ -197,6 +197,29 @@ def test_vulnerable_page_yields_browser_executed_dom_finding(lab_port):
     dyn = [f for f in found
            if f.get("type") == "dom_dynamic"
            and f.get("evidence_class") == "browser-executed"]
+    if not dyn:
+        # Hosted-only failure diagnostics (Phase 340): the scan produced
+        # zero findings on the GitHub runner while passing locally -- dump
+        # everything needed to attribute it (browser version, page markup,
+        # page JS errors) without a second round-trip.
+        import json as _json
+        try:
+            from playwright.sync_api import sync_playwright
+            with sync_playwright() as p:
+                b = p.chromium.launch(headless=True)
+                pg = b.new_page()
+                _errs = []
+                pg.on("pageerror", lambda e: _errs.append(str(e)))
+                pg.goto(f"http://127.0.0.1:{lab_port}/unsafe?q=xssentinel",
+                        wait_until="networkidle", timeout=20000)
+                pg.wait_for_timeout(1500)
+                _diag = {"browser": b.version,
+                         "page_errors": _errs,
+                         "body_head": pg.content()[:600]}
+                b.close()
+        except Exception as _e:
+            _diag = {"diag_crash": f"{type(_e).__name__}: {_e}"}
+        print("RANGE5 DIAG:", _json.dumps(_diag, ensure_ascii=False)[:900])
     assert dyn, (
         f"no browser-executed DOM finding on /unsafe -- the vendored "
         f"unsafeHTML write path is not observed by the sink "
