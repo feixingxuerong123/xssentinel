@@ -5095,3 +5095,26 @@ stealth 模块全局,防前缀泄漏污染后续测试——191 的 `_EGRESS_JAR
 **变异对照**:stash 旧实现 → 2 failed(前缀两例),恢复全绿。
 **门禁**:消费方批 46 passed;strict quick 切片双引擎 exit 0;默认路径字节
 不变故全量矩阵不适用(变更仅在非默认的 --marker-prefix 路径上),如实记账。
+
+## Phase 339:分发落地 —— 远端已建并推送,CI 队列级拒绝已定性
+
+Phase 329/322 挂账的"发布渠道待拍板"由操作者拍板:**推远端**。已执行:
+
+- **远端**:`origin` 从本地 bundle 切换到
+  **https://github.com/feixingxuerong123/xssentinel**(仓库经 API 新建,**私有**;
+  账号经 GCM 凭证实测为徽章 slug 属主本人;推送前全树密钥扫描 0 命中)。
+- **推送**:main(6fbb849)+ v1.2.0 / v1.2.1 / v1.2.2 三 tag 全部落地,
+  origin/main 与本地逐提交一致;bundle 文件保留作离线备份。
+- **README CI 徽章**:slug 与实际仓库一致;私有仓库期间徽章不渲染属预期。
+
+**CI 首跑 failure 已定性(不是代码/配置问题)**:`tests` 与 `min-python` 两个
+job **零步骤、无 runner、日志 BlobNotFound**,运行仅存活 3 秒——队列级拒绝;
+另三个 job 因 success() 门被跳过。**决定性诊断实验**:一次性公开探针仓
+(最小 workflow)同账号同日 **run 成功** ⇒ 公开仓 Actions 正常,**私有仓的
+Actions 分钟额度/花费上限耗尽是唯一剩余解释**(账号下其他项目有长期私有
+Actions 消耗)。探针仓删除被 token 作用域拒(403,缺 delete_repo),
+**需操作者手动删除 feixingxuerong123/ci-probe-temp**(网页一键)。
+
+**操作者选项(影响不可逆性不对称,故不代做)**:A 公开 xssentinel 仓(公开
+Actions 免费,徽章真实渲染;公开即历史公开,镜像/索引不可逆);B 保持私有,
+账号 Settings → Billing 调 Actions 花费上限或等额度重置;C 保持私有不管 CI。
