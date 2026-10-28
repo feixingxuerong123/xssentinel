@@ -4934,3 +4934,32 @@ pos-ctoss-01 timeout = 同机 vuln-agent 评测负载);全量 194 strict——sy
 **TP113/FP0/TN81/FN0/ERR0(0 SKIP)**、async **TP107/FP0/TN75/FN0/ERR0
 (12 SKIP)**,与 1.2.2 基线逐项相同、零漂移。产物 `benchmark/results/
 phase333_*` + `range3/results_p333.json`。
+
+## Phase 334:窗口死槽普查 —— 忠实 harness 审计 + 浏览器 oracle 定谳(测量轮,零产品改动)
+
+Phase 333 记账的后续候选:给 40 个上下文各搭**忠实反射 harness**(载荷按其
+上下文应被服务端嵌进的真实页面形状),对全部主窗口 head[:6] 过
+verify_semantic,尖锐候选再上真 Chromium 裁决。脚本 `dev/_p334_window_audit.py`
++ `dev/_p334_browser_oracle.py`(dev/ 惯例不入库);全文记
+OPTIMIZATION.md 2.1.5。
+
+**三个自我纠错,都是本轮的产出**:
+1. 初版 harness 把 css_exfil 再包一层 `<style>`(载荷自带包裹)、把 path_xss
+   的百分号编码原样反射(应先解码)——修正后 path_xss 全活;
+2. framework/template 的语义拒绝不构成死槽(框架执行/探针用途——`{{7*7}}`
+   是模板引擎检测探针);css_exfil 由 CSSI 层以外呼观测确认,同类;
+3. **最险的一个**:html_comment 家族里 `--!><svg/onload>` Chromium 执行而
+   验证器拒绝,形状上是真缺口——复测发现是 oracle 没传 `response_headers`,
+   promote 路径按文档要求"响应头已知无 CSP"才允许翻案;引擎恒传头,该条目
+   在引擎路径上是活的。**测验证器前先读它文档里的前提。**
+
+**定谳(浏览器 + 验证器双确认)**:约 **16 个真死槽 / 8 家族窗口**(error_page
+的 isindex/background-js、svg 的 use+javascript: ×2、math 的 maction 系 +
+annotation **拼错向量名**(annotation-xml 才是 HTML 集成点,实测后者执行且
+验证器确认)、css behavior:url(IE)、script_block 嵌套 script、
+script_string 的 \${} 转义、html_comment 的 CDATA 形态、event_handler 的
+2 条误归档 script-string 载荷)。
+
+**处置留下一轮(335)**:就地换活向量或删除,但删除移动家族尺寸会级联兄弟
+步长采样点(cdata→script_block+4 这类"谁在采样我"须逐家族先查),全量
+194 双引擎复测照例——一轮一个判定面改动,本轮零产品改动不欠门禁。

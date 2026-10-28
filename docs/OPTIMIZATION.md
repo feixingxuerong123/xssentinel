@@ -552,6 +552,45 @@ vuln-agent 评测负载的连接重置形态)**;全量 194 strict——sync
 **TP113/FP0/TN81/FN0/ERR0(0 SKIP)**、async **TP107/FP0/TN75/FN0/ERR0
 (12 SKIP)**,与 1.2.2 基线逐项相同、零漂移。产物
 `benchmark/results/phase333_*` + `range3/results_p333.json`。
+#### 2.1.5 窗口死槽普查(Phase 334,2026-10-28):忠实 harness 审计 + 浏览器 oracle 定谳
+
+Phase 333 的后续候选落地:给每个上下文搭**忠实反射 harness**(载荷按其语料
+上下文应被打进的真实页面形状),对全部 40 个上下文的主窗口 head[:6] 过
+`verify_semantic`,再对尖锐候选上真 Chromium 裁决(`dev/_p334_window_audit.py`
++ `dev/_p334_browser_oracle.py`)。初版审计的两个 harness 伪影已修正并记为
+教训:css_exfil 载荷自带 `<style>` 包裹(应打进元素体)、path_xss 需先 URL
+解码再反射。
+
+**验证器零缺口**(`--!>` 注释闭合 + svg/onload 一度是缺口候选:Chromium 执行
+而验证器拒绝——复测发现是 oracle 自己没传 `response_headers`,promote 路径按
+文档要求"响应头已知无 CSP"才允许把拒绝翻成确认;引擎恒传头,该语料条目在
+引擎路径上是活的。**教训:测验证器前先读它文档里的前提**)。
+
+**真死槽:约 16 槽 / 8 家族窗口(浏览器 + 验证器双确认,全在可达窗口内)**:
+- error_page 槽 2/4/5:`<isindex action=javascript:…>`(元素已从 HTML 移除)、
+  `<table|td background=javascript:…>`(现代浏览器从不执行);
+- svg_context 槽 4/5:`<svg><use href=javascript:…>` ×2(use 不接受 javascript: 域);
+- math_context 槽 0-3:`maction actiontype=statusline/relocate`(Firefox 专属
+  点击类)、`<annotation encoding=text/html>`(**向量名拼错**——HTML 集成点是
+  `annotation-xml`,浏览器实测 annotation-xml 形态执行且验证器确认,annotation
+  形态双死);
+- css_context 槽 3:`behavior:url(xss.htc)`(IE 专属);
+- script_block 槽 1:`<script>alert(1)</script>`(对 script_block 反射点
+  是嵌套 script,惰性);
+- script_string_dq 槽 2:`\${alert(1)}`(转义插值,构造上惰性);
+- html_comment 槽 4/5:`<![CDATA[…` 形态(HTML 注释内惰性;意图是 XHTML 上下文);
+- event_handler 窗口 2 条误归档(`";alert(1);//` / `';alert(1)//` 是
+  script-string 逃逸载荷,其转义变体已在 script_string_dq/sq 家族,放进
+  onerror 位结构性惰性)。
+
+**重分类(非死,审计伪影或机制不同)**:css_exfil(CSSI 层以外呼观测确认)、
+path_xss(解码后活)、framework_*/template_*(框架执行/探针用途,如 `{{7*7}}`
+是模板引擎检测探针不是执行载荷)、url_*/meta_refresh(点击类,headless 点击
+路径确认)、markdown(渲染器策略 + 点击)。
+
+**处置(候选 Phase 335,独立成轮)**:死槽就地换活向量或删条目,但删除会移动
+家族尺寸、级联影响**兄弟步长采样点**(cdata→script_block+4 这类路由),须逐
+家族先查"谁在采样我"再做;全量 194 双引擎复测照例。
 ### 2.2 报告层性能
 
 [report.py](file:///d:/qoder/xssentinel/xssentinel/core/report.py) **1428 行**,
