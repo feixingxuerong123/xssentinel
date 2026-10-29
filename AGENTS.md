@@ -5118,3 +5118,78 @@ Actions 消耗)。探针仓删除被 token 作用域拒(403,缺 delete_repo),
 **操作者选项(影响不可逆性不对称,故不代做)**:A 公开 xssentinel 仓(公开
 Actions 免费,徽章真实渲染;公开即历史公开,镜像/索引不可逆);B 保持私有,
 账号 Settings → Billing 调 Actions 花费上限或等额度重置;C 保持私有不管 CI。
+
+## Phase 340:托管 CI 从红到绿(五轮实跑)+ 两处判定面之外的真缺陷
+
+仓库公开后 GitHub Actions 真正开跑,五轮把 `CI` 推到全绿。**每一轮都由上一轮
+的日志/读数决定**,没有一处是"改改看"(产物见 `dev/_p340_ci_tests_log{,2,3}.txt`
+与 `dev/_p340b_ci_rc5.md`):
+
+| 轮 | 提交 | 结果 | 处置 |
+|---|---|---|---|
+| 1 | 35b7836 | ~160 文件后 4 个失败 | manifest utf7 的 `engines` 冗余键、nuclei 两个文件的依赖门、range5 只查 import 不查浏览器(探针真启动) |
+| 2 | 3382701 | 收敛到 1 个失败 | range5 活体对在 hosted 上 `findings: []`,加诊断转储 |
+| 3 | 1728d1d | 1 failed / 3710 passed(40:10) | 诊断当场点名 `Playwright Sync API inside the asyncio loop` —— **单进程 `pytest tests/` 被一个 async/DOM 测试绑死 loop,之后所有同步浏览器调用静默归零**;仓库自己的分批 runner 正是为此存在,CI 却从没用过 |
+| 4 | f8baa96(换 batched runner) | 255/256 绿,唯一失败 `test_nuclei_import` | 见下:不是超时(不在最慢 15 名单里),是 pytest 9 的 rc=5 |
+| 5 | 9816e29(rc=5 分类 + 装齐 extras + 证据上传) | **tests 步 256/256 绿 2698s**,但 job 在 benchmark 步被 60 分钟上限 cancel | 套件 45 分钟 + drills ≥19 分钟装不进 60 |
+| 6 | 6fd3402(drills 独立 job) | **全绿** | 墙钟 46 分钟 |
+
+### 1. pytest 9:模块级 skip 的退出码是 5,不是 0(实测)
+
+    模块级 pytest.importorskip("missing") / pytest.skip(allow_module_level=True)
+        -> 打印 "1 skipped",退出码 5
+    pytestmark = pytest.mark.skipif(True)  (逐条跳过)  -> 退出码 0
+    空文件(没有任何测试)                    -> 退出码 5,但摘要里没有 "skipped"
+
+本机 pytest 9.1.1 与 hosted 9.2.0 同形。`run_all_batched.py` 原来"非零即红",
+于是 **合法的依赖 skip 被判成失败**;而"空文件"这个真正该红的形状同样返回 5。
+修法:`_module_skipped(rc, stdout)` **必须同时满足** rc==5 且摘要里有 `N skipped`;
+`_file_verdict` 给出 `green | whole-skip | red` 三态,whole-skip 不重试、在 skip
+段里照旧打 `(WHOLE FILE -- contributed nothing)`。守卫
+`tests/test_runner_skip_reporting.py` 8 个判定格;变异:去掉摘要检查 → 空文件变绿,
+去掉 rc 判断 → 真失败变绿。**顺带修一个潜伏 UnboundLocalError**:非 quiet 模式
+的失败尾输出读 `r.stdout`,而 timeout 分支从不绑定 `r`(与 Phase 322 scanner.py 同形)。
+
+**忠实模拟的坑**:第一版用抛普通 `ImportError` 的 shim,结果 pytest 报的是
+收集错误(rc=2)而不是 skip —— `importorskip` 只对 `ModuleNotFoundError` 跳过。
+"依赖没装"的模拟必须让它抛 ModuleNotFoundError,否则你测的是另一个形状。
+
+### 2. "装少了"让测试自我跳过 —— 绿灯不等于跑过
+
+`tests` job 原来只装 `.[dev,async,ast]`:flask/werkzeug/pyyaml 全缺,于是
+`test_phase196_api_gate` 6 例、`test_phase324_mcp_http` 1 例、`test_nuclei_import`
+**整文件**都在"声称跑全套"的 job 里自跳过。改为 `.[dev,async,ast,api,nuclei]`
+后 **skip 19 → 12**(run4 → run5),nuclei 文件首次真跑。剩下的 12 例/5 文件全是
+声明式门(4 例 `XSS_DOM_LIVE` opt-in、3 例无 nuclei 二进制、1 例全量矩阵、
+1 例 accept-encoding、3 例 stored opt-in),runner 每次照常打印,不许被读成"全跑了"。
+
+### 3. 60 分钟天花板按实测重划:drills 独立并行 job
+
+run5 的读数:套件 **2698s(44:58)**,benchmark 步在 60 分钟上限处还差得远
+(约 14 分钟仍未见底)→ 套件 + drills 装不进一个 job。拆法不是拍脑袋:
+run6 实测 drills = benchmark 双引擎 **1089s** + range2 92s + range3 246s +
+range4 142s + range5 47s + range6 55s ≈ **28.8 分钟**(单给 45 分钟预算)。
+两 job 并行后墙钟 = 较慢一半 **46 分钟**(tests 45.6 + min-python 0.6),
+而不是 74 分钟的顺序和;被测试文件拖死也不再挤掉安全 drills。
+
+搬迁用脚本 `dev/_p340_split_ci.py`(带断言:块唯一、逐字节搬移、YAML 复解析、
+每个 Range #N 在 drills 恰好一次且不在 tests 里),不手抄 72 行 YAML——
+"缩进错一格仍能解析、但跑错 job"是这类编辑的典型失效。
+
+### 4. 证据必须活下来
+
+run4 红了一个文件,而 `--quiet` 只打 `FAIL <file>`,per-file 日志随 runner 消失
+—— 只能在本机从头复现。`tests` job 现补 `Upload failure evidence`(`if: failure()`,
+上传 `benchmark/results/regression_logs/`);nightly 早就有,单独的 tests job 没有。
+
+### 终态(run 6,提交 6fd3402)
+
+- `tests` 45.6min:**256/256 文件绿**(2692s),12 skips/5 文件(2 个整文件声明式);
+  最慢仍是对等门 548s、benchmark_fp 443s。
+- `drills` 28.8min:64 例 strict 切片双引擎 + range2..6 全绿,产物随 job 上传。
+- `min-python` 0.6min:3.10 地板烟测(CLI/transport/MCP/API 门/sitemap)。
+- 墙钟 **46 分钟**;`benchmark-full`/`nightly-gate` 仍是 schedule/dispatch。
+
+**方法论**:这五轮里没有任何一处判定面改动;红的全在"怎么跑测试"上——而它们
+恰恰是"绿灯可信度"本身。与 Phase 190(先量尺子)、201("绿"和"跑过"是两个词)
+同一条线,只是这次尺子换成了托管 runner。
