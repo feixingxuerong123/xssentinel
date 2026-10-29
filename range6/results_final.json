@@ -1,0 +1,176 @@
+{
+  "meta": {
+    "range": "range6",
+    "generated": "2026-10-29 22:41:24",
+    "engines": [
+      "sync",
+      "async"
+    ],
+    "max_payloads": 8,
+    "max_transforms": 4,
+    "per_case_timeout": 180,
+    "construct_validity": "server bytes are query-independent (static shells); pinned by tests/test_range6.py"
+  },
+  "counts": {
+    "sync": {
+      "TP": 1,
+      "FP": 0,
+      "TN": 1,
+      "FN": 0,
+      "ERROR": 0
+    },
+    "async": {
+      "TP": 1,
+      "FP": 0,
+      "TN": 1,
+      "FN": 0,
+      "ERROR": 0
+    }
+  },
+  "rows": [
+    {
+      "engine": "sync",
+      "case_id": "r6-pos-dompurify-207",
+      "verdict": "TP",
+      "findings": 6,
+      "elapsed_s": 14.5,
+      "retries": 0,
+      "findings_detail": [
+        {
+          "type": "dom_dynamic",
+          "severity": "high",
+          "context": "Element.outerHTML"
+        },
+        {
+          "type": "dom_dynamic",
+          "severity": "high",
+          "context": "Element.innerHTML"
+        },
+        {
+          "type": "trusted_types_taint_flow",
+          "severity": "low",
+          "context": "trusted_types_innerHTML"
+        },
+        {
+          "type": "trusted_types_no_policy",
+          "severity": "low",
+          "context": "trusted_types_innerHTML"
+        },
+        {
+          "type": "sanitizer_vulnerable_version",
+          "severity": "medium",
+          "context": "sanitizer_sanitizer_vulnerable_version"
+        },
+        {
+          "type": "sanitizer_output_to_innerhtml",
+          "severity": "medium",
+          "context": "sanitizer_sanitizer_output_to_innerhtml"
+        }
+      ],
+      "error": ""
+    },
+    {
+      "engine": "sync",
+      "case_id": "r6-neg-dompurify-3417",
+      "verdict": "TN",
+      "findings": 4,
+      "elapsed_s": 15.2,
+      "retries": 0,
+      "findings_detail": [
+        {
+          "type": "dom_sink_reachability",
+          "severity": "low",
+          "context": "Element.innerHTML"
+        },
+        {
+          "type": "trusted_types_taint_flow",
+          "severity": "low",
+          "context": "trusted_types_innerHTML"
+        },
+        {
+          "type": "trusted_types_no_policy",
+          "severity": "low",
+          "context": "trusted_types_innerHTML"
+        },
+        {
+          "type": "sanitizer_output_to_innerhtml",
+          "severity": "low",
+          "context": "sanitizer_sanitizer_output_to_innerhtml"
+        }
+      ],
+      "error": ""
+    },
+    {
+      "engine": "async",
+      "case_id": "r6-pos-dompurify-207",
+      "verdict": "TP",
+      "findings": 6,
+      "elapsed_s": 14.6,
+      "retries": 0,
+      "findings_detail": [
+        {
+          "type": "trusted_types_taint_flow",
+          "severity": "low",
+          "context": "trusted_types_innerHTML"
+        },
+        {
+          "type": "trusted_types_no_policy",
+          "severity": "low",
+          "context": "trusted_types_innerHTML"
+        },
+        {
+          "type": "sanitizer_vulnerable_version",
+          "severity": "medium",
+          "context": "sanitizer_sanitizer_vulnerable_version"
+        },
+        {
+          "type": "sanitizer_output_to_innerhtml",
+          "severity": "medium",
+          "context": "sanitizer_sanitizer_output_to_innerhtml"
+        },
+        {
+          "type": "dom_dynamic",
+          "severity": "high",
+          "context": "Element.outerHTML"
+        },
+        {
+          "type": "dom_dynamic",
+          "severity": "high",
+          "context": "Element.innerHTML"
+        }
+      ],
+      "error": ""
+    },
+    {
+      "engine": "async",
+      "case_id": "r6-neg-dompurify-3417",
+      "verdict": "TN",
+      "findings": 4,
+      "elapsed_s": 15.4,
+      "retries": 0,
+      "findings_detail": [
+        {
+          "type": "trusted_types_taint_flow",
+          "severity": "low",
+          "context": "trusted_types_innerHTML"
+        },
+        {
+          "type": "trusted_types_no_policy",
+          "severity": "low",
+          "context": "trusted_types_innerHTML"
+        },
+        {
+          "type": "sanitizer_output_to_innerhtml",
+          "severity": "low",
+          "context": "sanitizer_sanitizer_output_to_innerhtml"
+        },
+        {
+          "type": "dom_sink_reachability",
+          "severity": "low",
+          "context": "Element.innerHTML"
+        }
+      ],
+      "error": ""
+    }
+  ]
+}
