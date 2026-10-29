@@ -76,6 +76,45 @@ jobs:
         # was root-caused, so the old --ignore is gone too.
         run: python tests/run_all_batched.py --quiet
 
+      # Evidence must survive the run: a red gate whose per-file pytest log
+      # died with the runner forces a full re-run just to read one error.
+      # (2026-10-29: the first batched run failed on one file and the log
+      # was gone -- the failure had to be reproduced locally from scratch.)
+      - name: Upload failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: regression-logs
+          path: benchmark/results/regression_logs/
+          if-no-files-found: ignore
+
+  drills:
+    # Accuracy benchmark + range2..6 drills, separate from `tests` so the
+    # two halves get their own ceilings.  Measured 2026-10-29 on a hosted
+    # runner: the suite alone takes ~45 min and the drills ~18 min more,
+    # which cancelled the 60-min `tests` job mid-benchmark after the suite
+    # had already passed.  The jobs run in parallel, so the wall clock is
+    # the slower half instead of the sum, and a wedged test file can no
+    # longer starve the security drills.
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install
+        # Same dependency surface as the tests job: the 64-case slice
+        # includes DOM families (playwright/chromium) and the ranges ship
+        # their own vendored JS, so nothing here may self-skip.
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev,async,ast,api,nuclei]"
+          pip install cryptography playwright
+          python -m playwright install chromium --with-deps
+
       - name: Accuracy benchmark (64-case stratified slice, both engines, zero-error gate)
         # --strict-gate: FP0/FN0/ERROR0, because a gate that tolerates an FP or
         # an FN cannot see a broken layer.  The async arm runs here for the same
@@ -147,18 +186,6 @@ jobs:
         with:
           name: range6-results
           path: range6/results_ci.json
-          if-no-files-found: ignore
-
-      # Evidence must survive the run: a red gate whose per-file pytest log
-      # died with the runner forces a full re-run just to read one error.
-      # (2026-10-29: the first batched run failed on one file and the log
-      # was gone -- the failure had to be reproduced locally from scratch.)
-      - name: Upload failure evidence
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: regression-logs
-          path: benchmark/results/regression_logs/
           if-no-files-found: ignore
 
   min-python:
