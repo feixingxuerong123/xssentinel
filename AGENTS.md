@@ -5239,3 +5239,44 @@ dialog 迟到时付费,本地 docker 往返落在 settle 内 ⇒ 双向零漂移
 `dev/_xssmaze/server_p341.{json,md,tsv,run.log}` + `client_p341.*` +
 `replay_p341.tsv`(dev 惯例不入库),复跑命令同 DEVLOG。
 **入库**:341 代码 + 测试 + 本条目 + CHANGELOG Unreleased 按仓库惯例提交。
+
+- [x] **342 外部效度收官:商业工具 × 真实第三方靶对跑(OPTIMIZATION 1.0 最后一支,三工具同靶同 scorer)**:
+      XSSentinel / dalfox v2.13.0 / nuclei v3.11.1 在 XSSMaze 官方靶(ghcr.io/hahwul/xssmaze:main,
+      digest 35bb3c7d)上跑**同一** 1013 端点 server 群体 + 27 controls,同一 vendored 官方
+      runner、per-URL custom-scanner 模式、wrapper 墙钟上限 100s(与 p341 我方臂同预算)、
+      口径 322d;我方臂直接复用 p341 官方记分卡(8e6bce5..1073ec4 仅证据 JSON,判定面零改动)。
+      **server 群体:我方 944/69/0 F1 0.965;dalfox 757/256/4 F1 0.853(4072s);nuclei
+      731/282/4 F1 0.836(406s)**。client 群体(24+27):我方 24/0/0,dalfox 与 nuclei 双双
+      0/24/4(fragment 投递需要浏览器引擎,结构性)。**controls FP:我方 0;两个竞品各自认领
+      恰好是 CSP/nonce 防护页**(dalfox: csp-bypass-l3/cspbypass-l3/nonce-l2/waf-bypass-l3;
+      nuclei: csp-bypass-l3/l4/cspbypass-l3/nonce-l2)——竞品都不读 CSP 就认领,这正是
+      196b/341 我方 CSP 感知层的差异化价值,现在有了第三方数字。FN 交付画像两竞品几乎相同
+      (query ~200/body 33/header 11);FN 重叠 dalfox∩nuclei=178、我方∩dalfox=49、三者共同
+      漏 42;**14 例"只有我方漏"**(双方竞品都检出):cspbypass-l6、encodingedge-l4、
+      html5-sanitizer-l2、import-map-l4、mobserver-l2、modern-bypass-l23、nonce-l3、
+      path-l1/2/4、realworld-l3、sanitizer-edge-l4、sanitizer-l6、truncation-l4
+      ——下一轮检测改进候选清单(import-map/mobserver 是 p341 已记档的 wrapper 超时摆动)。
+      dalfox 臂有**四条被实测逼出的偏差**(全部记档):① `--skip-headless`——chromedp
+      无头层在本机不稳定(干净扫描与 teardown 挂死、`panic: close of closed channel`
+      allocate.go:233 交替,~50%,纯 python 本机服务器上也一样 ⇒ 非 docker-proxy 因素);
+      量化采样(24 FN 分层 + 5 TP,开 headless):**7/24 FN 被无头层收回**(apidom×3/
+      browser-state/channel/ariaattr/bugbounty),5/5 TP 不变,本轮 29/29 干净——flake 是
+      状态依赖不是稳定速率,整跑无头层=用无上界的挂死预算换约几十个 dom 类案,主臂保持
+      skip-headless 且记分卡权威;② 默认 worker(196b 的 `--worker 1` 在多参数页把
+      ~2000-query 电池串行化到 60-100s+/案,默认 worker 1-2s);③ `stdin=DEVNULL`
+      承重(dalfox 把非终端 stdin 当 URL 管道,subprocess 下必挂);④ 转发收窄为
+      V/found——dalfox v2.13 的 R 条目("Reflected Payload in HTML",severity Medium)带
+      payload 字段,196b 过滤器原样会数出 R:507 vs V:1 的假检出;TSV 保留全类型普查可
+      离线按任意口径重算。**事故与修复:宿主杀软(360/HipsDaemon 在跑,Defender 服务停)
+      在首轮跑中段把 benchmark/server.py(满体 XSS 载荷的靶场服务器)隔离**——wrapper 经
+      benchmark.adapters→runner→`from server import` 链读过 64 次后文件消失,后 976 案
+      256ms 内 ModuleNotFoundError 崩溃,runner 丢弃 stderr、把空 stdout 记"未检出",
+      产出假记分卡 30/983(exit 0、progress 照走到 1000/1040)。处置:伪产物按 p307
+      惯例存 `*_INVALID_avquarantine.*`;文件 git 恢复(git status 恰好只有这一个 D);
+      **wrapper 与 benchmark.adapters 解耦**(_p342_toolparse 本地副本,出处注明)使
+      rig 完全不再读该文件;**双 wrapper 加 rc=wrapper-error 落行守卫**——"静默崩溃风暴
+      伪装成未检出"结构上不再可能。redirect/level2 唯一超时重放干净 0 findings,记分卡
+      无需修正。产物 `dev/_xssmaze/cross_tool_p342.{json,md}`、
+      `server_{dalfox,nuclei}_p342.{json,md,tsv,run.log}`、`client_{dalfox,nuclei}_p342.*`、
+      `p342_meta.json`(指纹+事故档案)、`_p342_headless_run.tsv`;复跑命令同 DEVLOG。
+      OPTIMIZATION 1.0 的"商业工具 × 真实第三方靶"分支就此有测量结论,不再挂账。

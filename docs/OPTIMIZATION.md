@@ -882,9 +882,11 @@ ephemeral 绑定把机制本身去掉了。
 已完成: CSP 投递通道判定(header+meta、report-only 不再冒充保护)/ API 前端门对齐(196b)
 已完成: 1.0 真实靶场复跑(Phase 219,Juice Shop 20.2.0 双臂各 1 条 browser-executed)
 已完成: 2.3 range5(Phase 220,Lit)+ 2.1 parity 门扩到全 192 例(Phase 222,182 例 0 分歧)
-仍未做: 1.0 商业工具 × 真实第三方靶对跑(现只有自建矩阵上的切片)
+已完成: 1.0 商业工具 × 真实第三方靶对跑(Phase 342,XSSMaze 官方靶三工具同 scorer:
+          我方 944/69/0 F1 0.965,dalfox 757/256/4 F1 0.853,nuclei 731/282/4 F1 0.836;
+          controls FP 我方 0、两竞品各 4 且全部是 CSP/nonce 防护页;详见 AGENTS.md 342)
 已完成: 1.4 _probe_param 拆分(Phase 211,787 → 171 行;当前 209 行)
-下一轮: 1.0 的"商业工具 × 真实第三方靶"那一支
+1.0 的最后一支已测(342);后续候选见 AGENTS.md 342 的 14 例 we-only-miss 清单
 顺手:  3.x 随对应模块改动时一并处理
 ```
 
@@ -898,6 +900,11 @@ ephemeral 绑定把机制本身去掉了。
 —— 代理 `127.0.0.1:17054` 无监听(netstat 空),直连 `raw.githubusercontent.com`
 curl exit 28。上面"GitHub API 是通的"那条反向实测写于 2026-10-02,已过期。
 结论:1.0 的可执行性**逐日变化**,每次开工前先 `curl -m 10` 复测,不要引用旧条目。
+
+**2026-10-30 (Phase 342)**:这一支已经做完——而且实测发现它**根本不依赖外网**:
+"真实第三方靶"用本地 docker 的 XSSMaze 官方镜像(第三方编写 + 官方 runner + 官方
+ground truth),"商业工具"(dalfox/nuclei)是本机已有二进制。整轮零出网请求。
+上面两条网络注记只约束"从网上取新工具/新靶"的场景。
 
 ---
 
