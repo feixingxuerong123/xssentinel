@@ -5193,3 +5193,49 @@ run4 红了一个文件,而 `--quiet` 只打 `FAIL <file>`,per-file 日志随 ru
 **方法论**:这五轮里没有任何一处判定面改动;红的全在"怎么跑测试"上——而它们
 恰恰是"绿灯可信度"本身。与 Phase 190(先量尺子)、201("绿"和"跑过"是两个词)
 同一条线,只是这次尺子换成了托管 runner。
+
+## Phase 341:载体网络无关化(range5 静默 FN 修复)+ 外部靶 XSSMaze 官方口径复测(零判定面回归)
+
+**背景(接手被打断的会话)**:range5 async 门禁 2/33 失败,归因经
+`dev/_r5_onerror_causality.py`(浏览器级)→ `dev/_r5_onerror_engine_repro.py`
+(产品级,3/3 确定性复现)钉死:唯一在 Lit 页面存活的载体形状
+`<img src=x onerror=…>` 的执行要等图片请求**失败**——一次真实 HTTP 往返;
+DOM 引擎在导航后固定 settle(`_DOM_SETTLE_MS`=700ms)读 dialog 通道,慢靶上
+往返超过 settle ⇒ sink 命中在、dialog 不在 ⇒ **browser-confirmed 阳性静默降级**
+为 `dom_sink_reachability/low/not-fired`。实测(`dev/_carrier_sync_probe.py`,
+真 Chromium,range5 实页):404 往返 1100ms 时 html 载体 1162ms 才弹、svg 载体
+50ms 照弹。修复:`_CARRIER_SHAPES` 增 `("svg", "<svg onload=alert(%d)>")` ——
+插即执行、无网络依赖;**排第二不排第一是刻意的**:html 已弹时它零成本,只在
+html 的 dialog 迟到时付费。守卫 `tests/test_dom_dynamic_evidence.py`
+TestCarrierNeedsNoNetwork 3 例(网络无关形状存在且无 `src=` / 既有 html 形状
+不得被替换 / 顺序成本契约)。**接手时三个测试从未跑过且全红 —— import 把包名
+拼成 `xsssentinel`(三个 s);修正后 26 passed。**
+
+**外部靶官方口径复测**(337 语料交换 + 341 svg 载体是 p335 之后仅有的两个
+判定面改动,故重跑;靶容器 "Up 5 hours" 非刚重建,排除 p335 的 edge 靶态
+伪影;官方 runner + wrapper,`XSSMAZE_TIMEOUT=100`,契约 322d):
+
+| 群体 | 本轮 | p335 基线 | 结论 |
+|---|---|---|---|
+| server(1013 例) | **TP944 / FN69 / FP0**,F1 0.965,5741.0s | 948/65/0 | 净 -4,归因见下 |
+| client(24 例,headless) | **TP24 / FN0 / FP0**,F1 1.000,573.9s | 24/0/0 | 逐项相同 |
+| 控制例 27 | **0 FP**(双口径) | 0 FP | 相同 |
+| 契约交叉检查 | **NONE** | — | 上游分类未变 |
+
+**-4 逐例归因,by_class 对账零残余**:`import-map/level4` 与
+`mobserver/level2`(dom 类)= 本轮仅有的两个 wrapper 100s 超时,单跑重放
+**16.6s/3 findings 与 15.9s/5 findings 全恢复(各 1/1)** —— 重放修正口径
+**TP946/FN67/FP0(F1 0.966)**,官方 944/69/0 仍为权威产物(p307 计数惯例);
+`eventhandler/level4`+`level5`(reflected-attr 类)重放 **0 findings**,
+属已记档 polyglot 层跑间摆动家族(p316 命中→p319/322 不中→p335 命中、重放
+0/2 与 1/2→本轮不中),与 337/341 无关。其余五类 detected/missed 逐项相同
+(reflected-html 427/39、reflected-js 89/6、csti 5/0、stored 2/8、pp 5/5)。
+中位 1.5s/例与 p335 持平;墙钟 +17min ≈ 两个 100s 超时 + 主机负载。
+
+**341 的 svg 载体在外部靶上是零行为变化,这是设计使然**:它只在 html 载体
+dialog 迟到时付费,本地 docker 往返落在 settle 内 ⇒ 双向零漂移(0 恢复、
+0 丢失、控制例沉默)。其价值在 range5 负载下的静默 FN 修复,由
+`dev/_r5_*` 探针与 range5 门禁承担。产物
+`dev/_xssmaze/server_p341.{json,md,tsv,run.log}` + `client_p341.*` +
+`replay_p341.tsv`(dev 惯例不入库),复跑命令同 DEVLOG。
+**入库**:341 代码 + 测试 + 本条目 + CHANGELOG Unreleased 按仓库惯例提交。

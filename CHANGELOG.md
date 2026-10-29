@@ -7,6 +7,19 @@
 
 ### Fixed
 
+- **DOM 执行载体网络无关化(Phase 341)**:唯一在部分框架页面存活的载体形状
+  `<img src=x onerror=…>` 的执行要等图片请求失败 —— 一次真实 HTTP 往返;
+  DOM 引擎在导航后固定 settle 读 dialog 通道,慢/争用靶上往返超过 settle 时,
+  browser-confirmed 阳性会**静默降级**为 `dom_sink_reachability/low/not-fired`
+  (range5 async 门禁 2/33 失败的根因,产品级 3/3 确定性复现)。`_CARRIER_SHAPES`
+  新增 `<svg onload=…>` 形状 —— 插入即执行、无网络依赖,排第二不排第一
+  (html 已弹时零成本,只在 html 的 dialog 迟到时付费)。外部靶 XSSMaze
+  官方口径复测:server 944/69/0(-4 逐例归因:2 例 wrapper 超时单跑重放全恢复、
+  2 例属已记档 polyglot 摆动家族)、client 24/0/0、控制例 0 FP、契约 NONE ——
+  对外部效度双向零漂移(本地往返落在 settle 内,svg 载体按设计零付费)。
+  守卫:`TestCarrierNeedsNoNetwork` 3 例(网络无关形状存在且无 src / 既有形状
+  不被替换 / 顺序成本契约)。
+
 - **托管 CI 门禁(Phase 340)**:五轮实跑把 GitHub Actions 推到全绿,改的全是
   "怎么跑测试"而不是判定面。① `tests/run_all_batched.py` 把 pytest 9 的
   **模块级 skip 退出码 5** 误判为红(合法依赖跳过被判失败,而空文件同码必须

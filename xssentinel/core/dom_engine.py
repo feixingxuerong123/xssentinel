@@ -1164,6 +1164,27 @@ _DOM_PROBE_BUDGET_S = 30.0
 # every string/attribute context a real app interpolates into.
 _CARRIER_SHAPES = (
     ("html", "<img src=x onerror=alert(%d)>"),
+    # Phase 341: ``img@onerror`` needs the image request to FAIL, i.e. a
+    # real HTTP round trip, so its dialog lands at (round trip + render)
+    # rather than at render.  Measured on range5's Lit page
+    # (dev/_carrier_sync_probe.py, real Chromium):
+    #
+    #     404 round trip     html carrier fires at     svg carrier fires at
+    #          0ms                  60ms                     49ms
+    #       1100ms                1162ms                     50ms
+    #
+    # The engine reads the dialog channel a fixed settle after navigation,
+    # so on a slow or contended target the html carrier's execution was read
+    # as "delivery, no execution" -- a SILENT downgrade of a browser-
+    # confirmed positive (range5 async failed 2/33 runs this way; reproduced
+    # deterministically 3/3 in dev/_r5_onerror_engine_repro.py).
+    #
+    # ``svg@onload`` fires when the element is INSERTED, with no network
+    # dependency, so it lands inside the settle on any target.  It sits
+    # second rather than first on purpose: when the html carrier already
+    # fires (the common case) it wins the same way it always did and this
+    # shape costs nothing; it only pays when html's dialog is late.
+    ("svg", "<svg onload=alert(%d)>"),
     ("js", "alert(%d)"),
     ("url", "javascript:alert(%d)"),
     # Phase 265: range6 measured this form/math/mglyph namespace-confusion
@@ -2234,12 +2255,6 @@ class DynamicDomAnalyzer:
                             hits.append({"sink": "dialog",
                                          "snippet": _tok[0][:200],
                                          "via": "dialog"})
-                    # Phase 226: execution tier.  A dialog carrying either
-                    # token that fired during THIS probe's slice means the
-                    # page's own code ran it (the instrumentation no longer
-                    # alerts).  Otherwise the channel is replayed with
-                    # executable carriers -- and only a dialog fired by the
-                    # page during that replay earns "browser-executed".
                     executed = any(
                         marker in (m or "") or numtok in (m or "")
                         for m in dialog_msgs[dlg_start:])

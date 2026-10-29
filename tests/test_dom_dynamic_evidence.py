@@ -196,6 +196,60 @@ class TestDeliveryTypeIsWired:
         assert "alert(%d)" in shapes["mxss"]
 
 
+class TestCarrierNeedsNoNetwork:
+    """Phase 341: execution must not wait on a round trip.
+
+    ``<img src=x onerror=...>`` writes its sink hit synchronously but fires
+    its dialog only once the image request FAILS -- a real HTTP round trip.
+    The engine reads the dialog channel a fixed settle (``_DOM_SETTLE_MS``)
+    after navigation, so on a slow or contended target the execution was
+    read as absent and a browser-confirmed positive silently degraded to
+    ``dom_sink_reachability`` / not-fired.  Measured on range5's Lit page,
+    real Chromium (dev/_carrier_sync_probe.py):
+
+        404 round trip     html carrier fires at     svg carrier fires at
+             0ms                  60ms                     49ms
+          1100ms                1162ms                     50ms
+
+    So at least one carrier shape must execute on element INSERTION rather
+    than on a network outcome.  Dropping it re-opens a silent FN under load,
+    which no local green run would ever show.
+    """
+
+    def test_a_shape_is_network_independent(self):
+        from xssentinel.core.dom_engine import _CARRIER_SHAPES
+        shapes = dict(_CARRIER_SHAPES)
+        assert "svg" in shapes, \
+            "the network-independent carrier is what keeps a slow target from "\
+            "reading as delivery-only; see dev/_carrier_sync_probe.py"
+        assert shapes["svg"].startswith("<svg"), shapes["svg"]
+        assert "onload" in shapes["svg"]
+        assert "src=" not in shapes["svg"], \
+            "a src= would make it wait on a round trip again, which is the "\
+            "exact defect this shape exists to avoid"
+        assert "alert(%d)" in shapes["svg"]
+
+    def test_the_network_dependent_shape_is_still_there(self):
+        """The svg shape ADDS a fallback; it must not replace the incumbent.
+
+        ``html`` is the shape that survives the broadest set of sinks
+        (innerHTML/document.write/jQuery family) and it is the one the
+        benchmark matrix is calibrated against -- removing it would trade
+        one silent FN for another.
+        """
+        from xssentinel.core.dom_engine import _CARRIER_SHAPES
+        shapes = dict(_CARRIER_SHAPES)
+        assert "html" in shapes and "onerror" in shapes["html"]
+
+    def test_html_is_tried_before_svg(self):
+        """Order is the cost contract: when html already fires, svg is never
+        paid for.  Reversing them adds a navigation-side effect to every
+        page whose html carrier works, for no measured gain."""
+        from xssentinel.core.dom_engine import _CARRIER_SHAPES
+        names = [n for n, _ in _CARRIER_SHAPES]
+        assert names.index("html") < names.index("svg"), names
+
+
 class TestLegacyRows:
     """A row without ``executed`` (pre-Phase 226, or hand-built).
 
