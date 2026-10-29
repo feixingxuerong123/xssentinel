@@ -5,6 +5,20 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **托管 CI 门禁(Phase 340)**:五轮实跑把 GitHub Actions 推到全绿,改的全是
+  "怎么跑测试"而不是判定面。① `tests/run_all_batched.py` 把 pytest 9 的
+  **模块级 skip 退出码 5** 误判为红(合法依赖跳过被判失败,而空文件同码必须
+  判红)—— 新增 `_module_skipped` / `_file_verdict` 三态,并修掉非 quiet 模式
+  失败尾输出在 timeout 分支的 UnboundLocalError;② CI 的 `tests` job 装齐
+  `api`/`nuclei` extras,skip 19 → 12,flask 与 nuclei 桥接测试首次在 push 门
+  里真跑;③ 失败时上传 `benchmark/results/regression_logs/`(日志不再随
+  runner 消失);④ `drills`(64 例 strict 切片 + range2..6)拆成独立并行 job
+  —— 套件 45 分钟加上 drills 装不进 60 分钟上限,拆分后墙钟 46 分钟。
+  托管 runner 实测:`tests` 256/256 文件绿(2692s,12 例声明式 skip)、
+  `drills` 全绿(28.8 分钟)、3.10 地板烟测全绿。
+
 ## [1.2.3] - 2026-10-29
 
 质量与外部效度维护轮:Edgecast WAF 指纹误报收口、双引擎对等缺口修复、
