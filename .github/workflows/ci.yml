@@ -47,10 +47,14 @@ jobs:
       - name: Install
         # The test suite exercises every engine channel: aiohttp (async),
         # cryptography (MITM), esprima (sandbox JS gate), playwright
-        # (browser-confirmed DOM).  The dev extra alone misses them.
+        # (browser-confirmed DOM), flask/werkzeug (API gate) and pyyaml
+        # (nuclei dast bridge).  Installing less made those files
+        # self-skip in the very job that claims to run the suite -- the
+        # same lesson the nightly job recorded.  The skip counts stay in
+        # the gate output, so this list is checked, not assumed.
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[dev,async,ast]"
+          pip install -e ".[dev,async,ast,api,nuclei]"
           pip install cryptography playwright
           python -m playwright install chromium --with-deps
 
@@ -145,6 +149,18 @@ jobs:
           path: range6/results_ci.json
           if-no-files-found: ignore
 
+      # Evidence must survive the run: a red gate whose per-file pytest log
+      # died with the runner forces a full re-run just to read one error.
+      # (2026-10-29: the first batched run failed on one file and the log
+      # was gone -- the failure had to be reproduced locally from scratch.)
+      - name: Upload failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: regression-logs
+          path: benchmark/results/regression_logs/
+          if-no-files-found: ignore
+
   min-python:
     # The declared floor is 3.10 (Phase 328d; 3.9 cannot install the fixed
     # dependency releases).  Exercise install + transport/MCP/API there so
@@ -213,11 +229,13 @@ jobs:
           python-version: "3.11"
       - run: |
           python -m pip install --upgrade pip
-          # requirements.txt is the declared environment (`-e .[dev,async,ast,api]`);
-          # installing less here meant the AST-channel and flask-path tests
-          # self-skipped in the very job that claims to run "the same entry
-          # point the author's machine gates on".
-          pip install -e ".[dev,async,ast,api]"
+          # requirements.txt is the declared environment
+          # (`-e .[dev,async,ast,api]`); installing less here meant the
+          # AST-channel and flask-path tests self-skipped in the very job
+          # that claims to run "the same entry point the author's machine
+          # gates on".  nuclei is added for the same reason (2026-10-29:
+          # the whole test_nuclei_import file skipped for want of pyyaml).
+          pip install -e ".[dev,async,ast,api,nuclei]"
       - name: Full file-by-file test gate
         run: python tests/run_all_batched.py --quiet
       - name: Evidence-shape sweep (Phase 312, all routes both engines)

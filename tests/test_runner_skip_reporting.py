@@ -72,6 +72,43 @@ def test_a_whole_file_skip_is_distinguished_from_a_partial_one():
     assert partial is False
 
 
+@pytest.mark.parametrize("rc,payload,expected", [
+    # A file that really ran: pytest exits 0.
+    (0, b"7 passed in 1.0s\n", "green"),
+    # Module-level skip (pytest.importorskip / allow_module_level=True):
+    # pytest 9 reports "1 skipped" and exits 5 -- measured 2026-10-29 on
+    # 9.1.1 (local) and 9.2.0 (hosted CI).  This is green-as-skipped.
+    (5, b"1 skipped in 0.01s\n", "whole-skip"),
+    (5, b"1 skipped, 1 warning in 0.03s\n", "whole-skip"),
+    # An EMPTY file also exits 5, but nothing declared a skip: red, because
+    # "no tests here" is a defect, not a dependency gate.
+    (5, b"no tests ran in 0.01s\n", "red"),
+    # A real failure mentioning skips is still a failure.
+    (1, b"2 failed, 3 skipped in 2.0s\n", "red"),
+    (2, b"", "red"),                        # timeout path (no stdout)
+    (1, None, "red"),                       # subprocess produced nothing
+])
+def test_file_verdict_three_way_matrix(rc, payload, expected):
+    """rc==5 must not be read as 'red' OR as 'green' wholesale.
+
+    Reading it as red made a legal dependency skip fail the hosted gate
+    (2026-10-29: test_nuclei_import, PyYAML absent).  Reading it as green
+    would let an empty/broken file pass unnoticed.  Only a pytest summary
+    that actually says "N skipped" separates the two.
+    """
+    assert RUNNER._file_verdict(rc, payload) == expected
+
+
+def test_module_skip_predicate_is_not_a_blanket_rc5_pass():
+    """The predicate must key on the summary, not on the exit code alone."""
+    assert RUNNER._module_skipped(5, b"1 skipped in 0.01s\n") is True
+    assert RUNNER._module_skipped(5, b"no tests ran in 0.01s\n") is False
+    assert RUNNER._module_skipped(5, b"") is False
+    assert RUNNER._module_skipped(5, None) is False
+    assert RUNNER._module_skipped(0, b"1 skipped in 0.01s\n") is False
+    assert RUNNER._module_skipped(1, b"1 skipped in 0.01s\n") is False
+
+
 def test_the_counts_survive_trailing_noise_after_the_summary():
     """The counts must come from the summary, wherever it sits.
 

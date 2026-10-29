@@ -101,6 +101,40 @@ def _skip_counts(stdout) -> tuple:
     return skipped, (skipped > 0 and passed == 0)
 
 
+# pytest exit code 5 = "no tests were collected".  A module-level skip
+# (pytest.importorskip / pytest.skip(allow_module_level=True)) reports
+# exactly that -- measured on pytest 9.1.1 and 9.2.0, where a file whose
+# module skips itself prints "1 skipped" and exits 5, never 0.  Per-test
+# skip markers exit 0 instead, so a whole-file skip reached the gate as a
+# red file (the hosted CI run of 2026-10-29 failed on exactly this, with
+# PyYAML absent).  An EMPTY file also exits 5 but prints no skip count --
+# that one must stay red, because it contributes nothing for a reason
+# nobody declared.
+NO_TESTS_COLLECTED = 5
+
+
+def _module_skipped(rc, stdout) -> bool:
+    """True only for a declared module-level skip, never for an empty file."""
+    if rc != NO_TESTS_COLLECTED:
+        return False
+    skipped, _whole = _skip_counts(stdout)
+    return skipped > 0
+
+
+def _file_verdict(rc, stdout) -> str:
+    """'green' | 'whole-skip' | 'red' -- the single decision point.
+
+    'whole-skip' counts as green in the gate but is reported loudly in the
+    skip section: the file contributed nothing, and a green gate with
+    skipped files is not the same claim as one where everything ran.
+    """
+    if rc == 0:
+        return "green"
+    if _module_skipped(rc, stdout):
+        return "whole-skip"
+    return "red"
+
+
 def _write_timing_report(timings: list, failures: list, dt: float) -> str:
     """Persist per-file wall time.
 
@@ -157,28 +191,34 @@ def main() -> int:
                 rc = 2   # hung file: treat as failure, do not kill the gate
                 attempts.append((attempt, "TIMEOUT",
                                  exc.stdout or b"", exc.stderr or b""))
-            if rc == 0:
+            verdict = _file_verdict(rc, attempts[-1][2])
+            if verdict != "red":
                 break
-        if rc == 0:
-            skipped, whole = _skip_counts(attempts[-1][2] if attempts else b"")
+        last_stdout = attempts[-1][2] if attempts else b""
+        verdict = _file_verdict(rc, last_stdout)
+        if verdict in ("green", "whole-skip"):
+            skipped, whole = _skip_counts(last_stdout)
             if skipped:
                 skipped_files.append((f, skipped, whole))
         timings.append((f, time.perf_counter() - t_file))
         log_path = os.path.join(LOG_DIR, RUN_TS, f + ".log")
-        if attempts and (rc != 0 or len(attempts) > 1):
+        if attempts and (verdict == "red" or len(attempts) > 1):
             _dump_log(log_path, attempts)
-        if rc != 0:
+        if verdict == "red":
             failures.append(f)
             if os.path.exists(log_path):
                 print(f"FAIL {f}  log: {log_path}", flush=True)
             else:
                 print(f"FAIL {f}", flush=True)
             if not quiet:
-                tail = (r.stdout or b"")[-2000:].decode("utf-8", "replace")
+                # last_stdout, not the loop's `r`: the timeout path never
+                # binds `r` (Phase 322 hit the same shape in scanner.py).
+                tail = last_stdout[-2000:].decode("utf-8", "replace")
                 print(tail, flush=True)
         else:
             if not quiet:
-                print(f"ok   {f}", flush=True)
+                label = "skip" if verdict == "whole-skip" else "ok  "
+                print(f"{label} {f}", flush=True)
     dt = time.perf_counter() - t0
     print(f"\n{len(files) - len(failures)}/{len(files)} files green "
           f"in {dt:.0f}s; failures: {failures or 'none'}")
