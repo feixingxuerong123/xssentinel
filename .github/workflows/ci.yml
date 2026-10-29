@@ -61,14 +61,16 @@ jobs:
         run: python -m ruff check
 
       - name: Unit + integration tests (pipeline slice included)
-        # --timeout=300: the measured shape of the long tests (parity DOM
-        # slice 875s on the author's Windows box with loopback throttling,
-        # redteam up to 267s) exceeds 120s locally; on Linux runners they
-        # fit, but the margin is thin enough that a slow runner kills a
-        # green test mid-run.  The heavy tests carry explicit per-test
-        # timeout markers sized from their local measurements; this job
-        # ceiling only bounds runaway hangs.
-        run: pytest tests/ -q --ignore=tests/test_benchmark.py --timeout=300
+        # File-by-file batched runner (per-file subprocess, 540s budget +
+        # one retry; exit code = files still red).  A single-process
+        # `pytest tests/` wedges the whole suite once one async/DOM test
+        # binds the thread to an asyncio loop -- every later sync-Playwright
+        # call then dies with "Sync API inside the asyncio loop" and the
+        # browser tests degrade to zero findings (measured on the first
+        # hosted run, 2026-10-28; tests/run_all_batched.py exists for
+        # exactly this).  test_benchmark.py runs since its 192-era wedge
+        # was root-caused, so the old --ignore is gone too.
+        run: python tests/run_all_batched.py --quiet
 
       - name: Accuracy benchmark (64-case stratified slice, both engines, zero-error gate)
         # --strict-gate: FP0/FN0/ERROR0, because a gate that tolerates an FP or
