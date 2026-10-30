@@ -2255,6 +2255,12 @@ class DynamicDomAnalyzer:
                             hits.append({"sink": "dialog",
                                          "snippet": _tok[0][:200],
                                          "via": "dialog"})
+                    # Phase 226: execution tier.  A dialog carrying either
+                    # token that fired during THIS probe's slice means the
+                    # page's own code ran it (the instrumentation no longer
+                    # alerts).  Otherwise the channel is replayed with
+                    # executable carriers -- and only a dialog fired by the
+                    # page during that replay earns "browser-executed".
                     executed = any(
                         marker in (m or "") or numtok in (m or "")
                         for m in dialog_msgs[dlg_start:])
