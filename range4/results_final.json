@@ -1,7 +1,7 @@
 {
   "meta": {
     "range": "range4",
-    "generated": "2026-10-29 22:40:24",
+    "generated": "2026-10-30 17:42:51",
     "engines": [
       "sync",
       "async"
@@ -34,7 +34,7 @@
       "verdict": "TP",
       "findings": 13,
       "confirmed": 12,
-      "elapsed_s": 19.4,
+      "elapsed_s": 19.1,
       "retries": 0,
       "findings_detail": [
         {
@@ -124,7 +124,7 @@
       "verdict": "TN",
       "findings": 0,
       "confirmed": 0,
-      "elapsed_s": 15.2,
+      "elapsed_s": 14.5,
       "retries": 0,
       "findings_detail": [],
       "error": ""
@@ -135,7 +135,7 @@
       "verdict": "TP",
       "findings": 13,
       "confirmed": 12,
-      "elapsed_s": 19.2,
+      "elapsed_s": 19.0,
       "retries": 0,
       "findings_detail": [
         {
@@ -225,7 +225,7 @@
       "verdict": "TN",
       "findings": 0,
       "confirmed": 0,
-      "elapsed_s": 15.2,
+      "elapsed_s": 14.5,
       "retries": 0,
       "findings_detail": [],
       "error": ""
@@ -236,7 +236,7 @@
       "verdict": "TP",
       "findings": 13,
       "confirmed": 12,
-      "elapsed_s": 22.4,
+      "elapsed_s": 22.0,
       "retries": 0,
       "findings_detail": [
         {
@@ -326,7 +326,7 @@
       "verdict": "TN",
       "findings": 0,
       "confirmed": 0,
-      "elapsed_s": 15.4,
+      "elapsed_s": 14.6,
       "retries": 0,
       "findings_detail": [],
       "error": ""
@@ -337,7 +337,7 @@
       "verdict": "TP",
       "findings": 13,
       "confirmed": 12,
-      "elapsed_s": 22.4,
+      "elapsed_s": 22.1,
       "retries": 0,
       "findings_detail": [
         {
@@ -427,7 +427,7 @@
       "verdict": "TN",
       "findings": 0,
       "confirmed": 0,
-      "elapsed_s": 15.4,
+      "elapsed_s": 14.6,
       "retries": 0,
       "findings_detail": [],
       "error": ""

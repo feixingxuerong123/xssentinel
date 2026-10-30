@@ -1,7 +1,7 @@
 {
   "meta": {
     "range": "range6",
-    "generated": "2026-10-29 22:41:24",
+    "generated": "2026-10-30 17:43:49",
     "engines": [
       "sync",
       "async"
@@ -33,7 +33,7 @@
       "case_id": "r6-pos-dompurify-207",
       "verdict": "TP",
       "findings": 6,
-      "elapsed_s": 14.5,
+      "elapsed_s": 13.9,
       "retries": 0,
       "findings_detail": [
         {
@@ -74,7 +74,7 @@
       "case_id": "r6-neg-dompurify-3417",
       "verdict": "TN",
       "findings": 4,
-      "elapsed_s": 15.2,
+      "elapsed_s": 14.5,
       "retries": 0,
       "findings_detail": [
         {
@@ -105,7 +105,7 @@
       "case_id": "r6-pos-dompurify-207",
       "verdict": "TP",
       "findings": 6,
-      "elapsed_s": 14.6,
+      "elapsed_s": 14.1,
       "retries": 0,
       "findings_detail": [
         {
@@ -146,7 +146,7 @@
       "case_id": "r6-neg-dompurify-3417",
       "verdict": "TN",
       "findings": 4,
-      "elapsed_s": 15.4,
+      "elapsed_s": 14.7,
       "retries": 0,
       "findings_detail": [
         {
