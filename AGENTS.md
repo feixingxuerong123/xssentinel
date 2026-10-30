@@ -5280,3 +5280,76 @@ dialog 迟到时付费,本地 docker 往返落在 settle 内 ⇒ 双向零漂移
       `server_{dalfox,nuclei}_p342.{json,md,tsv,run.log}`、`client_{dalfox,nuclei}_p342.*`、
       `p342_meta.json`(指纹+事故档案)、`_p342_headless_run.tsv`;复跑命令同 DEVLOG。
       OPTIMIZATION 1.0 的"商业工具 × 真实第三方靶"分支就此有测量结论,不再挂账。
+
+## Phase 341 独立复验(另一会话,非提交者自证)
+
+**为什么单独记**:341 的修复由会话 A 提出并提交,本条目由会话 B 在同一棵树上
+**独立重跑**得出的数字;两者结论一致,但过程里证伪了两条更省事的解释,那两条
+才是本轮真正的价值。
+
+### 1. 先用可对比的数字排除"页面慢"
+
+`dev/_r5_render_latency.py` 对 Lit 实页连测 40 次渲染:min 31 / median 37 /
+p95 73 / **max 75ms** —— 远在 settle(`_DOM_SETTLE_MS`=700ms)之内。所以缺陷
+不是"渲染慢",而是**执行**(dialog)晚:只有 `<img onerror>` 这一条在 Lit 页
+存活的载体,其执行要等图片请求**失败**,即一次真实 HTTP 往返。
+
+### 2. "多等一会儿"被证伪(这轮最重要的负面结论)
+
+首版修法保留 settle 并额外轮询 dialog 1800ms,失败路径可见之处:
+
+- 正常路径 11.9s → **13.7s**(每个探针都白等);
+- 失败路径上**每个载体形状各等 1.8s**,吃光 `_DOM_PROBE_BUDGET_S`(30s)——
+  实测 **30.8s / 零 DOM finding**,以及 25 连跑里一次 **34.9s 预算耗尽行**。
+
+**延长等待只是把"静默降级"换成了"预算耗尽",两者都是 FN。** 该实现已整体
+撤回(`_DOM_EXEC_WAIT_MS` / `_DOM_EXEC_POLL_MS` / `_await_dialog` 全部移除,
+`git diff` 可证),正确解法是**换载体**而非放大窗口 —— 与 341 的结论互相印证,
+但这次是由**反证**得到的。
+
+### 3. 修复后把失败**分类**计量,而不是笼统记红
+
+`dev/_r5_classify.py` 逐跑判定四种形状(原缺陷 / 超时 / 零 finding / OK):
+
+| 计量 | 修复前 | 修复后 25 连跑 |
+|---|---|---|
+| 原缺陷(`dom_sink_reachability/not-fired` 顶替 `dom_dynamic/fired`) | 2/33 ≈ 6% | **0/25** |
+| 超时 / 零 finding | — | 0 / 0 |
+| 单跑耗时 | 11.9–12.0s | **11.2–11.7s**(未变慢:html 先命中时 svg 零成本) |
+
+确定性复现 `dev/_r5_onerror_engine_repro.py`(404 延迟 1100ms):修复前
+**3/3 `NO-EXEC`** → 修复后 **3/3 `FIRED`**;对照组(延迟 0)两侧恒 FIRED,
+说明修复没有放宽判定,只补上了迟到的执行。
+
+### 4. 门禁全绿(本轮实测,非引用上游数字)
+
+| 靶场 | sync | async |
+|---|---|---|
+| range3 | TP19 FP0 TN7 FN0 | TP17 FP0 TN7 FN0 SKIP2 |
+| range4 | TP2 FP0 TN2 FN0 | TP2 FP0 TN2 FN0 |
+| range5 | TP1 FP0 TN1 FN0(`confirmed=1`) | TP1 FP0 TN1 FN0(`confirmed=1`) |
+| range6 | TP1 FP0 TN1 FN0 | TP1 FP0 TN1 FN0 |
+| range7 | TP8 FP0 TN8 FN0 | TP6 FP0 TN6 FN0 SKIP4 |
+
+**五靶场双引擎合计 FP0 / FN0 / ERR0**;SKIP 全部是 manifest 主动声明的单引擎
+(range3 的 stored/二阶,range7 的同两条).全量 194 双引擎 benchmark:sync
+**TP113/FP0/TN81/FN0/ERR0**、async **TP107/FP0/TN75/FN0/ERR0**,
+recall=precision=1.000。全套 `tests/run_all_batched.py` **exit 0 零红文件**
+(2644s;唯一整文件 skip 是 `test_stored_e2e_acceptance.py` 3 例 —— 绿门禁与
+"每项都跑了"不是同一个断言,两个数一起报)。
+
+### 5. 两次测量错误入册(都是验证方的,不是产品的)
+
+1. **管道退出码**:`python runner.py 2>&1 | Select-String ...` 之后读
+   `$LASTEXITCODE` 拿到的是**管道**的退出码,据此一度误报 range7 门禁失败 ——
+   runner 单独跑 exit 0、产物计数也全对。**先怀疑测量器。**
+2. **关掉随机顺序插件**:`-p no:randomly` 使本仓依赖的执行顺序失效,3 个新
+   测试假红;正常顺序下同文件 26 passed(其中既有同名 import 一直绿)。
+   结论同 341:那个"三个 s 的包名"曾让一批测试从未真正跑过 —— **测试绿不绿,
+   先确认它真的跑了。**
+
+**处置**:341 的 `dom_engine.py` 改动本身未动一行逻辑;本会话只补回被
+`8e6bce5` 顺带删除的 Phase 226 六行说明注释(纯注释,`fc84e31`)。
+`benchmark/server.py` / `tests/vuln_server.py` 在本轮曾以 `D` 出现在
+`git status`,经 342 条目核对为**宿主杀软隔离**(非本人清理;本人清理只限于
+`range3..range7` 下 `_` 前缀临时文件),已 `git checkout` 恢复并复验存在。
