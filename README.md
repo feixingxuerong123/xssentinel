@@ -223,6 +223,22 @@ pip install playwright && playwright install chromium
 
 ### 命令行
 
+四个程序模式各有一个名字（Phase 344）：`scan`（默认）、`serve`、`selftest`、`mcp`。
+子命令是**纯语法糖**——它只是被替换成原本就存在的 flag，所以两种写法完全等价，
+现有脚本一行不用改：
+
+```bash
+xssentinel scan -u "https://t.com/search?q=test"   # == xssentinel -u ...
+xssentinel serve --port 8000                       # == xssentinel --serve ...
+xssentinel selftest                                # == xssentinel --self-test
+xssentinel mcp                                     # == xssentinel --mcp
+```
+
+`scan --help` 仍是完整列表（参数总数由 `--help` 构建时自算并印在页首——扫描确实
+需要这么多）；`serve` / `selftest` / `mcp` 的 `--help` 只显示各自用到的参数，
+650 行的墙缩到一屏内（上限 <60 行由 `tests/test_cli_subcommands.py` 钉住）。
+**隐藏只影响显示**：`xssentinel serve --headless` 照样能解析。
+
 ```bash
 # 扫描单个 GET 参数（自动从 URL ?q= 提取）
 python -m xssentinel -u "https://example.com/search?q=test" -o report.html
@@ -277,6 +293,14 @@ python -m xssentinel -u "https://example.com/search?q=test" --oob interactsh
 # 并发扫描（4 线程）
 python -m xssentinel -u "https://example.com/search?q=test" --threads 4
 
+# 异步引擎（aiohttp 高吞吐多目标）。缺 aiohttp 时默认回退 sync，但**回退会写进产物**：
+# 报告顶层 engine / engine_fallback_reason 两个字段说明「这次是谁跑的、为什么不是它」
+python -m xssentinel -u "https://example.com/search?q=test" --async
+
+# 流水线要求「产物必须来自异步引擎」时用 --require-async：缺依赖直接 exit 3，
+# 绝不静默降级（对比 sync 与 async 基线时，这条能挡住"引擎不同被当成检出差异"）
+python -m xssentinel -u "https://example.com/search?q=test" --require-async -f json -o r.json
+
 # 声明式多步场景（存储流等；JSON 配置，Nuclei 风格）
 python -m xssentinel -u "https://example.com/comment" --scenarios my_scenarios.json
 
@@ -300,7 +324,10 @@ python -m xssentinel -u "https://example.com" --check-outdated-js
 常用参数：`-m/--method`、`-d/--data`、`-c/--crawl`、`--headless`、`--timeout`、
 `--scan-policy {quick,normal,deep}`（策略预设，显式 flag 覆盖预设；max-transforms / max-payloads / threads 的默认值由预设档位决定——normal 档为 12 / 10 / 4，quick 档更低，显式传参始终优先）、
 `--max-transforms`（绕过变体数，随预设档位）、`--max-payloads`（每上下文最大 payload 数，随预设档位）、
-`--threads`（并发线程数，随预设档位）、`--oob {self,interactsh}`（盲打自动确认模式）、
+`--threads`（并发线程数，随预设档位）、
+`--async` / `--require-async`（异步引擎；后者要求产物必须来自异步引擎，缺 aiohttp 时
+exit 3 而不是回退 sync——报告顶层恒带 `engine` 与 `engine_fallback_reason`）、
+`--oob {self,interactsh}`（盲打自动确认模式）、
 `--oob-timeout`（等待回调秒数，默认 12）、
 `--dom-engine {auto,playwright,static}`（DOM-XSS 引擎：auto=有 playwright 用真浏览器确认、否则静态；playwright=强制真浏览器；static=仅静态启发式，默认 auto）、
 `--stored-inject` / `--stored-view` / `--stored-param`（存储型扫描）、
@@ -612,7 +639,23 @@ python tests/passive_demo.py         # 产出 tests/passive_demo_report.html
 | sync | 64 | 36 | 0 | 28 | 0 | 0 | 0 | 370.3s | `benchmark/results/phase190_quick_sync.json` |
 | async | 64 | 36 | 0 | 27 | 0 | 0 | 1 | 267.3s | `benchmark/results/phase190_quick_async.json` |
 
-（那 1 例 SKIP 是 `engines:["sync"]` 声明的存储型负样本，异步不实现，记 SKIP 不记通过。切片大小与文档口径的一致性由 `tests/test_quick_gate_slice.py` 6 例锁定，其中一条断言"CI / CONTRIBUTING / OPTIMIZATION 里写的切片数字 == 代码实际产生的数字"——本次修的就是这类数字烂掉后没人发现。）
+（那 1 例 SKIP 是 `engines:["sync"]` 声明的存储型负样本，异步不实现，记 SKIP 不记通过。切片大小与文档口径的一致性由 `tests/test_quick_gate_slice.py` 锁定，其中一条断言"CI / CONTRIBUTING / OPTIMIZATION 里写的切片数字 == 代码实际产生的数字"——本次修的就是这类数字烂掉后没人发现。）
+
+**切片按周轮转（Phase 343，`--quick-offset`）**：确定性让两次构建可比，但也意味着
+**push 永远只测同样的 64 例**——迭代几百轮之后，这 64 例成了"每次修复都验证过"的那批，
+剩下 130 例只有 nightly 全量兜底，那里出回归最多要等一天才发现。
+
+现在每个族取**第几条**由 `--quick-offset` 决定：offset 0 就是历史切片（逐字节不变），
+offset k 取每族第 k 条，模族长度回绕。CI 按 **ISO 周**给 offset，所以同一周内所有
+构建仍是同一批用例（红绿差异仍可归因），跨周则换一批。实测口径：
+
+- 切片 64 例 / 全矩阵 194 例，最大族 `vulnerable × html_element` = **49 例**
+- 因此 **49 次轮转即可覆盖全部 194 例**（固定切片要 194 次 push 才碰到一遍）
+- offset 0 → 1 换掉 22 例（切片的三分之一在变，不是象征性抖动）
+
+本地复现某次 CI：`python -m benchmark.runner --quick --quick-offset <N> --engine sync`。
+`tests/test_quick_gate_slice.py` 用"N 次轮转的并集 == 全 manifest"锁住这条，并断言
+49 < 194/2（轮转若比跑全量还贵，这个机制就没有意义）。
 
 **当前基线（Phase 304，194 用例矩阵，双引擎同一口径 14/12/90）**：用
 `benchmark/runner.py --strict-gate` 跑全量并入库：

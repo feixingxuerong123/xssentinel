@@ -4,17 +4,21 @@ name: CI
 #   1. unit + integration pytest (includes the pipeline slice over
 #      Attack Range #2 -- main-flow regressions fail here)
 #   2. accuracy benchmark -- the push job runs the stratified quick slice
-#      (benchmark.runner --quick = 64 of 192 cases, one per
+#      (benchmark.runner --quick = 64 of 194 cases, one per
 #      (ground_truth, context) pair, so EVERY context family is measured on
-#      every push) on BOTH engines, under --strict-gate (FP0/FN0/ERROR0);
-#      the full 192-case matrix lives in the
+#      every push) on BOTH engines, under --strict-gate (FP0/FN0/ERROR0).
+#      The slice rotates its representative per ISO week (--quick-offset):
+#      builds inside one week are byte-identical slices and therefore
+#      comparable, while the window moves, so the 130 cases a fixed slice
+#      never touched get measured within 49 weeks instead of never.
+#      The full 194-case matrix lives in the
 #      separate benchmark-full job (nightly + workflow_dispatch only, ~15 min
 #      of pure scanning).  The legacy FPR<=20%/recall>=50% thresholds stay as
 #      the default outside --strict-gate, but on a slice this size they
 #      tolerated a false positive and two misses per push without turning red.
 #   3. accuracy drill on Range #2 (15 vuln + 5 safe, 100%/100% required)
 # 4. nightly: the FULL file-by-file gate (tests/run_all_batched.py, 141
-#    test files with per-file timeout and retry) + the full 192-case matrix on
+#    test files with per-file timeout and retry) + the full 194-case matrix on
 #    both engines -- installed from the same extra set as requirements.txt, so
 #    a wedge or a per-file regression cannot hide behind the 64-case quick
 #    slice, and an esprima/flask-gated test cannot silently self-skip.
@@ -115,15 +119,38 @@ jobs:
           pip install cryptography playwright
           python -m playwright install chromium --with-deps
 
+      - name: Slice rotation (which member of each family this week measures)
+        id: slice
+        # The fixed slice scored the same 64 of 194 cases on every push, so
+        # after hundreds of rounds those 64 were the only ones a push ever
+        # measured; the other 130 waited for the nightly full run, and a
+        # regression there cost up to a day to notice.
+        #
+        # Rotating the representative per ISO week keeps every build inside one
+        # week comparable -- that is what makes a red/green diff mean something
+        # -- while the window moves.  49 rotations cover the whole matrix
+        # (largest family: vulnerable/html_element, 49 cases), so a year of
+        # pushes measures everything, instead of the same 64 forever.
+        # `tests/test_quick_gate_slice.py` locks both numbers against the
+        # manifest, so this constant cannot rot silently.
+        #
+        # `10#` forces base 10: `date +%V` yields "08" in week 8, and bash
+        # would read a bare 08 as an invalid octal literal.
+        run: echo "offset=$(( 10#$(date -u +%V) % 49 ))" >> "$GITHUB_OUTPUT"
+
       - name: Accuracy benchmark (64-case stratified slice, both engines, zero-error gate)
         # --strict-gate: FP0/FN0/ERROR0, because a gate that tolerates an FP or
         # an FN cannot see a broken layer.  The async arm runs here for the same
         # reason: every "async forgot a sync fix" regression on record (concat
         # retry, content-type downgrade, JSONP gadget) was invisible to a
         # push job that only ever scored sync.
+        #
+        # --quick-offset comes from the step above: same-week builds are
+        # byte-identical slices, different weeks measure different members of
+        # each family.  Reproduce a CI run locally by passing the same offset.
         run: |
-          python -m benchmark.runner --quick --engine sync --strict-gate
-          python -m benchmark.runner --quick --engine async --strict-gate
+          python -m benchmark.runner --quick --quick-offset ${{ steps.slice.outputs.offset }} --engine sync --strict-gate
+          python -m benchmark.runner --quick --quick-offset ${{ steps.slice.outputs.offset }} --engine async --strict-gate
 
       - name: "Range #2 accuracy drill (must be 100% / 100%)"
         run: python tests/run_range2.py
@@ -212,7 +239,7 @@ jobs:
             tests/test_sitemap_input.py -q --timeout=240
 
   benchmark-full:
-    # Full 192-case drill on demand (slower, ~15 min of pure scanning).
+    # Full 194-case drill on demand (slower, ~15 min of pure scanning).
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
     runs-on: ubuntu-latest
     timeout-minutes: 90
@@ -230,7 +257,7 @@ jobs:
           pip install -e ".[dev,async,ast]"
       - name: Full benchmark (sync)
         # No --strict-gate here yet: the zero-error claim is measured for the
-        # 64-case push slice, not for this 192-case run (the last full matrices
+        # 64-case push slice, not for this 194-case run (the last full matrices
         # on this project's own box logged environment FNs).  Tighten once a
         # full both-engines run has actually passed clean.
         run: python -m benchmark.runner

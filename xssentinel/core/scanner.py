@@ -125,6 +125,18 @@ def _set_json_leaf(obj, path: str, value) -> None:
 
 
 class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
+    # Which engine produced these findings.  Until this existed the artifact
+    # could not answer the question at all: `--async` with aiohttp missing
+    # falls back to this class (cli_runner._run_async_scan returns None), and
+    # the resulting report was byte-identical to one from a real async run --
+    # same fields, same exit code 0.  A pipeline that asks for async and
+    # silently gets sync cannot be audited after the fact, so the engine is
+    # now a first-class report field.  The async CLI path relabels its shim
+    # to "async"; anything built here is sync by construction.
+    engine = "sync"
+    # Set by the async path when it had to degrade; stays None on a clean run.
+    engine_fallback_reason = None
+
     def __init__(self, requester: Requester | None = None,
                  use_headless: bool = False, max_transforms: int = 12,
                  max_payloads: int = 14, crawl: bool = False,

@@ -123,18 +123,109 @@ def _jar_cookie_dicts(session) -> list[dict]:
             for c in session.cookies]
 
 
-def build_parser():
+#: Phase 344: `xssentinel <mode> ...` -- a name for each mutually exclusive
+#: program mode.  The value is the flag that already selects that mode, so the
+#: subcommand is pure sugar: it is stripped from argv before argparse sees it,
+#: which is why every existing invocation keeps working byte for byte
+#: (`xssentinel -u X` == `xssentinel scan -u X`, `xssentinel --serve` ==
+#: `xssentinel serve`).
+#:
+#: Only PROGRAM modes get a name.  `--passive`, `--sandbox`, `--fuzz-body`,
+#: `--verify-fix` and `--diff` are things `scan` does, not other programs, and
+#: giving them names would imply they cannot be combined with scan flags.
+_SUBCOMMANDS = {
+    "scan": (),                     # the default; carries every other flag
+    "serve": ("--serve",),
+    "selftest": ("--self-test",),
+    "mcp": ("--mcp",),
+}
+
+#: Phase 344 (part B): what each mode's `--help` is allowed to show.
+#:
+#: `scan` is deliberately absent: it is the full list, and that is correct --
+#: scanning really does accept 157 flags.  The other three are small programs
+#: that happened to grow up inside a scanner CLI, and dumping 650 lines of
+#: crawl/payload options at someone who typed `serve --help` is the same
+#: failure as the old flat help, just smaller.  Params are hidden by
+#: `help=SUPPRESS`, which affects DISPLAY only: `xssentinel serve --port 8080
+#: --headless` still parses both, it just does not advertise the second.
+_MODE_VISIBLE = {
+    "serve": {"serve", "host", "port", "api_key", "max_jobs", "use_flask",
+              "db_path", "webhook_urls", "verbose", "log_level"},
+    "selftest": {"self_test", "verbose", "log_level"},
+    "mcp": {"mcp", "verbose", "log_level"},
+}
+
+_MODE_META = {
+    "scan": (
+        "Comprehensive XSS detection framework",
+        "Where to look ({flags} flags below -- start from the group, not the top):\n"
+        "  scan basics       Target / HTTP / Crawl\n"
+        "  what gets tested  Detection / Blind & Stored XSS\n"
+        "  logged-in scans   Authentication\n"
+        "  reports + CI      Output / Config & Resume  (-f sarif, --exit-code)\n"
+        "  traffic capture   Passive proxy\n"
+        "  no scan at all    Fast checks\n"
+        "Grep it instead of scrolling:  xssentinel --help | grep -i cookie\n"
+        "\n"
+        "Examples:\n"
+        "  xssentinel -u 'https://t.com/search?q=test'\n"
+        "  xssentinel -u https://t.com -c --crawl-depth 3\n"
+        "  xssentinel --config scan.json\n"
+        "  xssentinel -u https://t.com --resume scan.ckpt.json\n"
+        "  xssentinel --batch urls.txt -o reports/\n"
+        "  xssentinel --self-test            # validate all detection layers\n",
+    ),
+    "serve": (
+        "XSSentinel REST API server -- submit scans over HTTP, poll for results",
+        "Examples:\n"
+        "  xssentinel serve\n"
+        "  xssentinel serve --host 0.0.0.0 --port 8000 --api-key SECRET\n"
+        "  xssentinel serve --db xssentinel.db     # jobs survive restarts\n"
+        "  xssentinel serve --webhook https://hooks.example.com/xss\n"
+        "\n"
+        "Endpoints: POST /api/v1/scans, GET /api/v1/scans/{id}\n"
+        "Equivalent to: xssentinel --serve ...\n",
+    ),
+    "selftest": (
+        "Validate every detection layer against the built-in fixtures",
+        "Examples:\n"
+        "  xssentinel selftest\n"
+        "\n"
+        "Runs the layer-by-layer self-test and prints ALL CHECKS PASSED or the\n"
+        "failing layer.  No target and no network needed.\n"
+        "Equivalent to: xssentinel --self-test\n",
+    ),
+    "mcp": (
+        "MCP (Model Context Protocol) stdio server -- lets an agent drive the scanner",
+        "Run it directly:\n"
+        "  xssentinel mcp\n"
+        "\n"
+        "Or add it to an MCP client as:\n"
+        "  command: xssentinel\n"
+        "  args: [\"mcp\"]\n"
+        "\n"
+        "JSON-RPC over stdin/stdout, one message per line.  Targets arrive in\n"
+        "tool calls, not argv, so target flags are meaningless here.\n"
+        "Equivalent to: xssentinel --mcp\n",
+    ),
+}
+
+
+def build_parser(mode: str = "scan"):
+    """Build the CLI parser for one program mode.
+
+    ``mode`` only changes what `--help` SHOWS and the description line; the
+    accepted flag set is identical in every mode.  Hiding is done with
+    ``help=SUPPRESS`` on the argument, which argparse applies to display only,
+    so no invocation that works today stops working.
+    """
+    description, epilog = _MODE_META.get(mode, _MODE_META["scan"])
     ap = argparse.ArgumentParser(
         prog="xssentinel",
-        description="Comprehensive XSS detection framework",
+        description=description,
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="Examples:\n"
-               "  xssentinel -u 'https://t.com/search?q=test'\n"
-               "  xssentinel -u https://t.com -c --crawl-depth 3\n"
-               "  xssentinel --config scan.json\n"
-               "  xssentinel -u https://t.com --resume scan.ckpt.json\n"
-               "  xssentinel --batch urls.txt -o reports/\n"
-               "  xssentinel --self-test            # validate all detection layers\n")
+        epilog=epilog)
     # Target
     g_tgt = ap.add_argument_group("Target")
     g_tgt.add_argument("-u", "--url", help="Target URL")
@@ -440,6 +531,12 @@ def build_parser():
                        help="Max params to deep-test after fuzzer triage (default 5)")
     g_det.add_argument("--async", dest="async_mode", action="store_true",
                        help="Use async scanner (aiohttp) for high-throughput multi-target scans")
+    g_det.add_argument("--require-async", dest="require_async",
+                       action="store_true",
+                       help="Implies --async. Exit 3 instead of silently "
+                            "falling back to the sync engine when aiohttp is "
+                            "missing (use this in pipelines that must know "
+                            "which engine produced the artifact)")
     g_det.add_argument("--max-payloads", type=int, default=None)
     g_det.add_argument("--threads", type=int, default=None)
     g_det.add_argument("--custom-payloads", default=None,
@@ -851,6 +948,27 @@ def build_parser():
                         help="Report outdated JS libraries (known-CVE "
                              "versions) found in page HTML (XSStrike "
                              "retireJS style)")
+    # Phase 344 (part B): narrow `--help` to the flags this mode actually
+    # uses.  `help=SUPPRESS` is a display switch -- the flag still parses, so
+    # `xssentinel serve --headless` keeps working even though serve's help no
+    # longer advertises it.  Modes with no entry in _MODE_VISIBLE (i.e. scan)
+    # show everything, which is correct: scanning really does take 157 flags.
+    visible = _MODE_VISIBLE.get(mode)
+    if visible is not None:
+        for _a in ap._actions:
+            if _a.dest in visible or _a.dest == "help":
+                continue
+            _a.help = argparse.SUPPRESS
+    # Fill the flag count AFTER every group exists.  A hard-coded number in
+    # help text rots exactly like the benchmark slice size did (192 -> 194
+    # went unnoticed for weeks), and this one is quoted to the user on every
+    # `--help`.  Counted by `dest`, not by option string: `-u/--url` is one
+    # flag, and quoting the option-string total (169) would overstate the list
+    # the reader is looking at.  Counted after hiding, so the number matches
+    # the list actually printed.
+    n_flags = len({a.dest for a in ap._actions
+                   if a.option_strings and a.help is not argparse.SUPPRESS})
+    ap.epilog = ap.epilog.replace("{flags}", str(n_flags))
     return ap
 
 
@@ -1089,8 +1207,29 @@ def main(argv=None):
         uninstall_cli_print_guard()
 
 
+def _split_subcommand(argv):
+    """Map a leading mode name onto the flag it stands for.
+
+    Returns ``(mode, argv)``.  The subcommand never reaches argparse: it is
+    replaced by the flag that already selects that mode, so there is exactly
+    one code path per mode and no second definition of what `serve` means.
+
+    A first argument that is not a known mode is left alone -- that is how
+    `xssentinel -u X` and `xssentinel --serve` keep working unchanged.
+    """
+    if not argv:
+        return "scan", argv
+    extra = _SUBCOMMANDS.get(argv[0])
+    if extra is None:
+        return "scan", argv
+    return argv[0], [*extra, *argv[1:]]
+
+
 def _main_impl(argv=None):
-    ap = build_parser()
+    if argv is None:
+        argv = sys.argv[1:]
+    mode, argv = _split_subcommand(list(argv))
+    ap = build_parser(mode)
     args = ap.parse_args(argv)
 
     # Configure logging based on --log-level or --verbose.
@@ -1496,7 +1635,23 @@ def _main_impl(argv=None):
     # after this rule landed showed 10/10 cases as `exit=3` for exactly that
     # reason, i.e. an honest-looking alarm raised by a missing instrument.
     egress_reported = False
+    # --require-async implies --async: asking for a hard guarantee about the
+    # engine is asking for that engine.  Kept as a separate flag rather than
+    # a --async=strict enum so the existing flag keeps its exact meaning.
+    if getattr(args, "require_async", False):
+        args.async_mode = True
     is_async = bool(getattr(args, "async_mode", False))
+    # Checked before any traffic is generated, not at the first URL: a batch
+    # that died mid-way would have written reports from two different engines
+    # under one flag.  Exit 3 = "this run cannot support your conclusion",
+    # the same code the completeness gate uses.
+    if getattr(args, "require_async", False):
+        from .core.async_scanner import is_available as _async_available
+        if not _async_available():
+            from .cli_runner import _ASYNC_MISSING_REASON
+            print(f"[!] --require-async: {_ASYNC_MISSING_REASON}. Refusing to "
+                  "run the sync engine in its place.", file=sys.stderr)
+            return 3
 
     # Phase 25-3: when --async is enabled with multiple URLs, run ALL URLs
     # through a single asyncio.run() call (one event loop, one aiohttp
@@ -1633,7 +1788,13 @@ def _main_impl(argv=None):
                     {"url": d.get("url"), "host": d.get("host"),
                      "method": d.get("method", "GET")}
                     for d in scope_dropped[:20]],
-                "scope_dropped_count": len(scope_dropped)}
+                "scope_dropped_count": len(scope_dropped),
+                # Set by the async path when it had to degrade to sync.  The
+                # engine itself comes from the scanner in _write_report; this
+                # is the "why" that makes the mismatch auditable instead of
+                # just visible.
+                "engine_fallback_reason": getattr(
+                    args, "_engine_fallback_reason", None)}
         try:
             out_path = _write_report(scanner, url, out_path, args.format, meta)
             # Phase 139: optional PoC artifacts (opt-in; see --poc-dir).

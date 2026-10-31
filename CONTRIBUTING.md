@@ -38,12 +38,16 @@ python -m pytest tests/test_report.py -q  # 单文件快速迭代
 
 ```bash
 python -m benchmark.runner --quick   # 64 例分层切片(每个 ground_truth×context 一条,覆盖全检测面;双引擎口径见 --engine)
+python -m benchmark.runner --quick --quick-offset 1   # 同一批族的另一批代表(CI 按 ISO 周轮转;0=历史切片)
 python range3/runner.py --engine both    # 异形应用靶场,ground truth 独立撰写
 python range4/runner.py --engine both    # React/Vue 真实框架 SPA 靶场(FN/FP/ERROR ⇒ exit 1)
 ```
 
 改动上下文分类、payload 选择、判定/评分路径时,这三个靶场是行为契约;
 只改报告 UI / 导出格式时跑 `tests/test_report*.py` 系列即可。
+
+`--quick-offset` 的用途:固定切片只覆盖 194 例里的 64 例(最大族 49 例,故 49 次轮转
+覆盖全矩阵)。定位"nightly 红了但 push 绿"的用例时,用对应 offset 本地复现那一批。
 
 ## 架构约定(改代码前必读)
 
@@ -79,7 +83,7 @@ python range4/runner.py --engine both    # React/Vue 真实框架 SPA 靶场(FN/
 | job | 触发 | 内容 |
 |---|---|---|
 | tests | push / PR | 全量 pytest + 快速精度矩阵 + range3 + range4 |
-| benchmark-full | 手动 / 定时 | 完整 192 例双引擎矩阵 |
+| benchmark-full | 手动 / 定时 | 完整 194 例双引擎矩阵 |
 | nightly-gate | 每日定时 | 全量分批门禁(与本地 run_all_batched 同口径) |
 
 PR 只需保证 tests job 绿; nightly 红灯先看是否为已知环境问题。

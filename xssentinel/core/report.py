@@ -120,6 +120,20 @@ def build_html(findings: list, target: str, meta: dict) -> str:
             f'<div class="banner banner-crit"><b>DEGRADED CRAWL: {_esc(_ceng or "static-fallback")} '
             f'({_esc(_cfr)}). The endpoint set came from the static BFS and is '
             'much smaller than a full browser crawl -- treat the coverage as partial.</b></div>')
+    # Which engine ran.  A `--async` run whose aiohttp is missing falls back
+    # to sync (cli_runner._note_async_unavailable); until this banner the
+    # human deliverable said nothing about it, so the operator compared a
+    # sync result against an async baseline and saw a detection difference
+    # that was really an engine difference.  Silent on a clean run: a banner
+    # on every sync report would be noise.
+    _efr = meta.get("engine_fallback_reason")
+    if _efr:
+        status_banners += (
+            f'<div class="banner banner-crit"><b>ENGINE FALLBACK: this report '
+            f'came from the SYNC engine, not the async engine requested '
+            f'({_esc(_efr)}). Concurrency and wall-clock are the sync '
+            'pipeline\'s, so do not compare these numbers with an async '
+            'baseline.</b></div>')
     # Phase 20-3: coverage section (when a coverage tracker is supplied).
     coverage_section = ""
     cov = meta.get("coverage")
@@ -389,7 +403,7 @@ def build_html(findings: list, target: str, meta: dict) -> str:
 <body>
 <header><h1>{BRAND_SVG}XSSentinel &mdash; XSS Detection Report</h1>
 <div class="head-tools">{theme_toggle_button()}</div>
-<div class="meta">Target: {_esc(target)} · Generated: {_esc(meta.get('generated'))} · Requests: {_esc(meta.get('requests'))} · WAF: {_esc(meta.get('waf') or 'none detected')} · Status: {_esc(_st)}{_crawl_meta}</div>
+<div class="meta">Target: {_esc(target)} · Generated: {_esc(meta.get('generated'))} · Requests: {_esc(meta.get('requests'))} · WAF: {_esc(meta.get('waf') or 'none detected')} · Engine: {_esc(meta.get('engine') or 'sync')} · Status: {_esc(_st)}{_crawl_meta}</div>
 </header>
 {status_banners}
 <div class="summary">
@@ -468,6 +482,13 @@ def build_json(findings: list, target: str, meta: dict) -> str:
         # Phase 298: how the crawl ended (pages crawled / failed /
         # budget-truncated / dropped by the page cap).
         "crawl_stats": meta.get("crawl_stats"),
+        # Which engine actually produced these findings, and why it is not the
+        # one the operator asked for.  benchmark artifacts have carried an
+        # `engine` field since Phase 43; the deliverable did not, so a
+        # `--async` run that fell back to sync (aiohttp missing) was
+        # indistinguishable from a real async run -- same fields, same exit 0.
+        "engine": meta.get("engine"),
+        "engine_fallback_reason": meta.get("engine_fallback_reason"),
         "findings": [f.data if hasattr(f, "data") else f for f in findings],
     }
     # Phase 20-3: include coverage data when a tracker is supplied.

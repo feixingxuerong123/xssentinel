@@ -3,9 +3,85 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 格式;
 版本号遵循语义化版本。详细的迭代决策记录见 [AGENTS.md](AGENTS.md)。
 
+## 版本策略(Phase 343 补记)
+
+规则:**破坏性变更**走 major,新增能力走 minor,只修缺陷走 patch。破坏性变更指
+移除 Python 版本支持、抬升依赖下限、改 CLI 契约(参数语义或默认值)、改报告字段
+语义。这类条目在 CHANGELOG 里以 `BREAKING:` 开头。
+
+**已知偏差**:[1.2.2] 移除了 Python 3.9 支持(`requires-python` 抬到 `>=3.10`),
+按本规则应是 major,实际发成了 patch。历史版本不追溯改号——下游 lockfile 与
+制品引用的是 `1.2.2` 这个字符串,改号会让它们对不上——但记录在此,免得下一个人
+据"1.x 内不会有破坏性变更"做判断。自 Phase 343 起新条目按上述规则执行。
+
 ## [Unreleased]
 
+### Added
+
+- **子命令 + 分层 `--help`(Phase 344)**:`serve` / `selftest` / `mcp` 是长在扫描器
+  CLI 里的另外三个程序,过去只能靠 flag 拼(`--serve` / `--self-test` / `--mcp`)。
+  现在各有名字:`xssentinel serve|selftest|mcp|scan`。子命令是**纯语法糖**——在
+  argparse 之前被替换成原本那个 flag,所以每个模式仍只有一条代码路径,不存在
+  "`serve` 是另一套实现"的可能;平铺写法(`xssentinel --serve`、`xssentinel -u X`)
+  逐字节不变。**只给程序模式起名**:`--passive` / `--sandbox` / `--fuzz-body` /
+  `--verify-fix` / `--diff` 是 scan 能做的事,给它们起名会暗示它们不能和扫描参数
+  组合。`--help` 按模式分层:`scan` 保持完整(完整列表——扫描确实要这么多,
+  参数计数由 `--help` 构建时自算、不写死),`serve`/`selftest`/`mcp` 从 650 行
+  的墙降到**一屏内**(上限 <60 行由 `tests/test_cli_subcommands.py` 钉住;
+  行数随终端宽度浮动,故这里不记单值)。隐藏用的是
+  `help=SUPPRESS`,**只影响显示**:`xssentinel serve --headless` 照常解析,这条
+  契约由 `tests/test_cli_subcommands.py` 单独锁定(18 例),另有"每个模式都必须在
+  epilog 里写明自己的调用形式""`_MODE_VISIBLE` 里的 dest 必须真实存在"两条防错。
+
+- **`--help` 加导航段(Phase 343)**:157 个唯一参数、650 余行输出,一次刷屏——
+  第一次用的人面对的是墙,不是文档。epilog 顶部现在给出"按工作流找参数"的六行
+  索引(Target/HTTP/Crawl → Detection → Auth → Output → Passive → Fast checks)、
+  一条 `grep` 用法,然后才是示例。参数计数**构建时算**(按 `dest` 去重,`-u/--url`
+  算一个),不写死:写死的数字会像切片大小那样腐烂,而这个数字每次 `--help` 都
+  展示给用户。`tests/test_engine_attribution.py` 锁住"渲染出来的数 == 实际数"。
+
+- **基准切片按周轮转 `--quick-offset`(Phase 343)**:push 精度门禁的分层切片是
+  **确定性**的(同一 manifest 永远同 64 例),这正是两次构建可比的原因——但它也
+  意味着 push 永远只测 194 例里的那 64 例。迭代几百轮之后,这 64 例成了"每次修复
+  都验证过"的那批,剩下 130 例只有 nightly 全量兜底,那里出回归最多等一天才发现。
+  现在每个族取第几条由 `--quick-offset` 决定:offset 0 = 历史切片(**逐字节不变**),
+  offset k 取每族第 k 条、模族长度回绕(rank 走 0..len-1,故每个成员恰好访问一次)。
+  CI 按 **ISO 周**给 offset:同一周内所有构建仍是同一批用例(红绿差异可归因),
+  跨周换一批。实测口径:切片 64 / 全矩阵 194,最大族 `vulnerable × html_element`
+  = 49 例,故 **49 次轮转覆盖全部 194 例**(固定切片要 194 次 push);offset 0→1
+  换掉 22 例。`tests/test_quick_gate_slice.py` 新增 7 例,其中一条是"N 次轮转的
+  并集 == 全 manifest"(证明而非声称),另一条断言 49 < 194/2(轮转若比跑全量还贵
+  就没有意义)。CI 的 `date +%V` 用 `10#` 强制十进制——第 8 周是 "08",bash 会把
+  裸 08 当非法八进制。
+
+- **引擎归属进产物 + `--require-async`(Phase 343)**:`--async` 在缺 aiohttp 时
+  只往 stderr 打一条 WARNING,然后回退 sync 引擎跑完——产物与真正的异步运行
+  **逐字节同形**(同字段、退出码 0),于是"这条流水线到底用了哪个引擎"事后
+  无法回答。两种比较因此悄悄失效:sync 结果对上 async 基线,以及 CI 以为在
+  压异步路径、实际跑的是同步。现在:① 报告顶层恒带 `engine`(sync/async),
+  回退时另带 `engine_fallback_reason`;② HTML 报告 meta 行显示引擎,回退时
+  顶部出 `ENGINE FALLBACK` banner(与 DEGRADED CRAWL 同级,不埋在字段里);
+  ③ 新增 `--require-async`(隐含 `--async`),缺依赖时**在发出任何流量之前**
+  以 exit 3 退出——与完整性闸门同码("这次运行支持不了你要的结论"),不写报告、
+  不降级。`tests/test_engine_attribution.py` 14 例锁定四件事:字段存在性
+  (含无 meta 时也必须是 null)、shim 反向标注(async 结果包在 sync Scanner 里
+  时不得自称 sync)、banner 只在回退时出现、严格模式 exit 3。
+
 ### Fixed
+
+- **可选依赖缺失时测试失败而非跳过(Phase 343)**:`sandbox._js_parses` 的三态
+  是**设计**(`None` = 没有解析器、判不了,绝不等于 inert),但 5 个测试断言
+  具体判定(`is True` / `state == "inert"`),在只装核心依赖(`pip install -e .`,
+  无 `ast` extra)的机器上直接红。CI 装了 ast extra,所以这个红只在贡献者
+  第一次跑时出现。现由 `test_sandbox.py::need_js_parser()` 与
+  `test_sandbox_phase300.py` 就地 skip,skip 理由带安装提示。
+  实测:无 esprima 时 `62 passed, 5 skipped`(此前 `5 failed`);装回后
+  `67 passed`,判定面零变化。
+
+- **`_run_async_scan` 的 docstring 归位(Phase 343)**:文档字符串被挤到函数体
+  中部(第 845 行起已是语句),因此它只是一条无人使用的字符串字面量,
+  `help()` 里该函数没有文档。移回首行,并补上"缺 aiohttp 时返回 None 让调用方
+  回退"这一条契约说明。
 
 - **DOM 执行载体网络无关化(Phase 341)**:唯一在部分框架页面存活的载体形状
   `<img src=x onerror=…>` 的执行要等图片请求失败 —— 一次真实 HTTP 往返;

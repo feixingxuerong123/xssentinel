@@ -553,7 +553,7 @@ def _evaluate_with_retries(base_url: str, case: dict, timeout: int,
     return r
 
 
-def _quick_subset(cases: list, per_class: int = 0) -> list:
+def _quick_subset(cases: list, per_class: int = 0, offset: int = 0) -> list:
     """Pick a quick-run subset that spans the manifest, not its first page.
 
     The previous pick was literally `[...][:5]` per class, i.e. whichever contexts
@@ -561,17 +561,31 @@ def _quick_subset(cases: list, per_class: int = 0) -> list:
     (see .github/workflows/ci.yml), so the same few contexts were re-measured
     forever while, say, every `url_href` case waited for a manual full run.
 
-    Round-robin over `context` keeps it deterministic -- the same manifest always
-    yields the same N cases, so two builds are comparable -- while making the N
-    cases cover N different contexts.
+    Round-robin over `context` keeps it deterministic -- the same manifest and
+    the same ``offset`` always yield the same N cases, so two builds are
+    comparable -- while making the N cases cover N different contexts.
 
     `per_class=0` (the default) means "one representative per (ground_truth,
     context) pair", i.e. full context coverage.  The old cap of 5 stopped the
     round-robin *mid-cycle* in alphabetical order, so the biggest families never
     entered the push gate at all: `html_element` alone carries 48 vulnerable +
     34 safe cases -- 43% of the matrix -- and was measured zero times per push.
+
+    ``offset`` rotates WHICH member of each family is the representative:
+    offset 0 is the historical slice (byte-for-byte the old behaviour), offset
+    k takes the family's k-th case.  Rotation is per family and wraps, so
+    offsets 0..len(family)-1 enumerate the whole family with no repeats.
+
+    Why this exists: determinism is what makes two builds comparable, but it
+    also means the same 64 of 194 cases are the only ones a push ever
+    measures.  After hundreds of rounds those 64 are the ones every fix was
+    validated against, and the other 130 are covered only by the nightly full
+    run -- a regression there costs up to a day to notice.  Rotating the
+    representative keeps "comparable within a window" (a week, a release
+    candidate) while the window changes and the coverage grows.
     """
     out: list = []
+    step = int(offset) if offset else 0
     for gt in ("vulnerable", "safe"):
         by_ctx: dict[str, list] = {}
         for c in cases:
@@ -584,7 +598,9 @@ def _quick_subset(cases: list, per_class: int = 0) -> list:
             for ctx in sorted(by_ctx):
                 bucket = by_ctx[ctx]
                 if rank < len(bucket) and picked < cap:
-                    out.append(bucket[rank])
+                    # `rank` walks 0..len-1, so the modulo only shifts the
+                    # starting point: every member is visited exactly once.
+                    out.append(bucket[(rank + step) % len(bucket)])
                     picked += 1
                     took = True
             if not took:
@@ -596,7 +612,7 @@ def _quick_subset(cases: list, per_class: int = 0) -> list:
 def run_benchmark(port: int = DEFAULT_PORT, concurrency: int = 1,
                   timeout: int = 60, max_payloads: int = DEFAULT_MAX_PAYLOADS,
                   max_transforms: int = DEFAULT_MAX_TRANSFORMS,
-                  quick: bool = False,
+                  quick: bool = False, quick_offset: int = 0,
                   verbose: bool = False, engine: str = "sync") -> BenchmarkResult:
     """Run the full benchmark suite.
 
@@ -610,6 +626,10 @@ def run_benchmark(port: int = DEFAULT_PORT, concurrency: int = 1,
             (ground_truth, context) pair -- currently 64 cases covering every
             context family in the manifest, instead of the 5+5 alphabetical
             prefix that used to re-measure the same few families every build.
+        quick_offset: Which member of each family is the representative
+            (0 = the historical slice, unchanged).  Rotating it lets a series
+            of runs cover the whole matrix while any single window stays
+            internally comparable; see `_quick_subset`.
         verbose: Print per-case progress.
 
     Returns:
@@ -623,9 +643,10 @@ def run_benchmark(port: int = DEFAULT_PORT, concurrency: int = 1,
     cases = manifest["cases"]
 
     if quick:
-        cases = _quick_subset(cases)
+        cases = _quick_subset(cases, offset=quick_offset)
         print(f"[*] Quick mode: {len(cases)} cases "
-              f"({len(set(c.get('context') for c in cases))} distinct contexts)")
+              f"({len(set(c.get('context') for c in cases))} distinct contexts)"
+              f"{f', offset {quick_offset}' if quick_offset else ''}")
 
     # Ensure results directory exists
     _RESULTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -869,6 +890,11 @@ def main():
     ap.add_argument("--quick", action="store_true",
                     help="Quick mode: stratified push slice (one case per "
                          "ground_truth x context, currently 64 of 192)")
+    ap.add_argument("--quick-offset", type=int, default=0,
+                    help="Rotate which member of each family the quick slice "
+                         "picks (0 = the historical slice, unchanged).  Use it "
+                         "to re-measure cases the fixed slice never touches, or "
+                         "to reproduce a rotated CI run locally.")
     ap.add_argument("--strict-gate", action="store_true",
                     help="Exit 1 on ANY false positive, false negative or "
                          "incomplete case, instead of the legacy FPR>20%% / "
@@ -892,6 +918,7 @@ def main():
         max_payloads=args.max_payloads,
         max_transforms=args.max_transforms,
         quick=args.quick,
+        quick_offset=args.quick_offset,
         verbose=args.verbose,
         engine=args.engine,
     )

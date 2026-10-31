@@ -804,6 +804,34 @@ def _warn_async_partial_flags(args) -> None:
               "payload itself will still reach that host.", file=sys.stderr)
 
 
+_ASYNC_MISSING_REASON = "aiohttp is not installed (pip install xssentinel[async])"
+
+
+def _note_async_unavailable(args, where: str) -> None:
+    """Handle "aiohttp is missing" for both async entry points, one place.
+
+    Two things were wrong with the old one-liner warning.  It was a WARNING
+    on a stream nobody reads in CI, and the run went on to produce a report
+    that was byte-identical to a real async run -- same fields, exit 0 -- so
+    "which engine produced this artifact" could not be answered afterwards.
+    The reason is now stashed on ``args`` for the report, and ``--require-async``
+    turns the fallback into exit 3 (the completeness gate's "this run cannot
+    support your conclusion" code) instead of degrading quietly.
+    """
+    setattr(args, "_engine_fallback_reason", _ASYNC_MISSING_REASON)
+    if getattr(args, "require_async", False):
+        # Second line of defence: `_main_impl` already refuses before any
+        # traffic is generated (so a batch cannot write reports from two
+        # different engines under one flag).  This branch covers callers that
+        # reach the engine helpers directly -- the guarantee belongs to the
+        # flag, not to one call site.
+        print(f"[!] --require-async: {_ASYNC_MISSING_REASON}. Refusing to run "
+              "the sync engine in its place.", file=sys.stderr)
+        raise SystemExit(3)
+    _log.warning("%s requested but %s. Falling back to sync.", where,
+                 _ASYNC_MISSING_REASON)
+
+
 def _operator_skip_params(args) -> set:
     """Phase 184: parse --skip-param ("a,b,c") into a lowercase set.
     Returns an empty set when the flag is absent -- both engines treat
@@ -841,6 +869,18 @@ def _operator_custom_payloads(args) -> list[str]:
 
 def _run_async_scan(args, url: str, oob, progress, checkpoint,
                     auth_state=None):
+    """Phase 22-1: run a scan via AsyncScanner when ``--async`` is enabled.
+
+    The async scanner mirrors the sync pipeline (L1 reflected / L2 WAF /
+    L3 DOM / L4 blind / L5 advanced / L6 CSP+JSONP) but uses aiohttp for
+    high-throughput concurrent I/O.  Findings are collected into a
+    lightweight Scanner-compatible shim so the same report writer works.
+
+    Returns ``None`` when aiohttp is unavailable, which makes the caller fall
+    back to the sync engine.  That fallback is a silent lie in the artifact
+    unless it is recorded, so the reason is stashed on ``args`` for the report
+    and ``--require-async`` turns it into a hard failure instead.
+    """
     # Phase 85: async mode does not implement these sync-only features;
     # warn instead of silently ignoring them.
     for _flag in _ASYNC_SYNC_ONLY_FLAGS:
@@ -849,19 +889,11 @@ def _run_async_scan(args, url: str, oob, progress, checkpoint,
                   "ignored in --async mode", file=sys.stderr)
     _warn_async_partial_flags(args)
 
-    """Phase 22-1: run a scan via AsyncScanner when ``--async`` is enabled.
-
-    The async scanner mirrors the sync pipeline (L1 reflected / L2 WAF /
-    L3 DOM / L4 blind / L5 advanced / L6 CSP+JSONP) but uses aiohttp for
-    high-throughput concurrent I/O.  Findings are collected into a
-    lightweight Scanner-compatible shim so the same report writer works.
-    """
     import asyncio
     from .core.async_scanner import AsyncScanner, is_available as async_available
 
     if not async_available():
-        _log.warning("--async requested but aiohttp is not installed. "
-                     "Install with: pip install aiohttp.  Falling back to sync scan.")
+        _note_async_unavailable(args, "--async")
         return None  # caller falls back to _run_scan
 
     from xssentinel.__main__ import _parse_kv, apply_scan_policy
@@ -997,6 +1029,10 @@ def _run_async_scan(args, url: str, oob, progress, checkpoint,
     shim = Scanner(requester=None, verbose=args.verbose,
                    poc_include_auth=getattr(args, "poc_include_auth", False),
                    poc_verify=getattr(args, "poc_verify", True))
+    # The shim is a sync Scanner instance, so it would report engine="sync"
+    # and make every async run indistinguishable from a fallback in the
+    # artifact.  Label it with the engine that actually did the work.
+    shim.engine = "async"
     shim.findings = list(asc.findings)
     shim.requests_made = asc.requests_made
     # Phase 208: hand the async engine's egress counters to the shim's tally
@@ -1080,7 +1116,7 @@ def _run_async_batch(args, urls: list[str], requester, oob, progress,
     from .core.async_scanner import AsyncScanner, is_available as async_available
 
     if not async_available():
-        _log.warning("--async requested but aiohttp is not installed.")
+        _note_async_unavailable(args, "--async (batch)")
         return {}
 
     # Phase 43 fix: same scan-policy fill as _run_async_scan -- args.threads
@@ -1270,6 +1306,8 @@ def _run_async_batch(args, urls: list[str], requester, oob, progress,
         shim = Scanner(requester=None, verbose=args.verbose,
                    poc_include_auth=getattr(args, "poc_include_auth", False),
                    poc_verify=getattr(args, "poc_verify", True))
+        # Batch path: same relabel as the single-URL path (see _run_async_scan).
+        shim.engine = "async"
         shim.findings = list(asc.findings[lo:hi])
         shim.requests_made = requests_before.get(orig_url, 0)
         shim.waf_name = getattr(asc, "waf_name", None)
@@ -1434,6 +1472,13 @@ def _write_report(scanner, target_url, output_path, fmt, meta=None):
     meta.setdefault("crawl_fallback_reason",
                     getattr(scanner, "crawl_fallback_reason", None))
     meta.setdefault("crawl_stats", getattr(scanner, "crawl_stats", None))
+    # Which engine produced these findings.  Same rule as crawl_engine: an
+    # artifact that cannot say what ran is an artifact nobody can audit.
+    # "sync" is the honest default -- a Scanner instance IS the sync engine,
+    # and only the async shim relabels itself.
+    meta.setdefault("engine", getattr(scanner, "engine", None) or "sync")
+    meta.setdefault("engine_fallback_reason",
+                    getattr(scanner, "engine_fallback_reason", None))
     # Phase 20-3: attach coverage tracker so HTML/JSON reports include
     # the scan-coverage section (which layers/params/payloads ran).
     if getattr(scanner, "coverage", None) is not None:

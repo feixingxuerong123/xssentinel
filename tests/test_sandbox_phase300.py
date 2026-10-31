@@ -45,6 +45,11 @@ def test_plain_comment_still_swallows_the_payload():
 
 def test_handler_trailing_line_comment_compiles():
     """`__x()//` is valid JS; the wrapper must not swallow its own brace."""
+    # `_js_parses` is tri-state: None means "no parser installed", not "inert".
+    # Asserting `is True` without this guard makes a core-only install (no
+    # `ast` extra) report a failure that says nothing about the sandbox.
+    if sandbox._js_parses("1") is None:
+        pytest.skip("esprima not installed (pip install xssentinel[ast])")
     assert sandbox._js_parses("__x()//", wrapped=True) is True
     doc = "<html><body><div><img src=x onerror=__x()//></div></body></html>"
     assert sandbox.judge(doc, TOKEN, sink="parser").state == "live"

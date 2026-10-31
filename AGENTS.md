@@ -5281,6 +5281,89 @@ dialog 迟到时付费,本地 docker 往返落在 settle 内 ⇒ 双向零漂移
       `p342_meta.json`(指纹+事故档案)、`_p342_headless_run.tsv`;复跑命令同 DEVLOG。
       OPTIMIZATION 1.0 的"商业工具 × 真实第三方靶"分支就此有测量结论,不再挂账。
 
+- [x] **343 引擎归属进产物 + `--require-async` + 基准切片按周轮转 + `--help` 导航段**
+      (实现由前一会话落在工作树,验证收尾后一并入库):
+  ① **引擎归属**:`--async` 缺 aiohttp 时旧路径只往 stderr 打一条 WARNING 然后回退
+  sync 引擎跑完 —— 产物与真异步运行逐字节同形(同字段、exit 0),"这条流水线到底
+  用了哪个引擎"事后无法回答,两种比较因此悄悄失效(sync 结果对 async 基线;CI
+  以为在压 async 实际跑 sync)。修复:报告 JSON 顶层恒带 `engine`,回退时另带
+  `engine_fallback_reason`(无 meta 时键也必须存在且为 null —— 消费者不用区分
+  "缺键"与"没回退");HTML meta 行显示引擎、回退时顶部出 `ENGINE FALLBACK`
+  banner(与 DEGRADED CRAWL 同级,不埋在字段里);`--require-async`(隐含
+  `--async`,单独成旗保持 `--async` 语义不动)在**发出任何流量之前** exit 3
+  (完整性闸门同码:"这次运行支持不了你要的结论" —— 批量场景一个批次写不出两种
+  引擎的报告);两条 async 入口的缺依赖处理收敛进 `_note_async_unavailable`
+  单点(原因带 `pip install xssentinel[async]` 安装提示)。测试
+  `tests/test_engine_attribution.py` 14 例(字段存在性含 null 态/shim 反向标注
+  —— async 结果包在 sync Scanner shim 里不得自称 sync/banner 只在回退时出现/
+  严格模式 exit 3),连带把 `_run_async_scan` 被挤到函数体中部的死 docstring
+  归位并钉住 `__doc__` 契约。
+  ② **`--quick-offset`**:push 精度门禁的固定 64 例切片是"两次构建可比"的来源,
+  也意味着 194 例里永远只有那 64 例被 push 测到,其余 130 例只有 nightly 兜底
+  (回归最晚一天才发现)。每族取第几条改由 offset 决定:offset 0 = 历史切片
+  **逐字节不变**,offset k 走 `bucket[(rank+step) % len]` 而 rank 本来就走
+  0..len-1,故每族成员恰好各被访问一次、无重复无遗漏。CI 按 **ISO 周**给
+  offset(同周构建切片逐字节相同、红绿差异可归因;跨周换一批;49 次轮转覆盖
+  全矩阵 —— 最大族 vulnerable×html_element=49 例;`10#` 强制十进制,防
+  `date +%V` 在第 8 周给出 "08" 被 bash 当非法八进制)。`tests/test_quick_gate_
+  slice.py` +7 例,含"N 次轮转的并集 == 全 manifest"(证明而非声称)与
+  "49 < 194/2"(轮转若比跑全量还贵就没有意义)。
+  ③ **`--help` 导航段**:scan 的 help 是 157 个 dest、650+ 行的墙;epilog 顶部
+  给六行工作流索引(Target/HTTP/Crawl → Detection → Auth → Output → Passive →
+  Fast checks)+ 一条 grep 用法,然后才是示例。参数计数**构建时算**(按 dest
+  去重、隐藏后计数),不写死 —— 写死的数字会像切片大小那样腐烂,而这个数字每次
+  `--help` 都印给用户;`test_help_states_the_real_flag_count` 锁"渲染出来的数
+  == 实际数"。
+  ④ **可选依赖缺失时 skip 而非假红**:`sandbox._js_parses` 的三态是设计
+  (`None`="没解析器、判不了",绝不等于 inert),5 个断言具体判定的用例在
+  core-only 安装下直接红(CI 装了 ast extra,所以只在贡献者首跑出现)。就地
+  skip 带安装提示;实测无 esprima `62 passed, 5 skipped`(此前 5 failed),
+  装回 `67 passed`,判定面零变化。
+  ⑤ CHANGELOG 版本策略补记:破坏性变更(含改 CLI 契约)= major 的规则入册,
+  [1.2.2] 的 known deviation(删 3.9 支持发成了 patch)记录在案、不追溯改号。
+  **证据**:全量 194 双引擎审计入库 —— sync **TP113/FP0/TN81/FN0/ERR0 f1=1.0**
+  (981s,`benchmark_20261030_192733.json`)、async **TP107/FP0/TN75/FN0/ERR0
+  f1=1.0**(1312s,`audit_async_full_20261031.json`)。
+
+- [x] **344 子命令 + 分层 `--help`(模式起名,零双注册)**(实现由前一会话落在
+  工作树,验证收尾后一并入库):
+  `serve`/`selftest`/`mcp`/`scan` 各有名字。**机制是前置分发而非 argparse
+  subparsers**:`_split_subcommand`(`__main__.py`)在 argparse 之前把子命令
+  替换成原本选中该模式的那个 flag(`serve`→`--serve`、`selftest`→`--self-test`、
+  `mcp`→`--mcp`、`scan` 恒等)—— 每个模式仍只有一条代码路径,"serve 是另一套
+  实现"结构上不可能;平铺写法(`xssentinel --serve`、`xssentinel -u X`)逐字节
+  保留,且平铺 `--help` **刻意保持完整**(旧拼法突然少文档是另一种惊吓,测试
+  注释明写这条取舍)。被否决的两条路:原生 subparsers(无参行为、错误消息
+  prog 前缀、互斥组跨层全要重验)、SUPPRESS 别名组双注册(每加一个参数要记得
+  加两处 —— 本仓"两处只改一处"付过三次账的形态)。**只给程序模式起名**:
+  `--passive`/`--sandbox`/`--fuzz-body`/`--verify-fix`/`--diff` 是 scan 能做的
+  事,起名会暗示它们不能与扫描参数组合;**bench 有意不加**(benchmark 是
+  `benchmark/` 独立 harness,不是主 CLI 程序模式,要加就是新能力,单独立项)。
+  `--help` 按模式分层:`_MODE_VISIBLE`(dest 白名单)+ `help=SUPPRESS`(**纯
+  显示开关,解析不受限** —— `xssentinel serve --headless` 照常解析,这条契约
+  有专门测试"SUPPRESS 变成真限制即红");serve/selftest/mcp 从 650 行的墙降到
+  一屏内(<60 行由测试钉住;行数随终端宽度浮动,文档不记单值),scan 保持完整
+  并带 343 的导航段。防错四条:`_MODE_VISIBLE` 里的 dest 必须真实存在且未被
+  隐藏(按 parser 实际 actions 查 —— `--webhook` 的 dest 是 `webhook_urls`,
+  名字推导会错);每个模式 epilog 必须写明两种拼法;scan 的 flag 计数必须与
+  实际一致;非 scan 模式不得引用 flag 计数(防又一个腐烂数字)。测试
+  `tests/test_cli_subcommands.py` 18 例。
+  **验证(收尾会话实测,全部数字非引用)**:受影响批 171 passed + CLI 族批
+  (fastchecks/marker_fuzz/har/interop/p27/p27_api/phase196_api_gate)554
+  passed;MCP 套件 7 文件 80 passed + 7 skip(`test_phase324_mcp_http` 首跑
+  loopback connect 超时,单文件复跑 14 passed 7.34s —— 本仓已记多轮的环境
+  形态,非回归);quick strict 双引擎 exit 0:sync TP36/FP0/TN28/FN0/ERR0
+  (432s)、async TP36/FP0/TN27/FN0/ERR0(404s,1 SKIP = stored-dom sync-only,
+  与 196b/200/201 基线逐项一致;产物 `phase344_quick_{sync,async}.json`);
+  四模式 `--help` 与平铺 `-u` 真扫描冒烟;ci.yml YAML 解析 + quick-offset
+  逻辑复核;`build_parser` 全仓唯一调用点且 `mode` 带默认值(外部无参调用不破);
+  `xssentinel selftest` 新拼法真 e2e **ALL CHECKS PASSED exit 0**
+  (`dev/_selftest_p344.log`;首次后台跑被外部终止 exit 0x40010004 零输出
+  —— 连 echo 都没到,是整 shell 被杀不是测试失败,`-u`+落盘日志重跑即过)。
+  ci/CONTRIBUTING/README/CHANGELOG 同步;README/CHANGELOG 里写死的 help 行数
+  措辞改"一屏内 + 测试钉上限"(行数是终端宽度的函数 —— 本机实测 serve 51 行
+  vs pytest 宽度 <60,同一实现两个"真实"数字,单值必腐)。
+
 ## Phase 341 独立复验(另一会话,非提交者自证)
 
 **为什么单独记**:341 的修复由会话 A 提出并提交,本条目由会话 B 在同一棵树上

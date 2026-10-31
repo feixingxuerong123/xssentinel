@@ -13,12 +13,29 @@ Run:  pytest tests/test_sandbox.py
 import os
 import sys
 
+import pytest
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from xssentinel.core import sandbox as sb  # noqa: E402
 
 X = "__x()"          # the oracle's quote-free sentinel
 NUL = "\x00"
+
+
+def need_js_parser() -> None:
+    """Skip when ``esprima`` is absent -- these verdicts need a JS parser.
+
+    ``sb._js_parses`` is tri-state on purpose: ``None`` means "no parser
+    installed, cannot decide", never "inert".  A test that asserts a specific
+    verdict is only meaningful with the parser present.  Without this guard a
+    bare ``pip install -e .`` (core requirements only) turns these assertions
+    red, and the redness says nothing about the sandbox -- measured: 4 here
+    plus 1 in test_sandbox_phase300.py.  CI installs the ``ast`` extra, which
+    is why the failure only ever appeared on a contributor's first run.
+    """
+    if sb._js_parses("1") is None:
+        pytest.skip("esprima not installed (pip install xssentinel[ast])")
 
 
 def ser(html: str) -> str:
@@ -143,6 +160,7 @@ def test_script_element_executes_from_the_parser_and_never_from_innerhtml():
 
 
 def test_token_inside_a_js_string_is_data():
+    need_js_parser()
     html = f'<script>var a = "{PAYLOAD}";</script>'
     v = sb.judge(html, X, sink="parser")
     assert v.state == "inert", v.reason
@@ -150,6 +168,7 @@ def test_token_inside_a_js_string_is_data():
 
 
 def test_payload_that_closes_the_quote_is_code_again():
+    need_js_parser()
     trapped = """<script>var a = "%s";</script>""" % PAYLOAD
     assert sb.judge(trapped, X, sink="parser").state == "inert"
     # The realistic breakout comment-terminates the statement: without the `//`
@@ -173,6 +192,7 @@ def test_a_string_that_is_a_call_argument_is_the_payload_landing():
     syntax tree says "argument of a call the script reaches", and that is the
     answer.
     """
+    need_js_parser()
     tok = "xssv_9d3ab398"
     called = f"<html><body><svg><![CDATA[]]></script><script>alert('{tok}')" \
              f"</script><![CDATA[]]></svg></body></html>"
@@ -633,6 +653,7 @@ def test_a_nul_in_a_start_tag_name_makes_an_unknown_element():
     own close tag failed, i.e. a confirmed finding out of a dead payload.
     Expected strings are Chromium's own innerHTML from
     benchmark/results/nul_probe.json."""
+    need_js_parser()
     p = "<scr\x00ipt>alert(1)</scr\x00ipt>"
     assert ser(p) == "<scr\ufffdipt>alert(1)</scr\ufffdipt>"
     # `judge` scopes to the token, so the token has to be the payload here --
