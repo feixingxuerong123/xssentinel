@@ -20,6 +20,12 @@ report.html.json
 xssentinel/data/llm_state.json
 .benchmarks/
 
+# pip / pytest 的临时目录与 range 靶场本地 DB(均运行时重建;2026-10-31 工作区清理后防重现)
+pip-*/
+pytest-of-*/
+*.sqlite3
+/*.db
+
 # 备份文件（git 即历史，.bak 不再需要入库）
 *.bak
 *.bak-*
@@ -29,6 +35,7 @@ xssentinel/data/llm_state.json
 .qoder/
 .trae/
 .agenthub/
+.zcode/
 
 # 根目录一次性探针 / 诊断 / 审计脚本及其输出目录。
 # 注意：这些此前只写在 .git/info/exclude（不入库、换机即失效），
@@ -73,7 +80,7 @@ benchmark/results/regression_logs/
 xssentinel/data/llm_providers.json
 
 # dev/ 沿用根目录约定:_ 前缀 = 探针/日志/产物,不入库。
-# (已追踪的 dev/_r4_construct_probe.py 等不受影响;CI 仍可引用。)
+# (2026-10-31 核对:当前无任何 tracked 的 dev/_ 文件。)
 /dev/_*
 
 # 跑分产物里的机器相关/证据日志,不入库(历史追踪文件不受影响)
