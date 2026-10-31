@@ -16,6 +16,18 @@
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-10-31
+
+引擎归属与 CLI 可读性轮(Phase 343-344):报告产物恒带 `engine`(回退时另带
+`engine_fallback_reason`)+ HTML 顶部 `ENGINE FALLBACK` banner +
+`--require-async` 缺依赖时在任何流量之前 exit 3;push 切片按 ISO 周轮转
+`--quick-offset`(offset 0 = 历史切片逐字节不变,49 次轮转覆盖全 194 例);
+`xssentinel serve|selftest|mcp|scan` 子命令(前置分发,平铺写法逐字节不变)+
+按模式分层的 `--help`(serve/selftest/mcp 一屏内,scan 保持完整并加导航段)。
+验证:全量 194 双引擎审计 FP0/FN0(f1=1.0);quick strict 双引擎 exit 0;
+全量分批门禁 258/258 文件绿(2576s,attempt 0 零重试);`xssentinel selftest`
+ALL CHECKS PASSED。
+
 ### Added
 
 - **子命令 + 分层 `--help`(Phase 344)**:`serve` / `selftest` / `mcp` 是长在扫描器
