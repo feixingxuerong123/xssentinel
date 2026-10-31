@@ -18,6 +18,14 @@
 
 ### Fixed
 
+- **被动代理 drain 无时间上限(OPTIMIZATION.md §3.6 item 6,slowloris 形状)**:
+  超限 body 的 drain 只有字节上限,声明大 `Content-Length` 后停滞的客户端可把
+  一个 handler 线程钉死(`rfile.read` 无 socket 超时;ThreadingHTTPServer
+  一线程一连接)。修复:drain 相位加墙钟截止 `_DRAIN_TIMEOUT=10s`(仅限该相位,
+  正常路径与 413 写出行为零变化;Phase 74 走私语义不变——仍 413 + 关连接,
+  绝不截断转发)。按"先补用例再改"落地:慢客户端用例修复前实测红、修复后
+  2.59s 绿,变异对照(摘掉 settimeout 行)变红、还原逐字节一致;
+  `test_passive_proxy.py` 全套 48 passed。
 - **fresh 安装缺 `cryptography`**:CONTRIBUTING 记载的开发安装命令
   (`.[dev,async,ast,headless,api]`)不含 `cryptography`,而 `test_passive_mitm*`
   与 `--mitm-ca`(HTTPS 拦截)需要它——照文档装的 fresh 环境 5 个 MITM 测试

@@ -753,16 +753,20 @@ JS config line(那本身就是 script-string sink),四例全 confirmed、safe
    的 `alert(MARKER)`(循环自证,且往被测页面注入弹窗);`outcome` 只在真的观测到
    弹窗时才写 `fired`。**这是判定语义改动 ⇒ 四件套验收 + 基准重定基线**。
 
-6. **被动代理 drain 循环只有字节上限、没有时间上限(Phase 224 记候选,未做)**:
-   `passive_proxy.py:_relay` 对超限 body 的 drain 按
-   `_BODY_LIMIT + 65536` 字节读,不设期限。声明一个大 Content-Length 却
-   慢慢吐字节的客户端可以把一个 handler 线程钉住(ThreadingHTTPServer
-   一线程一连接 ⇒ 慢客户端太多即线程耗尽,DoS 形状)。修法是给 drain 加
-   截止时间(超时后仍发 413 + 关连接,走私安全语义不变)——但**这会改变
-   对真实慢客户端(大文件上传)的行为**,属于独立决策,要单独量:
-   基准里没有"慢速大 body"用例,先补用例再改。
+6. ~~**被动代理 drain 循环只有字节上限、没有时间上限(Phase 224 记候选,未做)**~~
+   **已做(2026-10-31,按本条自己的处方"先补用例再改")**:
+   `tests/test_passive_proxy.py::TestRequestBodyHandling::test_oversized_slow_client_releases_handler`
+   先落并实测修复前为红——声明 `Content-Length: _BODY_LIMIT+1`、发 1000 字节后停滞,
+   handler 钉死在 `rfile.read`,客户端 6s 预算内无响应。随后 `passive_proxy.py:_relay`
+   的 drain 相位加墙钟截止 `_DRAIN_TIMEOUT = 10.0`(模块常量,测试 monkeypatch 到 2s):
+   每次 read 前 `connection.settimeout(remaining)`,超时仍发 413 + 关连接(Phase 74
+   走私语义不变);drain 结束恢复原 socket timeout,413 写出行为零变化。修复后同用例
+   **2.59s 绿**;**变异对照**(摘掉 `settimeout(remaining)` 行)用例变红、还原后
+   逐字节一致(guard 吃劲);`test_passive_proxy.py` 全套 **48 passed**。
+   "改变慢客户端行为"的顾虑按设计收窄:截止只作用于超限 body 的 drain 相位,
+   正常路径(含慢速合法大上传)零影响。
    (同源背景:413 用例的 flake 是 13h 套件 ~20× 劣化下 2.1 MB 传输超 15s
-   预算,Phase 224 按环境修了测试侧,产品侧这个候选仍开着。)
+   预算,Phase 224 按环境修了测试侧,产品侧此候选现关闭。)
 7. ~~**async 的 polyglot 确认落点与 sync 分叉(L7 fallback vs L1 主循环),叠加
    评分类型收窄后记成 FN**~~ **已修(Phase 309,测量推翻了本条的原假设)**:
    逐帧插桩发现 finding 不是 L7 fallback 发的 —— L1 主循环自己的

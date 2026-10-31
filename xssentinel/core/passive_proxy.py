@@ -198,6 +198,13 @@ def _parse_body(content_type: str | None, body: bytes) -> dict:
         return {}
 
 
+# OPTIMIZATION 3.6 item 6: wall-clock cap for the oversized-body drain in
+# _relay (a byte cap alone lets a stalled client pin a handler thread
+# indefinitely -- slowloris shape).  Module-level so tests can shorten it via
+# monkeypatch without touching production code paths.
+_DRAIN_TIMEOUT = 10.0
+
+
 class _ProxyHandler(BaseHTTPRequestHandler):
     """Single HTTP proxy request handler.
 
@@ -291,16 +298,45 @@ class _ProxyHandler(BaseHTTPRequestHandler):
             # which can destroy the 413 response before the client reads
             # it (intermittent "connection reset" instead of 413 -- the
             # test-suite flake and a real-client hazard alike).
+            # OPTIMIZATION 3.6 item 6 (2026-10-31): the drain previously had
+            # only a byte cap, so a client that declared a huge
+            # Content-Length and then stalled pinned this handler thread
+            # forever -- rfile.read blocks with no socket timeout, and
+            # ThreadingHTTPServer spends one thread per connection
+            # (slowloris shape).  The drain now runs under a wall-clock
+            # deadline: a stalled/slow client releases the thread after
+            # _DRAIN_TIMEOUT seconds and still gets the same 413 + close
+            # (smuggling semantics unchanged: never truncated-and-forward).
+            prev_timeout = None
             try:
                 cap = self._BODY_LIMIT + 65536
                 drained = 0
+                deadline = time.monotonic() + _DRAIN_TIMEOUT
+                prev_timeout = self.connection.gettimeout()
                 while drained < cap:
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        _log.debug("drain deadline hit for %s %s (%d/%d bytes)",
+                                   method, target, drained, cap)
+                        break
+                    # Bound THIS read to the remaining budget: rfile.read
+                    # blocks until N bytes or EOF, so a per-chunk clock
+                    # check alone can never see a fully stalled client.
+                    self.connection.settimeout(remaining)
                     chunk = self.rfile.read(min(cap - drained, 65536))
                     if not chunk:
                         break
                     drained += len(chunk)
             except Exception:
-                pass  # client vanished mid-drain -- nothing to salvage
+                pass  # client vanished mid-drain (or read timed out) -- nothing to salvage
+            finally:
+                # Only the drain phase is bounded; restore whatever the
+                # handler ran with (None = blocking) so the 413 write itself
+                # keeps its pre-change behaviour.
+                try:
+                    self.connection.settimeout(prev_timeout)
+                except Exception:
+                    pass
             self.send_error(413, "request body too large")
             return
         req = self.proxy.requester

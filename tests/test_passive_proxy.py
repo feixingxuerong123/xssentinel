@@ -877,6 +877,64 @@ class TestRequestBodyHandling:
             proxy.stop()
             srv.shutdown()
 
+    def test_oversized_slow_client_releases_handler(self, monkeypatch):
+        """OPTIMIZATION 3.6 item 6 (2026-10-31): the 413 drain loop had a byte
+        cap but no time cap.  A client that declares a huge Content-Length,
+        sends a few bytes and then stalls pinned one ThreadingHTTPServer
+        handler thread indefinitely -- ``rfile.read`` blocks with no socket
+        timeout (slowloris shape: one thread per connection, so enough
+        stalled clients exhaust the thread pool).  The drain must give up
+        after ``_DRAIN_TIMEOUT`` seconds and still answer 413 + close
+        (Phase 74 smuggling semantics unchanged: never truncated-and-forward).
+
+        Discrimination: pre-fix, ``rfile.read(65536)`` blocks until the
+        client sends 64 KB more or closes; this client does neither before
+        the recv budget expires, so a pre-fix run fails on "no 413 in time"
+        -- and the client-side socket timeout bounds the whole test, so the
+        pre-fix failure is a red assertion, not a hang.
+        """
+        if not loopback_healthy():
+            pytest.skip("loopback degraded")
+        import socket
+        from xssentinel.core import passive_proxy as pp
+        monkeypatch.setattr(pp, "_DRAIN_TIMEOUT", 2.0)
+        proxy = PassiveProxy(port=0, host="127.0.0.1", scope=None,
+                             requester=Requester(timeout=10))
+        proxy.start()
+        try:
+            s = socket.create_connection(("127.0.0.1", proxy.port), timeout=10)
+            s.settimeout(6.0)          # bounds the test even on pre-fix code
+            try:
+                head = (f"POST http://127.0.0.1:9/stall HTTP/1.1\r\n"
+                        f"Host: 127.0.0.1\r\nContent-Type: text/plain\r\n"
+                        f"Content-Length: "
+                        f"{pp._ProxyHandler._BODY_LIMIT + 1}\r\n"
+                        f"Connection: close\r\n\r\n").encode() + b"x" * 1000
+                t0 = time.monotonic()
+                s.sendall(head)        # 1000 bytes, then stall -- never finish
+                buf = b""
+                while b"\r\n" not in buf:
+                    try:
+                        chunk = s.recv(65536)
+                    except socket.timeout:
+                        break
+                    if not chunk:
+                        break
+                    buf += chunk
+                elapsed = time.monotonic() - t0
+            finally:
+                s.close()
+            status = buf.split(b"\r\n")[0]
+            assert b"413" in status, (
+                f"no 413 within the drain deadline (got {buf[:80]!r}) -- "
+                "a stalled oversized client pinned the handler past "
+                "_DRAIN_TIMEOUT")
+            assert elapsed < 5.0, (
+                f"413 arrived after {elapsed:.1f}s -- the drain deadline did "
+                "not bound the stall (target: _DRAIN_TIMEOUT=2s + jitter)")
+        finally:
+            proxy.stop()
+
 
 class TestMultipartCapture:
     """Phase 56: multipart uploads are captured -- non-file fields become
