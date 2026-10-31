@@ -637,6 +637,13 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
 
 ## 环境配置
 
+## 环境配置
+
+- 本机装依赖走 **uv**(`uv pip install --python .venv/Scripts/python.exe ...`):
+  2026-10-31 实测 pip 通路病态(TLS 已建立但近零吞吐,2MB 自升级 15min /
+  461s CPU 空转,同址 curl 1s 可达;直连与清华镜像同病),uv 10s 完成。
+  venv 建法照旧 `py -3.12 -m venv .venv`(默认 `python` 是 3.9,项目已弃)。
+
 - 依赖: requirements.txt;测试: `python tests/run_all_batched.py --quiet`(2026-10-05 实测
   162 个 test_*.py 文件 / 38086 行,`pytest --collect-only -q` 收集 2622 用例;裸跑单进程会卡死,必须分批 —— `test_async_budget.py` 在本机
   会挂满 2×540s 预算,按"未验证"记账而不是当回归)
@@ -5443,3 +5450,50 @@ recall=precision=1.000。全套 `tests/run_all_batched.py` **exit 0 零红文件
 `benchmark/server.py` / `tests/vuln_server.py` 在本轮曾以 `D` 出现在
 `git status`,经 342 条目核对为**宿主杀软隔离**(非本人清理;本人清理只限于
 `range3..range7` 下 `_` 前缀临时文件),已 `git checkout` 恢复并复验存在。
+
+
+## Phase 345:fresh 安装五级验证闭环 + cryptography 依赖缺口(门禁抓到即修)
+
+**起因**:全新 venv 走 CONTRIBUTING 记载的安装顺序做 fresh-clone 复现验证。
+环境两笔:① 本机 pip 网络通路病态(见上"环境配置"新增条),装依赖改走 uv;
+② 本会话 `%TEMP%` 拒写,报告产物落 `dev/_` 区。
+
+**验证五级(全部本机实测,非引用)**:烟测(反射点 3 findings / 46 请求 /
+0.51s)→ `--self-test` **ALL CHECKS PASSED**(exit 0)→ strict 64 例切片双引擎
+(sync FP0/FN0/ERR0 零 SKIP;async FP0/FN0/ERR0 + 1 SKIP = sync-only stored-dom,
+产物 `benchmark/results/phase_install_quick_{sync,async}.json`)→ 全量分批
+**255/258 文件绿(5924s,exit 3)**。
+
+**三个失败全部归因,无一为判定面回归**:
+
+1. `test_passive_mitm.py` + `_e2e.py`:**缺 `cryptography`**(确定性
+   ModuleNotFoundError,2.6s 内两轮同败)。根因是**文档刻度失真现行犯**:
+   CONTRIBUTING 的安装命令(`.[dev,async,ast,headless,api]`)不含
+   cryptography,而 pyproject 任何 extra 都没有它——CI 靠一行手工
+   `pip install cryptography playwright`(ci.yml:62)掩盖了缺口,照文档装的
+   fresh 环境必挂 MITM 全家。归因后补装复跑 **12 passed / 1 skipped**。
+2. `test_engine_parity_gate.py`:attempt 0 挂在 `_run_async` 线程 join 被
+   pytest-timeout 击杀、attempt 1 整文件超时(两轮共 2400.8s);单文件复跑
+   **4 passed in 353s** —— 与 187/200/201 记录的"满载双超时、单文件复跑绿"
+   同形,环境归因。
+
+**修复(4 文件)**:① pyproject:新立 `mitm` extra(运行时 `--mitm-ca` 按需装;
+无它被动代理仍工作,HTTPS 保持盲透传)+ `cryptography` 进 `dev`;②
+`tests/test_passive_mitm.py` 的 `TestHttpsMitm` 补类级 `@requires_crypto`
+(类 fixture 造 TLS 证书;此前仅 MitmManager 侧 5 个测试有装饰,缺包环境下
+整类 setup error 而非按文件自身意图 skip);③ CONTRIBUTING 版本行
+">= 3.9 可安装运行" → ">= 3.10"(与 README / pyproject / Phase 328d 对齐);
+④ CHANGELOG [Unreleased] 记 Fixed 两条。
+
+**守卫承重证据(变异对照)**:卸掉 cryptography 重跑两文件 =
+**13 skipped / 0 error**(修复前同场景 = 7 skipped + 5 errors);复装后三轮
+12 / 6 / 10 passed —— 浮动**只发生在文档化的 loopback 轴**(2-6 例
+"loopback degraded" skip),cryptography 轴零浮动。tomllib 解析 + extras
+内容断言 + ruff(改动文件零债)+ 文档数字守卫(`test_quick_gate_slice.py`
+14 passed)全过。
+
+**记账**:① `ci.yml:62` 的手工 cryptography 行冗余但无害,hosted 下次绿后再摘;
+② 本轮 skip 口径:11 skipped / 6 文件 / 2 整文件零贡献(`test_nuclei_import`
+1、`test_stored_e2e_acceptance` 3)——两个数一起报;③ 测试副产物污染工作树根
+(`pytest-of-Administrator/`、`range7.sqlite3`、`xssentinel_range3.db`,
+untracked)待入 .gitignore,本轮未动待拍板。

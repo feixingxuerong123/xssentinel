@@ -276,6 +276,9 @@ class TestMitmCa:
 # ---------------------------------------------------------------------------
 # End-to-end: HTTPS params captured through MITM; blind fallbacks intact
 # ---------------------------------------------------------------------------
+@requires_crypto  # class fixture `origin` builds a TLS cert -- without the
+                  # optional toolchain every test here must skip, not error
+                  # at setup (fresh-env gate 2026-10-31: 5 setup ERRORs).
 class TestHttpsMitm:
     @pytest.fixture()
     def origin(self, tmp_path):

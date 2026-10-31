@@ -16,6 +16,23 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **fresh 安装缺 `cryptography`**:CONTRIBUTING 记载的开发安装命令
+  (`.[dev,async,ast,headless,api]`)不含 `cryptography`,而 `test_passive_mitm*`
+  与 `--mitm-ca`(HTTPS 拦截)需要它——照文档装的 fresh 环境 5 个 MITM 测试
+  在 setup 报 error,CI 靠一行手工 `pip install cryptography`(ci.yml)掩盖了
+  这个缺口。修复:`cryptography` 进 `dev` extra,另立 `mitm` extra 供运行时
+  按需安装(被动代理无它仍工作,HTTPS 保持盲透传)。
+  `tests/test_passive_mitm.py` 的 `TestHttpsMitm` 补上类级 `@requires_crypto`
+  (类 fixture 造 TLS 证书;此前仅 MitmManager 的 5 个测试有装饰,缺包环境下
+  整类 error 而非按文件自身意图 skip)。
+- **CONTRIBUTING 版本刻度失真**:开发环境一节仍写 "Python >= 3.9 可安装运行",
+  与 README/pyproject 的 `>=3.10`(Phase 328d 弃 3.9)矛盾;已对齐。
+  发现途径:2026-10-31 全量分批门禁 255/258,两个失败文件即上述缺依赖,
+  复装后 12 passed/1 skipped;`test_engine_parity_gate` 双超时为同机环境
+  形态,单文件复跑 4 passed in 353s。
+
 ## [1.3.0] - 2026-10-31
 
 引擎归属与 CLI 可读性轮(Phase 343-344):报告产物恒带 `engine`(回退时另带

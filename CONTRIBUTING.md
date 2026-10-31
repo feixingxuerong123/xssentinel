@@ -12,8 +12,11 @@ pip install -e ".[dev,async,ast,headless,api]"
 playwright install chromium        # 仅 headless 确认层需要
 ```
 
-- Python >= 3.9(3.9 上实测可安装运行;CI 跑 3.11)。
+- Python >= 3.10(3.9 已 EOL,自 Phase 328d 起不再支持——见 README 与 pyproject
+  的 `requires-python`;CI 跑 3.11,另有 3.10 下限冒烟门)。
 - core 仅依赖 requests / beautifulsoup4 / lxml,其余能力全部走 extras,按需安装。
+  `dev` 已含 `cryptography`(test_passive_mitm* 与 `--mitm-ca` 需要它);
+  单独部署被动代理 HTTPS 拦截时装 `mitm` extra。
 
 ## 测试
 

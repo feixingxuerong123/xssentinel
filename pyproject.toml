@@ -57,6 +57,11 @@ nuclei = ["pyyaml>=6.0"]  # Phase 322: --nuclei-dast template bridge (clear Nucl
 # This extra only upgrades the window to a native one backed by the OS
 # webview (Edge WebView2 on Windows, already present on any supported box).
 desktop = ["pywebview>=4.0"]
+# --mitm-ca HTTPS interception (core/mitm_ca.py signs the per-host leaf certs).
+# Without it the passive proxy still works -- HTTPS stays a blind CONNECT
+# tunnel (cli_commands.py prints the install hint).  core/mitm_ca.available()
+# probes it lazily, so nothing else imports it.
+mitm = ["cryptography>=41"]
 dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
@@ -73,6 +78,11 @@ dev = [
     # Lint gate: ruff is a hard CI step (see .github/workflows/ci.yml).
     # The baseline is ZERO -- any new finding fails the build.
     "ruff>=0.6",
+    # tests/test_passive_mitm*.py need the TLS toolchain to build their
+    # self-signed origins (guarded with skipif, not error).  CI installs
+    # this by hand today (ci.yml: "pip install cryptography playwright");
+    # with it in dev the manual line is redundant but harmless.
+    "cryptography>=41",
 ]
 
 [project.scripts]
