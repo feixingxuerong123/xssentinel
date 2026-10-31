@@ -50,6 +50,84 @@ if os.environ.get("XSSENTINEL_ALLOW_LIVE_LLM_IN_TESTS") != "1":
     os.environ["XSSENTINEL_LLM_CONFIG"] = os.path.join(
         tempfile.gettempdir(), "xssentinel-no-live-llm-in-tests.json")
 
+
+# ---------------------------------------------------------------------------
+# Phase 346: %TEMP% is not always writable by the processes this suite starts
+# ---------------------------------------------------------------------------
+# Measured 2026-10-31 on this host: the workspace tree carries a Low mandatory
+# integrity label, which Windows propagates to every child process started
+# from a binary inside it.  A Low-integrity process cannot write to
+# Medium-integrity locations, and %TEMP% is one of them.  The same Python
+# that writes %TEMP% happily when launched from C:\...\Programs\Python
+# raises PermissionError when launched from .venv\Scripts -- the interpreter
+# is identical, the label is not.
+#
+# What that did to the gate: Playwright calls tempfile.mkdtemp() for its
+# driver artifacts, so EVERY real-browser test died with
+#   EPERM: operation not permitted, mkdtemp '...\Temp\playwright-artifacts-XXXXXX'
+# The documented command (python tests/run_all_batched.py --quiet) therefore
+# could not go green on this host no matter what the code did.
+#
+# The fix is repo-local on purpose: relabeling the tree would mask a real
+# capability difference and can be re-applied by whatever set it.  Pointing
+# TEMP at a directory this interpreter can actually write keeps the suite
+# honest -- the browser either works or the test fails for a reason about
+# the browser.
+#
+# Only applied when %TEMP% is unusable, so a healthy host sees no change.
+
+def _temp_is_writable() -> bool:
+    """Probe the path Playwright will actually use, with a REAL file.
+
+    Two traps this walks around, both measured on 2026-10-31:
+
+    1. ``os.access(path, os.W_OK)`` answers from the ACL and ignores the
+       integrity label, so it reported True on exactly the host where every
+       write raised PermissionError.
+
+    2. ``tempfile.gettempdir()`` is NOT the answer either: when %TEMP% is
+       unusable, Python silently falls back to the current working
+       directory -- so the probe wrote into the repo, succeeded, and
+       declared the environment healthy while the browser still died.  The
+       node driver inside Playwright reads the TEMP env var directly and
+       gets no such fallback.
+
+    So: read the env var ourselves.  A probe that asks a different question
+    than the code under test is the vacuous-guard shape from Phase 201.
+    """
+    root = os.environ.get("TEMP") or os.environ.get("TMP")
+    if not root:
+        return False
+    target = os.path.join(root, f".xssentinel-temp-probe-{os.getpid()}")
+    try:
+        with open(target, "w", encoding="utf-8") as fh:
+            fh.write("x")
+        os.remove(target)
+        return True
+    except Exception:
+        return False
+
+
+
+if not _temp_is_writable():
+    _fallback_tmp = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "_pytest_tmp")
+    try:
+        os.makedirs(_fallback_tmp, exist_ok=True)
+        os.environ["TEMP"] = _fallback_tmp
+        os.environ["TMP"] = _fallback_tmp
+        os.environ["TMPDIR"] = _fallback_tmp
+        # tempfile caches its answer on first use; drop the cache so the
+        # probe above (which populated it) does not pin the old path.
+        tempfile.tempdir = None
+        if not _temp_is_writable():
+            print("[env] %TEMP% unwritable and the fallback did not take; "
+                  "browser tests will fail on mkdtemp", file=sys.stderr)
+    except Exception as exc:                      # pragma: no cover
+        print(f"[env] could not install a writable TEMP: {exc}",
+              file=sys.stderr)
+
+
 SOCKETPAIR_OK = True
 
 

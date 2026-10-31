@@ -56,6 +56,16 @@ pytest-of-*/
 tests/cli_csv.csv
 tests/cli_sarif.sarif
 tests/batch_reports/
+# Phase 346: conftest 在 %TEMP% 不可写时把 TEMP 重定向到这里(见
+# tests/conftest.py 的 _temp_is_writable)。是运行期副产物,不入库。
+tests/_pytest_tmp/
+
+# Phase 347: 同一个成因的另一条路径。%TEMP% 不可写时 tempfile.gettempdir()
+# 回退到 CWD,依赖里的 mkstemp 于是在仓库根目录留下 0 字节的 tmpXXXXXX 文件
+# (名字每轮都变,2026-11-01 实测每次扫描两个)。根因已由 fsutil.ensure_writable_temp()
+# 在 CLI 启动时修掉;这条规则留着兜底——第三方库仍可能绕过它。
+/tmp[0-9a-z_]*
+/.xssentinel-tmp/
 
 # benchmark 运行临时文件
 benchmark/results/tmp*.json

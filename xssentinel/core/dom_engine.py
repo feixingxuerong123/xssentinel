@@ -835,7 +835,28 @@ def get_shared_browser():
             "use dom_engine='static' or run from a loop-free thread")
     from playwright.sync_api import sync_playwright
     pw = sync_playwright().start()
-    b = pw.chromium.launch(args=["--no-sandbox"])
+    # Phase 346: a FAILED launch must not leak the driver.  ``pw`` was
+    # recorded in _TLS only after a successful launch, so when launch()
+    # raised (chromium never installed, a sandbox denying temp dirs, an AV
+    # quarantine of the driver) the instance was unreachable: node.exe kept
+    # running and playwright's greenlet loop stayed parked in this thread,
+    # which makes every later asyncio.run() here raise "cannot be called
+    # from a running event loop" -- shutdown_thread_browser() could not
+    # unwind it because nothing pointed at it.  Measured 2026-10-31: with
+    # %TEMP% unwritable, _loop_running() was True before AND after
+    # shutdown_thread_browser(), and the driver process survived.
+    # Stopping here keeps the failure a failure instead of poisoning the
+    # rest of the process's async capability.
+    try:
+        b = pw.chromium.launch(args=["--no-sandbox"])
+    except BaseException:
+        try:
+            pw.stop()
+        except Exception:
+            # stop() failing must not mask the original launch error --
+            # that error is the thing the caller needs to read.
+            pass
+        raise
     _TLS.pw = pw
     _TLS.browser = b
     with _BROWSER_LOCK:

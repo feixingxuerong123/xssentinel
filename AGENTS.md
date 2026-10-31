@@ -19,8 +19,8 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
 
 ### 架构硬规则
 
-- scanner.py 已 Mixin 拆分(2026-10-05 实测:核心 1869 行 + layers 769 + crawl 406 + stored 579 + findings 216):新增能力进对应 Mixin,不堆回主文件
-- async_scanner.py 已同样 Mixin 化(2026-10-05 实测:核心 1618 行 + layers 1006 + crawl 321 + verify 136 + common 270,Phase 191):新增 async 能力进对应 Mixin,不堆回主文件;**搬代码与改逻辑绝不混在同一轮**
+- scanner.py 已 Mixin 拆分(2026-11-01 实测:核心 2246 行 + layers 936 + crawl 483 + stored 982 + findings 377):新增能力进对应 Mixin,不堆回主文件。**行数上限由 `tests/test_architecture_scale.py` 钉住**(核心 2400 / layers 1050 / crawl 550 / stored 1100 / findings 450);超限只有两条路——拆,或显式抬预算并在提交信息里写明理由。上一版(2026-10-05)的实测数字是 1869/769/406/579/216,即四周内核心涨了 20%、stored 涨了 70% 而无人报警,这就是把数字改成上限的理由:被测量的规则才是规则
+- async_scanner.py 已同样 Mixin 化(2026-11-01 实测:核心 1434 行 + layers 2148 + crawl 588 + verify 119 + common 456,Phase 191):新增 async 能力进对应 Mixin,不堆回主文件;**搬代码与改逻辑绝不混在同一轮**。上限同由 `tests/test_architecture_scale.py` 钉住(1600 / 2350 / 650 / 145 / 520)
 - fix_advice.py 数据化(2026-10-05 实测:127 行引擎 + JSON 语料):改建议优先改语料
 - 多步检测优先写场景 DSL,而非过程式代码
 
@@ -48,10 +48,19 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
 
 - 新增检测层必须**同时**注册 `coverage.LAYERS` 与 `layer_coverage` 矩阵(Phase 187/192 两次被门禁抓到的同一课)。
 
-## 当前状态(2026-10-31)
+## 当前状态(2026-11-01)
 
-- 版本 1.3.0;最新 Phase 345。源码 ~58.5K 行 / 测试 258 文件 ~59.3K 行(接近 1:1)。
-- 最近全量分批门禁:**258/258 文件绿,exit 0**(commit 14d0c5d);benchmark strict 64 例切片双引擎 F1=1.0。
+- 版本 1.3.0;最新 Phase 347。源码 58,902 行 / 测试 263 文件 60,379 行(接近 1:1)。
+  Phase 347 新增四个门禁:`tests/test_architecture_scale.py`(Mixin 行数上限)、
+  `tests/test_failure_reasons.py`(失败原因可见化,15 例)、
+  `tests/test_temp_dir_fallback.py`(临时目录回退,11 例)、
+  `tests/test_silent_except_ratchet.py`(宽泛吞异常棘轮,110 处/34 文件,只许降)。
+  行数上限与吞异常棘轮两个做过变异对照(红→还原→绿),另两个靠真实入口实跑验证。
+- 最近全量分批门禁(Phase 346,HEAD 含 4 个 post-345 提交):
+  **258/258 文件绿,exit 0**,4554s;skip 75 个 / 10 文件(2 个整文件零贡献:
+  `test_nuclei_import` 缺 PyYAML、`test_stored_e2e_acceptance` 需 opt-in)。
+  引用时两个数一起报。
+- benchmark strict 64 例切片双引擎 F1=1.0。
 - CI(`.github/workflows/ci.yml`):6 个 job 全部 ubuntu-latest —— tests(全量分批 + ruff)、drills(双引擎 strict 切片周轮转 + range3–7 门禁)、min-python(3.10)、benchmark-full、nightly-gate、dependency-audit;push 门 = 双引擎 strict 切片。
 - 开放项:SECURITY.md 联系方式待仓库归属者填写。产品级 backlog 无未决项
   (OPTIMIZATION.md §3.6 item 6 被动代理 drain 时间上限已于 2026-10-31 关闭;
@@ -79,3 +88,15 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
 - 本机 Windows 侧环境事实:端口走 **18xxx 段**(Windows 保留段 8810-9109 教训,Phase 179);
   测试 fixture 用 port 0;loopback 健康度由 `tests/conftest.py` 的 socketpair/loopback 探针
   决定(可用 `XSSENTINEL_FORCE_SOCKETPAIR=bad|good` 强制),劣化时测试按门禁跳过而非假绿。
+
+- **完整性标签(Phase 346 实测)**:本工作区树带 **Low 强制完整性标签**
+  (`icacls` 见 `Mandatory Label\Low Mandatory Level`,`.venv` 与其中全部 `.exe` 同),
+  Windows 会把它传给子进程 —— **Low 进程写不进 Medium 的 `%TEMP%`**。三解释器对照:
+  树外 `python.exe` = HIGH 可写;同一 exe 复制进树 = LOW 拒写;同副本
+  `icacls /setintegritylevel Medium` = 可写。后果是 Playwright 的
+  `tempfile.mkdtemp()` 全挂(真浏览器测试必红)。
+  `tests/conftest.py` 因此装了**可写 TEMP 回退**(仅在 `%TEMP%` 真不可写时启用,
+  落到 `tests/_pytest_tmp/`,已 ignore)。
+  **探针有两个陷阱,都实测过**:`os.access(W_OK)` 答 ACL、看不见标签;
+  `tempfile.gettempdir()` 不是 `%TEMP%`(Python 自己回退到 CWD,而 node driver 直接读
+  `TEMP` 环境变量)。改这块前先读 `tests/test_temp_probe_contract.py` 的 docstring。

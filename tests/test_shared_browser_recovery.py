@@ -104,9 +104,23 @@ def _clear_tls():
 
 @pytest.fixture
 def clean_tls():
+    """Isolate the thread-local slots AND the process-wide registry.
+
+    ``_ALL_BROWSERS`` is module-global, so a previous test's successful
+    launch stays in it: without snapshotting it here, an assertion like
+    "this call registered nothing" (the failed-launch test below) fails on
+    an entry that belongs to an EARLIER test -- a leak between tests, not
+    a defect in the code under test.  Measured: the failed-launch test was
+    red for exactly this reason before the fixture changed.
+    """
     _clear_tls()
+    with dom_engine._BROWSER_LOCK:
+        saved = dom_engine._ALL_BROWSERS[:]
+        dom_engine._ALL_BROWSERS[:] = []
     yield
     _clear_tls()
+    with dom_engine._BROWSER_LOCK:
+        dom_engine._ALL_BROWSERS[:] = saved
 
 
 # --------------------------------------------------------------------------
@@ -150,6 +164,79 @@ def test_healthy_instance_is_reused_without_unwind(monkeypatch, clean_tls):
     assert got is live
     assert live_pw.stopped == 0, "a healthy instance was stopped anyway"
     assert live_pw.chromium.launches == 0, "a healthy instance was relaunched"
+
+
+# --------------------------------------------------------------------------
+# 1b: a FAILED launch must not leak the driver (Phase 346)
+# --------------------------------------------------------------------------
+
+class _ExplodingChromium(_FakeChromium):
+    """launch() raises after playwright itself started successfully.
+
+    This is the shape measured on 2026-10-31 with %TEMP% unwritable:
+    ``sync_playwright().start()`` succeeded (node.exe came up), then
+    ``chromium.launch()`` raised ``EPERM: mkdtemp ...``.
+    """
+
+    def launch(self, args=None):
+        self.launches += 1
+        raise RuntimeError("BrowserType.launch: EPERM: mkdtemp denied")
+
+
+def test_failed_launch_stops_the_driver_it_started(monkeypatch, clean_tls):
+    """A launch that raises must stop the playwright instance it started.
+
+    Without this the instance is unreachable: it was never recorded in
+    ``_TLS`` (that happened only after a successful launch), so
+    ``shutdown_thread_browser()`` returned early and playwright's greenlet
+    loop stayed parked in the calling thread.  Every later ``asyncio.run()``
+    in that thread then dies with "cannot be called from a running event
+    loop" -- measured before this fix: ``_loop_running()`` was True both
+    before AND after ``shutdown_thread_browser()``.
+
+    The original exception must still reach the caller: ``pw.stop()``
+    failing must not replace the launch error, which is the one that
+    explains why the browser is unavailable.
+    """
+    pw = _FakePlaywright(_FakeBrowser(connected=True))
+    pw.chromium = _ExplodingChromium(_FakeBrowser(connected=True))
+
+    fake_mod = types.ModuleType("playwright.sync_api")
+    fake_mod.sync_playwright = lambda: pw                 # noqa: E731
+    monkeypatch.setitem(sys.modules, "playwright.sync_api", fake_mod)
+
+    with pytest.raises(RuntimeError, match="EPERM"):
+        dom_engine.get_shared_browser()
+
+    assert pw.stopped == 1, (
+        "the driver started by this call was never stopped -- its greenlet "
+        "loop is still parked in this thread and kills later asyncio.run()")
+    assert getattr(dom_engine._TLS, "pw", None) is None
+    assert getattr(dom_engine._TLS, "browser", None) is None
+    assert dom_engine._ALL_BROWSERS == [], "a dead instance was registered"
+
+
+def test_a_failed_stop_never_masks_the_launch_error(monkeypatch, clean_tls):
+    """If ``pw.stop()`` itself raises, the LAUNCH error is what surfaces.
+
+    A cleanup that throws must not turn "chromium could not start" into
+    "stop() failed somewhere" -- the caller's log line has to name the
+    reason the browser is unavailable."""
+    pw = _FakePlaywright(_FakeBrowser(connected=True))
+    pw.chromium = _ExplodingChromium(_FakeBrowser(connected=True))
+
+    def _bad_stop():
+        raise OSError("driver already gone")
+
+    pw.stop = _bad_stop                                  # type: ignore
+
+    fake_mod = types.ModuleType("playwright.sync_api")
+    fake_mod.sync_playwright = lambda: pw                 # noqa: E731
+    monkeypatch.setitem(sys.modules, "playwright.sync_api", fake_mod)
+
+    with pytest.raises(RuntimeError, match="EPERM"):
+        dom_engine.get_shared_browser()
+
 
 
 # --------------------------------------------------------------------------

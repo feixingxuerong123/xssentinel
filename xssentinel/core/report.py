@@ -463,6 +463,11 @@ def build_json(findings: list, target: str, meta: dict) -> str:
         # verdict a CI job can gate on.  See `scan_status`.
         "requests_attempted": meta.get("requests_attempted"),
         "requests_failed": meta.get("requests_failed"),
+        # Phase 347: the cause next to the count.  Empty when nothing failed;
+        # an entry per exception class with its first message, so a reader can
+        # tell "host is down" from "a proxy intercepted the scan" without
+        # re-running it.
+        "request_failure_reasons": meta.get("request_failure_reasons") or [],
         # Response bodies shortened by --max-response-bytes.  A reflection that
         # sat past the cap could not be seen, so a bounded scan must be able to
         # say it was bounded.

@@ -16,8 +16,82 @@
 
 ## [Unreleased]
 
+### Added
+
+- **失败原因进汇总与报告(Phase 347)**:`_Tally` 过去只累加 `failed`,把「为什么」
+  丢掉。实测(关闭端口 + `--log-level debug`)五个请求全失败,输出只有
+  `Scan incomplete: 5 of 5 request(s) received no response`,一个字的原因都没有;
+  死主机、代理吃掉流量、TLS 没握上手三者输出完全相同,操作者只能猜。
+  现在 `_Tally.note_failure(exc)` 按异常类名分组(低基数:`ConnectionError` x5,
+  不是 5 条各带端口的字符串)、保留首条消息作样例,`Requester.failure_reasons`
+  暴露它;CLI 在 `Scan incomplete` 之后打印 `[!] Why: ConnectionError x5` 与样例,
+  JSON 报告新增 `request_failure_reasons` 字段(默认 `[]`,不是 `null`)。
+  async 路径原本就 log 了 baseline 异常,这次是补齐 sync 的观测面对齐。
+  守卫 `tests/test_failure_reasons.py` 15 例;真实入口验证:关闭端口实跑,
+  输出 `ConnectionError x5`,报告字段同步。
+- **环境代理生效时的显式提示(Phase 347)**:实测本机存在全局 `HTTP_PROXY`,
+  扫描 `127.0.0.1` 时每个请求都被代理接管,结果是 `completed / 0 findings`——
+  一个关于代理的正确结论被读成了关于目标的结论。现在启动时用
+  `requests.utils.get_environ_proxies`(requests 自己的解析器,不另写一套
+  `NO_PROXY` 匹配)判定,命中即在 stderr 打一行说明与退出办法;
+  显式 `-x`/`--proxy-list` 静默(操作者已点名出口)。行为零变化,只是把
+  已经发生的事说出来。
+- **吞异常棘轮(Phase 347)**:项目在 `verifier.py` 里写过「静默抛出的门就是关着的门」,
+  但只在 `SANDBOX_GATE_ERRORS` 一处执行。AST 实测(不是 grep:`except Exception: pass`
+  写在同一行时 `grep -A1` 看不见)**34 个文件 110 处宽泛吞异常**,最多的
+  `dom_engine.py` 17 处。新增 `tests/test_silent_except_ratchet.py`:每文件计数即上限,
+  **只许降不许升**,且降了必须同步改数字(否则腾出的额度会被悄悄用掉,表和现实脱节);
+  同时钉住两个反向形状——新模块有吞异常但不在表里、表里有条目但文件已不吞。
+  判据收窄到「两边都认」:只数 `except` / `except Exception` / `except BaseException`
+  且函数体**只有一个 `pass`**;`except ImportError: pass` 这类可选依赖守卫不算。
+  变异对照两种形态均红(`bypass.py: 1 -> 2`、`_mutant_probe.py: 0 -> 1`),
+  还原后 13 passed。不要求大重构:碰到哪处就修哪处,顺手把数字降下来。
+- **架构行数上限门禁(Phase 347)**:`AGENTS.md` 的 Mixin 规则原先挂在一句
+  带日期的实测数字上(2026-10-05:核心 1869 / stored 579),四周后实际是
+  2246 / 982(核心 +20%、stored +70%),没有任何东西报警——散文里的数字不是
+  仪器。新增 `tests/test_architecture_scale.py` 钉住**上限**(2400/1050/550/
+  1100/450 与 async 侧 1600/2350/650/145/520),超限只能拆或显式抬预算;
+  同时钉两个反向失效形状:新 Mixin 没进预算表(集合可增删无告警)、
+  预算比实际高 25% 以上(棘轮被抬成摆设)。变异对照:把 `scanner.py` 预算
+  改成 1000 → 红(`2246 > 1000`),还原 → 4 passed。该测试第一次运行就抓到
+  自己给 `async_scanner_verify.py` 留的 68% 余量。
+
 ### Fixed
 
+- **扫描在工作目录留下 0 字节 tmp 文件(Phase 347)**:本机工作区树带 Low
+  完整性标签,`%TEMP%` 不可写,`tempfile.gettempdir()` 不报错而是回退到 CWD,
+  依赖里的 `mkstemp` 于是在仓库根目录留下 `tmpXXXXXX`(实测:每次扫描两个;
+  把 TEMP 指到可写目录后为零)。修复:`fsutil.ensure_writable_temp()` 在 CLI
+  启动时探测并重定向 `TEMP`/`TMP`/`TMPDIR` 与 `tempfile.tempdir`,并在移动时
+  明说。**第一版是错的且被实测抓住**:它只探 `gettempdir()` 是否可写,而
+  回退后的 CWD 当然可写,泄漏原样存活;现在同时检查环境变量并拒绝任何
+  落在 CWD 的候选。探针用真实创建/删除,不用 `os.access`(Windows 上它答 ACL、
+  看不见完整性标签)。守卫 `tests/test_temp_dir_fallback.py` 11 例,含
+  「CWD 回退不算健康」这条回归。
+- **`.gitignore` 兜底**:`/tmp[0-9a-z_]*` 与 `/.xssentinel-tmp/`——根因已修,
+  但第三方库仍可能绕过进程级设置。
+- **`xssentinel/core/transform.py.bak` 归档(Phase 347)**:2026-10-17 的旧备份
+  7973 字节留在包目录里,按 `dev/attic/README.md` 已有的 `bak/` 约定移到
+  `dev/attic/bak/`。git 即历史,这类快照无回归价值,但也不该躺在 `xssentinel/` 里。
+
+- **浏览器 launch 失败会泄漏 driver 与事件循环(Phase 346)**:`get_shared_browser()`
+  里 `sync_playwright().start()` 成功后若 `chromium.launch()` 抛出(chromium 未装、
+  杀软拦、沙箱拒 temp),`_TLS.pw` 因写在 launch 之后而从未赋值——实例无人登记,
+  `shutdown_thread_browser()` 提前返回收不回来。实测:launch 失败后
+  `_loop_running()` 为 True、driver 进程存活、shutdown 之后仍为 True,于是该线程
+  后续每个 `asyncio.run()` 都报 "cannot be called from a running event loop"。
+  修复:launch 包 try/except,异常路径先 `pw.stop()` 再 `raise`;`pw.stop()` 自身
+  失败不替换原始 launch 错误。守卫 `tests/test_shared_browser_recovery.py`
+  新增 2 例,变异对照摘掉 `pw.stop()` → 红,还原后 5 passed。
+- **本机 `%TEMP%` 不可写导致真浏览器测试全红(Phase 346)**:工作区树带 Low 强制
+  完整性标签并传给子进程,Low 进程写不进 Medium 的 `%TEMP%`,Playwright 的
+  `tempfile.mkdtemp()` 因此 EPERM。`tests/conftest.py` 增加可写 TEMP 回退
+  (`tests/_pytest_tmp/`,已 ignore),仅在 `%TEMP%` 真不可写时启用。
+  探针两个陷阱都实测过并写进守卫:`os.access(W_OK)` 答 ACL 看不见完整性标签;
+  `tempfile.gettempdir()` 不是 `%TEMP%`(Python 回退 CWD,node driver 直读环境
+  变量)。`tests/test_temp_probe_contract.py` 6 例,两条变异均红(其中一条第一版
+  守卫空转,补 `test_probe_believes_the_write_not_the_acl` 后转红)。
+- **`.gitignore` 补 `tests/_pytest_tmp/`**:上述回退的运行期产物。
 - **被动代理 drain 无时间上限(OPTIMIZATION.md §3.6 item 6,slowloris 形状)**:
   超限 body 的 drain 只有字节上限,声明大 `Content-Length` 后停滞的客户端可把
   一个 handler 线程钉死(`rfile.read` 无 socket 超时;ThreadingHTTPServer

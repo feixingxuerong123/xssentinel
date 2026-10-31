@@ -225,7 +225,7 @@ def _run_self_test():
         _log.error("run_self_test.py not found at %s", test_path)
         return 1
 
-    print("[*] Starting local vuln test server on port 8899 ...")
+    print("[*] Starting local vuln test server on port 8899 ...", flush=True)
     server_proc = subprocess.Popen(
         [sys.executable, server_path],
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -250,7 +250,12 @@ def _run_self_test():
         _log.error("Vuln server did not start within 10 seconds")
         return 1
 
-    print("[+] Vuln server ready. Running self-test suite ...\n")
+    # flush=True on both progress lines: this command can run for minutes, and
+    # stdout is block-buffered when piped to a log.  Measured: piping
+    # `--self-test | tee` showed nothing at all for two minutes, so an
+    # operator (or a CI log) cannot tell "starting" from "wedged" -- the exact
+    # distinction the timeout below exists to make.
+    print("[+] Vuln server ready. Running self-test suite ...\n", flush=True)
     # Phase 73: bound the self-test run.  On a degraded-loopback host the
     # full suite can hang forever (intermittently killed connections make
     # layer probes block); without a timeout, --self-test never returns and

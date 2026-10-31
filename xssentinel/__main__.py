@@ -25,11 +25,12 @@ from urllib.parse import urlparse
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from xssentinel.core.requester import (DEFAULT_MAX_RESPONSE_BYTES,
-                                       Requester)
+                                       Requester, env_proxy_for)
 from xssentinel.core.oob import make_listener, oob_callback_warning
 from xssentinel.core.config import Config, save_config
 from xssentinel.core.checkpoint import Checkpoint
 from xssentinel.core.logger import configure_logging, get_logger
+from xssentinel.core.fsutil import ensure_writable_temp
 from xssentinel.core import report as reportmod
 
 _log = get_logger("cli")
@@ -1225,6 +1226,51 @@ def _split_subcommand(argv):
     return argv[0], [*extra, *argv[1:]]
 
 
+def _note_env_proxy(urls: list, args) -> None:
+    """Say so when the environment proxy stands between the scan and target.
+
+    Phase 347.  ``requests`` honours ``HTTP(S)_PROXY`` by design, so this is
+    not a behaviour change -- it is the missing sentence in the report of what
+    happened.  A relay that answers every request with its own page produces
+    "completed, 0 findings": the scan is correct about the traffic it sent
+    and wrong about what the reader will conclude.  Explicit ``-x`` /
+    ``--proxy-list`` are silent here: the operator named that egress.
+    """
+    if getattr(args, "proxy", None) or getattr(args, "proxy_list", None):
+        return
+    proxy = None
+    for url in urls[:5]:
+        proxy = env_proxy_for(url)
+        if proxy:
+            break
+    if not proxy:
+        return
+    more = f" (and {len(urls) - 1} more target(s))" if len(urls) > 1 else ""
+    print(f"[*] Environment proxy in effect: {proxy}{more}. Requests honour "
+          "HTTP(S)_PROXY, so a proxy that answers for the target makes "
+          "'0 findings' a statement about the proxy. Set NO_PROXY or unset "
+          "the variable to scan the target directly.", file=sys.stderr)
+
+
+def _print_failure_reasons(reasons: dict, limit: int = 3) -> None:
+    """Name the causes behind an incomplete run (Phase 347).
+
+    The count without the cause is the shape this project keeps finding and
+    fixing elsewhere: "5 of 5 received no response" is a verdict, but the
+    operator cannot tell a dead host from a proxy that ate the traffic from
+    a TLS handshake that never completed.  Printed on stderr next to the
+    verdict, and carried into the JSON report by the same tally.
+    """
+    if not reasons:
+        return
+    ordered = sorted(reasons.items(), key=lambda kv: -kv[1]["count"])[:limit]
+    print("[!] Why: " + "; ".join(f"{label} x{v['count']}"
+                                  for label, v in ordered), file=sys.stderr)
+    for label, v in ordered:
+        if v.get("example"):
+            print(f"    - {label}: {v['example']}", file=sys.stderr)
+
+
 def _main_impl(argv=None):
     if argv is None:
         argv = sys.argv[1:]
@@ -1239,6 +1285,18 @@ def _main_impl(argv=None):
         # core modules' verbose diagnostics are _log.debug() calls.
         level = "debug" if args.verbose else "warning"
     configure_logging(level)
+
+    # Phase 347: the process temp dir must be writable before anything calls
+    # tempfile.  When it is not, Python silently falls back to the current
+    # working directory and the scan leaves 0-byte tmp* files wherever the
+    # operator happens to be standing (measured: two per run on a
+    # Low-integrity Windows tree).  Reported rather than done silently --
+    # moving a user's temp files is a fact about the run, not an internal
+    # detail.
+    _temp_moved = ensure_writable_temp()
+    if _temp_moved:
+        print(f"[*] System temp dir not writable; using {_temp_moved}",
+              file=sys.stderr)
 
     # --self-test: run the built-in self-test suite and exit.
     if args.self_test:
@@ -1410,6 +1468,16 @@ def _main_impl(argv=None):
         if not parsed.scheme or not parsed.netloc:
             _log.error("Invalid URL: %s", url)
             return 2
+
+    # Phase 347: an environment proxy rewrites what the scan is actually
+    # talking to.  Measured: with HTTP_PROXY set by the host environment, a
+    # scan of 127.0.0.1 returned "0 findings, completed" because every
+    # request went to the proxy -- a clean-looking result that described the
+    # relay, not the target.  Not a behaviour change (requests honours the
+    # environment by design); it is the same rule as the exit-code gate:
+    # the run must say what it did, so nobody reads a proxy's answer as the
+    # target's.
+    _note_env_proxy(urls, args)
 
     # Phase 176l: an imported host is not an authorized host.  A browser HAR
     # carries the site's CDN / analytics / SSO domains next to the application,
@@ -1629,6 +1697,10 @@ def _main_impl(argv=None):
     # on the wire, and how many never got a response.
     attempted_total = 0
     failed_total = 0
+    # Phase 347: the reason behind `failed_total`.  Same instrument as the
+    # counters above, filled from each Requester's tally, so the run-level
+    # "Scan incomplete" line can name the cause instead of only the count.
+    failure_reasons_total: dict[str, dict] = {}
     # Whether ANY scanner in this run actually reported egress numbers.  The
     # async engine returns a shim with no `.req`, and "not reported" must not be
     # read as "zero requests attempted" -- the first async measurement taken
@@ -1762,6 +1834,14 @@ def _main_impl(argv=None):
             _failed = getattr(_req, "failed_requests", 0)
             failed_total += (_failed if isinstance(_failed, int)
                              and not isinstance(_failed, bool) else 0)
+            # Phase 347: fold this target's causes into the run-level view.
+            for _reason in (getattr(_req, "failure_reasons", None) or []):
+                _slot = failure_reasons_total.setdefault(
+                    _reason["reason"],
+                    {"count": 0, "example": _reason.get("example", "")})
+                _slot["count"] += _reason["count"]
+                if not _slot["example"]:
+                    _slot["example"] = _reason.get("example", "")
 
         # Write report.
         if out_dir:
@@ -1781,6 +1861,12 @@ def _main_impl(argv=None):
             out_path = args.output
 
         meta = {"target": url, "ai": ai_opts,
+                # Phase 347: why the requests that failed failed.  `requests
+                # _failed` says how many; this says which.  A report that only
+                # carries the count forces the reader to guess between a dead
+                # host, a proxy and a TLS failure.
+                "request_failure_reasons": (
+                    getattr(_req, "failure_reasons", None) or []),
                 # What the scope check refused to touch, so the report itself
                 # records that part of the import was not scanned rather than
                 # letting "0 findings" imply the whole spec was covered.
@@ -1862,6 +1948,7 @@ def _main_impl(argv=None):
     if failed_targets:
         print(f"\n[!] Scan incomplete: {len(failed_targets)} target(s) raised "
               "and were not scanned. Exit 3.", file=sys.stderr)
+        _print_failure_reasons(failure_reasons_total)
         return 3
     if not egress_reported:
         # Say that the completeness gate was offline.  A check that silently
@@ -1876,6 +1963,7 @@ def _main_impl(argv=None):
               "request(s) received no response and nothing was confirmed. "
               "'No findings' here is not evidence of absence. Exit 3.",
               file=sys.stderr)
+        _print_failure_reasons(failure_reasons_total)
         return 3
 
     return 0

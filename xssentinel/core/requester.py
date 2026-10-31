@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import time
 import threading
-from collections import OrderedDict
+from collections import Counter, OrderedDict
 
 import requests
 
@@ -87,6 +87,57 @@ class JsonBody(dict):
     """
 
 
+def env_proxy_for(url: str) -> str | None:
+    """The environment proxy ``requests`` would use for ``url``, or None.
+
+    Phase 347.  Delegates to ``requests.utils.get_environ_proxies`` -- the
+    same resolver ``Session.merge_environment_settings`` calls -- instead of
+    re-implementing ``NO_PROXY`` matching.  A second implementation would be
+    a second opinion that can disagree with the traffic actually sent, and
+    then the warning would be about a proxy the scan never used.
+
+    Returns None when the environment does not route this target through a
+    proxy, including when ``NO_PROXY`` covers it.
+    """
+    try:
+        proxies = requests.utils.get_environ_proxies(url) or {}
+    except Exception:
+        # A malformed proxy variable must not stop a scan that would have
+        # run; the request path reports its own failure with a reason.
+        return None
+    for scheme in ("https", "http", "all"):
+        value = proxies.get(scheme)
+        if value:
+            return str(value)
+    return None
+
+
+def describe_transport_failure(exc: BaseException,
+                              limit: int = 160) -> tuple[str, str]:
+    """Split a transport exception into a (label, detail) pair.
+
+    ``label`` is the exception class name alone: it is what the operator
+    groups by, and it must stay low-cardinality (``ConnectionError`` x 40,
+    not 40 distinct strings each carrying a URL).  ``detail`` is the first
+    ``limit`` characters of the message with whitespace collapsed -- it is
+    the example, not the grouping key.
+
+    Why this exists (Phase 347): ``_Tally.failed`` counted *that* requests
+    died and discarded *why*.  A run whose every request was refused, one
+    that timed out behind a proxy, and one whose TLS never negotiated all
+    produced the same "N of N received no response", which is the number
+    without the diagnosis.  The async path already logs its baseline
+    exception (``async baseline error: ...``); sync had no equivalent.
+    """
+    label = type(exc).__name__
+    detail = " ".join(str(exc).split())
+    if len(detail) > limit:
+        # Mark the cut: a message that stops mid-token ("...NewConnectionError")
+        # reads as a truncated string bug rather than as "there was more".
+        detail = detail[:max(0, limit - 1)] + "\u2026"
+    return label, detail
+
+
 class _Tally:
     """Clone-shared counters for requests that were attempted and failed.
 
@@ -96,12 +147,45 @@ class _Tally:
     share one tally), `failed` counts the ones that raised before any response
     arrived.  `requests_made` on the Scanner cannot serve that purpose: it is
     bumped after a response, and a cache hit bumps it too.
+
+    Phase 347: `failure_reasons` / `failure_examples` keep the *cause* next
+    to the count.  Both are populated only from `note_failure`, so a caller
+    that assigns `failed` directly (the async shim in cli_runner.py copies
+    the count it measured) cannot accidentally desynchronise them.
     """
 
     def __init__(self) -> None:
         self.attempted = 0
         self.failed = 0
         self.truncated = 0
+        self.failure_reasons: Counter = Counter()
+        self.failure_examples: dict[str, str] = {}
+
+    def note_failure(self, exc: BaseException) -> None:
+        """Record one failed request and the reason it failed."""
+        self.failed += 1
+        label, detail = describe_transport_failure(exc)
+        self.failure_reasons[label] += 1
+        # First example wins: later ones for the same class are usually the
+        # same text with a different port, and a stable example is what a
+        # report reader can act on.
+        self.failure_examples.setdefault(label, detail)
+
+    def merge_failure_reasons(self, other: "_Tally | None") -> None:
+        """Fold another tally's reasons in (multi-target / async runs)."""
+        if other is None:
+            return
+        self.failure_reasons.update(other.failure_reasons)
+        for label, detail in other.failure_examples.items():
+            self.failure_examples.setdefault(label, detail)
+
+    def top_failure_reasons(self, limit: int = 3) -> list[dict]:
+        """The ``limit`` most common reasons, richest first."""
+        out = []
+        for label, count in self.failure_reasons.most_common(limit):
+            out.append({"reason": label, "count": count,
+                        "example": self.failure_examples.get(label, "")})
+        return out
 
 
 class GuardedSession(requests.Session):
@@ -252,6 +336,18 @@ class Requester:
         scan otherwise reports zero findings exactly as a clean result does.
         """
         return self.tally.failed
+
+    @property
+    def failure_reasons(self) -> list[dict]:
+        """Why the failed requests failed, most common first.
+
+        Phase 347: the count alone cannot be acted on.  "5 of 5 received no
+        response" is a verdict; ``ConnectionError: [WinError 10061] No
+        connection could be made`` is a diagnosis, and it is the difference
+        between an operator re-running the scan and an operator noticing the
+        host is simply down (or that a proxy is intercepting).
+        """
+        return self.tally.top_failure_reasons()
 
     def _guard(self, url: str) -> None:
         """Raise CircuitOpen when the breaker has tripped (pre-send)."""
@@ -406,13 +502,16 @@ class Requester:
                 return self._bound(self.session.request(method, url,
                                                         timeout=self.timeout,
                                                         **kw))
-        except Exception:
+        except Exception as exc:
             # Counted here and nowhere else: every call site that swallows a
             # request failure (`except Exception: continue`) is doing the right
             # thing for the scan and the wrong thing for the report.  A proxy
             # failover that succeeds is not a failure, so the tally is taken from
             # the outer scope that only a final raise reaches.
-            self.tally.failed += 1
+            #
+            # Phase 347: the tally also keeps WHY (class + first message), so
+            # the incomplete-scan summary can say it instead of only counting.
+            self.tally.note_failure(exc)
             # Phase 208: a request that raised is also a breaker failure.
             # Recorded here, after the failover retry is exhausted, so a
             # recovered proxy hop does not trip a breaker that has seen no
