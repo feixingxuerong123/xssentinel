@@ -5364,6 +5364,13 @@ dialog 迟到时付费,本地 docker 往返落在 settle 内 ⇒ 双向零漂移
   措辞改"一屏内 + 测试钉上限"(行数是终端宽度的函数 —— 本机实测 serve 51 行
   vs pytest 宽度 <60,同一实现两个"真实"数字,单值必腐)。
 
+**全量分批门禁(2026-10-31,`d81a6e5` 本树实测)**:**258/258 文件绿,exit 0,
+  2576s,attempt 0 全程零重试零 TIMEOUT**(无"重试后绿"的掩盖形态);skipped
+  tests: 9 across 4 files(test_dom_engine_probe_urls 4 / test_parity_full_matrix
+  1 / test_passive_mitm 1 / **test_stored_e2e_acceptance 3 —— 整文件 skip,
+  对本轮贡献为零**;"绿"和"跑过"两个数字一起报)。per-file 计时归档
+  `benchmark/results/regression_logs/20261031-162309/_timings.txt`(gitignored)。
+
 ## Phase 341 独立复验(另一会话,非提交者自证)
 
 **为什么单独记**:341 的修复由会话 A 提出并提交,本条目由会话 B 在同一棵树上
