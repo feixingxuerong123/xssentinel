@@ -1,7 +1,8 @@
 # 参与开发
 
-围绕 XSSentinel 做开发的实操指引。安装与使用见 [README](README.md);当前迭代
-进度与历史决策记录见 [AGENTS.md](AGENTS.md)。
+围绕 XSSentinel 做开发的实操指引。安装与使用见 [README](README.md);规则与当前
+状态见 [AGENTS.md](AGENTS.md),逐 Phase 过程日志在
+`docs/archive/AGENTS_phase_log_to_20261031.md`。
 
 ## 开发环境
 

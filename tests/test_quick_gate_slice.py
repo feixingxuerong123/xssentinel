@@ -52,6 +52,10 @@ _BANNED_STALE_CLAIMS = (
     # records -- what must not come back is a sentence asserting the matrix
     # IS 98 cases today.
     "同一 98 用例矩阵",
+    # The 2026-10-31 rot: runner.py's own docstring/argparse help still said
+    # "64 of 192" after the manifest grew to 194.  Exact string, so the dated
+    # incident record in run_benchmark.py ("185 of 192 cases") stays legal.
+    "64 of 192",
 )
 
 # Files that state how big the push slice is.  A file belongs here only if it
@@ -234,6 +238,11 @@ _BANNED_MATRIX_CLAIMS = (
 _MATRIX_CLAIMING_FILES = (
     os.path.join(".github", "workflows", "ci.yml"),
     "CONTRIBUTING.md",
+    # runner.py's usage docstring quotes the matrix size ("64 of 194 cases"),
+    # so it belongs here -- that is how the 2026-10-31 "64 of 192" rot gets
+    # caught next time the manifest grows (the presence check below demands
+    # the CURRENT number in this file, not just the absence of stale ones).
+    os.path.join("benchmark", "runner.py"),
 )
 
 

@@ -6,7 +6,7 @@ parses JSON reports, and computes TP/FP/TN/FN metrics.
 
 Usage:
     python benchmark/runner.py [--port 18777] [--concurrency 1] [--timeout 60]
-    python benchmark/runner.py --quick   # stratified push slice (64 of 192 cases)
+    python benchmark/runner.py --quick   # stratified push slice (64 of 194 cases)
 """
 from __future__ import annotations
 
@@ -889,7 +889,8 @@ def main():
                     help="Scanner transform budget")
     ap.add_argument("--quick", action="store_true",
                     help="Quick mode: stratified push slice (one case per "
-                         "ground_truth x context, currently 64 of 192)")
+                         "ground_truth x context pair; slice/matrix sizes are "
+                         "pinned by tests/test_quick_gate_slice.py)")
     ap.add_argument("--quick-offset", type=int, default=0,
                     help="Rotate which member of each family the quick slice "
                          "picks (0 = the historical slice, unchanged).  Use it "

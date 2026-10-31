@@ -17,8 +17,9 @@ name: CI
 #      the default outside --strict-gate, but on a slice this size they
 #      tolerated a false positive and two misses per push without turning red.
 #   3. accuracy drill on Range #2 (15 vuln + 5 safe, 100%/100% required)
-# 4. nightly: the FULL file-by-file gate (tests/run_all_batched.py, 141
-#    test files with per-file timeout and retry) + the full 194-case matrix on
+# 4. nightly: the FULL file-by-file gate (tests/run_all_batched.py -- every
+#    test_*.py discovered at runtime, with per-file timeout and retry; the file
+#    count is deliberately not frozen here, it grows) + the full 194-case matrix on
 #    both engines -- installed from the same extra set as requirements.txt, so
 #    a wedge or a per-file regression cannot hide behind the 64-case quick
 #    slice, and an esprima/flask-gated test cannot silently self-skip.
