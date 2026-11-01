@@ -82,12 +82,16 @@ python range4/runner.py --engine both    # React/Vue 真实框架 SPA 靶场(FN/
 
 ## CI
 
-`.github/workflows/ci.yml` 三个 job:
+`.github/workflows/ci.yml` 六个 job(全部 ubuntu-latest):
 
 | job | 触发 | 内容 |
 |---|---|---|
-| tests | push / PR | 全量 pytest + 快速精度矩阵 + range3 + range4 |
-| benchmark-full | 手动 / 定时 | 完整 194 例双引擎矩阵 |
-| nightly-gate | 每日定时 | 全量分批门禁(与本地 run_all_batched 同口径) |
+| tests | push / PR / 手动 / 定时 | ruff(E/F/W 零基线)+ 全量分批 pytest(`run_all_batched`,含 range7 契约测试)+ 失败证据上传 |
+| drills | push / PR / 手动 / 定时 | 双引擎 64 例 strict 精度切片(ISO 周轮转,FP0/FN0/ERROR0)+ range2–6 靶场门禁(各 100%/100%) |
+| min-python | push / PR / 手动 / 定时 | Python 3.10 下限冒烟(CLI + transport + MCP + API gate + sitemap) |
+| benchmark-full | 手动 / 定时 | 完整 194 例双引擎矩阵(sync + async) |
+| nightly-gate | 定时 / 手动 | 全量逐文件门禁(`run_all_batched` 同口径)+ evidence-shape sweep(全路由双引擎) |
+| dependency-audit | 定时 / 手动 | 依赖审计(REPORT-ONLY,见 `docs/DEPENDENCY_AUDIT.md`) |
 
-PR 只需保证 tests job 绿; nightly 红灯先看是否为已知环境问题。
+PR 需保证 tests / drills / min-python 三个 job 绿; nightly 红灯先看是否为已知
+环境问题。门禁体系各层如何协作见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
