@@ -75,6 +75,14 @@ dev = [
     # "undefined name" findings.  Without pyflakes that test silently
     # skips, and the NameError-landmine family it locks comes right back.
     "pyflakes>=3.0",
+    # tests/test_nuclei_import.py carries pytest.importorskip("yaml"): a dev
+    # install without PyYAML made the WHOLE file self-skip (a
+    # zero-contribution file that still counted as green; the 2026-10-29
+    # hosted gate failed on exactly this shape before CI gained the
+    # [nuclei] extra).  Declaring it here makes the local dev environment
+    # the same suite CI runs.  The runtime [nuclei] extra stays separate:
+    # it is a scanner feature, not a test dependency.
+    "pyyaml>=6.0",
     # Lint gate: ruff is a hard CI step (see .github/workflows/ci.yml).
     # The baseline is ZERO -- any new finding fails the build.
     "ruff>=0.6",
