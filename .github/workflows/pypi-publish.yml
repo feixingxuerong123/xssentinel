@@ -1,0 +1,55 @@
+name: pypi
+
+# Publishes sdist + wheel to PyPI on a version tag via Trusted Publishing (OIDC;
+# no API token stored in the repo).
+#
+# ONE-TIME owner setup on pypi.org (account -> Publishing -> add a pending
+# publisher), otherwise the publish job fails with a 403 from PyPI:
+#   owner:        feixingxuerong123
+#   repository:   xssentinel
+#   workflow:     pypi-publish.yml
+#   environment:  pypi
+#
+# Tag a release with:  git tag v1.3.0 && git push origin v1.3.0
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Build sdist + wheel
+        run: |
+          python -m pip install --upgrade pip
+          pip install build
+          python -m build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - uses: pypa/gh-action-pypi-publish@release/v1
