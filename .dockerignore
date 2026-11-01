@@ -1,0 +1,35 @@
+# The image ships the core engine only (pyproject.toml + README.md + xssentinel/).
+# Everything below exists in the dev tree but never in the build context.
+.git
+.venv
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.benchmarks/
+.nuclei-cache/
+.nuclei-config/
+.uncover-config/
+.zwork/
+.workbuddy/
+.workbuddy-ai/
+.zcode/
+.pytest-of-Administrator/
+xssentinel.egg-info/
+nuclei/
+range3/
+range4/
+range5/
+range6/
+range7/
+benchmark/
+dev/
+tests/
+docs/
+skills/
+_review_20261101/
+/report.html
+/report.html.json
+/xssentinel_range3.db
+Dockerfile
+.dockerignore
