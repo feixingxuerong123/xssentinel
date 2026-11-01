@@ -1,0 +1,55 @@
+{
+  "phase": "342",
+  "date": "2026-10-30",
+  "tree_head": "1073ec4 (detection surface byte-identical to 8e6bce5 = p341 baseline; 8e6bce5..1073ec4 touches evidence JSON only)",
+  "target": {
+    "image": "ghcr.io/hahwul/xssmaze:main",
+    "image_digest": "sha256:35bb3c7d314f6287f05cc60a71165e4ac824475fb0268fcd0c30b35595d67086",
+    "container_started": "2026-10-29T10:28:20Z",
+    "base_url": "http://127.0.0.1:3001",
+    "version": "v0.3.0"
+  },
+  "runner": {
+    "file": "dev/_xssmaze/benchmark.py (vendored hahwul/xssmaze@main scripts/benchmark.py)",
+    "mode": "--reach server, per-URL custom-scanner, one invocation per endpoint, no retries",
+    "detect_contract": "--detect-json 'findings[].url'",
+    "scanner_timeout": 180,
+    "scoring": "official runner is the authoritative scorer; xsleak = correct silence (contract 322d, benchmark/xssmaze_scoring.py cross-check)"
+  },
+  "arms": {
+    "XSSentinel": {
+      "source": "reused official p341 scorecard (server_p341.json); NOT re-run",
+      "reason": "zero detection-surface commits between the p341 run tree and this tree",
+      "wrapper": "wrapper.py (XSSMAZE_TIMEOUT=100, sync, no --headless)"
+    },
+    "dalfox": {
+      "version": "v2.13.0 (C:/GoWorkspace/bin/dalfox.exe)",
+      "wrapper": "wrapper_dalfox.py (XSSMAZE_TIMEOUT=100)",
+      "cmd": "dalfox url <url> --format json --silence --skip-headless; stdin=DEVNULL",
+      "deviations": [
+        "--skip-headless: chromedp headless layer host-unstable (panic close-of-closed-channel allocate.go:233; teardown hangs; ~50% of invocations; on plain localhost too). 5/5 stable with skip. Headless-layer contribution quantified separately on a sample.",
+        "default workers (no --worker 1): worker=1 serialized the ~2000-query battery into 60-100s+/case on multi-param XSSMaze pages (level1 hit the 100s cap, level2 74.7s); default workers complete the same pages in 1-2s.",
+        "stdin=DEVNULL: dalfox treats a non-terminal stdin as a piped URL list and blocks (measured: 60s wrapper timeouts in-wrapper vs 1.1s `[{}]` under a bash pipe vs 5.8s real scan with DEVNULL).",
+        "forward V/found entries only: dalfox v2.13.0 emits R entries (Reflected Payload in HTML, message_id 464, severity Medium) carrying payload fields; counting them would score every reflection candidate as detection (level3 measured R:507 vs V:1). TSV types column keeps the full census for offline re-scoring under any contract."
+      ]
+    },
+    "nuclei": {
+      "version": "v3.11.1 (~/go/bin/nuclei.exe)",
+      "wrapper": "wrapper_nuclei.py (XSSMAZE_TIMEOUT=100)",
+      "cmd": "nuclei -u <url> -dast -t ~/nuclei-templates/dast/vulnerabilities/xss -jsonl -silent -no-color -timeout 10 -retries 1 -duc -nc; stdin=DEVNULL",
+      "deviations": [
+        "per-URL custom-scanner mode instead of the runner's built-in batch nuclei (batch = one 900s subprocess for all 1040 URLs, no per-case timing or attribution)",
+        "hit = JSONL line with info.severity medium/high/critical (the 196b contract; info-level reflection detections are not vulnerability claims)",
+        "-duc/-nc load-bearing: template-update probe hangs the full ceiling on this proxied host (196b)"
+      ]
+    }
+  },
+  "population": {"server": 1013, "controls": 27},
+  "incidents": [
+    "AV quarantine (2026-10-30 ~03:45): host AV (360SPService/HipsDaemon running, Defender service stopped) quarantined benchmark/server.py mid-run after ~64 wrapper imports of it; scans 65-1040 crashed in ~256ms with ModuleNotFoundError and the runner scored 976 consecutive 'not flagged' (30/983 scorecard). Artifacts kept as server_dalfox_p342_INVALID_avquarantine.*; file restored from git; wrappers decoupled from benchmark.adapters (local _p342_toolparse copies) so the rig no longer reads that file at all.",
+    "wrapper crash observability: the runner discards stderr and scores empty stdout as 'not flagged', so the 976 silent crashes produced no signal; both wrappers now write a rc=wrapper-error TSV row on any unexpected exception.",
+    "redirect/level2 wrapper timeout in the valid run replayed clean with 0 findings -> the single timeout hides no detection; official 757/256/4 needs no replay correction (p307 counting convention).",
+    "headless-layer quantification (stratified sample, XSSMAZE_DALFOX_HEADLESS=1): 24 FN cases (dom-head 12, reflected-html 5, reflected-attr 3, reflected-js 2, csti 1, pp 1) + 5 TP controls; 29/29 clean rc this round (the chromedp flake is state-dependent, not a stable rate), 7/24 FN cases recovered (apidom x3, browser-state, channel, ariaattr, bugbounty), 5/5 TP unchanged -> the headless layer is worth roughly tens of cases, concentrated in dom; the main arm still runs skip-headless and its scorecard stays authoritative.",
+    "sample-file CRLF lesson: a python-text-mode-written URL list fed `read -r` trailing \\r -> dalfox instant-empty exits scored 0 findings at 0.1s; strip CR before shell-reading generated URL lists."
+  ]
+}
