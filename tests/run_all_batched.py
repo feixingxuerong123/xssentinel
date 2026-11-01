@@ -9,15 +9,26 @@ months, so it is not written down anymore; expect 10+ minutes).  Usage:
 
     python tests/run_all_batched.py            # all files
     python tests/run_all_batched.py --quiet    # only print failures
+    python tests/run_all_batched.py --jobs 4   # parallel file subprocesses (opt-in)
 
 Exit code: number of files that still fail after the retry (0 = green).
+
+--jobs N runs N file-subprocesses concurrently.  The default is 1, which
+keeps the historical sequential behavior: same per-file timeout and retry
+semantics, same verdicts, same logs, same reports, same exit code.  The
+flag exists because the wall clock is top-heavy (measured 2026-11-01:
+top-15 files = 1462s of 2386s, ~61%, while the median file is seconds);
+it is opt-in because this host's loopback degrades under load -- start
+low (2-4) and as always quote the green count AND the skip count together.
 """
 from __future__ import annotations
 import os
 import re
 import subprocess
 import sys
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -40,6 +51,10 @@ PER_FILE_TIMEOUT_OVERRIDES = {
     "test_async_budget.py": 3600,
 }
 RETRIES = 1
+
+# Per-file progress lines from parallel workers must not interleave
+# mid-line; print() is a single call under this lock in _run_one.
+_PRINT_LOCK = threading.Lock()
 
 
 LOG_DIR = os.path.join(ROOT, "benchmark", "results", "regression_logs")
@@ -159,8 +174,85 @@ def _write_timing_report(timings: list, failures: list, dt: float) -> str:
     return path
 
 
+def _parse_jobs(argv) -> int:
+    """--jobs N (separate-arg form), default 1.
+
+    Malformed input must fail loudly.  A typo that silently fell back to
+    serial would look like parallelism and deliver a 4x-slower gate --
+    the same 'looks green, means nothing' trap one level up.
+    """
+    if "--jobs" not in argv:
+        return 1
+    i = argv.index("--jobs")
+    if i + 1 >= len(argv):
+        raise SystemExit("--jobs requires a positive integer (got nothing)")
+    raw = argv[i + 1]
+    try:
+        n = int(raw)
+    except ValueError:
+        raise SystemExit(f"--jobs requires an integer (got {raw!r})")
+    if n < 1:
+        raise SystemExit(f"--jobs must be >= 1 (got {n})")
+    return n
+
+
+def _run_one(f: str, quiet: bool) -> tuple:
+    """Run one test file to a verdict: the unit the pool maps over.
+
+    The historical per-file loop body, verbatim in behavior: same budget
+    lookup, same retry-unless-not-red loop, same verdict, same log
+    dumping, same printing.  Returns (file, verdict, skipped, whole_file,
+    seconds); the caller aggregates in file order, so the summary is
+    identical to the sequential run's regardless of completion order.
+    """
+    budget = PER_FILE_TIMEOUT_OVERRIDES.get(f, PER_FILE_TIMEOUT)
+    t_file = time.perf_counter()
+    rc = 1
+    attempts: list = []
+    for attempt in range(RETRIES + 1):
+        try:
+            r = subprocess.run(
+                [sys.executable, "-m", "pytest", os.path.join(HERE, f),
+                 "-q"],
+                cwd=ROOT, timeout=budget,
+                capture_output=True)
+            rc = r.returncode
+            attempts.append((attempt, rc, r.stdout, r.stderr))
+        except subprocess.TimeoutExpired as exc:
+            rc = 2   # hung file: treat as failure, do not kill the gate
+            attempts.append((attempt, "TIMEOUT",
+                             exc.stdout or b"", exc.stderr or b""))
+        verdict = _file_verdict(rc, attempts[-1][2])
+        if verdict != "red":
+            break
+    last_stdout = attempts[-1][2] if attempts else b""
+    verdict = _file_verdict(rc, last_stdout)
+    skipped, whole = 0, False
+    if verdict in ("green", "whole-skip"):
+        skipped, whole = _skip_counts(last_stdout)
+    secs = time.perf_counter() - t_file
+    log_path = os.path.join(LOG_DIR, RUN_TS, f + ".log")
+    if attempts and (verdict == "red" or len(attempts) > 1):
+        _dump_log(log_path, attempts)
+    with _PRINT_LOCK:
+        if verdict == "red":
+            log_note = f"  log: {log_path}" if os.path.exists(log_path) else ""
+            print(f"FAIL {f}{log_note}", flush=True)
+            if not quiet:
+                # last_stdout, not the loop's `r`: the timeout path never
+                # binds `r` (Phase 322 hit the same shape in scanner.py).
+                tail = last_stdout[-2000:].decode("utf-8", "replace")
+                print(tail, flush=True)
+        else:
+            if not quiet:
+                label = "skip" if verdict == "whole-skip" else "ok  "
+                print(f"{label} {f}", flush=True)
+    return (f, verdict, skipped, whole, secs)
+
+
 def main() -> int:
     quiet = "--quiet" in sys.argv
+    jobs = _parse_jobs(sys.argv)
     # Any argv item that names a test file limits the run to those files --
     # lets a long degraded run be resumed file by file instead of redone.
     wanted = [a for a in sys.argv[1:] if a.startswith("test_")]
@@ -173,53 +265,23 @@ def main() -> int:
     skipped_files: list[tuple] = []   # (file, skipped_test_count)
     timings: list[tuple] = []         # (file, seconds) -- every file, incl. fails
     t0 = time.perf_counter()
-    for f in files:
-        budget = PER_FILE_TIMEOUT_OVERRIDES.get(f, PER_FILE_TIMEOUT)
-        t_file = time.perf_counter()
-        rc = 1
-        attempts: list = []
-        for attempt in range(RETRIES + 1):
-            try:
-                r = subprocess.run(
-                    [sys.executable, "-m", "pytest", os.path.join(HERE, f),
-                     "-q"],
-                    cwd=ROOT, timeout=budget,
-                    capture_output=True)
-                rc = r.returncode
-                attempts.append((attempt, rc, r.stdout, r.stderr))
-            except subprocess.TimeoutExpired as exc:
-                rc = 2   # hung file: treat as failure, do not kill the gate
-                attempts.append((attempt, "TIMEOUT",
-                                 exc.stdout or b"", exc.stderr or b""))
-            verdict = _file_verdict(rc, attempts[-1][2])
-            if verdict != "red":
-                break
-        last_stdout = attempts[-1][2] if attempts else b""
-        verdict = _file_verdict(rc, last_stdout)
-        if verdict in ("green", "whole-skip"):
-            skipped, whole = _skip_counts(last_stdout)
-            if skipped:
-                skipped_files.append((f, skipped, whole))
-        timings.append((f, time.perf_counter() - t_file))
-        log_path = os.path.join(LOG_DIR, RUN_TS, f + ".log")
-        if attempts and (verdict == "red" or len(attempts) > 1):
-            _dump_log(log_path, attempts)
-        if verdict == "red":
-            failures.append(f)
-            if os.path.exists(log_path):
-                print(f"FAIL {f}  log: {log_path}", flush=True)
-            else:
-                print(f"FAIL {f}", flush=True)
-            if not quiet:
-                # last_stdout, not the loop's `r`: the timeout path never
-                # binds `r` (Phase 322 hit the same shape in scanner.py).
-                tail = last_stdout[-2000:].decode("utf-8", "replace")
-                print(tail, flush=True)
-        else:
-            if not quiet:
-                label = "skip" if verdict == "whole-skip" else "ok  "
-                print(f"{label} {f}", flush=True)
+    if jobs == 1:
+        records = [_run_one(f, quiet) for f in files]
+    else:
+        # map() preserves input order, so the aggregate below is identical
+        # to the sequential run's regardless of completion order.  Threads
+        # (not processes) suffice: the unit of work is a blocking
+        # subprocess.run, which releases the GIL while the child runs.
+        if not quiet:
+            print(f"[runner] jobs={jobs}: file subprocesses run concurrently; "
+                  f"per-file timeout/retry semantics unchanged", flush=True)
+        with ThreadPoolExecutor(max_workers=jobs) as ex:
+            records = list(ex.map(lambda f: _run_one(f, quiet), files))
     dt = time.perf_counter() - t0
+    failures = [f for f, v, _s, _w, _sec in records if v == "red"]
+    timings = [(f, sec) for f, _v, _s, _w, sec in records]
+    skipped_files = [(f, s, w) for f, v, s, w, _sec in records
+                     if v in ("green", "whole-skip") and s]
     print(f"\n{len(files) - len(failures)}/{len(files)} files green "
           f"in {dt:.0f}s; failures: {failures or 'none'}")
     # 'green' means 'nothing failed', not 'everything ran'.  Report the
@@ -245,7 +307,7 @@ def main() -> int:
         slowest = sorted(timings, key=lambda t: -t[1])[:15]
         top = sum(s for _f, s in slowest)
         print(f"\nslowest {len(slowest)} files "
-              f"({top:.0f}s of {dt:.0f}s = {100*top/dt:.0f}% of the run):")
+              f"(sum {top:.0f}s; wall {dt:.0f}s):")
         for f, secs in slowest:
             print(f"  {secs:8.1f}s  {f}")
         tp = _write_timing_report(timings, failures, dt)
