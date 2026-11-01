@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 安全漏洞（报告 XSSentinel 本身）/ Security vulnerability
+    url: https://github.com/feixingxuerong123/xssentinel/security/advisories/new
+    about: 请走 GitHub 私密安全通告，不要公开 issue（流程与时效见 SECURITY.md）
