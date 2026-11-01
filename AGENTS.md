@@ -11,7 +11,9 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
 | 要找什么 | 去哪 |
 |---|---|
 | 逐 Phase 过程日志(176f–345,每项改动的归因、门禁证据、自我纠正) | `docs/archive/AGENTS_phase_log_to_20261031.md` |
+| README 历史 Phase 叙事(基线演化、缺陷家族、自我纠正;2026-11-01 蒸馏出库) | `docs/archive/README_phase_log_to_20261101.md` |
 | 开发约定 / 回归靶场 / 架构约定 | `CONTRIBUTING.md` |
+| 门禁体系如何运作 / Mixin 隐式契约 | `docs/ARCHITECTURE.md` |
 | 优化 backlog(含明确不做清单) | `docs/OPTIMIZATION.md` |
 | 安装、使用、能力清单 | `README.md` |
 
@@ -61,7 +63,7 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
   `test_nuclei_import` 缺 PyYAML、`test_stored_e2e_acceptance` 需 opt-in)。
   引用时两个数一起报。
 - benchmark strict 64 例切片双引擎 F1=1.0。
-- CI(`.github/workflows/ci.yml`):6 个 job 全部 ubuntu-latest —— tests(全量分批 + ruff)、drills(双引擎 strict 切片周轮转 + range3–7 门禁)、min-python(3.10)、benchmark-full、nightly-gate、dependency-audit;push 门 = 双引擎 strict 切片。
+- CI(`.github/workflows/ci.yml`):6 个 job 全部 ubuntu-latest —— tests(全量分批 + ruff)、drills(双引擎 strict 切片周轮转 + range2–6 门禁;range7 走 tests job 的 pytest 契约测试)、min-python(3.10)、benchmark-full、nightly-gate、dependency-audit;push 门 = 双引擎 strict 切片。
 - 开放项:SECURITY.md 联系方式待仓库归属者填写。产品级 backlog 无未决项
   (OPTIMIZATION.md §3.6 item 6 被动代理 drain 时间上限已于 2026-10-31 关闭;
   其余均为"有意不做/需外部条件"清单)。

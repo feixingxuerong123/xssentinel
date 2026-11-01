@@ -402,8 +402,42 @@ class _AsyncScannerShim(AdvancedLayerMixin, CrawlMixin):
         self.max_payloads = getattr(async_scanner, "max_payloads", 14)
         self.param_wordlist = None      # --param-wordlist stays sync-only
         self.bav = False                # --bav is documented sync-only
+        # --skip-param / --audit-xs-leaks 的组合契约口(tests/test_mixin_contracts.py
+        # 抓出):shim 继承的 _mine_hidden_params / _scan_xsleak_audit /
+        # _bound_drop_skip_params 都读这两个名字,sync 核心在 __init__ 里有、
+        # shim 没有。这不是潜伏缺口而是现行静默分歧:挖矿经
+        # _mine_hidden_params_async -> shim._mine_hidden_params 走
+        # getattr(self, "skip_params", None),空缺把操作者的 --skip-param
+        # 静默降级成「挖矿照挖」(sync 引擎尊重它)。与上面 oob 的 Phase 176s
+        # 处置同例:代理操作者意图,而不是让层看见空值。xsleak_audit 今天
+        # 没有 shim 调用方(async 走自己的 _scan_xsleak_audit_async),代理它
+        # 只是把继承方法的语义补完整。
+        self.skip_params = set(getattr(async_scanner, "skip_params", None) or ())
+        self.xsleak_audit = bool(getattr(async_scanner, "xsleak_audit", False))
+        # CrawlMixin._crawl / _crawl_spa 直读这两个(无 getattr 兜底,scanner_crawl
+        # :110/276/301)——shim 上缺席不是降级而是 AttributeError,一旦哪条路径把
+        # BFS 接到 shim 上就会被 layer_guard 吞成 DEBUG。crawl_depth 取 async 的
+        # 真实值(async_scanner __init__ 恒有);async 引擎自己不实现 --scope,
+        # None 即「不限域」,与 async 现行为一致。
+        self.crawl_depth = max(0, int(getattr(async_scanner, "crawl_depth", 2)))
+        self.scope = getattr(async_scanner, "scope", None)
         import threading
         self._lock = threading.Lock()
+
+    @property
+    def _dom_engine(self):
+        """``AdvancedLayerMixin._scan_dom`` 的 L6 引擎口(惰性,不可用即 None)。
+
+        契约缺口由 tests/test_mixin_contracts.py 抓出:shim 继承了 sync 的
+        ``_scan_dom``(方法本体可达),却没有 sync 核心在 ``__init__`` 里造的
+        ``self._dom_engine``——今天 run_page_layers 不调 ``_scan_dom``,所以
+        只是潜伏断链;但哪个路径一旦把它接到 shim 上,首行 ``self._dom_engine``
+        就 AttributeError,再被 layer_guard 按 duck-typing 吞成 DEBUG,又是一条
+        「实现完整、永远不工作」。委托 async 侧同名解析器(Phase 65 为 L6
+        parity 而生),语义与 async 自己的 DOM 层一致:``--dom-engine static``
+        或 Playwright 不可用时返回 None,调用方照旧跳过 L6。
+        """
+        return self._async._resolve_dom_engine()
 
     def _add(self, finding: Finding) -> None:
         with self._lock:
