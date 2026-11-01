@@ -1,0 +1,35 @@
+name: 'XSSentinel Scan'
+description: >
+  Run the XSSentinel XSS scanner against a target and write the report into the
+  job workspace. Runs the repository Dockerfile (core engine, no headless
+  browser): DOM confirmation degrades to static heuristics inside this
+  container; SARIF output feeds github/codeql-action/upload-sarif directly.
+
+branding:
+  icon: 'shield'
+  color: 'blue'
+
+inputs:
+  target:
+    description: 'Target URL, parameter included (e.g. https://host/app/search?q=probe). Only use on systems you are authorized to test.'
+    required: true
+  format:
+    description: 'Report format: html / json / csv / sarif / junit / markdown / burp / nuclei'
+    required: false
+    default: 'sarif'
+  output-file:
+    description: 'Report filename written into the job workspace (GITHUB_WORKSPACE)'
+    required: false
+    default: 'xssentinel-report.sarif'
+
+runs:
+  using: 'docker'
+  image: 'Dockerfile'
+  args:
+    - scan
+    - '-u'
+    - '${{ inputs.target }}'
+    - '-f'
+    - '${{ inputs.format }}'
+    - '-o'
+    - '/github/workspace/${{ inputs.output-file }}'
