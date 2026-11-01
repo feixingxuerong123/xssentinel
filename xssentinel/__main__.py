@@ -540,6 +540,12 @@ def build_parser(mode: str = "scan"):
                             "which engine produced the artifact)")
     g_det.add_argument("--max-payloads", type=int, default=None)
     g_det.add_argument("--threads", type=int, default=None)
+    g_det.add_argument("--batch-workers", type=int, default=1,
+                       help="Concurrent targets for multi-target runs "
+                            "(--batch / --batch-stdin / --har / --openapi). "
+                            "Default 1 = sequential, byte-identical to "
+                            "previous releases.  The rate limit and the "
+                            "request budget stay global (shared).")
     g_det.add_argument("--custom-payloads", default=None,
                        help="File of custom payloads to append to the corpus")
     g_det.add_argument("--nuclei-dast", dest="nuclei_dast", default=None,
@@ -1740,10 +1746,49 @@ def _main_impl(argv=None):
             _log.error("async batch failed: %s", e, exc_info=args.verbose)
             async_results = {}
 
-    for i, url in enumerate(urls):
+    # --batch-workers validation (Phase 349).  Loud and before any traffic:
+    # a typo'd value must not silently degrade to sequential or fork an
+    # unbounded pool.
+    _batch_workers = getattr(args, "batch_workers", None)
+    if _batch_workers is None:
+        _batch_workers = 1
+    if _batch_workers < 1 or _batch_workers > 64:
+        # `or 1` would swallow an explicit 0 -- a falsy value must reach
+        # this range check like any other.
+        raise SystemExit("--batch-workers requires an integer in [1, 64] "
+                         f"(got {_batch_workers})")
+    _use_parallel = (_batch_workers > 1 and len(urls) > 1 and not is_async)
+    _batch_lock = None
+    if _batch_workers > 1 and len(urls) > 1:
+        if is_async:
+            # The async batch loop drives all URLs through one event loop
+            # (Phase 25-3); teaching it bounded target concurrency is its
+            # own change.  Until then the flag must not pretend to apply.
+            print("[!] --batch-workers: async batch concurrency is not "
+                  "supported yet; scanning targets sequentially.")
+        else:
+            import threading as _threading
+            _batch_lock = _threading.Lock()
+            print(f"[*] --batch-workers {_batch_workers}: targets run "
+                  "concurrently; the rate limit and request budget stay "
+                  "global (shared).")
+
+    def _scan_one_target(i, url):
+        """Phase 349: one batch target.
+
+        Verbatim extraction of the former inline loop body so
+        ``--batch-workers N`` (N>1) can run several targets concurrently.
+        Returns a stats dict instead of mutating the run-level accumulators
+        (total_findings / failed_targets / ...) -- the drivers below fold
+        those in; with workers=1 that fold happens inline and observable
+        behavior (prints, report files, exit code) is unchanged.
+        """
+        st = {"url": url, "status": "ok", "findings": 0, "attempted": 0,
+              "failed_requests": 0, "failure_reasons": [], "egress": False}
         if checkpoint and checkpoint.is_scanned(url) and url not in async_results:
             print(f"[*] Skipping already-scanned: {url}")
-            continue
+            st["status"] = "skipped"
+            return st
         if len(urls) > 1:
             print(f"\n[{i+1}/{len(urls)}] {url}")
 
@@ -1775,10 +1820,19 @@ def _main_impl(argv=None):
             # (age-based refresh always; loss-detection probe when asked).
             if session_mgr is not None:
                 try:
-                    if session_mgr.keep_alive(
+                    def _keepalive():
+                        return session_mgr.keep_alive(
                             probe_url=url,
                             relogin_on_loss=getattr(
-                                args, "auth_relogin_on_loss", False)):
+                                args, "auth_relogin_on_loss", False))
+                    # Concurrent targets race the shared session refresh;
+                    # serialize it only in the parallel driver.
+                    if _batch_lock is not None:
+                        with _batch_lock:
+                            _ka = _keepalive()
+                    else:
+                        _ka = _keepalive()
+                    if _ka:
                         _log.info("Session re-established for %s", url)
                 except Exception as e:
                     _log.debug("session keep-alive failed: %s", e)
@@ -1797,14 +1851,14 @@ def _main_impl(argv=None):
                                     auth_state=auth_state)
         except Exception as e:
             _log.error("Scan failed for %s: %s", url, e, exc_info=args.verbose)
-            failed_targets.append(url)
             # Record the failure in the checkpoint so --resume doesn't
             # re-scan a target that crashed the scanner last time.
             if checkpoint:
                 checkpoint.mark_scanned(url)
-            continue
+            st["status"] = "failed"
+            return st
 
-        total_findings += len(scanner.findings)
+        st["findings"] = len(scanner.findings)
         _req = getattr(scanner, "req", None)
         _att = getattr(_req, "attempted_requests", None)
         # The async shim carries a real `Requester` (used for auth replay and
@@ -1829,19 +1883,13 @@ def _main_impl(argv=None):
         _att_count = _att if isinstance(_att, int) and not isinstance(
             _att, bool) else None
         if _att_count is not None and (_att_count > 0 or not is_async):
-            egress_reported = True
-            attempted_total += _att_count
+            st["egress"] = True
+            st["attempted"] = _att_count
             _failed = getattr(_req, "failed_requests", 0)
-            failed_total += (_failed if isinstance(_failed, int)
-                             and not isinstance(_failed, bool) else 0)
-            # Phase 347: fold this target's causes into the run-level view.
-            for _reason in (getattr(_req, "failure_reasons", None) or []):
-                _slot = failure_reasons_total.setdefault(
-                    _reason["reason"],
-                    {"count": 0, "example": _reason.get("example", "")})
-                _slot["count"] += _reason["count"]
-                if not _slot["example"]:
-                    _slot["example"] = _reason.get("example", "")
+            st["failed_requests"] = (_failed if isinstance(_failed, int)
+                                     and not isinstance(_failed, bool) else 0)
+            st["failure_reasons"] = (
+                getattr(_req, "failure_reasons", None) or [])
 
         # Write report.
         if out_dir:
@@ -1894,8 +1942,8 @@ def _main_impl(argv=None):
                              len(written), args.poc_dir)
         except Exception as e:
             _log.error("Report write failed: %s", e, exc_info=args.verbose)
-            failed_targets.append(url)
-            continue
+            st["status"] = "failed"
+            return st
 
         hi = sum(1 for f in scanner.findings
                  if (f.data if hasattr(f, "data") else f).get("severity") == "high")
@@ -1904,6 +1952,64 @@ def _main_impl(argv=None):
                   f"({hi} high). Report: {out_path}")
             if scanner.waf_name:
                 print(f"[*] WAF detected: {scanner.waf_name}")
+        return st
+
+    def _merge_target(st):
+        """Fold one target's stats into the run-level accumulators."""
+        nonlocal total_findings, attempted_total, failed_total
+        nonlocal egress_reported
+        if st["status"] == "skipped":
+            return
+        if st["status"] == "failed":
+            failed_targets.append(st["url"])
+            # A report-write failure still counted its scan stats in the
+            # former inline body (the fold at the old 1807/1831 ran before
+            # the report write); a scan failure contributed nothing (the
+            # old `continue` preceded them).  st carries exactly that
+            # distinction: findings/egress stay 0/False for scan failures.
+        total_findings += st["findings"]
+        if st["egress"]:
+            egress_reported = True
+            attempted_total += st["attempted"]
+            failed_total += st["failed_requests"]
+            # Phase 347: fold this target's causes into the run-level view.
+            for _reason in st["failure_reasons"]:
+                _slot = failure_reasons_total.setdefault(
+                    _reason["reason"],
+                    {"count": 0, "example": _reason.get("example", "")})
+                _slot["count"] += _reason["count"]
+                if not _slot["example"]:
+                    _slot["example"] = _reason.get("example", "")
+
+    if _use_parallel:
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        results = {}
+        with ThreadPoolExecutor(max_workers=_batch_workers) as _ex:
+            _futs = {_ex.submit(_scan_one_target, i, u): u
+                     for i, u in enumerate(urls)}
+            for _f in as_completed(_futs):
+                _u = _futs[_f]
+                try:
+                    results[_u] = _f.result()
+                except Exception as e:
+                    # A bug escaping _scan_one_target must fail that target,
+                    # not unwind the batch -- the same isolation contract the
+                    # in-body try/except gives the sequential driver.
+                    _log.error("Scan failed for %s: %s", _u, e,
+                               exc_info=args.verbose)
+                    if checkpoint:
+                        checkpoint.mark_scanned(_u)
+                    results[_u] = {"url": _u, "status": "failed",
+                                   "findings": 0, "attempted": 0,
+                                   "failed_requests": 0,
+                                   "failure_reasons": [], "egress": False}
+        # Merge in URL order so the summary lines and the failed-target list
+        # are identical to the sequential run's regardless of finish order.
+        for _u in urls:
+            _merge_target(results[_u])
+    else:
+        for i, url in enumerate(urls):
+            _merge_target(_scan_one_target(i, url))
 
     if getattr(args, "stop_at_cross_origin", False) and requester.egress.boundary_stops:
         # The boundary is a scope decision the operator made, so the refusals
