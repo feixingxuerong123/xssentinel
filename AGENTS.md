@@ -67,11 +67,13 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
   加双模式端到端 verdict 对比,真子进程不用替身)。`pyyaml>=6.0` 进 dev extras:
   `test_nuclei_import` 不再因缺 PyYAML 整文件跳过(单文件实跑 16 passed;
   运行期 [nuclei] extra 保持独立,那是扫描器功能不是测试依赖)。
-- 最近全量分批门禁(2026-11-02,HEAD `15801a1` + 工作树未提交改动):
-  **268/268 文件绿,exit 0**,616s(`--jobs 4`);**skip 13 个 / 6 文件**
+- 最近全量分批门禁(2026-11-02,**HEAD `3b277e9`,工作树干净**):
+  **268/268 文件绿,exit 0**,620s(`--jobs 4`);**skip 13 个 / 6 文件**
   (2 个整文件零贡献:`test_oracle_default_sent.py` 3、`test_stored_e2e_acceptance.py` 3)。
-  引用时两个数一起报。这是 Phase 348 并行档的首次全量实跑;与 Phase 346 的
-  258 文件 / 4554s **不是同一口径**(文件集不同、顺序 vs 并行),不能相除当倍数引用。
+  引用时两个数一起报。同一工作内容的前一轮(616s)跑在未提交树上,数字相同、口径更弱;
+  这一轮是提交后的复验,替换之。这是 Phase 348 并行档的首次全量实跑;
+  与 Phase 346 的 258 文件 / 4554s **不是同一口径**(文件集不同、顺序 vs 并行),
+  不能相除当倍数引用。
   跑之前拦下两件事,都记在这里因为它们是这次数字的前提:
   ① `benchmark/server.py` 与 `tests/vuln_server.py` 在批量清理 `benchmark/results/*`
   时被误删,6 个模块 `from server import ...` 全挂(首轮 98s 内 15 文件红,
