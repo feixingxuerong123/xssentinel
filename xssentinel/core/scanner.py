@@ -416,16 +416,50 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
             self._progress.on_start(total)
         if self.threads > 1 and len(endpoints) > 1:
             from .budget import BudgetExhausted, CircuitOpen
+
+            def _ep_task(ep, req):
+                # Phase 350: return this task's own (url, observed finding
+                # delta) so the completion loop below can do the checkpoint
+                # bookkeeping.  The parallel branch used to drop that
+                # bookkeeping entirely -- mark_scanned / add_findings / save
+                # and on_endpoint_done only existed in the serial loop -- so
+                # `--checkpoint` + threads>1 silently wrote a resume file
+                # that believed nothing had been scanned.
+                before = len(self.findings)
+                self.scan_endpoint(*ep, req=req)
+                return ep[0], max(0, len(self.findings) - before)
+
             try:
                 with ThreadPoolExecutor(max_workers=self.threads) as ex:
                     futures = []
                     for i, ep in enumerate(endpoints):
                         if self._progress:
                             self._progress.on_endpoint_start(ep[0], i + 1, total)
-                        futures.append(ex.submit(self.scan_endpoint, *ep,
-                                                 req=self.req.clone()))
+                        futures.append(ex.submit(_ep_task, ep,
+                                                 self.req.clone()))
                     for f in futures:
-                        f.result()  # propagate exceptions
+                        try:
+                            url, n_new = f.result()
+                        except (BudgetExhausted, CircuitOpen) as e:
+                            _log.warning("[!] Scan stopped early (%s) -- "
+                                         "findings so far: %d", e,
+                                         len(self.findings))
+                            break
+                        # The per-endpoint delta is approximate under
+                        # interleaving (another endpoint's finding may land
+                        # inside the window).  add_findings needs an exact
+                        # slice, which concurrency cannot provide, so the
+                        # parallel branch records scanned URLs and counters
+                        # but not the findings copy -- resume only reads
+                        # scanned_urls, so nothing downstream regresses.
+                        if self._checkpoint:
+                            self._checkpoint.mark_scanned(url)
+                            self._checkpoint.requests_made = \
+                                self.requests_made
+                            self._checkpoint.waf_name = self.waf_name
+                            self._checkpoint.save()
+                        if self._progress:
+                            self._progress.on_endpoint_done(url, n_new)
             except (BudgetExhausted, CircuitOpen) as e:
                 _log.warning("[!] Scan stopped early (%s) -- findings so "
                              "far: %d", e, len(self.findings))
