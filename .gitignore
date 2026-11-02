@@ -111,3 +111,8 @@ benchmark/results/_local_archive/
 .nuclei-config/
 .zwork/
 nuclei/config.yaml
+
+# uv 的锁文件(2026-11-02):CI 用 pip + pyproject 的下限安装,从不读这把锁。
+# 入库会造出第二个真相——贡献者按锁装、CI 按下限装,版本一漂移两边都自称"对",
+# 而没有任何门禁能发现分歧。本机 `uv pip install` 仍会生成并使用它,只是不入库。
+uv.lock
