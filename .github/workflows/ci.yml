@@ -291,6 +291,16 @@ jobs:
           # gates on".  nuclei is added for the same reason (2026-10-29:
           # the whole test_nuclei_import file skipped for want of pyyaml).
           pip install -e ".[dev,async,ast,api,nuclei]"
+          # 2026-11-01: nightly failed three schedule runs in a row at the
+          # gate step while the push `tests` job (SAME run_all_batched.py
+          # entry) stayed green in the same run -- the only install delta
+          # was cryptography/playwright/chromium.  Align with the tests
+          # job: a gate that runs with fewer deps than the entry point
+          # promises measures a different suite. (The specific red file is
+          # not yet identified -- job logs need auth to fetch; the next
+          # scheduled run confirms.)
+          pip install cryptography playwright
+          python -m playwright install chromium --with-deps
       - name: Full file-by-file test gate
         run: python tests/run_all_batched.py --quiet
       - name: Evidence-shape sweep (Phase 312, all routes both engines)
@@ -304,10 +314,12 @@ jobs:
           if-no-files-found: ignore
 
   dependency-audit:
-    # Supply-chain measurement (Phase 328c). REPORT-ONLY until the fixed
-    # versions have been verified in an isolated venv (see
-    # docs/DEPENDENCY_AUDIT.md): flipping this to blocking before that run
-    # would make the gate red on known, unmeasured upgrades.
+    # Supply-chain measurement (Phase 328c). Was REPORT-ONLY until the
+    # fixed versions were verified under the declared floors -- see
+    # docs/DEPENDENCY_AUDIT.md: fresh-install audits report 0 advisories
+    # (2026-10-26 / 2026-11-01) and the main job is green on 3.10/3.11
+    # with the floors, so the documented flip condition is met and the
+    # step is blocking since 2026-11-01 (with one transport retry).
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -321,11 +333,44 @@ jobs:
           pip install -e ".[dev,async,ast,api]"
           pip install pip-audit
       - name: Audit installed dependencies
-        continue-on-error: true
-        run: python -m pip_audit --format json -o pip-audit.json
+        # 2026-11-01: flip condition in docs/DEPENDENCY_AUDIT.md ("only
+        # after the main CI job passes on 3.10/3.11 with these floors") is
+        # met -- pushes green on 3.10 min-python + 3.11 main since Phase
+        # 328d (runs 1073ec4 / 2a74478 / 14d0c5d / fad3830 / 793535b), and
+        # fresh-install pip-audit reports 0 advisories (2026-10-26 and
+        # 2026-11-01 re-run).  The retry tolerates OSV transport blips; a
+        # real advisory fails both attempts and stays red.
+        run: python -m pip_audit --format json -o pip-audit.json || python -m pip_audit --format json -o pip-audit.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: pip-audit
           path: pip-audit.json
           if-no-files-found: ignore
+
+  windows-smoke:
+    # 2026-11-01 (release-readiness gap audit): the dev box is Windows and this
+    # repo documents Windows-specific pathologies (mandatory integrity labels vs
+    # Playwright tempdirs, SO_REUSEADDR port shadowing, loopback throttling),
+    # yet every CI job ran on ubuntu only -- the pyproject classifier claims
+    # "OS Independent" with no Windows evidence. This smoke job pins the
+    # platform floor: CLI construction plus the static/architecture gates that
+    # need no loopback. Deliberately NOT the network-heavy suites -- those stay
+    # on Linux where the loopback gate is calibrated.
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install (dev toolchain; core engine only -- no headless/network suites here)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+      - name: CLI smoke (arg parsing + entry points construct on Windows)
+        run: |
+          python -m xssentinel --help
+          python -m xssentinel selftest --help
+      - name: Platform-independent gates (no loopback required)
+        run: pytest tests/test_architecture_scale.py tests/test_quick_gate_slice.py tests/test_silent_except_ratchet.py tests/test_doc_code_counts.py tests/test_cli_subcommands.py -q --timeout=240
