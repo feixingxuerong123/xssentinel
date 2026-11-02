@@ -33,7 +33,7 @@ layer is replaceable on its own. Highlights:
 - **Generative payloads** (XSStrike-style): builds payloads on the fly from
   surviving characters (e.g. tagged-template `alert\`1\`` when parens are
   filtered).
-- **WAF-adaptive bypass**: 23 transform/encoding families from
+- **WAF-adaptive bypass**: 28 transform/encoding families from
   `core/transform.py` `REGISTRY`.
 - **DOM XSS**: static taint analysis (sources → sinks) plus optional JS AST
   data-flow (`esprima`, degrades to regex), plus **real headless-browser
@@ -53,11 +53,31 @@ layer is replaceable on its own. Highlights:
 - **MCP server** (stdio + Streamable HTTP): seven tools for LLM agents with
   argument validation, `structuredContent`/`outputSchema`, progress
   notifications and cancellation — see `skills/xssentinel-mcp/SKILL.md`.
-- **Six report formats**: HTML / JSON / CSV / SARIF 2.1.0 / JUnit / Markdown.
+- **Eight report formats** (`-f`): HTML / JSON / CSV / SARIF 2.1.0 / JUnit / Markdown + Burp XML / nuclei export.
   Every confirmed finding carries a reproducible PoC (curl, URL, self-contained
   HTML page).
 
 Use it **only against systems you are authorized to test.**
+
+> **First time?** Start with [docs/QUICKSTART.en.md](docs/QUICKSTART.en.md) —
+> three commands, four exit codes, and four environment traps that get results
+> misread.
+
+## Quality gates (why this result is believable)
+
+- **Push gate**: a 64-case stratified slice on both engines under `--strict-gate`
+  (FP0 / FN0 / ERROR0 required); the slice rotates per ISO week, 49 weeks cover
+  the full 194-case matrix (numbers pinned by `tests/test_quick_gate_slice.py`).
+- **Full gate**: every `test_*.py` runs file-by-file with its own timeout and one
+  retry (failure evidence survives the run; latest run 258/258 files green with
+  75 skips / 10 files — both numbers reported together). Guards such as the
+  architecture line caps and the broad-except ratchet are mutation-tested
+  (red → restore → green).
+- **Independent target**: the official XSSMaze target + official runner scoring
+  three tools on the same cases; artifacts ship with the repo (see below).
+
+How to run: [CONTRIBUTING.md](CONTRIBUTING.md) ("Testing") and
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ---
 
@@ -81,10 +101,24 @@ XSSMaze v0.3.0 (official runner, 2026-10-24): server 925/88/0 (R 91.3%,
 F1 0.955), client 24/0/0 (F1 1.000), 27 control cases with zero findings.
 Replay-corrected 948/65.
 
-PortSwigger cheat-sheet corpus coverage (822 vectors): the "no user
-interaction" group is **100%** on events, tags and protocols; the
-"requires-interaction" group is only 15.4% — expected, since most of that group
-needs a user gesture and is not counted as the main metric.
+Phase 342 (2026-10-30), same official target + official runner, three tools
+scored identically: XSSentinel TP944 / FN69 / FP0 (P 1.000, R 0.932, F1 **0.965**,
+5741 s), dalfox 757/256/4 (F1 0.853, 4072 s), nuclei 731/282/4 (F1 0.836, 406 s);
+control FP: this repo 0, each competitor 4 (all CSP/nonce-protected pages).
+Caveats: the dalfox arm is the frozen Go branch v2.13.0 (the current Rust v3 was
+not run — its release assets are not fetchable from this host) and ran with
+`--skip-headless` (chromedp instability on this host; headless contribution
+quantified separately on a sample); the XSSentinel scorecard reuses p341 (zero
+detection-surface commits between trees). nuclei remains an order of magnitude
+faster (406 s vs 5741 s). Versions, per-arm deviations and per-case data:
+[benchmark/results/phase342_xssmaze/](benchmark/results/phase342_xssmaze/p342_meta.json).
+
+PortSwigger cheat-sheet corpus coverage (822 vectors; re-run 2026-11-01 against
+the 2026-09-30 cheat-sheet snapshot, product: benchmark/results/portswigger_corpus_coverage.json):
+the "no user interaction" group is **100%** on events, tags and protocols (gap
+zeroed by the Phase 192 corpus additions); the "requires-interaction" group is
+73.1% on events (76/104, up from 15.4% pre-Phase-192) — reference only, not the
+main metric.
 
 ---
 
@@ -92,7 +126,7 @@ needs a user gesture and is not counted as the main metric.
 
 ```
 L1  Reflection  probe today's reflection point -> 20+ contexts -> per-context payloads
-L2  WAF bypass  on block -> 23 transform/encoding families -> retry
+L2  WAF bypass  on block -> 28 transform/encoding families -> retry
 L3  DOM        static source->sink analysis of page JS
 L4  Stored     inject -> re-fetch display page -> confirm persistence
 L5  Blind OOB  (optional) unique-token callbacks -> polling -> beacon = confirmed
@@ -118,7 +152,7 @@ python -m venv .venv && .venv\Scripts\activate     # Windows
 pip install -e .                                   # deps: requests, beautifulsoup4
 ```
 
-Optional headless confirmation (L4/L6 and `--discover`):
+Optional headless confirmation (L6 and `--discover`):
 
 ```bash
 pip install playwright && playwright install chromium
@@ -142,7 +176,7 @@ python -m xssentinel -u "https://example.com/search?q=test" -o report.html
 
 # POST form, auth headers, proxy
 python -m xssentinel -u "https://example.com/comment" -m POST -d "name=x&bio=y"
-python -m xssentinel -u "https://example.com/p" -H "Authorization: Bearer X" -b "session=yyy"
+python -m xssentinel -u "https://example.com/p" -H "Authorization: Bearer <TOKEN>" -b "session=yyy"
 
 # Crawl (depth 2) / checkpoint & resume
 python -m xssentinel -u "https://example.com" -c
@@ -151,7 +185,7 @@ python -m xssentinel -u "https://example.com" -c --checkpoint cp.json --resume
 # Real-browser confirmation (needs playwright)
 python -m xssentinel -u "https://example.com/search?q=test" --headless
 
-# Six report formats
+# Report formats (`-f`: html,json,csv,sarif,junit,markdown,burp,nuclei)
 python -m xssentinel -u "https://example.com/search?q=test" -f sarif -o report.sarif
 
 # Stored XSS: inject at /store, confirm on /view

@@ -20,203 +20,17 @@
     "no_interaction": {
       "events": {
         "portswigger_total": 52,
-        "covered": 12,
-        "missing": 40,
-        "coverage_pct": 23.1,
-        "missing_top": [
-          {
-            "name": "beforematch",
-            "uses": 1
-          },
-          {
-            "name": "durationchange",
-            "uses": 1
-          },
-          {
-            "name": "webkitanimationiteration",
-            "uses": 1
-          },
-          {
-            "name": "scrollend",
-            "uses": 1
-          },
-          {
-            "name": "webkitneedkey",
-            "uses": 1
-          },
-          {
-            "name": "beforeprint",
-            "uses": 1
-          },
-          {
-            "name": "scrollsnapchange",
-            "uses": 1
-          },
-          {
-            "name": "suspend",
-            "uses": 1
-          },
-          {
-            "name": "popstate",
-            "uses": 1
-          },
-          {
-            "name": "transitionrun",
-            "uses": 1
-          },
-          {
-            "name": "transitioncancel",
-            "uses": 1
-          },
-          {
-            "name": "message",
-            "uses": 1
-          },
-          {
-            "name": "playing",
-            "uses": 1
-          },
-          {
-            "name": "animationend",
-            "uses": 1
-          },
-          {
-            "name": "timeupdate",
-            "uses": 1
-          },
-          {
-            "name": "unload",
-            "uses": 1
-          },
-          {
-            "name": "slotchange",
-            "uses": 1
-          },
-          {
-            "name": "hashchange",
-            "uses": 1
-          },
-          {
-            "name": "pagereveal",
-            "uses": 1
-          },
-          {
-            "name": "animationiteration",
-            "uses": 1
-          },
-          {
-            "name": "resize",
-            "uses": 1
-          },
-          {
-            "name": "pageshow",
-            "uses": 1
-          },
-          {
-            "name": "unhandledrejection",
-            "uses": 1
-          },
-          {
-            "name": "loadedmetadata",
-            "uses": 1
-          },
-          {
-            "name": "securitypolicyviolation",
-            "uses": 1
-          },
-          {
-            "name": "validationstatuschange",
-            "uses": 1
-          },
-          {
-            "name": "beforeunload",
-            "uses": 1
-          },
-          {
-            "name": "play",
-            "uses": 1
-          },
-          {
-            "name": "transitionstart",
-            "uses": 1
-          },
-          {
-            "name": "progress",
-            "uses": 1
-          },
-          {
-            "name": "scroll",
-            "uses": 1
-          },
-          {
-            "name": "transitionend",
-            "uses": 1
-          },
-          {
-            "name": "cuechange",
-            "uses": 1
-          },
-          {
-            "name": "animationcancel",
-            "uses": 1
-          },
-          {
-            "name": "ended",
-            "uses": 1
-          },
-          {
-            "name": "webkitanimationend",
-            "uses": 1
-          },
-          {
-            "name": "waiting",
-            "uses": 1
-          },
-          {
-            "name": "canplaythrough",
-            "uses": 1
-          },
-          {
-            "name": "webkitanimationstart",
-            "uses": 1
-          },
-          {
-            "name": "webkittransitionend",
-            "uses": 1
-          }
-        ]
+        "covered": 52,
+        "missing": 0,
+        "coverage_pct": 100.0,
+        "missing_top": []
       },
       "tags": {
         "portswigger_total": 21,
-        "covered": 15,
-        "missing": 6,
-        "coverage_pct": 71.4,
-        "missing_top": [
-          {
-            "name": "slot",
-            "uses": 1
-          },
-          {
-            "name": "address",
-            "uses": 1
-          },
-          {
-            "name": "camera",
-            "uses": 1
-          },
-          {
-            "name": "span",
-            "uses": 1
-          },
-          {
-            "name": "br",
-            "uses": 1
-          },
-          {
-            "name": "b",
-            "uses": 1
-          }
-        ]
+        "covered": 21,
+        "missing": 0,
+        "coverage_pct": 100.0,
+        "missing_top": []
       },
       "protocols": {
         "portswigger_total": 1,
@@ -229,140 +43,28 @@
     "requires_interaction": {
       "events": {
         "portswigger_total": 104,
-        "covered": 16,
-        "missing": 88,
-        "coverage_pct": 15.4,
+        "covered": 76,
+        "missing": 28,
+        "coverage_pct": 73.1,
         "missing_top": [
-          {
-            "name": "pointerdown",
-            "uses": 7
-          },
-          {
-            "name": "mouseup",
-            "uses": 5
-          },
-          {
-            "name": "pointerover",
-            "uses": 5
-          },
-          {
-            "name": "mouseenter",
-            "uses": 5
-          },
-          {
-            "name": "pointerenter",
-            "uses": 5
-          },
-          {
-            "name": "pointermove",
-            "uses": 5
-          },
-          {
-            "name": "mousemove",
-            "uses": 5
-          },
-          {
-            "name": "mousedown",
-            "uses": 3
-          },
           {
             "name": "pageswap",
             "uses": 2
-          },
-          {
-            "name": "select",
-            "uses": 2
-          },
-          {
-            "name": "cancel",
-            "uses": 1
-          },
-          {
-            "name": "auxclick",
-            "uses": 1
-          },
-          {
-            "name": "webkitmouseforcedown",
-            "uses": 1
-          },
-          {
-            "name": "cut",
-            "uses": 1
-          },
-          {
-            "name": "pagehide",
-            "uses": 1
-          },
-          {
-            "name": "beforetoggle",
-            "uses": 1
           },
           {
             "name": "formdata",
             "uses": 1
           },
           {
-            "name": "ratechange",
+            "name": "gesturechange",
             "uses": 1
           },
           {
-            "name": "pointerup",
+            "name": "location",
             "uses": 1
           },
           {
-            "name": "webkitfullscreenchange",
-            "uses": 1
-          },
-          {
-            "name": "contextmenu",
-            "uses": 1
-          },
-          {
-            "name": "paste",
-            "uses": 1
-          },
-          {
-            "name": "pointerout",
-            "uses": 1
-          },
-          {
-            "name": "gotpointercapture",
-            "uses": 1
-          },
-          {
-            "name": "dragexit",
-            "uses": 1
-          },
-          {
-            "name": "fullscreenchange",
-            "uses": 1
-          },
-          {
-            "name": "invalid",
-            "uses": 1
-          },
-          {
-            "name": "beforecut",
-            "uses": 1
-          },
-          {
-            "name": "volumechange",
-            "uses": 1
-          },
-          {
-            "name": "pagereveal",
-            "uses": 1
-          },
-          {
-            "name": "hashchange",
-            "uses": 1
-          },
-          {
-            "name": "pointerleave",
-            "uses": 1
-          },
-          {
-            "name": "touchstart",
+            "name": "mozfullscreenchange",
             "uses": 1
           },
           {
@@ -370,7 +72,23 @@
             "uses": 1
           },
           {
-            "name": "reset",
+            "name": "webkitmouseforcewillbegin",
+            "uses": 1
+          },
+          {
+            "name": "auxclick",
+            "uses": 1
+          },
+          {
+            "name": "webkitfullscreenchange",
+            "uses": 1
+          },
+          {
+            "name": "pagehide",
+            "uses": 1
+          },
+          {
+            "name": "promptdismiss",
             "uses": 1
           },
           {
@@ -378,11 +96,11 @@
             "uses": 1
           },
           {
-            "name": "webkitmouseforcewillbegin",
+            "name": "beforecut",
             "uses": 1
           },
           {
-            "name": "deviceorientationabsolute",
+            "name": "dragexit",
             "uses": 1
           },
           {
@@ -390,7 +108,55 @@
             "uses": 1
           },
           {
-            "name": "dragenter",
+            "name": "gesturestart",
+            "uses": 1
+          },
+          {
+            "name": "command",
+            "uses": 1
+          },
+          {
+            "name": "stream",
+            "uses": 1
+          },
+          {
+            "name": "contextmenu",
+            "uses": 1
+          },
+          {
+            "name": "webkitmouseforceup",
+            "uses": 1
+          },
+          {
+            "name": "webkitwillrevealbottom",
+            "uses": 1
+          },
+          {
+            "name": "mousewheel",
+            "uses": 1
+          },
+          {
+            "name": "webkitpresentationmodechanged",
+            "uses": 1
+          },
+          {
+            "name": "deviceorientation",
+            "uses": 1
+          },
+          {
+            "name": "webkitmouseforcechanged",
+            "uses": 1
+          },
+          {
+            "name": "webkitmouseforcedown",
+            "uses": 1
+          },
+          {
+            "name": "promptaction",
+            "uses": 1
+          },
+          {
+            "name": "deviceorientationabsolute",
             "uses": 1
           }
         ]
@@ -422,6 +188,10 @@
             "uses": 2
           },
           {
+            "name": "usermedia",
+            "uses": 1
+          },
+          {
             "name": "label",
             "uses": 1
           },
@@ -435,10 +205,6 @@
           },
           {
             "name": "area",
-            "uses": 1
-          },
-          {
-            "name": "usermedia",
             "uses": 1
           }
         ]
@@ -454,41 +220,16 @@
     "other": {
       "events": {
         "portswigger_total": 14,
-        "covered": 8,
-        "missing": 6,
-        "coverage_pct": 57.1,
-        "missing_top": [
-          {
-            "name": "afterscriptexecute",
-            "uses": 1
-          },
-          {
-            "name": "loadend",
-            "uses": 1
-          },
-          {
-            "name": "finish",
-            "uses": 1
-          },
-          {
-            "name": "show",
-            "uses": 1
-          },
-          {
-            "name": "beforescriptexecute",
-            "uses": 1
-          },
-          {
-            "name": "bounce",
-            "uses": 1
-          }
-        ]
+        "covered": 14,
+        "missing": 0,
+        "coverage_pct": 100.0,
+        "missing_top": []
       },
       "tags": {
         "portswigger_total": 52,
-        "covered": 36,
-        "missing": 16,
-        "coverage_pct": 69.2,
+        "covered": 37,
+        "missing": 15,
+        "coverage_pct": 71.2,
         "missing_top": [
           {
             "name": "x",
@@ -503,19 +244,7 @@
             "uses": 2
           },
           {
-            "name": "b",
-            "uses": 2
-          },
-          {
-            "name": "tfoot",
-            "uses": 1
-          },
-          {
-            "name": "option",
-            "uses": 1
-          },
-          {
-            "name": "frameset",
+            "name": "frame",
             "uses": 1
           },
           {
@@ -523,15 +252,19 @@
             "uses": 1
           },
           {
+            "name": "strong",
+            "uses": 1
+          },
+          {
+            "name": "frameset",
+            "uses": 1
+          },
+          {
             "name": "thead",
             "uses": 1
           },
           {
-            "name": "t",
-            "uses": 1
-          },
-          {
-            "name": "font",
+            "name": "tfoot",
             "uses": 1
           },
           {
@@ -539,19 +272,23 @@
             "uses": 1
           },
           {
+            "name": "th",
+            "uses": 1
+          },
+          {
+            "name": "font",
+            "uses": 1
+          },
+          {
+            "name": "option",
+            "uses": 1
+          },
+          {
             "name": "tbody",
             "uses": 1
           },
           {
-            "name": "strong",
-            "uses": 1
-          },
-          {
-            "name": "frame",
-            "uses": 1
-          },
-          {
-            "name": "th",
+            "name": "t",
             "uses": 1
           }
         ]

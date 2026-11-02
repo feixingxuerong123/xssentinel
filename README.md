@@ -17,7 +17,7 @@
 XSSentinel 的目标是**在开源/自研工具中做到检测维度最全、架构最干净、最易扩展**：它把通常被单点工具割裂的能力整合进一个流水线，并且每一层都可单独替换/增强。它在以下方面优于常见的单技术 XSS 脚本：
 
 <details>
-<summary><b>展开完整能力清单（36 项，含实现出处与标定历史）</b></summary>
+<summary><b>展开完整能力清单（含实现出处与标定历史）</b></summary>
 
 
 - **6 层检测流水线**：反射 → WAF 绕过 → DOM 污点 → 存储型 → 盲打(OOB) → 无头确认，覆盖大多数工具只做其中 1–2 项的盲区。
@@ -30,7 +30,7 @@ XSSentinel 的目标是**在开源/自研工具中做到检测维度最全、架
 - **自动预编码管道（Phase 34）**：自动识别 base64 / 双重 base64 / JSON-in-base64 / JWT 容器参数，把 payload 用**同样的容器重新包装**后注入（DalFox 思路）——JWT 保留 header 与签名段、JSON 追加字段；命中即跳过对结构化参数几乎无望的明文 payload 循环。
 - **CSP 感知预算门控（Phase 35）**：strict CSP（内联被禁且分析器未发现绕过路径）时自动把反射 payload 预算切到早停档，nonce 策略保守放行（可能存在 nonce 泄露绕过）；可绕过的 CSP 保持全预算。`--async` 高吞吐模式同步接入预编码管道（Phase 43 修复：async 主入口的 `as_completed(async_generator)` 误用与 scan-policy 预设填充缺失均已修复，`--async` 单目标/批量现已端到端可用并有真实 HTTP 回归测试守护）。
 - **验证器 RCDATA 加固（Phase 35）**：lxml 的 HTML 结构修复会把写在 `<title>/<textarea>/<xmp>` 内的标签提升到文档顶层、丢失 RCDATA 祖先——语义验证器现在在结构化解析**之前**先做原始文本 RCDATA 检查，杜绝该类罕见误报；真正的 `</title>` 后逃逸仍然照常确认。
-- **WAF 自适应绕过**：检测到拦截后，自动套用 **23 种**变形/编码家族（混合大小写、HTML/JS/CSS/UTF-7 实体、注释打断、空字节、全角、构造器逃逸、重复属性等）生成绕过变体；数量以 `core/transform.py` 的 `REGISTRY` 为准，新增变形只改 REGISTRY 即可。
+- **WAF 自适应绕过**：检测到拦截后，自动套用 **28 个**变形/编码家族（混合大小写、HTML/JS/CSS/UTF-7 实体、注释打断、空字节、全角、构造器逃逸、重复属性等）生成绕过变体；数量以 `core/transform.py` 的 `REGISTRY` 为准，新增变形只改 REGISTRY 即可。
 - **DOM XSS 静态污点分析**：不依赖服务器响应，直接分析前端 JS 的 source→sink 流（如 `location.hash` → `innerHTML`、jQuery `.html()`、`postMessage` 事件、`dangerouslySetInnerHTML`、`v-html`、`{{ }}` 等）。
 - **JS AST 数据流分析（Phase 43）**：esprima ESTree 解析每个 `<script>` 块，跟踪污点变量跨声明/赋值/拼接的多跳传播（含压缩混淆代码与 postMessage 回调函数体），产出带 `[AST]` 标记的高置信 source→sink 链（DalFox v3 式）；解析失败透明回退正则通道（`pip install xssentinel[ast]` 启用，缺失时自动降级）。
 - **DOM XSS 真·浏览器执行确认（L6 强化）**：在真实无头浏览器（Playwright）里给危险 sink 插桩——`innerHTML`/`outerHTML`/`document.write`/`Function`/`setTimeout`/`location.*`/`window.open`/`setAttribute(on*)`/jQuery `.html()` 等，并把唯一标记注入 `location.hash`/`location.search`/`document.cookie`/`postMessage` 等可控源。**只有页面自己在真实浏览器里执行了载体（弹窗携带本次探针的 token）才判定为已确认（high）`dom_dynamic`**；数据到达 sink 但没有观测到执行时，单独记为 `dom_sink_reachability`（low，投递线索，**不是已确认 XSS**，也不生成可执行 PoC）。这样净化器正确使用的页面（如当前版 DOMPurify + innerHTML）不会被报成高危；range6 的双引擎门禁同时验证 2.0.7 真执行 / 3.4.17 静默。Playwright 不可用时优雅降级为静态启发式，不影响其他层。
@@ -71,15 +71,23 @@ XSSentinel 的目标是**在开源/自研工具中做到检测维度最全、架
 - **CSP 交付家族粒度（Phase 189）**：`script-src-elem` / `script-src-attr` 不是"追加"到 `script-src`，而是对各自投递形态**替换**。原实现（`csp.analyze` / `is_strict_inline` / `gadget_chain_relevant` / `verifier._csp_blocks_inline`）一律只读 `script-src`，于是两个方向都错：`script-src 'self'; script-src-attr 'unsafe-inline'` 被判"内联全禁"（反射型 `onerror` 被否证 = FN，预算还被切到早停档），`script-src https://cdn.example.com`（没有 `'unsafe-inline'`）里的反射 `<script>` 被判可执行 = FP。nonce 的"使 `unsafe-inline` 失效"规则改为**按家族**判定：`script-src` 上的 nonce 不再吃掉 `script-src-attr` 里的 `unsafe-inline`。同时 `'unsafe-hashes'` 与 gadget 主机识别覆盖 `-elem`/`-attr` 列表。
 - **净化器语料现代化（Phase 189）**：DOMPurify 版本线从"停在 2020（<2.0.8）"改为三段**修复线**（<2.0.8 mXSS／<3.1.3 原型污染+嵌套 mXSS／≤3.4.15 2026 集群），编号取自厂商 advisory 列表（GitHub API 实测 25 条，最新发布 3.4.16），并按"一个版本一条发现"去重（横幅注释与 npm 路径两种形态不再各报一次）。2026 年全部 advisory 的利用面都是**配置项**而非标签白名单，故新增 `IN_PLACE` / `CUSTOM_ELEMENT_HANDLING` / `SAFE_FOR_TEMPLATES` / `setConfig()` 持久化 / `USE_PROFILES` / `ADD_ATTR` 里的 `on*`（high）/ `ADD_URI_SAFE_ATTR` / `ALLOWED_URI_REGEXP` / `RETURN_TRUSTED_TYPE` 检测，且带"加固过的页面必须沉默"反向对照。
 - **Source map 摄取（Phase 189，对标 nexa / ASTra 类 JS 源码挖掘）**：`//# sourceMappingURL=`（含 legacy `//@`、块注释形、`data:` 内联形）→ 取回 `.map` → `sourcesContent` 里的**未压缩原始源码**进既有 JS 端点/汇聚点挖矿通道（压缩改名的路由、被 tree-shake 掉的 API 路径只有在这里看得见）；能读回 `sourcesContent` 时另记一条 `source_map_exposed`（low）发现。两道硬限制：每个脚本最多取一个 map、引用指向别的源就不取（页面点名的 URL 不构成抓取授权）；非 JSON/超限 body 静默不炸挖矿。
-- **多格式报告 + 并发**：HTML / JSON / CSV / **SARIF(2.1.0) / JUnit / Markdown** 六格式，SARIF 可直接接入 CI / 缺陷平台（如 GitHub code scanning、Defender、Jira）；多线程端点/参数并发扫描；报告与 PoC 产物在 POSIX 上以 **0600** 写出（Phase 326，产物含目标 URL/参数/载荷，共享主机上不应全局可读）。
+- **多格式报告 + 并发**：HTML / JSON / CSV / **SARIF(2.1.0) / JUnit / Markdown** 六种文档格式 + Burp XML / nuclei 两种生态导出，SARIF 可直接接入 CI / 缺陷平台（如 GitHub code scanning、Defender、Jira）；多线程端点/参数并发扫描；报告与 PoC 产物在 POSIX 上以 **0600** 写出（Phase 326，产物含目标 URL/参数/载荷，共享主机上不应全局可读）。
 
 
 </details>
 
 **只用于你被授权测试的系统。**
 
-> **第一次用？** 先看 [`docs/QUICKSTART.md`](docs/QUICKSTART.md)——五条命令、三个退出码、
-> 四个会让人误读结果的环境陷阱。上面这 36 项能力清单是**参考**，不是上手路径。
+> **第一次用？** 先看 [`docs/QUICKSTART.md`](docs/QUICKSTART.md)——三条命令、四个退出码、
+> 四个会让人误读结果的环境陷阱。上面这份能力清单是**参考**，不是上手路径。
+
+## 质量门禁（为什么可以信这份结果）
+
+- **push 门**：64 例分层切片 × 双引擎，`--strict-gate` 要求 FP0 / FN0 / ERROR0；切片按 ISO 周轮转，49 周覆盖全 194 例矩阵（数字由 `tests/test_quick_gate_slice.py` 钉住）。
+- **全量门**：全部 test_*.py 逐文件分批跑（每文件独立超时 + 一次重试，失败证据随 CI 产物留存；最近一次 258/258 文件绿，skip 75 例 / 10 文件——两个数一起报）；架构行数上限、宽泛吞异常棘轮等守卫做过变异对照（红→还原→绿）。
+- **独立靶**：官方 XSSMaze 靶 + 官方 runner 同 scorer 三工具对跑，产物随仓库分发（见下「外部效度」）。
+
+跑法与口径见 [CONTRIBUTING](CONTRIBUTING.md)「测试」一节与 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
 
 ---
 
@@ -97,18 +105,18 @@ python benchmark/portswigger_corpus_coverage.py --html pw.html \
     --json benchmark/results/portswigger_corpus_coverage.json
 ```
 
-当前结果（822 条向量，对照 `payloads.json` / `svg_xss.json` / `framework_xss.json`）：
+当前结果（2026-11-01 复跑，cheat sheet 快照 2026-09-30，产物 `benchmark/results/portswigger_corpus_coverage.json`；822 条向量，对照 `payloads.json` / `svg_xss.json` / `framework_xss.json`）：
 
 | 分组 | 向量数 | 事件处理器覆盖 | 标签覆盖 | 协议覆盖 |
 |---|---|---|---|---|
 | **无需用户交互**（主指标） | 57 | **100%**（52/52，Phase 192 补齐 40 个缺失事件） | 100%（21/21，Phase 192 补齐 6 个缺失标签） | 100%（1/1） |
-| 需用户交互（仅参考） | 520 | 15.4%（16/104） | 74.4%（29/39） | 100%（2/2） |
+| 需用户交互（仅参考） | 520 | 73.1%（76/104，Phase 192 语料补齐后） | 74.4%（29/39） | 100%（2/2） |
 | 其他（标签 / 框架 / 协议类） | 245 | **100%**（14/14，Phase 192） | 71.2%（37/52） | 100%（3/3） |
 
 **为什么只把"无需用户交互"当主指标**：cheat sheet 穷举了浏览器整个事件面，其中一大半
 （pointerdown / mousemove / mouseenter …）必须用户交互才触发，把它们算进分母会得出一个
-误导性的低数字（三组混算只有 15.4%）。公平口径是看注入即执行的那一组——Phase 192 起该组
-**三维全部 100%**。
+误导性的低数字（Phase 192 语料补齐前，三组混算实测只有 15.4%）。公平口径是看注入即执行的那一组——Phase 192 起该组
+**三维全部 100%**（2026-11-01 复跑确认）。
 
 **这个数字不能说明什么**（别拿它自欺）：
 
@@ -116,9 +124,10 @@ python benchmark/portswigger_corpus_coverage.py --html pw.html \
 - 覆盖 ≠ 能检出：这只测"检测面有没有提到这项技术"，不测端到端检出率；
 - 忽略 PortSwigger 标注的浏览器支持差异。
 
-缺口 top（`no_interaction` 组，按 PortSwigger 使用频次）：`beforematch`、`durationchange`、
-`scrollend`、`beforeprint`、`webkitanimationiteration`、`scrollsnapchange`、`popstate`、
-`transitionrun` 等 40 个事件处理器；标签侧缺 `slot`、`address`、`camera`、`span`、`br`、`b`。
+缺口 top（2026-11-01 复跑口径）：`no_interaction` 组（主指标）三维缺口已**清零**；当前缺口集中在参考组——
+`requires_interaction` 事件缺 28 个（`pageswap`、`formdata`、`auxclick`、`pagehide`、`gesturechange` 等）、
+标签缺 10 个（`param`、`geolocation`、`noembed`、`xmp`、`noframes` 等）；`other` 组标签缺 15 个
+（`x`、`frame`、`strong`、`frameset`、`thead`/`tfoot` 等）——多为需交互或纯展示标签，不影响主指标。
 
 
 ## 外部参照：同类开源扫描器同靶跑分（2026-10-04）
@@ -179,7 +188,7 @@ python range3/server.py 8902               # 单独起靶场(app 模式)
 
 ```
 L1  反射层    探针定位反射点 → 上下文分析(20+ 种) → 按上下文选 payload 并发射
-L2  WAF 绕过   命中拦截 → 套用 23 种变形/编码家族生成变体 → 再尝试
+L2  WAF 绕过   命中拦截 → 套用 28 个变形/编码家族生成变体 → 再尝试
 L3  DOM 层     静态分析页面 JS：source( location/document/postMessage… ) → sink( innerHTML/eval/jQuery… )
 L4  存储层     注入 → 重新拉取"展示页" → 确认持久化执行
 L5  盲打层     (可选)为每处注入生成唯一 token 的 OOB payload → 轮询回调监听 → 收到 beacon 即"已确认"盲打
@@ -210,7 +219,7 @@ python -m venv .venv && .venv\Scripts\activate     # Windows
 pip install -e .                                   # 依赖：requests, beautifulsoup4
 ```
 
-可选（用于 L4 无头浏览器确认）：
+可选（用于 L6 无头浏览器确认）：
 ```bash
 pip install playwright && playwright install chromium
 ```
@@ -250,7 +259,7 @@ python -m xssentinel -u "https://example.com/search?q=test" -o report.html
 python -m xssentinel -u "https://example.com/comment" -m POST -d "name=x&bio=y"
 
 # 带认证 / 代理
-python -m xssentinel -u "https://example.com/p" -H "Authorization: Bearer XXX" -b "session=yyy"
+python -m xssentinel -u "https://example.com/p" -H "Authorization: Bearer <TOKEN>" -b "session=yyy"
 
 # 表单登录（认证感知爬取）：登录成功后 cookie/token 自动携带，会话丢失自动重登
 python -m xssentinel -u "https://example.com/app" -c \
@@ -280,7 +289,7 @@ python -m xssentinel -u "https://example.com/search?q=test" --dom-engine playwri
 # 仅用静态启发式（不启动浏览器，最快）
 python -m xssentinel -u "https://example.com/search?q=test" --dom-engine static
 
-# 六种报告（-f 支持 html,json,csv,sarif,junit,markdown）
+# 多格式报告（-f 支持 html,json,csv,sarif,junit,markdown,burp,nuclei）
 python -m xssentinel -u "https://example.com/search?q=test" -f json -o report.json
 python -m xssentinel -u "https://example.com/search?q=test" -f sarif -o report.sarif
 
@@ -547,7 +556,7 @@ xssentinel/
     ├── generator.py       # 生成式 payload 构造器（仅用存活字符拼装）
     ├── pre_encode.py      # 自动预编码管道（base64/JWT/JSON 容器同构注入）
     ├── payloads.py        # payload 语料加载与按上下文检索
-    ├── transform.py       # 23 种 WAF 绕过变形/编码家族（REGISTRY 为准）
+    ├── transform.py       # 28 个 WAF 绕过变形/编码家族（REGISTRY 为准）
     ├── waf.py             # WAF/拦截指纹识别
     ├── verifier.py        # 语义确认 + 无头确认（BeautifulSoup 结构化判定）
     ├── dom.py             # DOM XSS 静态污点分析
@@ -680,6 +689,16 @@ async 的 12 个 SKIP = stored 6 + upload 2 + second-order 2 + scenario 2，mani
 27 条控制例 **0 findings**。server 的 88 条 FN 中，主体是 query 能力缺口；
 body/header/path 约 35 条是官方 runner 只给 URL 的投递契约形状。4 条 100s wrapper
 超时单独复跑 10–12s 完成并命中，补齐口径 **929 / 84 / 0（R 91.7% / F1 0.957）**。
+
+**同 scorer 三工具对跑（Phase 342，2026-10-30）**：同一官方 XSSMaze v0.3.0 靶 + 官方
+runner，三工具逐例对跑——XSSentinel **TP944 / FN69 / FP0**（P 1.000 / R 0.932 /
+F1 **0.965**，5741s）、dalfox 757/256/4（F1 0.853，4072s）、nuclei 731/282/4
+（F1 0.836，406s）；控制例 FP 我方 0、两竞品各 4（均为 CSP/nonce 防护页）。
+**口径限定**：dalfox 臂是 Go 冻结分支 v2.13.0，现行 Rust v3 未对跑（本机取不到其
+release 资产）；其 chromedp headless 层在本机不稳而 `--skip-headless`（该层贡献已
+另行抽样量化）；我方记分卡复用 p341（两树检测面零提交差）。速度维度 nuclei 仍快
+一个量级。工具版本、逐项 deviation 与逐例数据见
+[`benchmark/results/phase342_xssmaze/`](benchmark/results/phase342_xssmaze/p342_meta.json)。
 
 ### 基准工具链
 
