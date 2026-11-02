@@ -18,6 +18,20 @@
 
 ### Added
 
+- **分批 runner 并行档 `--jobs N`(Phase 348)**:`tests/run_all_batched.py` 的每文件
+  循环体原样提取为 `_run_one`,`--jobs N` 用线程池并发跑文件子进程(每文件单元本就
+  是阻塞的 subprocess.run);默认 1 = 历史顺序行为逐字节不变,verdict/重试/日志/
+  耗时报告全同。A/B 实测(11 文件头部权重抽样,2026-11-02):顺序 465s → jobs=4
+  **124s(3.75×)**,逐文件 verdict 与单文件耗时零漂移(test_pipeline 69.0s → 69.9s);
+  全量门禁按 Amdahl 投影约 600–700s,**2026-11-02 全量实跑兑现 616s**(268 文件,
+  exit 0,skip 13/6)。守卫
+  `tests/test_runner_parallel.py`:解析契约(畸形 `--jobs` 响亮报错,绝不静默回退
+  串行)+ 双模式端到端 verdict 对比(真子进程,不用替身)。
+- **`pyyaml>=6.0` 进 dev extras(Phase 348)**:`test_nuclei_import.py` 整文件
+  `importorskip("yaml")`,dev 安装缺 PyYAML 时它整文件跳过还计绿(零贡献;
+  2026-10-29 hosted 门禁在 CI 加 [nuclei] extra 前就红过同一形状)。声明进 dev 后
+  本地 = CI 同一套件;单文件实跑 16 passed。运行期 [nuclei] extra 保持独立
+  (那是扫描器功能,不是测试依赖)。
 - **失败原因进汇总与报告(Phase 347)**:`_Tally` 过去只累加 `failed`,把「为什么」
   丢掉。实测(关闭端口 + `--log-level debug`)五个请求全失败,输出只有
   `Scan incomplete: 5 of 5 request(s) received no response`,一个字的原因都没有;
@@ -55,6 +69,16 @@
   预算比实际高 25% 以上(棘轮被抬成摆设)。变异对照:把 `scanner.py` 预算
   改成 1000 → 红(`2246 > 1000`),还原 → 4 passed。该测试第一次运行就抓到
   自己给 `async_scanner_verify.py` 留的 68% 余量。
+- **新维护者上手路径 `docs/ONBOARDING.md`(外部评审回灌,2026-11-01)**:AGENTS/ARCHITECTURE 是为作者自己的记忆服务的,本页补**顺序**——第 0 天环境(uv 三件套 + 秒级结构自检)、第 1 周真实门禁(全量分批 + 切片 + range3)、改动→必跑速查、历史去哪查;nightly 安装面教训写成 why-line:同一入口的两次门禁必须同依赖面,否则量的是两套套件。
+- **文档计数守卫 `tests/test_doc_code_counts.py`(外部评审回灌,2026-11-01)**:`test_quick_gate_slice` 的数字闸只覆盖切片/矩阵类,README 的 REGISTRY 家族数(自称 23,实测 28)与能力条数(自称 36,实为 42)在多个 Phase 里无人看守地腐烂。新增守卫把「代码派生计数」钉住:README(中/英)写的家族数必须等于 `len(REGISTRY)`,历史烂账字符串禁入;会持续增长的能力条数改为去数字化表述(没有数字就没有数字可腐烂)。
+
+### Changed
+
+- **PortSwigger 覆盖证据刷新(外部评审回灌,2026-11-01)**:README 现在时的 100%(52/52)此前在仓库内没有产物支撑——唯一产物停在 Phase 192 之前的 23.1%(12/52),同文档「缺口 top」又把同一批 40 个事件列为当前缺口,构成自相矛盾。用 2026-09-30 cheat sheet 快照复跑 `portswigger_corpus_coverage.py`:no_interaction 组三维 **100% 证实**,产物刷新;requires_interaction 事件 16/104 → 76/104(Phase 192 语料补齐的效果),缺口段落按复跑口径重写(主指标缺口清零,移到参考组)。
+- **文档计数去数字化/实数化(外部评审回灌,2026-11-01)**:「36 项」去数字化;「23 种」→ 28 并由守卫钉住;「六种报告」→ -f 八种口径(六文档格式 + burp/nuclei 两种生态导出);README 指针摘要与 QUICKSTART 实际小节对齐(三条命令/四个退出码);`Authorization= Bearer XXX` → `Authorization: Bearer <TOKEN>`(原写法非合法 HTTP 头);L4→L6 层号笔误;AGENTS 快照刷新到当日实测。
+- **CI:nightly-gate 安装面对齐(外部评审回灌,2026-11-01)**:nightly 连续三个 schedule run 红(11-01/10-31/10-30)而同一 run 的 push `tests` job(同一 `run_all_batched.py` 入口)全绿——唯一安装差异是少装 cryptography/playwright/chromium。本机用 import 屏蔽 shim 复现该环境:**6 个无守卫导入 playwright 的测试文件 23 failed + 16 errors**(range7_construct_browser / crawl_stats / phase196_csp_delivery / range6 / spa_crawler_fallback / spa_crawler_nav_recovery)。已对齐安装面,待下一次 schedule run 端到端确认。
+- **CI:dependency-audit 翻为阻断(外部评审回灌,2026-11-01)**:REPORT-ONLY 是 DEPENDENCY_AUDIT.md 写明翻转条件的刻意设计;条件已满足(328d 后 3.10/3.11 push 全绿 + 两次全新安装审计 0 告警:2026-10-26 与 2026-11-01 复跑「No known vulnerabilities found」)。加一次传输重试——OSV 抖动不假红,真漏洞两次都红。
+- **benchmark/results 产物瘦身(外部评审回灌,2026-11-01)**:落地「只保留被文档引用的证据与被脚本读取的输入」口径——27 个(约 3.3MB,含 corpus_gap/gate_cost 的 6 个输入固件)入库,338 个(约 16.5MB)去跟踪并移入 gitignored 的 `_local_archive/`(仅本机留档);仓库 tracked 文件 1129 → 791。
 
 ### Fixed
 

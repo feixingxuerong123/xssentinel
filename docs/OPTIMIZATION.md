@@ -888,9 +888,12 @@ ephemeral 绑定把机制本身去掉了。
 已完成: 2.3 range5(Phase 220,Lit)+ 2.1 parity 门扩到全 192 例(Phase 222,182 例 0 分歧)
 已完成: 1.0 商业工具 × 真实第三方靶对跑(Phase 342,XSSMaze 官方靶三工具同 scorer:
           我方 944/69/0 F1 0.965,dalfox 757/256/4 F1 0.853,nuclei 731/282/4 F1 0.836;
-          controls FP 我方 0、两竞品各 4 且全部是 CSP/nonce 防护页;详见 AGENTS.md 342)
+          controls FP 我方 0、两竞品各 4 且全部是 CSP/nonce 防护页;证据与全部 deviation 见
+          benchmark/results/phase342_xssmaze/(p342_meta.json;AGENTS.md 过程日志已归档,
+          342 条目以该产物为准))
 已完成: 1.4 _probe_param 拆分(Phase 211,787 → 171 行;当前 209 行)
-1.0 的最后一支已测(342);后续候选见 AGENTS.md 342 的 14 例 we-only-miss 清单
+1.0 的最后一支已测(342);后续候选(14 例 we-only-miss)清单在 dev/_xssmaze/DEVLOG.md
+——该目录 gitignore 不随仓库分发,如需对外先复制进 benchmark/results/phase342_xssmaze/
 顺手:  3.x 随对应模块改动时一并处理
 ```
 
@@ -1011,3 +1014,40 @@ async scan()        : [['reflected','high','high']]
 假红,是**假绿**:一个语法上正确、逻辑上匹配不到任何东西的门,比没有门更
 危险,因为它看起来在工作。本轮是变异验证救了它 —— 如果省掉那一步,
 就会把这道假门当成"已覆盖 Phase 222"写进账上。
+
+## 7. 外部评审回灌(2026-11-01):已修与待决
+
+2026-11-01 的一次全方面只读评审回灌的处置记录。口径:行数为 wc -l 物理行;本节只追加,未改动上文任何既有数字。
+
+**已修(本轮,均有实测/产物背书)**:
+
+- PortSwigger 覆盖表:用 2026-09-30 cheat sheet 快照复跑 `benchmark/portswigger_corpus_coverage.py`,
+  产物 `portswigger_corpus_coverage.json` 刷新——no_interaction 组三维 100% **证实**。此前仓内唯一产物
+  停在 Phase 192 之前的 23.1%(12/52),README 的 100% 声明在仓库内没有证据支撑;现在有了。同时把
+  requires_interaction 事件 16/104 → 76/104(Phase 192 语料补齐的效果)与「缺口 top」段落按复跑口径重写
+  (no_interaction 缺口已清零,缺口移到参考组)。
+- 计数漂移治理:README「36 项」去数字化(清单条数随 Phase 增长,没有数字就没有数字可腐烂);
+  「23 种」实数化为 28 并新增 `tests/test_doc_code_counts.py` 钉住 len(REGISTRY)(中英同步,禁入清单模式);
+  「六种报告」改为 -f 八种口径(六文档格式 + burp/nuclei 两种生态导出);QUICKSTART 的 36 复述同步。
+- AGENTS.md 快照刷新到当日实测;`test_failure_reasons` 用例数去数字化。
+- README 中英 `Authorization` 示例改为 `Authorization: Bearer <TOKEN>`(原文 `= Bearer XXX` 不是合法
+  HTTP 头写法,且演示凭据应显式占位);L4→L6 层号笔误;README 指针摘要与 QUICKSTART 实际小节对齐
+  (三条命令/四个退出码)。
+
+**待决(需归属者决策,不宜单方面动)**:
+
+1. ~~dependency-audit 永不红~~ **已处置(2026-11-01)**:复查发现 report-only 是 DEPENDENCY_AUDIT.md 写明
+   翻转条件的刻意设计(初评「名存实亡」判断不公,已更正);条件当日满足(328d 后 push 全绿 + 两次全新安装
+   审计 0 告警),已翻为阻断并加一次传输重试,详见该文档 Remaining verification。另发现并修复:nightly-gate
+   的安装面比 push tests job 少 cryptography/playwright/chromium,同一入口连红三天(11-01/10-31/10-30
+   schedule)而 push 全绿——已对齐,待下一次 schedule run 确认变绿。
+2. `nightly-gate` 与 push `tests` job 同入口同 extras,增量有限——评估合并或错峰,省下的额度可喣
+   nightly 全矩阵。
+3. ~~产物入库体积~~ **已处置(2026-11-01)**:落地"只保留被文档引用的证据与被脚本读取的输入"口径——
+   results 根目录留 27 个(约 3.3MB,含 corpus_gap/gate_cost 的 6 个输入固件与全部文档引用产物),
+   其余 338 个跟踪产物(约 16.5MB)去跟踪并移入 gitignored 的 `_local_archive/`(仅本机留档);
+   regression_logs 本就未跟踪。仓库跟踪文件 1129 → 791。
+4. README.en 同步机制:本轮 EN 已修一处与中文脱节的实错;建议建立中英对照检查单,EN 保持
+   "压缩版"定位但数字必须同源。
+5. 外部效度:与商业工具在同一独立靶上的对跑仍未发生;Juice Shop 20.2.0 单挑战验证(Phase 209)
+   是现成起点,全集对跑是下一步。

@@ -16,7 +16,8 @@ playwright install chromium        # 仅 headless 确认层需要
 - Python >= 3.10(3.9 已 EOL,自 Phase 328d 起不再支持——见 README 与 pyproject
   的 `requires-python`;CI 跑 3.11,另有 3.10 下限冒烟门)。
 - core 仅依赖 requests / beautifulsoup4 / lxml,其余能力全部走 extras,按需安装。
-  `dev` 已含 `cryptography`(test_passive_mitm* 与 `--mitm-ca` 需要它);
+  `dev` 已含 `cryptography`(test_passive_mitm* 与 `--mitm-ca` 需要它)与 `pyyaml`
+  (test_nuclei_import 不再因缺 PyYAML 整文件跳过,本地 = CI 同一套件);
   单独部署被动代理 HTTPS 拦截时装 `mitm` extra。
 
 ## 测试
@@ -26,8 +27,19 @@ playwright install chromium        # 仅 headless 确认层需要
 
 ```bash
 python tests/run_all_batched.py --quiet   # 全量逐文件门禁(本机约 60-75 分钟)
+python tests/run_all_batched.py --jobs 4  # 并行档(可选,见下)
 python -m pytest tests/test_report.py -q  # 单文件快速迭代
 ```
+
+- 并行档 `--jobs N`(可选,默认 1 = 历史顺序行为逐字节不变):N 个文件子进程并发,
+  每文件的预算/重试/verdict/日志/耗时报告语义不变。A/B 实测(2026-11-02,11 文件
+  头部权重抽样):顺序 465s → jobs=4 **124s(3.75×)**,逐文件 verdict 与单文件耗时
+  零漂移(test_pipeline 69.0s → 69.9s)。全量门禁按 Amdahl 投影约 600–700s(头部
+  三个重文件串行收尾),**2026-11-02 全量实跑兑现 616s**(268 文件,exit 0,skip 13/6)。
+  默认不开的原因:
+  本机 loopback 在负载下会劣化——开低档(2–4),绿数与 skip 数照旧两个一起报。
+  解析契约:畸形 `--jobs`(缺值/非整数/0/负数)响亮报错,绝不静默回退串行;
+  守卫见 `tests/test_runner_parallel.py`。
 
 - runner 对每个文件独立 540s 预算(可覆盖),失败/超时才写日志到
   `benchmark/results/regression_logs/<时间戳>/`。
@@ -82,7 +94,7 @@ python range4/runner.py --engine both    # React/Vue 真实框架 SPA 靶场(FN/
 
 ## CI
 
-`.github/workflows/ci.yml` 六个 job(全部 ubuntu-latest):
+`.github/workflows/ci.yml` 七个 job(ubuntu-latest + windows-smoke):
 
 | job | 触发 | 内容 |
 |---|---|---|
@@ -91,7 +103,8 @@ python range4/runner.py --engine both    # React/Vue 真实框架 SPA 靶场(FN/
 | min-python | push / PR / 手动 / 定时 | Python 3.10 下限冒烟(CLI + transport + MCP + API gate + sitemap) |
 | benchmark-full | 手动 / 定时 | 完整 194 例双引擎矩阵(sync + async) |
 | nightly-gate | 定时 / 手动 | 全量逐文件门禁(`run_all_batched` 同口径)+ evidence-shape sweep(全路由双引擎) |
-| dependency-audit | 定时 / 手动 | 依赖审计(REPORT-ONLY,见 `docs/DEPENDENCY_AUDIT.md`) |
+| windows-smoke | push / PR | Windows 平台地板:CLI 构造 + 无 loopback 依赖的静态门(架构行数/切片数字/吞异常棘轮/文档计数/子命令)——`OS Independent` 从声明变成被测量 |
+| dependency-audit | 定时 / 手动 | 依赖审计(2026-11-01 起阻断;翻转依据与两次 0 告警实测见 `docs/DEPENDENCY_AUDIT.md`) |
 
 PR 需保证 tests / drills / min-python 三个 job 绿; nightly 红灯先看是否为已知
 环境问题。门禁体系各层如何协作见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。

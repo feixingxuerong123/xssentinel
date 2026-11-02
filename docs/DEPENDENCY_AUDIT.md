@@ -96,12 +96,17 @@ is rejected by pip (`3.9.4 not in '>=3.10'`), and the built wheel's
 
 ## Remaining verification
 
-1. The quick strict slice passed under the new floors: sync TP36/FP0/TN28/
-   FN0/ERR0 (64, 0 SKIP, 414.1s) and async TP36/FP0/TN27/FN0/ERR0 (63,
-   1 SKIP, 392.2s), F1=1.0 both, matching the Phase 190 baseline.  The full
-   192-case matrix and the full file-by-file suite have not run yet.
-2. Flip the nightly `dependency-audit` job from report-only to blocking
-   only after the main CI job passes on 3.10/3.11 with these floors.
+1. ✅ (2026-11-01) The full suites have since run under the floors on CI:
+   the push `tests` job (full file-by-file gate, 3.11) is green on
+   2026-10-29 / 10-31 / 11-01 (runs 1073ec4 → 793535b), and `benchmark-full`
+   (full 194-case matrix) is green in the 2026-11-01 nightly. The quick
+   strict slice record under the floors (Phase 328d) is kept below.
+2. ✅ Flipped 2026-11-01: the main CI job has passed on 3.10 (min-python)
+   and 3.11 (tests) with these floors on every push since Phase 328d, and
+   two fresh-install audits report 0 advisories (2026-10-26; 2026-11-01
+   re-run on the declared venv, artifact in the gitignored local archive).
+   The nightly step is now blocking with one retry for OSV transport
+   blips; a real advisory fails both attempts and stays red.
 3. Python 3.9 is intentionally unsupported; do not reintroduce a 3.9 path
    that silently resolves the vulnerable releases.
 
