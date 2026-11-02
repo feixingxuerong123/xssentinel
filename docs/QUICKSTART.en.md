@@ -121,8 +121,13 @@ issue: once some async/DOM test binds the event loop, every subsequent sync Play
 call fails with "Sync API inside the asyncio loop". You must use the batched runner:
 
 ```bash
-python tests/run_all_batched.py --quiet
+python tests/run_all_batched.py --quiet              # sequential, ~60-75 min here
+python tests/run_all_batched.py --quiet --jobs 4     # parallel: 268 files in 616s, measured 2026-11-02
 ```
+
+Both modes produce the same per-file verdicts; `--jobs` only changes wall-clock time.
+Quote the **skip count together with the pass count** — a gate whose whole files were
+skipped contributed nothing.
 
 **④ Local loopback degradation.** Some security software intermittently cuts loopback
 TCP, which shows up as random failures. Re-run the single file first; if the re-run

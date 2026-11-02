@@ -1,7 +1,7 @@
 # 五分钟上手
 
 这份文档只回答一个问题:**怎么在五分钟内拿到一个我能判断真假的结果**。
-36 项能力清单在 [README](../README.md),检测原理在「检测架构」一节——
+完整能力清单在 [README](../README.md),检测原理在「检测架构」一节——
 那些是参考,不是上手路径。
 
 ---
@@ -111,8 +111,12 @@ esac
 必须用分批 runner:
 
 ```bash
-python tests/run_all_batched.py --quiet
+python tests/run_all_batched.py --quiet              # 顺序档,本机约 60–75 分钟
+python tests/run_all_batched.py --quiet --jobs 4     # 并行档,2026-11-02 实测 268 文件 616s
 ```
+
+两档逐文件 verdict 一致,`--jobs` 只换墙钟不改判定;引用结果时**跳过数必须一起报**
+(整文件 skip 的门禁什么都不曾贡献)。
 
 **④ 本机 loopback 劣化。** 部分安全软件会间歇掐断 loopback TCP,表现为
 随机失败。先单文件复跑;复跑通过就按「未验证」记账,不要当回归。

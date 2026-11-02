@@ -16,13 +16,14 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
 | 门禁体系如何运作 / Mixin 隐式契约 | `docs/ARCHITECTURE.md` |
 | 优化 backlog(含明确不做清单) | `docs/OPTIMIZATION.md` |
 | 安装、使用、能力清单 | `README.md` |
+| 新维护者上手路径(第一周怎么跑) | `docs/ONBOARDING.md` |
 
 ## 规则约定
 
 ### 架构硬规则
 
 - scanner.py 已 Mixin 拆分(2026-11-01 实测:核心 2246 行 + layers 936 + crawl 483 + stored 982 + findings 377):新增能力进对应 Mixin,不堆回主文件。**行数上限由 `tests/test_architecture_scale.py` 钉住**(核心 2400 / layers 1050 / crawl 550 / stored 1100 / findings 450);超限只有两条路——拆,或显式抬预算并在提交信息里写明理由。上一版(2026-10-05)的实测数字是 1869/769/406/579/216,即四周内核心涨了 20%、stored 涨了 70% 而无人报警,这就是把数字改成上限的理由:被测量的规则才是规则
-- async_scanner.py 已同样 Mixin 化(2026-11-01 实测:核心 1434 行 + layers 2148 + crawl 588 + verify 119 + common 456,Phase 191):新增 async 能力进对应 Mixin,不堆回主文件;**搬代码与改逻辑绝不混在同一轮**。上限同由 `tests/test_architecture_scale.py` 钉住(1600 / 2350 / 650 / 145 / 520)
+- async_scanner.py 已同样 Mixin 化(2026-11-01 实测:核心 1434 行 + layers 2148 + crawl 588 + verify 119 + common 490,Phase 191):新增 async 能力进对应 Mixin,不堆回主文件;**搬代码与改逻辑绝不混在同一轮**。上限同由 `tests/test_architecture_scale.py` 钉住(1600 / 2350 / 650 / 145 / 520)
 - fix_advice.py 数据化(2026-10-05 实测:127 行引擎 + JSON 语料):改建议优先改语料
 - 多步检测优先写场景 DSL,而非过程式代码
 
@@ -50,21 +51,40 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
 
 - 新增检测层必须**同时**注册 `coverage.LAYERS` 与 `layer_coverage` 矩阵(Phase 187/192 两次被门禁抓到的同一课)。
 
-## 当前状态(2026-11-01)
+## 当前状态(2026-11-02)
 
-- 版本 1.3.0;最新 Phase 347。源码 58,902 行 / 测试 263 文件 60,379 行(接近 1:1)。
+- 版本 1.3.0;最新 Phase 349。源码 133 文件 59,076 行 / 测试 268 文件 61,216 行(接近 1:1;2026-11-02 复测)。
   Phase 347 新增四个门禁:`tests/test_architecture_scale.py`(Mixin 行数上限)、
-  `tests/test_failure_reasons.py`(失败原因可见化,15 例)、
+  `tests/test_failure_reasons.py`(失败原因可见化)、
   `tests/test_temp_dir_fallback.py`(临时目录回退,11 例)、
   `tests/test_silent_except_ratchet.py`(宽泛吞异常棘轮,110 处/34 文件,只许降)。
   行数上限与吞异常棘轮两个做过变异对照(红→还原→绿),另两个靠真实入口实跑验证。
-- 最近全量分批门禁(Phase 346,HEAD 含 4 个 post-345 提交):
-  **258/258 文件绿,exit 0**,4554s;skip 75 个 / 10 文件(2 个整文件零贡献:
-  `test_nuclei_import` 缺 PyYAML、`test_stored_e2e_acceptance` 需 opt-in)。
-  引用时两个数一起报。
+  Phase 348(2026-11-02,测试优化):分批 runner 新增 `--jobs N` 并行档(默认 1,
+  顺序行为逐字节不变;每文件预算/重试/verdict/日志/耗时报告语义不变)。A/B 实测
+  (11 文件头部权重抽样,2026-11-02):顺序 465s → jobs=4 124s(3.75×),逐文件
+  verdict 与单文件耗时零漂移;全量投影 600–700s,**2026-11-02 全量实跑兑现 616s**
+  (见下条门禁)。守卫:`tests/test_runner_parallel.py`(解析契约——畸形 `--jobs` 响亮报错——
+  加双模式端到端 verdict 对比,真子进程不用替身)。`pyyaml>=6.0` 进 dev extras:
+  `test_nuclei_import` 不再因缺 PyYAML 整文件跳过(单文件实跑 16 passed;
+  运行期 [nuclei] extra 保持独立,那是扫描器功能不是测试依赖)。
+- 最近全量分批门禁(2026-11-02,HEAD `15801a1` + 工作树未提交改动):
+  **268/268 文件绿,exit 0**,616s(`--jobs 4`);**skip 13 个 / 6 文件**
+  (2 个整文件零贡献:`test_oracle_default_sent.py` 3、`test_stored_e2e_acceptance.py` 3)。
+  引用时两个数一起报。这是 Phase 348 并行档的首次全量实跑;与 Phase 346 的
+  258 文件 / 4554s **不是同一口径**(文件集不同、顺序 vs 并行),不能相除当倍数引用。
+  跑之前拦下两件事,都记在这里因为它们是这次数字的前提:
+  ① `benchmark/server.py` 与 `tests/vuln_server.py` 在批量清理 `benchmark/results/*`
+  时被误删,6 个模块 `from server import ...` 全挂(首轮 98s 内 15 文件红,
+  `ModuleNotFoundError: No module named 'benchmark.server'`),已从 HEAD 恢复;
+  ② `test_scanner_parallel_checkpoint.py` 的 fixture 未传 `crawl=True`,且补上后默认
+  `crawl_engine="auto"` 会派发到 `_crawl_spa()` 绕过 `_crawl` stub——四组配置对照实测
+  后两参数一并补齐(只有 `crawl=True, crawl_engine="static"` 三端点才全部入账)。
 - benchmark strict 64 例切片双引擎 F1=1.0。
 - CI(`.github/workflows/ci.yml`):6 个 job 全部 ubuntu-latest —— tests(全量分批 + ruff)、drills(双引擎 strict 切片周轮转 + range2–6 门禁;range7 走 tests job 的 pytest 契约测试)、min-python(3.10)、benchmark-full、nightly-gate、dependency-audit;push 门 = 双引擎 strict 切片。
-- 开放项:SECURITY.md 联系方式待仓库归属者填写。产品级 backlog 无未决项
+- 开放项:无。SECURITY.md 的举报渠道已定为 **GitHub 私密安全通告**(仓库 → Security →
+  Report a vulnerability,流程与 72 小时时效已写在 SECURITY.md,无需额外邮箱即可生效);
+  原「联系方式待仓库归属者填写」一项于 2026-11-01 关闭。如需增加邮箱等第三方渠道,
+  由仓库归属者自行补充,不阻塞发布。产品级 backlog 无未决项
   (OPTIMIZATION.md §3.6 item 6 被动代理 drain 时间上限已于 2026-10-31 关闭;
   其余均为"有意不做/需外部条件"清单)。
 
@@ -77,6 +97,8 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
 
 - 依赖: requirements.txt;测试: `python tests/run_all_batched.py --quiet`(裸跑单进程会卡死,
   必须分批;runner 对个别慢文件带 per-file 超时 override,失败/重试才写日志)。
+  **日常全量门禁加 `--jobs 4`**:2026-11-02 实测 268 文件 616s(顺序档 1 保留为默认,
+  两档逐文件 verdict 一致;并发只换墙钟,不改判定)。
   2026-10-31 实测 258 个 test_*.py 文件 / 59289 行;本机 loopback 劣化期的失败先单文件复跑,
   按「未验证」记账而不是当回归(2026-10-05 实测形态,归档 Phase 201 有完整归因)。
 
