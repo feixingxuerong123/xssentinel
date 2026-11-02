@@ -97,6 +97,17 @@ xssentinel/data/llm_providers.json
 benchmark/results/*_log.txt
 benchmark/results/INVALID_*
 
+# 本地归档:2026-11-01 产物瘦身移出的历史跑分与临时产物(仅本机留档,不入库;
+# 入库口径见 docs/OPTIMIZATION.md §7:只保留被文档引用的证据与被脚本读取的输入)
+benchmark/results/_local_archive/
+
 # 本地 AI 工具状态(此前只写在 .git/info/exclude,换机即失效,现共享化)
 .workbuddy/
 .workbuddy-ai/
+
+# 本地工具缓存与生成配置(2026-11-02):跑 nuclei / zwork 会在仓库根落这几个目录,
+# 内容是机器相关的缓存与 goflags 生成的 config.yaml,换机即失效,不入库。
+.nuclei-cache/
+.nuclei-config/
+.zwork/
+nuclei/config.yaml
