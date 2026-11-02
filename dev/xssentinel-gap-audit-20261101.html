@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>交付前差距清单 · XSSentinel vs GitHub 同类扫描器</title>
+<style>
+  :root {
+    --bg: #fafbfc;
+    --ink: #16191d;
+    --ink-2: #454c54;
+    --ink-3: #828a93;
+    --line: #d8dee4;
+    --line-soft: #e7ebef;
+    --accent: #1c5f7d;
+    --accent-deep: #12465e;
+    --sans: "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+    --mono: "Cascadia Mono", "Consolas", "SFMono-Regular", monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { background: var(--bg); }
+  body {
+    font-family: var(--sans);
+    color: var(--ink);
+    font-size: 15.5px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  .frame {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 56px 40px 80px;
+    display: grid;
+    grid-template-columns: 200px minmax(0, 1fr);
+    gap: 56px;
+  }
+  /* ---------- TOC ---------- */
+  .toc { position: sticky; top: 56px; align-self: start; }
+  .toc-brand {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    color: var(--ink-3);
+    text-transform: uppercase;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 18px;
+  }
+  .toc ol { list-style: none; }
+  .toc a {
+    display: block;
+    text-decoration: none;
+    color: var(--ink-2);
+    font-size: 13px;
+    line-height: 1.4;
+    padding: 6px 0;
+    border-left: 2px solid transparent;
+    padding-left: 12px;
+    margin-left: -14px;
+  }
+  .toc a:hover { color: var(--accent-deep); }
+  .toc .no { font-family: var(--mono); font-size: 11px; color: var(--ink-3); margin-right: 7px; }
+  /* ---------- Typography ---------- */
+  .kicker {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    margin-bottom: 14px;
+  }
+  h1 {
+    font-size: 34px;
+    line-height: 1.18;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    max-width: 21em;
+  }
+  h2 {
+    font-size: 21px;
+    line-height: 1.25;
+    font-weight: 600;
+    margin: 0 0 18px;
+  }
+  h3 { font-size: 16.5px; font-weight: 600; line-height: 1.35; }
+  h4 {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    font-weight: 400;
+    margin-bottom: 8px;
+  }
+  section { margin-top: 64px; }
+  .rule { border: 0; border-top: 1px solid var(--line); margin: 0 0 26px; }
+  .rule-short { width: 64px; border: 0; border-top: 2px solid var(--ink); margin: 0 0 26px; }
+  p.lede { font-size: 17px; line-height: 1.7; max-width: 68ch; color: var(--ink); }
+  .prose { max-width: 68ch; color: var(--ink-2); }
+  .prose strong { color: var(--ink); font-weight: 600; }
+  .prose p + p { margin-top: 10px; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code, .mono { font-family: var(--mono); font-size: 0.92em; color: var(--ink); }
+  .src {
+    font-family: var(--mono);
+    font-size: 11px;
+    line-height: 1.6;
+    color: var(--ink-3);
+    margin-top: 10px;
+  }
+  /* ---------- Cover ---------- */
+  .cover { grid-column: 2; }
+  .cover .sub {
+    margin-top: 12px;
+    font-size: 15px;
+    color: var(--ink-2);
+    max-width: 62ch;
+  }
+  .cover-meta {
+    margin-top: 26px;
+    padding-top: 14px;
+    border-top: 1px solid var(--line);
+    display: flex;
+    gap: 40px;
+    flex-wrap: wrap;
+  }
+  .cover-meta div { min-width: 180px; }
+  .cover-meta .k {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    margin-bottom: 3px;
+  }
+  .cover-meta .v { font-size: 13.5px; color: var(--ink); }
+  /* ---------- Verdict block ---------- */
+  .verdict {
+    border-top: 2px solid var(--ink);
+    padding-top: 18px;
+    max-width: 68ch;
+  }
+  .verdict p { font-size: 16px; line-height: 1.7; }
+  .verdict p + p { margin-top: 10px; }
+  .verdict .q { color: var(--accent-deep); font-weight: 600; }
+  /* ---------- Tables ---------- */
+  .tbl-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+  caption {
+    text-align: left;
+    font-size: 12.5px;
+    color: var(--ink-3);
+    padding-bottom: 10px;
+  }
+  th {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    font-weight: 400;
+    color: var(--ink-3);
+    text-align: left;
+    padding: 8px 14px 8px 0;
+    border-bottom: 1px solid var(--ink);
+    white-space: nowrap;
+  }
+  td {
+    padding: 9px 14px 9px 0;
+    border-bottom: 1px solid var(--line-soft);
+    vertical-align: top;
+    color: var(--ink-2);
+    line-height: 1.5;
+  }
+  td.num { font-family: var(--mono); font-size: 12.5px; color: var(--ink); white-space: nowrap; }
+  td .self-row { color: var(--accent-deep); font-weight: 600; }
+  tr.self td { background: #f1f5f7; }
+  /* ---------- GAP items ---------- */
+  .gap { border-top: 1px solid var(--line); padding: 26px 0 8px; }
+  .gap-head { display: flex; align-items: baseline; gap: 14px; margin-bottom: 12px; }
+  .gap-no { font-family: var(--mono); font-size: 11.5px; color: var(--ink-3); white-space: nowrap; }
+  .tier {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+    color: var(--ink);
+    border: 1px solid var(--ink);
+    padding: 1px 7px;
+    white-space: nowrap;
+  }
+  .gap-head h3 { flex: 1; }
+  .gap-claim { max-width: 68ch; color: var(--ink); margin-bottom: 16px; }
+  .evidence {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    border-top: 1px solid var(--line-soft);
+    border-bottom: 1px solid var(--line-soft);
+    margin-bottom: 14px;
+  }
+  .ev-col { padding: 14px 18px 14px 0; }
+  .ev-col + .ev-col { border-left: 1px solid var(--line-soft); padding-left: 18px; padding-right: 0; }
+  .ev-col ul { list-style: none; }
+  .ev-col li {
+    font-size: 13px;
+    line-height: 1.55;
+    color: var(--ink-2);
+    padding: 3px 0 3px 14px;
+    position: relative;
+  }
+  .ev-col li::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 11px;
+    width: 6px;
+    height: 1px;
+    background: var(--ink-3);
+  }
+  .ev-col li strong { color: var(--ink); font-weight: 600; }
+  .gap .impact, .gap .fix { max-width: 68ch; font-size: 13.5px; color: var(--ink-2); margin-top: 8px; }
+  .gap .impact strong, .gap .fix strong { color: var(--ink); }
+  /* ---------- Clarify list ---------- */
+  .clarify { border-top: 1px solid var(--line); }
+  .clarify-item { padding: 18px 0; border-bottom: 1px solid var(--line-soft); display: grid; grid-template-columns: 30px 1fr; gap: 16px; }
+  .clarify-item .mark { font-family: var(--mono); font-size: 12px; color: var(--accent-deep); }
+  .clarify-item p { font-size: 14px; color: var(--ink-2); max-width: 70ch; }
+  .clarify-item p strong { color: var(--ink); }
+  /* ---------- Colophon ---------- */
+  .colophon {
+    margin-top: 72px;
+    border-top: 2px solid var(--ink);
+    padding-top: 22px;
+    font-size: 12.5px;
+    color: var(--ink-2);
+    max-width: 78ch;
+  }
+  .colophon h4 { margin-top: 16px; }
+  .colophon ul { list-style: none; }
+  .colophon li { padding: 2px 0 2px 14px; position: relative; line-height: 1.6; }
+  .colophon li::before { content: ""; position: absolute; left: 0; top: 11px; width: 6px; height: 1px; background: var(--ink-3); }
+  @media (max-width: 1000px) {
+    .frame { grid-template-columns: 1fr; padding: 40px 22px 60px; }
+    .toc { position: static; }
+    .evidence { grid-template-columns: 1fr; }
+    .ev-col + .ev-col { border-left: 0; border-top: 1px solid var(--line-soft); padding-left: 0; }
+  }
+</style>
+</head>
+<body>
+<div class="frame">
+
+  <aside class="toc">
+    <div class="toc-brand">GAP AUDIT<br>2026-11-01</div>
+    <ol>
+      <li><a href="#s0"><span class="no">00</span>结论</a></li>
+      <li><a href="#s1"><span class="no">01</span>对比口径</a></li>
+      <li><a href="#s2"><span class="no">02</span>P0 · 发布即撞上</a></li>
+      <li><a href="#s3"><span class="no">03</span>P1 · 采用与可信度</a></li>
+      <li><a href="#s4"><span class="no">04</span>P2 · 记账项</a></li>
+      <li><a href="#s5"><span class="no">05</span>不算缺点的部分</a></li>
+      <li><a href="#s6"><span class="no">06</span>行动清单</a></li>
+      <li><a href="#s7"><span class="no">07</span>来源与方法</a></li>
+    </ol>
+  </aside>
+
+  <main>
+    <header class="cover">
+      <p class="kicker">XSSentinel · 交付前竞品差距审计</p>
+      <h1>对比 GitHub 同类项目，这个项目差在哪</h1>
+      <p class="sub">回答一个问题：仓库已达可交付状态（1.3.0，258 文件门禁全绿），把它放进 GitHub 同类开源扫描器中间，短板是什么。结论按影响排序，每条都给双方证据与来源。</p>
+      <div class="cover-meta">
+        <div><div class="k">对象</div><div class="v">XSSentinel 1.3.0（本仓）</div></div>
+        <div><div class="k">对照组</div><div class="v">dalfox / nuclei / ZAP / wapiti / XSStrike</div></div>
+        <div><div class="k">数据截至</div><div class="v">2026-11-01</div></div>
+        <div><div class="k">方法</div><div class="v">GitHub API + PyPI API + 本仓实测</div></div>
+      </div>
+    </header>
+
+    <section id="s0">
+      <hr class="rule-short">
+      <h2>00 · 结论</h2>
+      <div class="verdict">
+        <p>检测引擎与工程纪律在开源 XSS 赛道处于第一梯队；真实差距<strong>不在「扫得准不准」，而在「产品化」</strong>——分发形态、社区信任信号、语言覆盖、跨平台验证、对外证据链，五条。这五条有个共同点：<span class="q">全部是发布前花几天就能补齐的工程动作，没有一条需要动检测判定。</span></p>
+        <p>反过来说：这个赛道还活着的对手其实只有两个（dalfox v3、nuclei），而 XSSentinel 在两者的自报靶场上以更严格的口径拿过更高的分——缺的不是能力，是让外部读者相信并装上来的那一层。</p>
+      </div>
+    </section>
+
+    <section id="s1">
+      <hr class="rule-short">
+      <h2>01 · 对比口径</h2>
+      <div class="tbl-wrap">
+      <table>
+        <caption>对照组活跃度与分发形态。Stars / Forks / 最近推送来自 GitHub API（2026-11-01 实测）；XSStrike 为项目内 docs/TRENDING_20261026.md 记录的 2026-10-26 快照。</caption>
+        <thead>
+          <tr><th>项目</th><th>Stars</th><th>Forks</th><th>最近推送</th><th>当前版本</th><th>维护主体</th><th>一键安装</th></tr>
+        </thead>
+        <tbody>
+          <tr class="self">
+            <td><span class="self-row">XSSentinel（本仓）</span></td>
+            <td class="num">0</td><td class="num">0</td><td class="num">2026-11-01</td>
+            <td>1.3.0（仅 git tag，无 Release）</td>
+            <td>单人 + AI 代理提交（391 commits 单一作者）</td>
+            <td>无</td>
+          </tr>
+          <tr>
+            <td>nuclei</td>
+            <td class="num">32,303</td><td class="num">3,941</td><td class="num">2026-10-25</td>
+            <td>v3.11.1</td>
+            <td>ProjectDiscovery（公司背书，284 贡献者）</td>
+            <td>go install / 预编译 / 官方 GitHub Action / 云平台</td>
+          </tr>
+          <tr>
+            <td>ZAP</td>
+            <td class="num">15,305</td><td class="num">2,580</td><td class="num">2026-06-19</td>
+            <td>周更发布</td>
+            <td>OWASP 项目（Checkmarx 背书）</td>
+            <td>多平台安装包 / Docker</td>
+          </tr>
+          <tr>
+            <td>XSStrike</td>
+            <td class="num">15,225</td><td class="num">—</td><td class="num">2025-04-26</td>
+            <td>3.1.6（半停更，96 open issues）</td>
+            <td>个人</td>
+            <td>pip（依赖陈旧）</td>
+          </tr>
+          <tr>
+            <td>dalfox</td>
+            <td class="num">5,339</td><td class="num">574</td><td class="num">2026-10-30</td>
+            <td>v3.x（Rust 重写；Go v2 冻结只收安全 backport）</td>
+            <td>个人 hahwul + 社区（贡献者数十人）</td>
+            <td>brew / snap / AUR / nix / 预编译二进制（含 musl 静态）</td>
+          </tr>
+          <tr>
+            <td>wapiti</td>
+            <td class="num">1,902</td><td class="num">276</td><td class="num">2026-10-05</td>
+            <td>3.3.2（PyPI 实测）</td>
+            <td>wapiti-scanner 组织</td>
+            <td>pip install wapiti3</td>
+          </tr>
+        </tbody>
+      </table>
+      </div>
+      <p class="src">来源：api.github.com/repos/{hahwul/dalfox, zaproxy/zaproxy, wapiti-scanner/wapiti}（2026-11-01）；nuclei 与模板仓数据见本仓 research/nuclei.md（2026-11-01，快照轨迹可复核）；XSStrike 见 docs/TRENDING_20261026.md 与 docs/COMPETITORS.md（2026-10 复核）。</p>
+      <p class="prose" style="margin-top:14px">先说一句口径：XSStrike 的 15k star 是<span class="mono">半停更</span>状态的人气存量，不是活对手。<strong>牌桌上真正活跃的同类是 dalfox v3 与 nuclei 两个</strong>——这个判断来自项目自己的 docs/COMPETITORS.md（2026-10 复核），本次未推翻。</p>
+    </section>
+
+    <section id="s2">
+      <hr class="rule-short">
+      <h2>02 · P0 —— 发布当天用户就会撞上的</h2>
+
+      <article class="gap">
+        <div class="gap-head"><span class="gap-no">GAP 01</span><span class="tier">P0</span><h3>分发形态是全场最重的一条安装路径</h3></div>
+        <p class="gap-claim">安全从业者的默认动作是「下载即用」。本仓目前唯一入口是 git clone + 手工 venv + <span class="mono">pip install -e .</span>，对照组全部有一键安装。</p>
+        <div class="evidence">
+          <div class="ev-col">
+            <h4>本仓事实（2026-11-01 实测）</h4>
+            <ul>
+              <li><strong>无 PyPI 包</strong>：<span class="mono">pypi.org/pypi/xssentinel/json → 404</span></li>
+              <li><strong>无 Dockerfile</strong>：全仓 <span class="mono">find **/Dockerfile*</span> 零匹配</li>
+              <li><strong>无 GitHub Releases</strong>：仓库页无 Releases 导航，仅 tag v1.2.0–v1.3.0；无 release/pypi/docker 发布工作流（.github/ 仅 ci.yml）</li>
+              <li>要求 Python ≥ 3.10 + venv；无头确认另需 <span class="mono">playwright install chromium</span>（一次浏览器下载）</li>
+            </ul>
+          </div>
+          <div class="ev-col">
+            <h4>同类做法</h4>
+            <ul>
+              <li>覆盖面：dalfox 六种安装渠道 + 静态 musl 二进制；nuclei go install + 预编译；wapiti <span class="mono">pip install wapiti3</span>（PyPI v3.3.2 实测）；ZAP 安装包 + Docker</li>
+              <li>共同点：核心装完 <strong>零额外下载</strong> 即可跑；本仓的 L6 真浏览器确认（能力差异化点）恰恰锁在最重的可选依赖后面</li>
+            </ul>
+          </div>
+        </div>
+        <p class="impact"><strong>影响</strong>：第一印象即摩擦。装不起来不会有第二次机会；「pip install -e .」也会把 dev 工具链一起装上（requirements.txt 现为委托行，等价 <span class="mono">-e ".[dev,async,ast,api]"</span>），不符合普通用户预期。</p>
+        <p class="fix"><strong>建议</strong>：GitHub Release（把 v1.3.0 tag 转成带 CHANGELOG 摘录的正式 Release）+ PyPI 发布（trusted publishing）+ Dockerfile/GHCR，合计约 2 天，不动任何检测代码。</p>
+      </article>
+
+      <article class="gap">
+        <div class="gap-head"><span class="gap-no">GAP 02</span><span class="tier">P0</span><h3>社区信任信号为零，而安全工具的信任门槛天然最高</h3></div>
+        <p class="gap-claim">用户要把一个会主动发攻击载荷的工具跑在自己机器上。对照组的信任由社区规模背书；本仓目前的信号全部指向「风险」而非「可信」。</p>
+        <div class="evidence">
+          <div class="ev-col">
+            <h4>本仓事实</h4>
+            <ul>
+              <li><strong>0 star / 0 fork / 0 watcher</strong>（GitHub 页面，2026-11-01）</li>
+              <li><strong>391 commits 唯一作者名「WorkBuddy Agent」</strong>——提交历史里没有一个人类署名</li>
+              <li>.github/ 仅 <span class="mono">workflows/ci.yml</span>：无 issue 模板、无 PR 模板、无 discussions、无 FUNDING、无 dependabot</li>
+              <li>SECURITY.md 联系方式是 AGENTS.md 里挂着的开放项（现文件建议走 GitHub 私密安全通告，但未写死联系人与时效承诺的归属）</li>
+            </ul>
+          </div>
+          <div class="ev-col">
+            <h4>同类做法</h4>
+            <ul>
+              <li>社区设施：dalfox 开 discussions、贡献者数十人、文档站 + 迁移指南；nuclei 284 贡献者 + 公司背书（组织 12.2k followers）+ 每版 release notes 列新贡献者</li>
+              <li>ZAP：858 个 open issue 的活体社区 + OWASP 治理</li>
+              <li>单人仓库不是问题本身——<strong>没有向社会解释「单人 + AI 开发如何被验证」才是</strong></li>
+            </ul>
+          </div>
+        </div>
+        <p class="impact"><strong>影响</strong>：AI 提交历史会触发供应链审查直觉。而本仓最大的差异化资产——变异对照门禁、1:1 测试、诚实声明文化——恰恰是回答这个质疑的证据，现在埋在 AGENTS.md 里没有站到台前。</p>
+        <p class="fix"><strong>建议</strong>：开 discussions + issue/PR 模板（1 小时）；README 顶部把「质量门禁如何运作」提炼成三行对外叙事（对应 docs/ARCHITECTURE.md 已有内容）；补 SECURITY.md 联系方式（唯一待仓库归属者填的项，10 分钟）。</p>
+      </article>
+
+      <article class="gap">
+        <div class="gap-head"><span class="gap-no">GAP 03</span><span class="tier">P0</span><h3>文档语言结构：英文用户的上手路径断在第一步</h3></div>
+        <p class="gap-claim">README.en.md 存在且质量不错——但它是精简版。双语首页引着英文用户进来，然后所有深度文档都是中文。</p>
+        <div class="evidence">
+          <div class="ev-col">
+            <h4>本仓事实</h4>
+            <ul>
+              <li>README.en.md 约 282 行，为中文版（约 1,100+ 行）的提炼版；能力清单、跑分章节内容显著缩水</li>
+              <li>docs/ 七份文档（QUICKSTART / ARCHITECTURE / CONTRIBUTING / ONBOARDING / OPTIMIZATION / DEPENDENCY_AUDIT / COMPETITORS）<strong>全部中文</strong>，README 首屏「第一次用？」直接指向中文 QUICKSTART</li>
+              <li>CHANGELOG 中文</li>
+            </ul>
+          </div>
+          <div class="ev-col">
+            <h4>同类做法</h4>
+            <ul>
+              <li>distribution：dalfox 作者韩国人，英文一手文档站（dalfox.hahwul.com）+ 参数/检测模型/输出分页文档</li>
+              <li>nuclei：docs.projectdiscovery.io 按协议/模板类型分页的英文文档体系</li>
+              <li>ZAP：zaproxy.org 全英文 + 多语言 UI</li>
+            </ul>
+          </div>
+        </div>
+        <p class="impact"><strong>影响</strong>：安全工具的主要受众是全球的；英文用户点开 QUICKSTART 发现是中文，转化路径就断了。这直接放大 GAP 02——英文世界既装不上、也读不懂，自然不会来验证。</p>
+        <p class="fix"><strong>建议</strong>：优先翻译 QUICKSTART（本就短，一条命令路径）与安装/退出码段落；用 GitHub Pages 挂一份最小英文文档站。不必翻 OPTIMIZATION/ARCHITECTURE——那些是维护者文档。</p>
+      </article>
+    </section>
+
+    <section id="s3">
+      <hr class="rule-short">
+      <h2>03 · P1 —— 影响采用与可信度</h2>
+
+      <article class="gap">
+        <div class="gap-head"><span class="gap-no">GAP 04</span><span class="tier">P1</span><h3>CI 只在 ubuntu 上验证，而项目的病灶集中在 Windows</h3></div>
+        <p class="gap-claim">这是本仓最讽刺的一条：项目开发在 Windows，AGENTS.md 用整段记录 Windows 专属病理，但 6 个 CI job 全部 ubuntu-latest。</p>
+        <div class="evidence">
+          <div class="ev-col">
+            <h4>本仓事实</h4>
+            <ul>
+              <li>.github/workflows/ci.yml：tests / drills / min-python / benchmark-full / nightly-gate / dependency-audit —— <strong>全部 ubuntu-latest</strong>，Python 3.11 主力 + 3.10 下限冒烟</li>
+              <li>AGENTS.md 记录的 Windows 专属问题：Low 强制完整性标签导致 Playwright <span class="mono">tempfile.mkdtemp()</span> 全挂、Windows 保留端口段教训、SO_REUSEADDR 端口假绿、loopback 劣化期测试跳过</li>
+              <li>pyproject classifier 声明 <span class="mono">Operating System :: OS Independent</span>——无 CI 证据支撑</li>
+            </ul>
+          </div>
+          <div class="ev-col">
+            <h4>同类做法</h4>
+            <ul>
+              <li>distribution：dalfox / nuclei 为 linux / macOS / Windows（含 arm64）发布预编译产物，跨平台是产品承诺而非偶然</li>
+              <li>ZAP：三平台官方安装包 + Docker</li>
+            </ul>
+          </div>
+        </div>
+        <p class="impact"><strong>影响</strong>：Windows/macOS 用户踩到的坑不在门禁覆盖内——README 里那些「环境陷阱」对外部 Windows 用户同样是陷阱，只是没有门禁替他们先踩过。</p>
+        <p class="fix"><strong>建议</strong>：加一个 windows-latest smoke job（复用 min-python 的用例子集即可，约 2 小时）。不必全量——smoke 覆盖 CLI + 传输 + API 就够把「OS Independent」变成被测量的声明。</p>
+      </article>
+
+      <article class="gap">
+        <div class="gap-head"><span class="gap-no">GAP 05</span><span class="tier">P1</span><h3>扫描速度与 nuclei 有 7 倍差距（同靶实测）</h3></div>
+        <p class="gap-claim">同一批 60 例目标（phase196 交叉对跑，工具版本与逐例矩阵已入库）：nuclei 49 秒完成，本仓 346 秒。</p>
+        <div class="evidence">
+          <div class="ev-col">
+            <h4>本仓数据（benchmark/results/phase196_cross_tool.md）</h4>
+            <ul>
+              <li>XSSentinel：<strong>346.4s</strong>，F1 0.986（14/12 预算口径）</li>
+              <li>nuclei v3.9.0 dast/xss：48.6s，F1 0.839 —— <strong>约 7× 快</strong></li>
+              <li>dalfox v2.13.0：1172.7s，F1 0.825 —— 本仓比它约 3.4× 快</li>
+              <li>README 已诚实校准：「速度不是单向优势。nuclei 用 49s 拿到 0.839，比我们先完成 7 倍」</li>
+            </ul>
+          </div>
+          <div class="ev-col">
+            <h4>语境</h4>
+            <ul>
+              <li>换的是检测深度与判定严谨度：本仓 F1 高 0.147，且 0 误报；nuclei 是模板引擎，单请求成本天然低</li>
+              <li>缓解手段已存在：<span class="mono">--scan-policy quick</span>、async 引擎、CSP 感知预算门控</li>
+            </ul>
+          </div>
+        </div>
+        <p class="impact"><strong>影响</strong>：大规模 bug bounty 目标（数百端点 × 深预算）的墙钟时间。用户第一次跑大目标时，速度差距会被直接感知，而精度优势要跑完才看得到。</p>
+        <p class="fix"><strong>建议</strong>：无需掩饰——README 的校准写法是对的。可做的是用 benchmark/req_stats.py 的「请求数才是稳定度量」思路，profile 一次每请求开销，确认时间花在判定而非 IO；如果大头在判定，同步引擎的批内并发还有空间。</p>
+      </article>
+
+      <article class="gap">
+        <div class="gap-head"><span class="gap-no">GAP 06</span><span class="tier">P1</span><h3>对外证据链有缺口：头条对比数字在仓库外不可复现</h3></div>
+        <p class="gap-claim">本项目对竞品最重要的主张——XSSMaze 官方靶三工具同 scorer 对跑胜出——其证据目前不随仓库分发。</p>
+        <div class="evidence">
+          <div class="ev-col">
+            <h4>本仓事实</h4>
+            <ul>
+              <li>Phase 342 产物（<span class="mono">dev/_xssmaze/cross_tool_p342.*</span>、p342_meta.json）落在 <span class="mono">dev/_xssmaze/</span>，被 .gitignore 第 94 行 <span class="mono">/dev/_*</span> 排除——<strong>外部读者无法从仓库内容复现 0.965 vs 0.853/0.836</strong></li>
+              <li>OPTIMIZATION.md 的「详见 AGENTS.md 342」是<strong>死指针</strong>：AGENTS.md 已于 2026-10-31 移除过程日志，归档文件中亦无 342 条目</li>
+              <li>p342_meta.json 里有完整的公平性 deviation 记录（dalfox 臂 <span class="mono">--skip-headless</span>、记分卡复用 p341 等）——外部看不到</li>
+            </ul>
+          </div>
+          <div class="ev-col">
+            <h4>对比口径的代差</h4>
+            <ul>
+              <li>dalfox 臂用的是 <strong>v2.13.0（Go 冻结分支）</strong>；现行版本是 Rust v3.2.x（COMPETITORS.md 记录其自报 XSSMaze 97.8%，v3.2.4 于 2026-10-07 发布）</li>
+              <li>本机拿不到 v3 的 release 资产（环境所限，OPTIMIZATION.md 有记录）——客观限制，但<strong>外部读者只会看到「赢了 dalfox」四个字</strong></li>
+              <li>商业工具（Burp Pro / Acunetix）从未对跑——README 已自认</li>
+            </ul>
+          </div>
+        </div>
+        <p class="impact"><strong>影响</strong>：在 0 star 新仓库的语境下，一个无法复现的「我们赢了」比不写更伤可信度。这与项目自己的文化（「引用门禁数字必须来自自己的运行」「证据先确认归属」）直接冲突。</p>
+        <p class="fix"><strong>建议</strong>：把 p342 摘要产物（cross_tool_p342.md/json + p342_meta.json）复制进 benchmark/results/ 并解除该路径 gitignore；修 OPTIMIZATION.md 死链；在 README 对比表标注「dalfox 对比版本 v2.13.0（Go 冻结分支），v3 Rust 版未对跑」。全部约 1 小时，不动任何代码。</p>
+      </article>
+
+      <article class="gap">
+        <div class="gap-head"><span class="gap-no">GAP 07</span><span class="tier">P1</span><h3>生态位：专精 XSS 是定位选择，但生态厚度差距是实打实的</h3></div>
+        <p class="gap-claim">「XSS 专精」没有问题——问题在于用户比较时的隐性权重：nuclei 卖的不只是引擎，是 362 人共建、约三周一版的模板生态与整套 CI 接入。</p>
+        <div class="evidence">
+          <div class="ev-col">
+            <h4>对照生态（research/nuclei.md，2026-11-01）</h4>
+            <ul>
+              <li>nuclei-templates：<strong>11,997 个模板文件、1,269 个 XSS 模板、362 贡献者</strong>，v10.4.4→v10.5.1 间约 3 周一版，单版新增模板 68–295 个、首次贡献者 11–20 人</li>
+              <li>官方 nuclei-action：SARIF → GitHub code scanning 一等公民；宣称对接 Jira / Splunk / Elastic / GitLab</li>
+              <li>ZAP：add-on 市场 + 全漏洞类</li>
+            </ul>
+          </div>
+          <div class="ev-col">
+            <h4>本仓现状</h4>
+            <ul>
+              <li>场景 DSL（Nuclei 风格）<strong>无社区贡献通道</strong>：语料/场景是仓库内 JSON，没有「提 PR 加场景」的 documented 流程</li>
+              <li>有 SARIF 导出（2.1.0）但<strong>没有官方 GitHub Action</strong>——CI 用户要自己写 step</li>
+              <li>SQLi 只是错误回显快检；retireJS 覆盖 7 个库——边界清晰，但对比表上会显得薄</li>
+            </ul>
+          </div>
+        </div>
+        <p class="impact"><strong>影响</strong>：「要不要为一个漏洞类单独装一个工具」的决策里，生态厚度是隐性分。本仓的 DSL 与 fix_advice 数据化设计本来是冲着可扩展去的，但外部看不到参与入口。</p>
+        <p class="fix"><strong>建议</strong>：发布一个官方 xssentinel-github-action（SARIF→code scanning 是现成能力，约 1 天）；在文档里写明「给 data/scenarios.example.json 提 PR」的场景贡献流程。模板生态短期追不上，不必追——把「场景可贡献」的入口打开即可。</p>
+      </article>
+    </section>
+
+    <section id="s4">
+      <hr class="rule-short">
+      <h2>04 · P2 —— 记账项</h2>
+
+      <article class="gap">
+        <div class="gap-head"><span class="gap-no">GAP 08</span><span class="tier">P2</span><h3>单人维护 + 重门禁的长期成本</h3></div>
+        <p class="gap-claim">391 commits 单一作者（AI 代理署名）；测试 265 文件 / 60,685 行；全量分批门禁一次 4,554 秒（约 76 分钟），skip 75 例 / 10 文件。</p>
+        <p class="impact"><strong>影响</strong>：bus factor = 1。1:1 测试比是优点，但也意味着外部贡献者的第一条 PR 要面对一个 76 分钟的全量门禁体系——分批 runner 缓解了单进程卡死，但没有降低体系重量。</p>
+        <p class="fix"><strong>建议</strong>：不必改体系。在 CONTRIBUTING/ONBOARDING 明确「分层验证」路径：quick 切片门（分钟级）→ 单文件复跑 → 全量门留给 nightly。让贡献者知道哪一层够用。</p>
+      </article>
+
+      <article class="gap">
+        <div class="gap-head"><span class="gap-no">GAP 09</span><span class="tier">P2</span><h3>独立靶上的真实能力缺口（已自认，放进对比语境）</h3></div>
+        <p class="gap-claim">外部独立靶 XSSMaze（官方 runner、第三方 ground truth）上，server 群 recall 91.3–91.7%——约 8–9% 的缺口真实存在。</p>
+        <p class="impact"><strong>影响</strong>：README 已如实记录（88 FN 中主体是 query 能力缺口，另有约 35 条是官方 runner 只给 URL 的投递契约形状）。但外部读者会把它与 dalfox 自报的 97.8% 直接并读——口径不同（本仓用官方 runner + 控制例 FP 0 的更严口径），这个「口径说明」目前只在 README 的限定段落里。</p>
+        <p class="fix"><strong>建议</strong>：维持诚实口径不动。若做 GAP 06 的证据入库，把「同 scorer 三工具对跑」的表放在最前面，自报数字的口径差异就有对照了。</p>
+      </article>
+
+      <article class="gap">
+        <div class="gap-head"><span class="gap-no">GAP 10</span><span class="tier">P2</span><h3>爬虫深度与复杂 SPA / 鉴权流（README 自认）</h3></div>
+        <p class="gap-claim">爬虫是 BFS 深度 2 的轻量实现；复杂 SPA / 鉴权流建议 <span class="mono">--headless</span> 或人工提供入口。对照 ZAP 的 spider + AJAX spider + 认证上下文体系。</p>
+        <p class="impact"><strong>影响</strong>：对真实大站的覆盖面受限。但反证同样入库：OWASP Juice Shop 20.2.0 上一条命令报出 <span class="mono">dom_dynamic high / browser-executed</span>，SPA hash 路由自动发现（Phase 209）是真实能力。</p>
+        <p class="fix"><strong>建议</strong>：已知限制如实即可。值得做的是把 Juice Shop 的实战结果从能力清单深处提到 README 更显眼处——「第三方真实应用上的实测」是对 GAP 02 信任问题的最好回应之一。</p>
+      </article>
+    </section>
+
+    <section id="s5">
+      <hr class="rule-short">
+      <h2>05 · 不算缺点的部分</h2>
+      <p class="prose" style="margin-bottom:18px">以下几项在对比中容易被误读成短板，核对证据后不成立——或者说，方向相反。</p>
+      <div class="clarify">
+        <div class="clarify-item"><span class="mark">a.</span><p><strong>「检测维度不如人」——不成立。</strong>CSP nonce 泄露利用链（全部竞品零覆盖）、真浏览器执行确认（dalfox 官方文档明示自己是 "static parse of a real response, <em>not browser execution</em>"；有浏览器确认的 XSSer/DOMDig 无同量级工程体系）、存储型二阶自动收网、自托管 OOB——这些是 docs/COMPETITORS.md 列出的「第三档机会清单」里本仓已占据的部分。竞品对照由项目自己的竞品文档背书，且本次未发现反面证据。</p></div>
+        <div class="clarify-item"><span class="mark">b.</span><p><strong>「测试与门禁是负担所以是缺点」——误读。</strong>变异对照（红→还原→绿）门禁、零基础 lint 门禁、「零不是通过」的 verdict 语义，在同类开源扫描器中没有第二个——15k star 的 XSStrike 连自己的 benchmark 都没有（docs/COMPETITORS.md 原话）。这是吸引严肃用户与贡献者的资产，不是负债；它只是需要在 README 前屏被看见。</p></div>
+        <div class="clarify-item"><span class="mark">c.</span><p><strong>「对手很多所以卷不过」——不成立。</strong>赛道分层实测：dalfox v3（周更）与 nuclei 是仅有的两个活跃对手；XSStrike 半停更（2025-04 后无 push），GoSpider / XSLeaks 事实停更。活牌桌只有三人，且本仓在 XSSMaze 同 scorer 对跑中 F1 0.965 领先两者（0.853 / 0.836）。</p></div>
+        <div class="clarify-item"><span class="mark">d.</span><p><strong>「许可证」——是优点。</strong>MIT 对商业使用比 wapiti 的 GPL-2.0 更友好；依赖面干净（核心仅 5 个直接依赖，pyproject 实测），fresh-install pip-audit 0 advisory（dependency-audit job，2026-11-01 起 blocking）。</p></div>
+      </div>
+    </section>
+
+    <section id="s6">
+      <hr class="rule-short">
+      <h2>06 · 行动清单（按投入产出排序）</h2>
+      <p class="prose" style="margin-bottom:16px">没有一条需要动检测判定；合计约 5 个工作日，完成后上面 10 条 GAP 里 8 条关闭或显著缓解。</p>
+      <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>#</th><th>动作</th><th>成本</th><th>关闭</th></tr></thead>
+        <tbody>
+          <tr><td class="num">1</td><td>补 SECURITY.md 联系方式（唯一待仓库归属者的开放项）</td><td>10 min</td><td>GAP 02</td></tr>
+          <tr><td class="num">2</td><td>Phase 342 产物复制进 benchmark/results/（解除 dev/_xssmaze 的 gitignore 效应）+ 修 OPTIMIZATION.md「AGENTS.md 342」死链</td><td>1 h</td><td>GAP 06</td></tr>
+          <tr><td class="num">3</td><td>开 discussions + issue/PR 模板；README 前屏加三行「门禁体系」对外叙事</td><td>1 h</td><td>GAP 02</td></tr>
+          <tr><td class="num">4</td><td>GitHub Release：v1.3.0 tag → 正式 Release，附 CHANGELOG 摘录与验证说明</td><td>0.5 d</td><td>GAP 01</td></tr>
+          <tr><td class="num">5</td><td>windows-latest smoke CI job（复用 min-python 用例子集）</td><td>2 h</td><td>GAP 04</td></tr>
+          <tr><td class="num">6</td><td>Dockerfile + GHCR 发布</td><td>0.5 d</td><td>GAP 01</td></tr>
+          <tr><td class="num">7</td><td>PyPI 发布（trusted publishing workflow）</td><td>1 d</td><td>GAP 01</td></tr>
+          <tr><td class="num">8</td><td>QUICKSTART 英文翻译 + GitHub Pages 最小文档站</td><td>1 d</td><td>GAP 03</td></tr>
+          <tr><td class="num">9</td><td>官方 GitHub Action（SARIF → code scanning）；场景贡献流程文档化</td><td>1 d</td><td>GAP 07</td></tr>
+        </tbody>
+      </table>
+      </div>
+    </section>
+
+    <section id="s7">
+      <hr class="rule-short">
+      <h2>07 · 来源与方法</h2>
+      <div class="colophon">
+        <h4>本机实测（2026-11-01）</h4>
+        <ul>
+          <li>git log / tag（391 commits 单一作者「WorkBuddy Agent」；tag v1.2.0–v1.3.0；最后提交 2026-11-01）</li>
+          <li>仓库结构：.github/ 仅 workflows/ci.yml；全仓无 Dockerfile；pyproject.toml（依赖面、OS Independent classifier）；requirements.txt（委托行）</li>
+          <li>.github/workflows/ci.yml（6 job 全 ubuntu-latest）；AGENTS.md（Phase 346/347 状态、Windows 病理记录）；README.md / README.en.md 行数对比</li>
+          <li>benchmark/results/phase196_cross_tool.md（60 例三工具对跑、版本与逐例矩阵）；dev/_xssmaze/p342_meta.json（Phase 342 工具版本与 deviation 记录；该目录被 .gitignore:94 /dev/_* 排除）</li>
+          <li>docs/COMPETITORS.md（2026-10 复核：dalfox v3 Rust 重写、赛道活跃度分层、能力矩阵）、docs/OPTIMIZATION.md（Phase 342 摘要、明确不做清单）、docs/TRENDING_20261026.md（XSStrike 15,225★）</li>
+        </ul>
+        <h4>外部实测（2026-11-01）</h4>
+        <ul>
+          <li>GitHub API：hahwul/dalfox（5,339★ / 574 fork / pushed 2026-10-30 / Rust / MIT）、zaproxy/zaproxy（15,305★ / 2,580 fork / pushed 2026-06-19）、wapiti-scanner/wapiti（1,902★ / 276 fork / pushed 2026-10-05）、feixingxuerong123/xssentinel（0★ / 0 fork / Public）</li>
+          <li>PyPI JSON API：<span class="mono">xssentinel → 404</span>；<span class="mono">wapiti3 → 200, v3.3.2</span></li>
+          <li>nuclei / nuclei-templates：32,303★ / 284 贡献者；模板仓 13,132★ / 11,997 文件 / 1,269 XSS 模板 / v10.5.1（2026-10-23）——详见本仓 research/nuclei.md（含快照轨迹与待证项）</li>
+        </ul>
+        <h4>局限</h4>
+        <ul>
+          <li>扫描能力维度未做新实验——直接引用项目已入库的对跑数据，并保留其自带限定（自编靶占比、dalfox v2 代差、XS-Leaks 打分口径）。</li>
+          <li>「缺点」判断以 GitHub 可见信号与文档证据为准；未评估暗面（如搜索引擎收录、社区口碑）。</li>
+          <li>XSStrike fork 数未实测，记为「—」；ZAP 具体版本号未取（官网周更口径），均不虚构。</li>
+        </ul>
+      </div>
+    </section>
+
+  </main>
+</div>
+</body>
+</html>
