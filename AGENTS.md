@@ -12,6 +12,7 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
 |---|---|
 | 逐 Phase 过程日志(176f–345,每项改动的归因、门禁证据、自我纠正) | `docs/archive/AGENTS_phase_log_to_20261031.md` |
 | README 历史 Phase 叙事(基线演化、缺陷家族、自我纠正;2026-11-01 蒸馏出库) | `docs/archive/README_phase_log_to_20261101.md` |
+| Phase 350–356 轮次报告(345 之后的逐轮实测数字与归因) | `benchmark/results/round2..round5_*_20261103.md`、`zap_unavailable_20261103.md` |
 | 开发约定 / 回归靶场 / 架构约定 | `CONTRIBUTING.md` |
 | 门禁体系如何运作 / Mixin 隐式契约 | `docs/ARCHITECTURE.md` |
 | 优化 backlog(含明确不做清单) | `docs/OPTIMIZATION.md` |

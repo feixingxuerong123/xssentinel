@@ -792,6 +792,11 @@ JS config line(那本身就是 script-string sink),四例全 confirmed、safe
 | 重写 async 引擎为纯 asyncio 解析 | BS4/lxml 无 async API,`asyncio.to_thread` 是正确折中 |
 | 引入重型 ORM/数据库 | range3 证明 SQLite 足够;API 持久化当前无规模压力 |
 | 继续扩充自编 194 例基准 | sync 已 f1=1.000,边际信息为零;要新信息就去建 **1.0 的第三方对照集** |
+| OWASP ZAP 对跑 | 环境不可达(ghcr denied / Docker Hub 镜像 TLS / GitHub 超时 / PyPI 包仅 74KB API 客户端),2026-11-03 起永久标注 `unavailable`,不暗示优于商业工具 |
+| XVWA 靶场接入 | 镜像源 not found,一次尝试后放弃(2026-11-03) |
+| Juice Shop 持久化反馈载体 | 服务端 `sanitize-html` 在入库时剥离,18 载体 0 可执行——服务端行为,结论已定,不再投入实验(2026-11-03) |
+| Juice Shop accounting 角色 | 该版本不存在此角色,`/rest/accounting` 与 `/api/Accounting` 均 500(2026-11-03 实测) |
+| bWAPP medium/high 难度矩阵 | 本轮只接 low(security_level=0);权限维度已由 DVWA 三档矩阵覆盖(2026-11-03) |
 
 ---
 
