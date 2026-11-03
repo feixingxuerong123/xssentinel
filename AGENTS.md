@@ -107,15 +107,16 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
   仍由同文件 ≤520 预算测试钉住。
 - benchmark strict 64 例切片双引擎 F1=1.0(async 的 1 个 SKIP 是 manifest
   声明 sync-only 的 `neg-stored-02`);27 控制例双引擎 0/27 FP。
-- 最近全量分批门禁(2026-11-04 凌晨,本树,`--jobs 4`):**271/274 文件绿,
-  exit 3**,1759s;**skip 59 个 / 14 文件**(3 个整文件零贡献)。三个红全是
-  `rc=TIMEOUT×2`(per-file 1080s 预算双次撞顶),按劣化期协议单文件复跑
-  **全部绿**:`test_dom_sink_matrix` 17 passed/176s、`test_nav_recovery`
-  8 passed/2.15s、`test_phase216_crawl_request_layers` 4 passed/606s(该
-  文件单跑就要 10 分钟,四路并发下超预算)。当晚 loopback 劣化:同夜前一
-  全量轮 `test_engine_parity_gate` 63s→1564s、全量墙钟 1457s→1759s,非
-  回归;与 2026-11-02 的 268 文件/620s **不是同一文件集与机器状态**,不作
-  商引用。引用时「271/274 in-gate」与「3 文件单跑绿」两个数一起报。
+- 最近全量分批门禁(2026-11-04 凌晨,本树,`--jobs 4`;当晚机器持续抖动,
+  四轮中以此轮为引用口径):**271/274 文件 in-gate 绿,exit 3**,1412s;
+  **skip 69 个 / 18 文件**(5 个整文件零贡献)。3 红全是环境形态(TIMEOUT×2
+  撞 per-file 1080s 预算 + fixture ReadTimeout),单文件复跑全绿且快:
+  `test_phase196_csp_delivery` 21 passed/10.3s、`test_phase193` 10
+  passed/17.9s、`test_sitemap_input` 9 passed/11.6s。合计 **274/274 文件绿**
+  (271 in-gate + 3 单跑),引用时两组数一起报。前一轮 272/274 受 vuln-agent
+  并发污染不引用;另有一轮 runner 本体无总结退出(exit 1、无 _timings,
+  stderr 未捕获,当晚仅一次)。与 2026-11-02 的 268 文件/620s/13 skip
+  **不是同一机器状态**,不作商引用。
 - CI(`.github/workflows/ci.yml`):6 个 job 全部 ubuntu-latest —— tests(全量分批 + ruff)、drills(双引擎 strict 切片周轮转 + range2–6 门禁;range7 走 tests job 的 pytest 契约测试)、min-python(3.10)、benchmark-full、nightly-gate、dependency-audit;push 门 = 双引擎 strict 切片。
 - 开放项:无。SECURITY.md 的举报渠道已定为 **GitHub 私密安全通告**(仓库 → Security →
   Report a vulnerability,流程与 72 小时时效已写在 SECURITY.md,无需额外邮箱即可生效);
@@ -123,12 +124,15 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
   由仓库归属者自行补充,不阻塞发布。产品级 backlog 无未决项
   (OPTIMIZATION.md §3.6 item 6 被动代理 drain 时间上限已于 2026-10-31 关闭;
   其余均为"有意不做/需外部条件"清单)。
-- 环境事件(2026-11-04 凌晨):邻项目 `D:\qoder\vuln-agent` 同时段并发跑
-  自己的测试批;loopback 劣化贯穿夜间(见上条门禁的耗时证据);其中一轮
-  `test_batch_input.py` 红为 fixture server 拒连,安静后单文件 5.4s 全绿,
-  按「未验证→复跑定论」记账,不当回归。`benchmark/server.py` 二度被外部
-  进程删除后恢复,来源仍未确认,再现时用
-  `git show HEAD:benchmark/server.py` 恢复。
+- 环境事件(2026-11-04 凌晨):① 邻项目 `D:\qoder\vuln-agent` 同时段并发
+  跑自己的测试批(污染一轮门禁,该轮不引用);② 负载抖动贯穿夜间——同一
+  文件单跑 2.2s~176s、门禁内可 1080s×2 超时,skip 数 59→69→134 随 conftest
+  探针摆动,失败一律按劣化期协议单文件复跑定论、不当回归(`test_batch_input`
+  拒连红即此形态,复跑 5.4s 全绿);③ 出现一个外部迷你 runner(00:45 /
+  02:23 两次,各 1s,只跑 `test_quick_gate_slice` + `test_doc_code_counts`,
+  0 失败,来源未确认,疑似另一个会话的观察进程);④ runner 本体一次无总结
+  退出(exit 1,见上条);⑤ `benchmark/server.py` 二度被外部进程删除后恢复,
+  来源仍未确认,再现时用 `git show HEAD:benchmark/server.py` 恢复。
 
 ## 环境配置
 
