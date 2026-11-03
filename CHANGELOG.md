@@ -16,8 +16,41 @@
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-04
+
+存储自动发现与 marker-form 轮(Phase 345–356,含 Phase 347/348 的门禁与
+runner 工作):存储注入点自动发现(sync 默认开,官方靶 9/9 双引擎 FP 0);
+引号形态 fan-out + sha1 十位数字别名;DOM 静态层精度收敛(AST 优先、正则
+兜底);认证会话 header canary 修复;真实应用回归集 v2.2(22 例 / 5 app,
+xssentinel 13 TP / 0 FP / 9 TN);成熟度按实测降 Beta。
+验证:194 例自编矩阵双引擎 FP0/FN0(f1=1.0);strict 64 例切片双引擎
+exit 0;27 控制例双引擎 0 FP;全量分批门禁 274 文件全绿(271 in-gate + 3 个
+环境超时文件单跑复绿;2026-11-04 夜间口径,证据链见 AGENTS.md)。
+
 ### Added
 
+- **存储自动发现(Phase 352)**:存储注入点自动发现独立成 Mixin
+  (`scanner_stored_auto.py` + `stored_discovery.py`),sync 路径默认开
+  (`--stored-auto`;显式 `--stored-inject` 时自动让位,不重复证明已点名的
+  写/读对)。官方靶实测 stored 自动发现 **sync 9/9、async 9/9,FP 0**;
+  写表单 + 回读 + 指纹差分,死目标上熔断器正确早停(2026-11-04 门禁日志
+  实测)。行数走「拆新 Mixin」不走抬预算。
+- **marker forms 引号形态 fan-out(Phase 356)**:同一注入点先按引号形态各发
+  一发 plain 探针,命中即返回——addslashes 型过滤杀单引号形态
+  (`alert('tok')`→`alert(\'tok\')` 语法错误),杀不了裸/双引号/反引号形态;
+  12 变换 × 4 形态连乘付不起,每形态一发付得起。unquoted 形态用 sha1 派生的
+  10 位数字别名(`verifier.numeric_alias`,十位起避开页面日期);stored 路径
+  每个 (form, transform) 对发新 token(共享 token 曾让死变体借用活变体的
+  确认)。`XSS_MARKER_FORMS=0` 为 A/B 旧路径;`_detect_quote_escaping` 一发
+  探针实测目标是否反斜杠转义引号,只在值得的地方开 fan-out。守卫
+  `tests/test_phase356_marker_forms.py`。
+- **真实应用回归集 v2.2 与 `benchmark/realworld/`(2026-11-03)**:22 例 /
+  5 个 app(Juice Shop 匿名+unsafe、DVWA、bWAPP、自建四面靶),每例有官方
+  challenge/源码/`bugs.txt` 或构造依据 + 独立 Playwright ground truth;
+  四工具同靶对照 xssentinel **13 TP / 0 FP / 9 TN(recall 1.000)**、
+  dalfox 0.571、nuclei 0.500(开源对照,非商业基线)。多角色:DVWA 三档
+  权限矩阵、bWAPP bee+bwuser、Juice customer→deluxe 走官方
+  `freeDeluxeChallenge` 路由(合法可达)。
 - **分批 runner 并行档 `--jobs N`(Phase 348)**:`tests/run_all_batched.py` 的每文件
   循环体原样提取为 `_run_one`,`--jobs N` 用线程池并发跑文件子进程(每文件单元本就
   是阻塞的 subprocess.run);默认 1 = 历史顺序行为逐字节不变,verdict/重试/日志/
@@ -74,6 +107,17 @@
 
 ### Changed
 
+- **DOM 静态层精度收敛(Phase 354)**:AST 优先(esprima 跨语句污点链)、
+  正则兜底;5 类真实框架写法(`document.title=`、`aria-label`、
+  `.attr('title')`/`.val()`、`appendChild`)不再报 medium,真 sink
+  (innerHTML/document.write/`attr('href')`/`setAttribute('onclick')`)保留;
+  DVWA guestbook 页实测 120 low / 0 medium-high,low 一律不进告警。
+  边界明示不假装解决:计算属性名、跨语句对象身份、外部 bundle 归浏览器臂。
+  守卫 `tests/test_dom_static_precision.py`、`tests/test_dom_source_gate.py`。
+- **成熟度声明降 Beta(2026-11-02)**:`pyproject.toml` 从
+  `5 - Production/Stable` 降 `4 - Beta`,理由注释在文件内(存储需要可达的
+  viewer、无商业工具对跑、当时真实应用集只有 7 例匿名 smoke);README 增
+  「已具备/尚未具备/适用边界」实测口径声明——测过什么就声明什么。
 - **PortSwigger 覆盖证据刷新(外部评审回灌,2026-11-01)**:README 现在时的 100%(52/52)此前在仓库内没有产物支撑——唯一产物停在 Phase 192 之前的 23.1%(12/52),同文档「缺口 top」又把同一批 40 个事件列为当前缺口,构成自相矛盾。用 2026-09-30 cheat sheet 快照复跑 `portswigger_corpus_coverage.py`:no_interaction 组三维 **100% 证实**,产物刷新;requires_interaction 事件 16/104 → 76/104(Phase 192 语料补齐的效果),缺口段落按复跑口径重写(主指标缺口清零,移到参考组)。
 - **文档计数去数字化/实数化(外部评审回灌,2026-11-01)**:「36 项」去数字化;「23 种」→ 28 并由守卫钉住;「六种报告」→ -f 八种口径(六文档格式 + burp/nuclei 两种生态导出);README 指针摘要与 QUICKSTART 实际小节对齐(三条命令/四个退出码);`Authorization= Bearer XXX` → `Authorization: Bearer <TOKEN>`(原写法非合法 HTTP 头);L4→L6 层号笔误;AGENTS 快照刷新到当日实测。
 - **CI:nightly-gate 安装面对齐(外部评审回灌,2026-11-01)**:nightly 连续三个 schedule run 红(11-01/10-31/10-30)而同一 run 的 push `tests` job(同一 `run_all_batched.py` 入口)全绿——唯一安装差异是少装 cryptography/playwright/chromium。本机用 import 屏蔽 shim 复现该环境:**6 个无守卫导入 playwright 的测试文件 23 failed + 16 errors**(range7_construct_browser / crawl_stats / phase196_csp_delivery / range6 / spa_crawler_fallback / spa_crawler_nav_recovery)。已对齐安装面,待下一次 schedule run 端到端确认。
@@ -82,6 +126,9 @@
 
 ### Fixed
 
+- **认证会话下 header canary 排除 Cookie(Phase 355)**:transport 层的
+  header/cookie all-name canary 在有会话态的扫描里不再把 Cookie 列入注入面
+  (避免打脏会话本身)。守卫 `tests/test_phase355_transport_canary.py` 14 例。
 - **扫描在工作目录留下 0 字节 tmp 文件(Phase 347)**:本机工作区树带 Low
   完整性标签,`%TEMP%` 不可写,`tempfile.gettempdir()` 不报错而是回退到 CWD,
   依赖里的 `mkstemp` 于是在仓库根目录留下 `tmpXXXXXX`(实测:每次扫描两个;
