@@ -1,0 +1,3270 @@
+{
+  "truth": {
+    "generated": "2026-11-03T22:59:50",
+    "level_checks": [
+      {
+        "level": "low",
+        "confirmed": {
+          "bee": "low",
+          "bwuser": "low"
+        },
+        "all_ok": true
+      },
+      {
+        "level": "medium",
+        "confirmed": {
+          "bee": "medium",
+          "bwuser": "medium"
+        },
+        "all_ok": true
+      },
+      {
+        "level": "high",
+        "confirmed": {
+          "bee": "high",
+          "bwuser": "high"
+        },
+        "all_ok": true
+      }
+    ],
+    "rows": [
+      {
+        "level": "low",
+        "level_id": 0,
+        "face": "reflected",
+        "carrier": "script",
+        "role": "bwuser",
+        "n": 11,
+        "http": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": false,
+          "payload_exact": true,
+          "tag_intact": true,
+          "context": "Welcome <script>alert(11)</script> x\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a href=\"http://be.linkedin.com/in/malikmesellem\" target=\"blank_\" class=\"b"
+        },
+        "browser": {
+          "payload_exact": true,
+          "tag_intact": true,
+          "executed": true,
+          "dialogs": [
+            "11"
+          ],
+          "dom_tag_intact": true,
+          "text": "XSS - Reflected (GET)\n\nEnter your first and last name:\n\nFirst name:\n\n\nLast name:\n\n\nGo\n\nWelcome x",
+          "error": null,
+          "page_level": "low"
+        }
+      },
+      {
+        "level": "low",
+        "level_id": 0,
+        "face": "header",
+        "carrier": "script",
+        "role": "bwuser",
+        "n": 11,
+        "http": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": false,
+          "payload_exact": true,
+          "tag_intact": true,
+          "context": "Your User-Agent: <i><script>alert(11)</script></i></p>\n\n</div>\n\n<div id=\"side\">\n\n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a href=\"http://be.linkedin.com/in/malikmesellem\" target=\"blank_\" c"
+        },
+        "browser": {
+          "payload_exact": true,
+          "tag_intact": true,
+          "executed": true,
+          "dialogs": [
+            "11"
+          ],
+          "dom_tag_intact": true,
+          "text": "XSS - Reflected (User-Agent)\n\nYour User-Agent:",
+          "error": null,
+          "page_level": "low"
+        }
+      },
+      {
+        "level": "low",
+        "level_id": 0,
+        "face": "stored",
+        "carrier": "script",
+        "role": "bwuser",
+        "n": 11,
+        "http": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": false,
+          "payload_exact": true,
+          "tag_intact": true,
+          "context": "<tr height=\"40\">\n\n            <td align=\"center\">48</td>\n            <td>bwuser</td>\n            <td>2026-11-03 14:56:09</td>\n            <td><script>alert(11)</script></td>\n\n        </tr>\n\n    </table>\n\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n "
+        },
+        "http_view": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": false,
+          "payload_exact": true,
+          "tag_intact": true,
+          "context": "<tr height=\"40\">\n\n            <td align=\"center\">48</td>\n            <td>bwuser</td>\n            <td>2026-11-03 14:56:09</td>\n            <td><script>alert(11)</script></td>\n\n        </tr>\n\n    </table>\n\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n "
+        },
+        "browser": {
+          "payload_exact": true,
+          "tag_intact": true,
+          "executed": true,
+          "dialogs": [
+            "11"
+          ],
+          "dom_tag_intact": true,
+          "text": "XSS - Stored (Blog)\n\n\nSubmit\tAdd: \tShow all: \tDelete: \t\t\n\n\n#\tOwner\tDate\tEntry\n48\tbwuser\t2026-11-03 14:56:09\t",
+          "error": null,
+          "page_level": "low"
+        }
+      },
+      {
+        "level": "low",
+        "level_id": 0,
+        "face": "reflected",
+        "carrier": "img",
+        "role": "bwuser",
+        "n": 21,
+        "http": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": false,
+          "payload_exact": true,
+          "tag_intact": true,
+          "context": "Welcome <img src=x onerror=alert(21)> x\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a href=\"http://be.linkedin.com/in/malikmesellem\" target=\"blank_\" class"
+        },
+        "browser": {
+          "payload_exact": true,
+          "tag_intact": true,
+          "executed": true,
+          "dialogs": [
+            "21"
+          ],
+          "dom_tag_intact": false,
+          "text": "XSS - Reflected (GET)\n\nEnter your first and last name:\n\nFirst name:\n\n\nLast name:\n\n\nGo\n\nWelcome  x",
+          "error": null,
+          "page_level": "low"
+        }
+      },
+      {
+        "level": "low",
+        "level_id": 0,
+        "face": "header",
+        "carrier": "img",
+        "role": "bwuser",
+        "n": 21,
+        "http": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": false,
+          "payload_exact": true,
+          "tag_intact": true,
+          "context": "Your User-Agent: <i><img src=x onerror=alert(21)></i></p>\n\n</div>\n\n<div id=\"side\">\n\n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a href=\"http://be.linkedin.com/in/malikmesellem\" target=\"blank_"
+        },
+        "browser": {
+          "payload_exact": true,
+          "tag_intact": true,
+          "executed": true,
+          "dialogs": [
+            "21"
+          ],
+          "dom_tag_intact": false,
+          "text": "XSS - Reflected (User-Agent)\n\nYour User-Agent: ",
+          "error": null,
+          "page_level": "low"
+        }
+      },
+      {
+        "level": "low",
+        "level_id": 0,
+        "face": "stored",
+        "carrier": "img",
+        "role": "bwuser",
+        "n": 21,
+        "http": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": false,
+          "payload_exact": true,
+          "tag_intact": true,
+          "context": "\"40\">\n\n            <td align=\"center\">49</td>\n            <td>bwuser</td>\n            <td>2026-11-03 14:56:18</td>\n            <td><img src=x onerror=alert(21)></td>\n\n        </tr>\n\n    </table>\n\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a hr"
+        },
+        "http_view": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": false,
+          "payload_exact": true,
+          "tag_intact": true,
+          "context": "\"40\">\n\n            <td align=\"center\">49</td>\n            <td>bwuser</td>\n            <td>2026-11-03 14:56:18</td>\n            <td><img src=x onerror=alert(21)></td>\n\n        </tr>\n\n    </table>\n\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a hr"
+        },
+        "browser": {
+          "payload_exact": true,
+          "tag_intact": true,
+          "executed": true,
+          "dialogs": [
+            "11",
+            "21"
+          ],
+          "dom_tag_intact": false,
+          "text": "XSS - Stored (Blog)\n\n\nSubmit\tAdd: \tShow all: \tDelete: \t\t\n\n\n#\tOwner\tDate\tEntry\n48\tbwuser\t2026-11-03 14:56:09\t\n49\tbwuser\t2026-11-03 14:56:18\t",
+          "error": null,
+          "page_level": "low"
+        }
+      },
+      {
+        "level": "low",
+        "level_id": 0,
+        "face": "reflected",
+        "carrier": "svg",
+        "role": "bwuser",
+        "n": 31,
+        "http": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": false,
+          "payload_exact": true,
+          "tag_intact": true,
+          "context": "Welcome <svg onload=alert(31)> x\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a href=\"http://be.linkedin.com/in/malikmesellem\" target=\"blank_\" class=\"butto"
+        },
+        "browser": {
+          "payload_exact": true,
+          "tag_intact": true,
+          "executed": true,
+          "dialogs": [
+            "31"
+          ],
+          "dom_tag_intact": false,
+          "text": "XSS - Reflected (GET)\n\nEnter your first and last name:\n\nFirst name:\n\n\nLast name:\n\n\nGo\n\nWelcome ",
+          "error": null,
+          "page_level": "low"
+        }
+      },
+      {
+        "level": "low",
+        "level_id": 0,
+        "face": "header",
+        "carrier": "svg",
+        "role": "bwuser",
+        "n": 31,
+        "http": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": false,
+          "payload_exact": true,
+          "tag_intact": true,
+          "context": "Your User-Agent: <i><svg onload=alert(31)></i></p>\n\n</div>\n\n<div id=\"side\">\n\n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a href=\"http://be.linkedin.com/in/malikmesellem\" target=\"blank_\" class"
+        },
+        "browser": {
+          "payload_exact": true,
+          "tag_intact": true,
+          "executed": true,
+          "dialogs": [
+            "31"
+          ],
+          "dom_tag_intact": false,
+          "text": "XSS - Reflected (User-Agent)\n\nYour User-Agent: ",
+          "error": null,
+          "page_level": "low"
+        }
+      },
+      {
+        "level": "low",
+        "level_id": 0,
+        "face": "stored",
+        "carrier": "svg",
+        "role": "bwuser",
+        "n": 31,
+        "http": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": false,
+          "payload_exact": true,
+          "tag_intact": true,
+          "context": "height=\"40\">\n\n            <td align=\"center\">50</td>\n            <td>bwuser</td>\n            <td>2026-11-03 14:56:27</td>\n            <td><svg onload=alert(31)></td>\n\n        </tr>\n\n    </table>\n\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a hr"
+        },
+        "http_view": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": false,
+          "payload_exact": true,
+          "tag_intact": true,
+          "context": "height=\"40\">\n\n            <td align=\"center\">50</td>\n            <td>bwuser</td>\n            <td>2026-11-03 14:56:27</td>\n            <td><svg onload=alert(31)></td>\n\n        </tr>\n\n    </table>\n\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a hr"
+        },
+        "browser": {
+          "payload_exact": true,
+          "tag_intact": true,
+          "executed": true,
+          "dialogs": [
+            "11",
+            "21",
+            "31"
+          ],
+          "dom_tag_intact": false,
+          "text": "XSS - Stored (Blog)\n\n\nSubmit\tAdd: \tShow all: \tDelete: \t\t\n\n\n#\tOwner\tDate\tEntry\n48\tbwuser\t2026-11-03 14:56:09\t\n49\tbwuser\t2026-11-03 14:56:18\t\n50\tbwuser\t2026-11-03 14:56:27\t",
+          "error": null,
+          "page_level": "low"
+        }
+      },
+      {
+        "level": "low",
+        "level_id": 0,
+        "face": "reflected",
+        "carrier": "attr-escape",
+        "role": "bwuser",
+        "n": 41,
+        "http": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": false,
+          "payload_exact": true,
+          "tag_intact": true,
+          "context": "Welcome \"><img src=x onerror=alert(41)> x\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a href=\"http://be.linkedin.com/in/malikmesellem\" target=\"blank_\" cla"
+        },
+        "browser": {
+          "payload_exact": true,
+          "tag_intact": true,
+          "executed": true,
+          "dialogs": [
+            "41"
+          ],
+          "dom_tag_intact": false,
+          "text": "XSS - Reflected (GET)\n\nEnter your first and last name:\n\nFirst name:\n\n\nLast name:\n\n\nGo\n\nWelcome \"> x",
+          "error": null,
+          "page_level": "low"
+        }
+      },
+      {
+        "level": "low",
+        "level_id": 0,
+        "face": "header",
+        "carrier": "attr-escape",
+        "role": "bwuser",
+        "n": 41,
+        "http": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": false,
+          "payload_exact": true,
+          "tag_intact": true,
+          "context": "Your User-Agent: <i>\"><img src=x onerror=alert(41)></i></p>\n\n</div>\n\n<div id=\"side\">\n\n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a href=\"http://be.linkedin.com/in/malikmesellem\" target=\"blan"
+        },
+        "browser": {
+          "payload_exact": true,
+          "tag_intact": true,
+          "executed": true,
+          "dialogs": [
+            "41"
+          ],
+          "dom_tag_intact": false,
+          "text": "XSS - Reflected (User-Agent)\n\nYour User-Agent: \">",
+          "error": null,
+          "page_level": "low"
+        }
+      },
+      {
+        "level": "low",
+        "level_id": 0,
+        "face": "stored",
+        "carrier": "attr-escape",
+        "role": "bwuser",
+        "n": 41,
+        "http": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": false,
+          "payload_exact": true,
+          "tag_intact": true,
+          "context": "0\">\n\n            <td align=\"center\">51</td>\n            <td>bwuser</td>\n            <td>2026-11-03 14:56:36</td>\n            <td>\"><img src=x onerror=alert(41)></td>\n\n        </tr>\n\n    </table>\n\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a hr"
+        },
+        "http_view": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": false,
+          "payload_exact": true,
+          "tag_intact": true,
+          "context": "0\">\n\n            <td align=\"center\">51</td>\n            <td>bwuser</td>\n            <td>2026-11-03 14:56:36</td>\n            <td>\"><img src=x onerror=alert(41)></td>\n\n        </tr>\n\n    </table>\n\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a hr"
+        },
+        "browser": {
+          "payload_exact": true,
+          "tag_intact": true,
+          "executed": true,
+          "dialogs": [
+            "11",
+            "21",
+            "41",
+            "31"
+          ],
+          "dom_tag_intact": false,
+          "text": "XSS - Stored (Blog)\n\n\nSubmit\tAdd: \tShow all: \tDelete: \t\t\n\n\n#\tOwner\tDate\tEntry\n48\tbwuser\t2026-11-03 14:56:09\t\n49\tbwuser\t2026-11-03 14:56:18\t\n50\tbwuser\t2026-11-03 14:56:27\t\n51\tbwuser\t2026-11-03 14:56:36",
+          "error": null,
+          "page_level": "low"
+        }
+      },
+      {
+        "level": "low",
+        "level_id": 0,
+        "face": "reflected",
+        "carrier": "script",
+        "role": "bee",
+        "n": 51,
+        "http": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": false,
+          "payload_exact": true,
+          "tag_intact": true,
+          "context": "Welcome <script>alert(51)</script> x\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a href=\"http://be.linkedin.com/in/malikmesellem\" target=\"blank_\" class=\"b"
+        },
+        "browser": {
+          "payload_exact": true,
+          "tag_intact": true,
+          "executed": true,
+          "dialogs": [
+            "51"
+          ],
+          "dom_tag_intact": true,
+          "text": "XSS - Reflected (GET)\n\nEnter your first and last name:\n\nFirst name:\n\n\nLast name:\n\n\nGo\n\nWelcome x",
+          "error": null,
+          "page_level": "low"
+        }
+      },
+      {
+        "level": "low",
+        "level_id": 0,
+        "face": "header",
+        "carrier": "script",
+        "role": "bee",
+        "n": 51,
+        "http": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": false,
+          "payload_exact": true,
+          "tag_intact": true,
+          "context": "Your User-Agent: <i><script>alert(51)</script></i></p>\n\n</div>\n\n<div id=\"side\">\n\n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a href=\"http://be.linkedin.com/in/malikmesellem\" target=\"blank_\" c"
+        },
+        "browser": {
+          "payload_exact": true,
+          "tag_intact": true,
+          "executed": true,
+          "dialogs": [
+            "51"
+          ],
+          "dom_tag_intact": true,
+          "text": "XSS - Reflected (User-Agent)\n\nYour User-Agent:",
+          "error": null,
+          "page_level": "low"
+        }
+      },
+      {
+        "level": "low",
+        "level_id": 0,
+        "face": "stored",
+        "carrier": "script",
+        "role": "bee",
+        "n": 51,
+        "http": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": false,
+          "payload_exact": true,
+          "tag_intact": true,
+          "context": "   <tr height=\"40\">\n\n            <td align=\"center\">52</td>\n            <td>bee</td>\n            <td>2026-11-03 14:56:45</td>\n            <td><script>alert(51)</script></td>\n\n        </tr>\n\n    </table>\n\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n "
+        },
+        "http_view": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": false,
+          "payload_exact": true,
+          "tag_intact": true,
+          "context": "   <tr height=\"40\">\n\n            <td align=\"center\">52</td>\n            <td>bee</td>\n            <td>2026-11-03 14:56:45</td>\n            <td><script>alert(51)</script></td>\n\n        </tr>\n\n    </table>\n\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n "
+        },
+        "browser": {
+          "payload_exact": true,
+          "tag_intact": true,
+          "executed": true,
+          "dialogs": [
+            "51"
+          ],
+          "dom_tag_intact": true,
+          "text": "XSS - Stored (Blog)\n\n\nSubmit\tAdd: \tShow all: \tDelete: \t\t\n\n\n#\tOwner\tDate\tEntry\n52\tbee\t2026-11-03 14:56:45\t",
+          "error": null,
+          "page_level": "low"
+        }
+      },
+      {
+        "level": "low",
+        "level_id": 0,
+        "face": "reflected",
+        "carrier": "img",
+        "role": "bee",
+        "n": 61,
+        "http": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": false,
+          "payload_exact": true,
+          "tag_intact": true,
+          "context": "Welcome <img src=x onerror=alert(61)> x\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a href=\"http://be.linkedin.com/in/malikmesellem\" target=\"blank_\" class"
+        },
+        "browser": {
+          "payload_exact": true,
+          "tag_intact": true,
+          "executed": true,
+          "dialogs": [
+            "61"
+          ],
+          "dom_tag_intact": false,
+          "text": "XSS - Reflected (GET)\n\nEnter your first and last name:\n\nFirst name:\n\n\nLast name:\n\n\nGo\n\nWelcome  x",
+          "error": null,
+          "page_level": "low"
+        }
+      },
+      {
+        "level": "low",
+        "level_id": 0,
+        "face": "header",
+        "carrier": "img",
+        "role": "bee",
+        "n": 61,
+        "http": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": false,
+          "payload_exact": true,
+          "tag_intact": true,
+          "context": "Your User-Agent: <i><img src=x onerror=alert(61)></i></p>\n\n</div>\n\n<div id=\"side\">\n\n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a href=\"http://be.linkedin.com/in/malikmesellem\" target=\"blank_"
+        },
+        "browser": {
+          "payload_exact": true,
+          "tag_intact": true,
+          "executed": true,
+          "dialogs": [
+            "61"
+          ],
+          "dom_tag_intact": false,
+          "text": "XSS - Reflected (User-Agent)\n\nYour User-Agent: ",
+          "error": null,
+          "page_level": "low"
+        }
+      },
+      {
+        "level": "low",
+        "level_id": 0,
+        "face": "stored",
+        "carrier": "img",
+        "role": "bee",
+        "n": 61,
+        "http": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": false,
+          "payload_exact": true,
+          "tag_intact": true,
+          "context": "ht=\"40\">\n\n            <td align=\"center\">53</td>\n            <td>bee</td>\n            <td>2026-11-03 14:56:54</td>\n            <td><img src=x onerror=alert(61)></td>\n\n        </tr>\n\n    </table>\n\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a hr"
+        },
+        "http_view": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": false,
+          "payload_exact": true,
+          "tag_intact": true,
+          "context": "ht=\"40\">\n\n            <td align=\"center\">53</td>\n            <td>bee</td>\n            <td>2026-11-03 14:56:54</td>\n            <td><img src=x onerror=alert(61)></td>\n\n        </tr>\n\n    </table>\n\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a hr"
+        },
+        "browser": {
+          "payload_exact": true,
+          "tag_intact": true,
+          "executed": true,
+          "dialogs": [
+            "51",
+            "61"
+          ],
+          "dom_tag_intact": false,
+          "text": "XSS - Stored (Blog)\n\n\nSubmit\tAdd: \tShow all: \tDelete: \t\t\n\n\n#\tOwner\tDate\tEntry\n52\tbee\t2026-11-03 14:56:45\t\n53\tbee\t2026-11-03 14:56:54\t",
+          "error": null,
+          "page_level": "low"
+        }
+      },
+      {
+        "level": "low",
+        "level_id": 0,
+        "face": "reflected",
+        "carrier": "svg",
+        "role": "bee",
+        "n": 71,
+        "http": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": false,
+          "payload_exact": true,
+          "tag_intact": true,
+          "context": "Welcome <svg onload=alert(71)> x\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a href=\"http://be.linkedin.com/in/malikmesellem\" target=\"blank_\" class=\"butto"
+        },
+        "browser": {
+          "payload_exact": true,
+          "tag_intact": true,
+          "executed": true,
+          "dialogs": [
+            "71"
+          ],
+          "dom_tag_intact": false,
+          "text": "XSS - Reflected (GET)\n\nEnter your first and last name:\n\nFirst name:\n\n\nLast name:\n\n\nGo\n\nWelcome ",
+          "error": null,
+          "page_level": "low"
+        }
+      },
+      {
+        "level": "low",
+        "level_id": 0,
+        "face": "header",
+        "carrier": "svg",
+        "role": "bee",
+        "n": 71,
+        "http": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": false,
+          "payload_exact": true,
+          "tag_intact": true,
+          "context": "Your User-Agent: <i><svg onload=alert(71)></i></p>\n\n</div>\n\n<div id=\"side\">\n\n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a href=\"http://be.linkedin.com/in/malikmesellem\" target=\"blank_\" class"
+        },
+        "browser": {
+          "payload_exact": true,
+          "tag_intact": true,
+          "executed": true,
+          "dialogs": [
+            "71"
+          ],
+          "dom_tag_intact": false,
+          "text": "XSS - Reflected (User-Agent)\n\nYour User-Agent: ",
+          "error": null,
+          "page_level": "low"
+        }
+      },
+      {
+        "level": "low",
+        "level_id": 0,
+        "face": "stored",
+        "carrier": "svg",
+        "role": "bee",
+        "n": 71,
+        "http": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": false,
+          "payload_exact": true,
+          "tag_intact": true,
+          "context": "tr height=\"40\">\n\n            <td align=\"center\">54</td>\n            <td>bee</td>\n            <td>2026-11-03 14:57:03</td>\n            <td><svg onload=alert(71)></td>\n\n        </tr>\n\n    </table>\n\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a hr"
+        },
+        "http_view": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": false,
+          "payload_exact": true,
+          "tag_intact": true,
+          "context": "tr height=\"40\">\n\n            <td align=\"center\">54</td>\n            <td>bee</td>\n            <td>2026-11-03 14:57:03</td>\n            <td><svg onload=alert(71)></td>\n\n        </tr>\n\n    </table>\n\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a hr"
+        },
+        "browser": {
+          "payload_exact": true,
+          "tag_intact": true,
+          "executed": true,
+          "dialogs": [
+            "51",
+            "61",
+            "71"
+          ],
+          "dom_tag_intact": false,
+          "text": "XSS - Stored (Blog)\n\n\nSubmit\tAdd: \tShow all: \tDelete: \t\t\n\n\n#\tOwner\tDate\tEntry\n52\tbee\t2026-11-03 14:56:45\t\n53\tbee\t2026-11-03 14:56:54\t\n54\tbee\t2026-11-03 14:57:03\t",
+          "error": null,
+          "page_level": "low"
+        }
+      },
+      {
+        "level": "low",
+        "level_id": 0,
+        "face": "reflected",
+        "carrier": "attr-escape",
+        "role": "bee",
+        "n": 81,
+        "http": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": false,
+          "payload_exact": true,
+          "tag_intact": true,
+          "context": "Welcome \"><img src=x onerror=alert(81)> x\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a href=\"http://be.linkedin.com/in/malikmesellem\" target=\"blank_\" cla"
+        },
+        "browser": {
+          "payload_exact": true,
+          "tag_intact": true,
+          "executed": true,
+          "dialogs": [
+            "81"
+          ],
+          "dom_tag_intact": false,
+          "text": "XSS - Reflected (GET)\n\nEnter your first and last name:\n\nFirst name:\n\n\nLast name:\n\n\nGo\n\nWelcome \"> x",
+          "error": null,
+          "page_level": "low"
+        }
+      },
+      {
+        "level": "low",
+        "level_id": 0,
+        "face": "header",
+        "carrier": "attr-escape",
+        "role": "bee",
+        "n": 81,
+        "http": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": false,
+          "payload_exact": true,
+          "tag_intact": true,
+          "context": "Your User-Agent: <i>\"><img src=x onerror=alert(81)></i></p>\n\n</div>\n\n<div id=\"side\">\n\n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a href=\"http://be.linkedin.com/in/malikmesellem\" target=\"blan"
+        },
+        "browser": {
+          "payload_exact": true,
+          "tag_intact": true,
+          "executed": true,
+          "dialogs": [
+            "81"
+          ],
+          "dom_tag_intact": false,
+          "text": "XSS - Reflected (User-Agent)\n\nYour User-Agent: \">",
+          "error": null,
+          "page_level": "low"
+        }
+      },
+      {
+        "level": "low",
+        "level_id": 0,
+        "face": "stored",
+        "carrier": "attr-escape",
+        "role": "bee",
+        "n": 81,
+        "http": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": false,
+          "payload_exact": true,
+          "tag_intact": true,
+          "context": "=\"40\">\n\n            <td align=\"center\">55</td>\n            <td>bee</td>\n            <td>2026-11-03 14:57:12</td>\n            <td>\"><img src=x onerror=alert(81)></td>\n\n        </tr>\n\n    </table>\n\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a hr"
+        },
+        "http_view": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": false,
+          "payload_exact": true,
+          "tag_intact": true,
+          "context": "=\"40\">\n\n            <td align=\"center\">55</td>\n            <td>bee</td>\n            <td>2026-11-03 14:57:12</td>\n            <td>\"><img src=x onerror=alert(81)></td>\n\n        </tr>\n\n    </table>\n\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a hr"
+        },
+        "browser": {
+          "payload_exact": true,
+          "tag_intact": true,
+          "executed": true,
+          "dialogs": [
+            "51",
+            "61",
+            "81",
+            "71"
+          ],
+          "dom_tag_intact": false,
+          "text": "XSS - Stored (Blog)\n\n\nSubmit\tAdd: \tShow all: \tDelete: \t\t\n\n\n#\tOwner\tDate\tEntry\n52\tbee\t2026-11-03 14:56:45\t\n53\tbee\t2026-11-03 14:56:54\t\n54\tbee\t2026-11-03 14:57:03\t\n55\tbee\t2026-11-03 14:57:12\t\">",
+          "error": null,
+          "page_level": "low"
+        }
+      },
+      {
+        "level": "medium",
+        "level_id": 1,
+        "face": "reflected",
+        "carrier": "script",
+        "role": "bwuser",
+        "n": 11,
+        "http": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": false,
+          "payload_exact": true,
+          "tag_intact": true,
+          "context": "Welcome <script>alert(11)</script> x\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a href=\"http://be.linkedin.com/in/malikmesellem\" target=\"blank_\" class=\"b"
+        },
+        "browser": {
+          "payload_exact": true,
+          "tag_intact": true,
+          "executed": true,
+          "dialogs": [
+            "11"
+          ],
+          "dom_tag_intact": true,
+          "text": "XSS - Reflected (GET)\n\nEnter your first and last name:\n\nFirst name:\n\n\nLast name:\n\n\nGo\n\nWelcome x",
+          "error": null,
+          "page_level": "medium"
+        }
+      },
+      {
+        "level": "medium",
+        "level_id": 1,
+        "face": "header",
+        "carrier": "script",
+        "role": "bwuser",
+        "n": 11,
+        "http": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": false,
+          "payload_exact": true,
+          "tag_intact": true,
+          "context": "Your User-Agent: <i><script>alert(11)</script></i></p>\n\n</div>\n\n<div id=\"side\">\n\n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a href=\"http://be.linkedin.com/in/malikmesellem\" target=\"blank_\" c"
+        },
+        "browser": {
+          "payload_exact": true,
+          "tag_intact": true,
+          "executed": true,
+          "dialogs": [
+            "11"
+          ],
+          "dom_tag_intact": true,
+          "text": "XSS - Reflected (User-Agent)\n\nYour User-Agent:",
+          "error": null,
+          "page_level": "medium"
+        }
+      },
+      {
+        "level": "medium",
+        "level_id": 1,
+        "face": "stored",
+        "carrier": "script",
+        "role": "bwuser",
+        "n": 11,
+        "http": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": false,
+          "payload_exact": true,
+          "tag_intact": true,
+          "context": "<tr height=\"40\">\n\n            <td align=\"center\">56</td>\n            <td>bwuser</td>\n            <td>2026-11-03 14:57:25</td>\n            <td><script>alert(11)</script></td>\n\n        </tr>\n\n    </table>\n\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n "
+        },
+        "http_view": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": false,
+          "payload_exact": true,
+          "tag_intact": true,
+          "context": "<tr height=\"40\">\n\n            <td align=\"center\">56</td>\n            <td>bwuser</td>\n            <td>2026-11-03 14:57:25</td>\n            <td><script>alert(11)</script></td>\n\n        </tr>\n\n    </table>\n\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n "
+        },
+        "browser": {
+          "payload_exact": true,
+          "tag_intact": true,
+          "executed": true,
+          "dialogs": [
+            "11"
+          ],
+          "dom_tag_intact": true,
+          "text": "XSS - Stored (Blog)\n\n\nSubmit\tAdd: \tShow all: \tDelete: \t\t\n\n\n#\tOwner\tDate\tEntry\n56\tbwuser\t2026-11-03 14:57:25\t",
+          "error": null,
+          "page_level": "medium"
+        }
+      },
+      {
+        "level": "medium",
+        "level_id": 1,
+        "face": "reflected",
+        "carrier": "img",
+        "role": "bwuser",
+        "n": 21,
+        "http": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": false,
+          "payload_exact": true,
+          "tag_intact": true,
+          "context": "Welcome <img src=x onerror=alert(21)> x\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a href=\"http://be.linkedin.com/in/malikmesellem\" target=\"blank_\" class"
+        },
+        "browser": {
+          "payload_exact": true,
+          "tag_intact": true,
+          "executed": true,
+          "dialogs": [
+            "21"
+          ],
+          "dom_tag_intact": false,
+          "text": "XSS - Reflected (GET)\n\nEnter your first and last name:\n\nFirst name:\n\n\nLast name:\n\n\nGo\n\nWelcome  x",
+          "error": null,
+          "page_level": "medium"
+        }
+      },
+      {
+        "level": "medium",
+        "level_id": 1,
+        "face": "header",
+        "carrier": "img",
+        "role": "bwuser",
+        "n": 21,
+        "http": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": false,
+          "payload_exact": true,
+          "tag_intact": true,
+          "context": "Your User-Agent: <i><img src=x onerror=alert(21)></i></p>\n\n</div>\n\n<div id=\"side\">\n\n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a href=\"http://be.linkedin.com/in/malikmesellem\" target=\"blank_"
+        },
+        "browser": {
+          "payload_exact": true,
+          "tag_intact": true,
+          "executed": true,
+          "dialogs": [
+            "21"
+          ],
+          "dom_tag_intact": false,
+          "text": "XSS - Reflected (User-Agent)\n\nYour User-Agent: ",
+          "error": null,
+          "page_level": "medium"
+        }
+      },
+      {
+        "level": "medium",
+        "level_id": 1,
+        "face": "stored",
+        "carrier": "img",
+        "role": "bwuser",
+        "n": 21,
+        "http": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": false,
+          "payload_exact": true,
+          "tag_intact": true,
+          "context": "\"40\">\n\n            <td align=\"center\">57</td>\n            <td>bwuser</td>\n            <td>2026-11-03 14:57:34</td>\n            <td><img src=x onerror=alert(21)></td>\n\n        </tr>\n\n    </table>\n\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a hr"
+        },
+        "http_view": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": false,
+          "payload_exact": true,
+          "tag_intact": true,
+          "context": "\"40\">\n\n            <td align=\"center\">57</td>\n            <td>bwuser</td>\n            <td>2026-11-03 14:57:34</td>\n            <td><img src=x onerror=alert(21)></td>\n\n        </tr>\n\n    </table>\n\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a hr"
+        },
+        "browser": {
+          "payload_exact": true,
+          "tag_intact": true,
+          "executed": true,
+          "dialogs": [
+            "11",
+            "21"
+          ],
+          "dom_tag_intact": false,
+          "text": "XSS - Stored (Blog)\n\n\nSubmit\tAdd: \tShow all: \tDelete: \t\t\n\n\n#\tOwner\tDate\tEntry\n56\tbwuser\t2026-11-03 14:57:25\t\n57\tbwuser\t2026-11-03 14:57:34\t",
+          "error": null,
+          "page_level": "medium"
+        }
+      },
+      {
+        "level": "medium",
+        "level_id": 1,
+        "face": "reflected",
+        "carrier": "svg",
+        "role": "bwuser",
+        "n": 31,
+        "http": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": false,
+          "payload_exact": true,
+          "tag_intact": true,
+          "context": "Welcome <svg onload=alert(31)> x\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a href=\"http://be.linkedin.com/in/malikmesellem\" target=\"blank_\" class=\"butto"
+        },
+        "browser": {
+          "payload_exact": true,
+          "tag_intact": true,
+          "executed": true,
+          "dialogs": [
+            "31"
+          ],
+          "dom_tag_intact": false,
+          "text": "XSS - Reflected (GET)\n\nEnter your first and last name:\n\nFirst name:\n\n\nLast name:\n\n\nGo\n\nWelcome ",
+          "error": null,
+          "page_level": "medium"
+        }
+      },
+      {
+        "level": "medium",
+        "level_id": 1,
+        "face": "header",
+        "carrier": "svg",
+        "role": "bwuser",
+        "n": 31,
+        "http": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": false,
+          "payload_exact": true,
+          "tag_intact": true,
+          "context": "Your User-Agent: <i><svg onload=alert(31)></i></p>\n\n</div>\n\n<div id=\"side\">\n\n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a href=\"http://be.linkedin.com/in/malikmesellem\" target=\"blank_\" class"
+        },
+        "browser": {
+          "payload_exact": true,
+          "tag_intact": true,
+          "executed": true,
+          "dialogs": [
+            "31"
+          ],
+          "dom_tag_intact": false,
+          "text": "XSS - Reflected (User-Agent)\n\nYour User-Agent: ",
+          "error": null,
+          "page_level": "medium"
+        }
+      },
+      {
+        "level": "medium",
+        "level_id": 1,
+        "face": "stored",
+        "carrier": "svg",
+        "role": "bwuser",
+        "n": 31,
+        "http": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": false,
+          "payload_exact": true,
+          "tag_intact": true,
+          "context": "height=\"40\">\n\n            <td align=\"center\">58</td>\n            <td>bwuser</td>\n            <td>2026-11-03 14:57:43</td>\n            <td><svg onload=alert(31)></td>\n\n        </tr>\n\n    </table>\n\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a hr"
+        },
+        "http_view": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": false,
+          "payload_exact": true,
+          "tag_intact": true,
+          "context": "height=\"40\">\n\n            <td align=\"center\">58</td>\n            <td>bwuser</td>\n            <td>2026-11-03 14:57:43</td>\n            <td><svg onload=alert(31)></td>\n\n        </tr>\n\n    </table>\n\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a hr"
+        },
+        "browser": {
+          "payload_exact": true,
+          "tag_intact": true,
+          "executed": true,
+          "dialogs": [
+            "11",
+            "21",
+            "31"
+          ],
+          "dom_tag_intact": false,
+          "text": "XSS - Stored (Blog)\n\n\nSubmit\tAdd: \tShow all: \tDelete: \t\t\n\n\n#\tOwner\tDate\tEntry\n56\tbwuser\t2026-11-03 14:57:25\t\n57\tbwuser\t2026-11-03 14:57:34\t\n58\tbwuser\t2026-11-03 14:57:43\t",
+          "error": null,
+          "page_level": "medium"
+        }
+      },
+      {
+        "level": "medium",
+        "level_id": 1,
+        "face": "reflected",
+        "carrier": "attr-escape",
+        "role": "bwuser",
+        "n": 41,
+        "http": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": true,
+          "payload_exact": false,
+          "tag_intact": true,
+          "context": "Welcome \\\"><img src=x onerror=alert(41)> x\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a href=\"http://be.linkedin.com/in/malikmesellem\" target=\"blank_\" cl"
+        },
+        "browser": {
+          "payload_exact": false,
+          "tag_intact": true,
+          "executed": true,
+          "dialogs": [
+            "41"
+          ],
+          "dom_tag_intact": false,
+          "text": "XSS - Reflected (GET)\n\nEnter your first and last name:\n\nFirst name:\n\n\nLast name:\n\n\nGo\n\nWelcome \\\"> x",
+          "error": null,
+          "page_level": "medium"
+        }
+      },
+      {
+        "level": "medium",
+        "level_id": 1,
+        "face": "header",
+        "carrier": "attr-escape",
+        "role": "bwuser",
+        "n": 41,
+        "http": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": true,
+          "payload_exact": false,
+          "tag_intact": true,
+          "context": "Your User-Agent: <i>\\\"><img src=x onerror=alert(41)></i></p>\n\n</div>\n\n<div id=\"side\">\n\n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a href=\"http://be.linkedin.com/in/malikmesellem\" target=\"bla"
+        },
+        "browser": {
+          "payload_exact": false,
+          "tag_intact": true,
+          "executed": true,
+          "dialogs": [
+            "41"
+          ],
+          "dom_tag_intact": false,
+          "text": "XSS - Reflected (User-Agent)\n\nYour User-Agent: \\\">",
+          "error": null,
+          "page_level": "medium"
+        }
+      },
+      {
+        "level": "medium",
+        "level_id": 1,
+        "face": "stored",
+        "carrier": "attr-escape",
+        "role": "bwuser",
+        "n": 41,
+        "http": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": true,
+          "payload_exact": false,
+          "tag_intact": true,
+          "context": "\">\n\n            <td align=\"center\">59</td>\n            <td>bwuser</td>\n            <td>2026-11-03 14:57:52</td>\n            <td>\\\"><img src=x onerror=alert(41)></td>\n\n        </tr>\n\n    </table>\n\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a hr"
+        },
+        "http_view": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": true,
+          "payload_exact": false,
+          "tag_intact": true,
+          "context": "\">\n\n            <td align=\"center\">59</td>\n            <td>bwuser</td>\n            <td>2026-11-03 14:57:52</td>\n            <td>\\\"><img src=x onerror=alert(41)></td>\n\n        </tr>\n\n    </table>\n\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a hr"
+        },
+        "browser": {
+          "payload_exact": false,
+          "tag_intact": true,
+          "executed": true,
+          "dialogs": [
+            "11",
+            "21",
+            "41",
+            "31"
+          ],
+          "dom_tag_intact": false,
+          "text": "XSS - Stored (Blog)\n\n\nSubmit\tAdd: \tShow all: \tDelete: \t\t\n\n\n#\tOwner\tDate\tEntry\n56\tbwuser\t2026-11-03 14:57:25\t\n57\tbwuser\t2026-11-03 14:57:34\t\n58\tbwuser\t2026-11-03 14:57:43\t\n59\tbwuser\t2026-11-03 14:57:52",
+          "error": null,
+          "page_level": "medium"
+        }
+      },
+      {
+        "level": "medium",
+        "level_id": 1,
+        "face": "reflected",
+        "carrier": "script",
+        "role": "bee",
+        "n": 51,
+        "http": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": false,
+          "payload_exact": true,
+          "tag_intact": true,
+          "context": "Welcome <script>alert(51)</script> x\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a href=\"http://be.linkedin.com/in/malikmesellem\" target=\"blank_\" class=\"b"
+        },
+        "browser": {
+          "payload_exact": true,
+          "tag_intact": true,
+          "executed": true,
+          "dialogs": [
+            "51"
+          ],
+          "dom_tag_intact": true,
+          "text": "XSS - Reflected (GET)\n\nEnter your first and last name:\n\nFirst name:\n\n\nLast name:\n\n\nGo\n\nWelcome x",
+          "error": null,
+          "page_level": "medium"
+        }
+      },
+      {
+        "level": "medium",
+        "level_id": 1,
+        "face": "header",
+        "carrier": "script",
+        "role": "bee",
+        "n": 51,
+        "http": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": false,
+          "payload_exact": true,
+          "tag_intact": true,
+          "context": "Your User-Agent: <i><script>alert(51)</script></i></p>\n\n</div>\n\n<div id=\"side\">\n\n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a href=\"http://be.linkedin.com/in/malikmesellem\" target=\"blank_\" c"
+        },
+        "browser": {
+          "payload_exact": true,
+          "tag_intact": true,
+          "executed": true,
+          "dialogs": [
+            "51"
+          ],
+          "dom_tag_intact": true,
+          "text": "XSS - Reflected (User-Agent)\n\nYour User-Agent:",
+          "error": null,
+          "page_level": "medium"
+        }
+      },
+      {
+        "level": "medium",
+        "level_id": 1,
+        "face": "stored",
+        "carrier": "script",
+        "role": "bee",
+        "n": 51,
+        "http": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": false,
+          "payload_exact": true,
+          "tag_intact": true,
+          "context": "   <tr height=\"40\">\n\n            <td align=\"center\">60</td>\n            <td>bee</td>\n            <td>2026-11-03 14:58:01</td>\n            <td><script>alert(51)</script></td>\n\n        </tr>\n\n    </table>\n\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n "
+        },
+        "http_view": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": false,
+          "payload_exact": true,
+          "tag_intact": true,
+          "context": "   <tr height=\"40\">\n\n            <td align=\"center\">60</td>\n            <td>bee</td>\n            <td>2026-11-03 14:58:01</td>\n            <td><script>alert(51)</script></td>\n\n        </tr>\n\n    </table>\n\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n "
+        },
+        "browser": {
+          "payload_exact": true,
+          "tag_intact": true,
+          "executed": true,
+          "dialogs": [
+            "51"
+          ],
+          "dom_tag_intact": true,
+          "text": "XSS - Stored (Blog)\n\n\nSubmit\tAdd: \tShow all: \tDelete: \t\t\n\n\n#\tOwner\tDate\tEntry\n60\tbee\t2026-11-03 14:58:01\t",
+          "error": null,
+          "page_level": "medium"
+        }
+      },
+      {
+        "level": "medium",
+        "level_id": 1,
+        "face": "reflected",
+        "carrier": "img",
+        "role": "bee",
+        "n": 61,
+        "http": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": false,
+          "payload_exact": true,
+          "tag_intact": true,
+          "context": "Welcome <img src=x onerror=alert(61)> x\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a href=\"http://be.linkedin.com/in/malikmesellem\" target=\"blank_\" class"
+        },
+        "browser": {
+          "payload_exact": true,
+          "tag_intact": true,
+          "executed": true,
+          "dialogs": [
+            "61"
+          ],
+          "dom_tag_intact": false,
+          "text": "XSS - Reflected (GET)\n\nEnter your first and last name:\n\nFirst name:\n\n\nLast name:\n\n\nGo\n\nWelcome  x",
+          "error": null,
+          "page_level": "medium"
+        }
+      },
+      {
+        "level": "medium",
+        "level_id": 1,
+        "face": "header",
+        "carrier": "img",
+        "role": "bee",
+        "n": 61,
+        "http": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": false,
+          "payload_exact": true,
+          "tag_intact": true,
+          "context": "Your User-Agent: <i><img src=x onerror=alert(61)></i></p>\n\n</div>\n\n<div id=\"side\">\n\n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a href=\"http://be.linkedin.com/in/malikmesellem\" target=\"blank_"
+        },
+        "browser": {
+          "payload_exact": true,
+          "tag_intact": true,
+          "executed": true,
+          "dialogs": [
+            "61"
+          ],
+          "dom_tag_intact": false,
+          "text": "XSS - Reflected (User-Agent)\n\nYour User-Agent: ",
+          "error": null,
+          "page_level": "medium"
+        }
+      },
+      {
+        "level": "medium",
+        "level_id": 1,
+        "face": "stored",
+        "carrier": "img",
+        "role": "bee",
+        "n": 61,
+        "http": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": false,
+          "payload_exact": true,
+          "tag_intact": true,
+          "context": "ht=\"40\">\n\n            <td align=\"center\">61</td>\n            <td>bee</td>\n            <td>2026-11-03 14:58:10</td>\n            <td><img src=x onerror=alert(61)></td>\n\n        </tr>\n\n    </table>\n\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a hr"
+        },
+        "http_view": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": false,
+          "payload_exact": true,
+          "tag_intact": true,
+          "context": "ht=\"40\">\n\n            <td align=\"center\">61</td>\n            <td>bee</td>\n            <td>2026-11-03 14:58:10</td>\n            <td><img src=x onerror=alert(61)></td>\n\n        </tr>\n\n    </table>\n\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a hr"
+        },
+        "browser": {
+          "payload_exact": true,
+          "tag_intact": true,
+          "executed": true,
+          "dialogs": [
+            "51",
+            "61"
+          ],
+          "dom_tag_intact": false,
+          "text": "XSS - Stored (Blog)\n\n\nSubmit\tAdd: \tShow all: \tDelete: \t\t\n\n\n#\tOwner\tDate\tEntry\n60\tbee\t2026-11-03 14:58:01\t\n61\tbee\t2026-11-03 14:58:10\t",
+          "error": null,
+          "page_level": "medium"
+        }
+      },
+      {
+        "level": "medium",
+        "level_id": 1,
+        "face": "reflected",
+        "carrier": "svg",
+        "role": "bee",
+        "n": 71,
+        "http": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": false,
+          "payload_exact": true,
+          "tag_intact": true,
+          "context": "Welcome <svg onload=alert(71)> x\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a href=\"http://be.linkedin.com/in/malikmesellem\" target=\"blank_\" class=\"butto"
+        },
+        "browser": {
+          "payload_exact": true,
+          "tag_intact": true,
+          "executed": true,
+          "dialogs": [
+            "71"
+          ],
+          "dom_tag_intact": false,
+          "text": "XSS - Reflected (GET)\n\nEnter your first and last name:\n\nFirst name:\n\n\nLast name:\n\n\nGo\n\nWelcome ",
+          "error": null,
+          "page_level": "medium"
+        }
+      },
+      {
+        "level": "medium",
+        "level_id": 1,
+        "face": "header",
+        "carrier": "svg",
+        "role": "bee",
+        "n": 71,
+        "http": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": false,
+          "payload_exact": true,
+          "tag_intact": true,
+          "context": "Your User-Agent: <i><svg onload=alert(71)></i></p>\n\n</div>\n\n<div id=\"side\">\n\n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a href=\"http://be.linkedin.com/in/malikmesellem\" target=\"blank_\" class"
+        },
+        "browser": {
+          "payload_exact": true,
+          "tag_intact": true,
+          "executed": true,
+          "dialogs": [
+            "71"
+          ],
+          "dom_tag_intact": false,
+          "text": "XSS - Reflected (User-Agent)\n\nYour User-Agent: ",
+          "error": null,
+          "page_level": "medium"
+        }
+      },
+      {
+        "level": "medium",
+        "level_id": 1,
+        "face": "stored",
+        "carrier": "svg",
+        "role": "bee",
+        "n": 71,
+        "http": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": false,
+          "payload_exact": true,
+          "tag_intact": true,
+          "context": "tr height=\"40\">\n\n            <td align=\"center\">62</td>\n            <td>bee</td>\n            <td>2026-11-03 14:58:19</td>\n            <td><svg onload=alert(71)></td>\n\n        </tr>\n\n    </table>\n\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a hr"
+        },
+        "http_view": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": false,
+          "payload_exact": true,
+          "tag_intact": true,
+          "context": "tr height=\"40\">\n\n            <td align=\"center\">62</td>\n            <td>bee</td>\n            <td>2026-11-03 14:58:19</td>\n            <td><svg onload=alert(71)></td>\n\n        </tr>\n\n    </table>\n\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a hr"
+        },
+        "browser": {
+          "payload_exact": true,
+          "tag_intact": true,
+          "executed": true,
+          "dialogs": [
+            "51",
+            "61",
+            "71"
+          ],
+          "dom_tag_intact": false,
+          "text": "XSS - Stored (Blog)\n\n\nSubmit\tAdd: \tShow all: \tDelete: \t\t\n\n\n#\tOwner\tDate\tEntry\n60\tbee\t2026-11-03 14:58:01\t\n61\tbee\t2026-11-03 14:58:10\t\n62\tbee\t2026-11-03 14:58:19\t",
+          "error": null,
+          "page_level": "medium"
+        }
+      },
+      {
+        "level": "medium",
+        "level_id": 1,
+        "face": "reflected",
+        "carrier": "attr-escape",
+        "role": "bee",
+        "n": 81,
+        "http": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": true,
+          "payload_exact": false,
+          "tag_intact": true,
+          "context": "Welcome \\\"><img src=x onerror=alert(81)> x\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a href=\"http://be.linkedin.com/in/malikmesellem\" target=\"blank_\" cl"
+        },
+        "browser": {
+          "payload_exact": false,
+          "tag_intact": true,
+          "executed": true,
+          "dialogs": [
+            "81"
+          ],
+          "dom_tag_intact": false,
+          "text": "XSS - Reflected (GET)\n\nEnter your first and last name:\n\nFirst name:\n\n\nLast name:\n\n\nGo\n\nWelcome \\\"> x",
+          "error": null,
+          "page_level": "medium"
+        }
+      },
+      {
+        "level": "medium",
+        "level_id": 1,
+        "face": "header",
+        "carrier": "attr-escape",
+        "role": "bee",
+        "n": 81,
+        "http": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": true,
+          "payload_exact": false,
+          "tag_intact": true,
+          "context": "Your User-Agent: <i>\\\"><img src=x onerror=alert(81)></i></p>\n\n</div>\n\n<div id=\"side\">\n\n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a href=\"http://be.linkedin.com/in/malikmesellem\" target=\"bla"
+        },
+        "browser": {
+          "payload_exact": false,
+          "tag_intact": true,
+          "executed": true,
+          "dialogs": [
+            "81"
+          ],
+          "dom_tag_intact": false,
+          "text": "XSS - Reflected (User-Agent)\n\nYour User-Agent: \\\">",
+          "error": null,
+          "page_level": "medium"
+        }
+      },
+      {
+        "level": "medium",
+        "level_id": 1,
+        "face": "stored",
+        "carrier": "attr-escape",
+        "role": "bee",
+        "n": 81,
+        "http": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": true,
+          "payload_exact": false,
+          "tag_intact": true,
+          "context": "\"40\">\n\n            <td align=\"center\">63</td>\n            <td>bee</td>\n            <td>2026-11-03 14:58:28</td>\n            <td>\\\"><img src=x onerror=alert(81)></td>\n\n        </tr>\n\n    </table>\n\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a hr"
+        },
+        "http_view": {
+          "status": 200,
+          "payload_in": true,
+          "addslashes_escaped": true,
+          "payload_exact": false,
+          "tag_intact": true,
+          "context": "\"40\">\n\n            <td align=\"center\">63</td>\n            <td>bee</td>\n            <td>2026-11-03 14:58:28</td>\n            <td>\\\"><img src=x onerror=alert(81)></td>\n\n        </tr>\n\n    </table>\n\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a hr"
+        },
+        "browser": {
+          "payload_exact": false,
+          "tag_intact": true,
+          "executed": true,
+          "dialogs": [
+            "51",
+            "61",
+            "81",
+            "71"
+          ],
+          "dom_tag_intact": false,
+          "text": "XSS - Stored (Blog)\n\n\nSubmit\tAdd: \tShow all: \tDelete: \t\t\n\n\n#\tOwner\tDate\tEntry\n60\tbee\t2026-11-03 14:58:01\t\n61\tbee\t2026-11-03 14:58:10\t\n62\tbee\t2026-11-03 14:58:19\t\n63\tbee\t2026-11-03 14:58:28\t\\\">",
+          "error": null,
+          "page_level": "medium"
+        }
+      },
+      {
+        "level": "high",
+        "level_id": 2,
+        "face": "reflected",
+        "carrier": "script",
+        "role": "bwuser",
+        "n": 11,
+        "http": {
+          "status": 200,
+          "payload_in": false,
+          "addslashes_escaped": false,
+          "payload_exact": false,
+          "tag_intact": false,
+          "context": "Welcome &lt;script&gt;alert(11)&lt;/script&gt; x\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a href=\"http://be.linkedin.com/in/malikmesellem\" target=\"blan"
+        },
+        "browser": {
+          "payload_exact": false,
+          "tag_intact": false,
+          "executed": false,
+          "dialogs": [],
+          "dom_tag_intact": false,
+          "text": "XSS - Reflected (GET)\n\nEnter your first and last name:\n\nFirst name:\n\n\nLast name:\n\n\nGo\n\nWelcome <script>alert(11)</script> x",
+          "error": null,
+          "page_level": "high"
+        }
+      },
+      {
+        "level": "high",
+        "level_id": 2,
+        "face": "header",
+        "carrier": "script",
+        "role": "bwuser",
+        "n": 11,
+        "http": {
+          "status": 200,
+          "payload_in": false,
+          "addslashes_escaped": false,
+          "payload_exact": false,
+          "tag_intact": false,
+          "context": "Your User-Agent: <i>&lt;script&gt;alert(11)&lt;/script&gt;</i></p>\n\n</div>\n\n<div id=\"side\">\n\n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a href=\"http://be.linkedin.com/in/malikmesellem\" targe"
+        },
+        "browser": {
+          "payload_exact": false,
+          "tag_intact": false,
+          "executed": false,
+          "dialogs": [],
+          "dom_tag_intact": false,
+          "text": "XSS - Reflected (User-Agent)\n\nYour User-Agent: <script>alert(11)</script>",
+          "error": null,
+          "page_level": "high"
+        }
+      },
+      {
+        "level": "high",
+        "level_id": 2,
+        "face": "stored",
+        "carrier": "script",
+        "role": "bwuser",
+        "n": 11,
+        "http": {
+          "status": 200,
+          "payload_in": false,
+          "addslashes_escaped": false,
+          "payload_exact": false,
+          "tag_intact": false,
+          "context": "ight=\"40\">\n\n            <td align=\"center\">64</td>\n            <td>bwuser</td>\n            <td>2026-11-03 14:58:41</td>\n            <td>&lt;script&gt;alert(11)&lt;/script&gt;</td>\n\n        </tr>\n\n    </table>\n\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\">"
+        },
+        "http_view": {
+          "status": 200,
+          "payload_in": false,
+          "addslashes_escaped": false,
+          "payload_exact": false,
+          "tag_intact": false,
+          "context": "ight=\"40\">\n\n            <td align=\"center\">64</td>\n            <td>bwuser</td>\n            <td>2026-11-03 14:58:41</td>\n            <td>&lt;script&gt;alert(11)&lt;/script&gt;</td>\n\n        </tr>\n\n    </table>\n\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\">"
+        },
+        "browser": {
+          "payload_exact": false,
+          "tag_intact": false,
+          "executed": false,
+          "dialogs": [],
+          "dom_tag_intact": false,
+          "text": "XSS - Stored (Blog)\n\n\nSubmit\tAdd: \tShow all: \tDelete: \t\t\n\n\n#\tOwner\tDate\tEntry\n64\tbwuser\t2026-11-03 14:58:41\t<script>alert(11)</script>",
+          "error": null,
+          "page_level": "high"
+        }
+      },
+      {
+        "level": "high",
+        "level_id": 2,
+        "face": "reflected",
+        "carrier": "img",
+        "role": "bwuser",
+        "n": 21,
+        "http": {
+          "status": 200,
+          "payload_in": false,
+          "addslashes_escaped": false,
+          "payload_exact": false,
+          "tag_intact": false,
+          "context": "Welcome &lt;img src=x onerror=alert(21)&gt; x\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a href=\"http://be.linkedin.com/in/malikmesellem\" target=\"blank_\""
+        },
+        "browser": {
+          "payload_exact": false,
+          "tag_intact": false,
+          "executed": false,
+          "dialogs": [],
+          "dom_tag_intact": false,
+          "text": "XSS - Reflected (GET)\n\nEnter your first and last name:\n\nFirst name:\n\n\nLast name:\n\n\nGo\n\nWelcome <img src=x onerror=alert(21)> x",
+          "error": null,
+          "page_level": "high"
+        }
+      },
+      {
+        "level": "high",
+        "level_id": 2,
+        "face": "header",
+        "carrier": "img",
+        "role": "bwuser",
+        "n": 21,
+        "http": {
+          "status": 200,
+          "payload_in": false,
+          "addslashes_escaped": false,
+          "payload_exact": false,
+          "tag_intact": false,
+          "context": "Your User-Agent: <i>&lt;img src=x onerror=alert(21)&gt;</i></p>\n\n</div>\n\n<div id=\"side\">\n\n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a href=\"http://be.linkedin.com/in/malikmesellem\" target=\""
+        },
+        "browser": {
+          "payload_exact": false,
+          "tag_intact": false,
+          "executed": false,
+          "dialogs": [],
+          "dom_tag_intact": false,
+          "text": "XSS - Reflected (User-Agent)\n\nYour User-Agent: <img src=x onerror=alert(21)>",
+          "error": null,
+          "page_level": "high"
+        }
+      },
+      {
+        "level": "high",
+        "level_id": 2,
+        "face": "stored",
+        "carrier": "img",
+        "role": "bwuser",
+        "n": 21,
+        "http": {
+          "status": 200,
+          "payload_in": false,
+          "addslashes_escaped": false,
+          "payload_exact": false,
+          "tag_intact": false,
+          "context": "\">\n\n            <td align=\"center\">65</td>\n            <td>bwuser</td>\n            <td>2026-11-03 14:58:50</td>\n            <td>&lt;img src=x onerror=alert(21)&gt;</td>\n\n        </tr>\n\n    </table>\n\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a"
+        },
+        "http_view": {
+          "status": 200,
+          "payload_in": false,
+          "addslashes_escaped": false,
+          "payload_exact": false,
+          "tag_intact": false,
+          "context": "\">\n\n            <td align=\"center\">65</td>\n            <td>bwuser</td>\n            <td>2026-11-03 14:58:50</td>\n            <td>&lt;img src=x onerror=alert(21)&gt;</td>\n\n        </tr>\n\n    </table>\n\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a"
+        },
+        "browser": {
+          "payload_exact": false,
+          "tag_intact": false,
+          "executed": false,
+          "dialogs": [],
+          "dom_tag_intact": false,
+          "text": "XSS - Stored (Blog)\n\n\nSubmit\tAdd: \tShow all: \tDelete: \t\t\n\n\n#\tOwner\tDate\tEntry\n64\tbwuser\t2026-11-03 14:58:41\t<script>alert(11)</script>\n65\tbwuser\t2026-11-03 14:58:50\t<img src=x onerror=alert(21)>",
+          "error": null,
+          "page_level": "high"
+        }
+      },
+      {
+        "level": "high",
+        "level_id": 2,
+        "face": "reflected",
+        "carrier": "svg",
+        "role": "bwuser",
+        "n": 31,
+        "http": {
+          "status": 200,
+          "payload_in": false,
+          "addslashes_escaped": false,
+          "payload_exact": false,
+          "tag_intact": false,
+          "context": "Welcome &lt;svg onload=alert(31)&gt; x\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a href=\"http://be.linkedin.com/in/malikmesellem\" target=\"blank_\" class="
+        },
+        "browser": {
+          "payload_exact": false,
+          "tag_intact": false,
+          "executed": false,
+          "dialogs": [],
+          "dom_tag_intact": false,
+          "text": "XSS - Reflected (GET)\n\nEnter your first and last name:\n\nFirst name:\n\n\nLast name:\n\n\nGo\n\nWelcome <svg onload=alert(31)> x",
+          "error": null,
+          "page_level": "high"
+        }
+      },
+      {
+        "level": "high",
+        "level_id": 2,
+        "face": "header",
+        "carrier": "svg",
+        "role": "bwuser",
+        "n": 31,
+        "http": {
+          "status": 200,
+          "payload_in": false,
+          "addslashes_escaped": false,
+          "payload_exact": false,
+          "tag_intact": false,
+          "context": "Your User-Agent: <i>&lt;svg onload=alert(31)&gt;</i></p>\n\n</div>\n\n<div id=\"side\">\n\n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a href=\"http://be.linkedin.com/in/malikmesellem\" target=\"blank_\""
+        },
+        "browser": {
+          "payload_exact": false,
+          "tag_intact": false,
+          "executed": false,
+          "dialogs": [],
+          "dom_tag_intact": false,
+          "text": "XSS - Reflected (User-Agent)\n\nYour User-Agent: <svg onload=alert(31)>",
+          "error": null,
+          "page_level": "high"
+        }
+      },
+      {
+        "level": "high",
+        "level_id": 2,
+        "face": "stored",
+        "carrier": "svg",
+        "role": "bwuser",
+        "n": 31,
+        "http": {
+          "status": 200,
+          "payload_in": false,
+          "addslashes_escaped": false,
+          "payload_exact": false,
+          "tag_intact": false,
+          "context": "ght=\"40\">\n\n            <td align=\"center\">66</td>\n            <td>bwuser</td>\n            <td>2026-11-03 14:58:59</td>\n            <td>&lt;svg onload=alert(31)&gt;</td>\n\n        </tr>\n\n    </table>\n\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a"
+        },
+        "http_view": {
+          "status": 200,
+          "payload_in": false,
+          "addslashes_escaped": false,
+          "payload_exact": false,
+          "tag_intact": false,
+          "context": "ght=\"40\">\n\n            <td align=\"center\">66</td>\n            <td>bwuser</td>\n            <td>2026-11-03 14:58:59</td>\n            <td>&lt;svg onload=alert(31)&gt;</td>\n\n        </tr>\n\n    </table>\n\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a"
+        },
+        "browser": {
+          "payload_exact": false,
+          "tag_intact": false,
+          "executed": false,
+          "dialogs": [],
+          "dom_tag_intact": false,
+          "text": "XSS - Stored (Blog)\n\n\nSubmit\tAdd: \tShow all: \tDelete: \t\t\n\n\n#\tOwner\tDate\tEntry\n64\tbwuser\t2026-11-03 14:58:41\t<script>alert(11)</script>\n65\tbwuser\t2026-11-03 14:58:50\t<img src=x onerror=alert(21)>\n66\tbw",
+          "error": null,
+          "page_level": "high"
+        }
+      },
+      {
+        "level": "high",
+        "level_id": 2,
+        "face": "reflected",
+        "carrier": "attr-escape",
+        "role": "bwuser",
+        "n": 41,
+        "http": {
+          "status": 200,
+          "payload_in": false,
+          "addslashes_escaped": false,
+          "payload_exact": false,
+          "tag_intact": false,
+          "context": "Welcome &quot;&gt;&lt;img src=x onerror=alert(41)&gt; x\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a href=\"http://be.linkedin.com/in/malikmesellem\" targe"
+        },
+        "browser": {
+          "payload_exact": false,
+          "tag_intact": false,
+          "executed": false,
+          "dialogs": [],
+          "dom_tag_intact": false,
+          "text": "XSS - Reflected (GET)\n\nEnter your first and last name:\n\nFirst name:\n\n\nLast name:\n\n\nGo\n\nWelcome \"><img src=x onerror=alert(41)> x",
+          "error": null,
+          "page_level": "high"
+        }
+      },
+      {
+        "level": "high",
+        "level_id": 2,
+        "face": "header",
+        "carrier": "attr-escape",
+        "role": "bwuser",
+        "n": 41,
+        "http": {
+          "status": 200,
+          "payload_in": false,
+          "addslashes_escaped": false,
+          "payload_exact": false,
+          "tag_intact": false,
+          "context": "Your User-Agent: <i>&quot;&gt;&lt;img src=x onerror=alert(41)&gt;</i></p>\n\n</div>\n\n<div id=\"side\">\n\n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a href=\"http://be.linkedin.com/in/malikmesellem"
+        },
+        "browser": {
+          "payload_exact": false,
+          "tag_intact": false,
+          "executed": false,
+          "dialogs": [],
+          "dom_tag_intact": false,
+          "text": "XSS - Reflected (User-Agent)\n\nYour User-Agent: \"><img src=x onerror=alert(41)>",
+          "error": null,
+          "page_level": "high"
+        }
+      },
+      {
+        "level": "high",
+        "level_id": 2,
+        "face": "stored",
+        "carrier": "attr-escape",
+        "role": "bwuser",
+        "n": 41,
+        "http": {
+          "status": 200,
+          "payload_in": false,
+          "addslashes_escaped": false,
+          "payload_exact": false,
+          "tag_intact": false,
+          "context": "      <td align=\"center\">67</td>\n            <td>bwuser</td>\n            <td>2026-11-03 14:59:08</td>\n            <td>&quot;&gt;&lt;img src=x onerror=alert(41)&gt;</td>\n\n        </tr>\n\n    </table>\n\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a"
+        },
+        "http_view": {
+          "status": 200,
+          "payload_in": false,
+          "addslashes_escaped": false,
+          "payload_exact": false,
+          "tag_intact": false,
+          "context": "      <td align=\"center\">67</td>\n            <td>bwuser</td>\n            <td>2026-11-03 14:59:08</td>\n            <td>&quot;&gt;&lt;img src=x onerror=alert(41)&gt;</td>\n\n        </tr>\n\n    </table>\n\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a"
+        },
+        "browser": {
+          "payload_exact": false,
+          "tag_intact": false,
+          "executed": false,
+          "dialogs": [],
+          "dom_tag_intact": false,
+          "text": "XSS - Stored (Blog)\n\n\nSubmit\tAdd: \tShow all: \tDelete: \t\t\n\n\n#\tOwner\tDate\tEntry\n64\tbwuser\t2026-11-03 14:58:41\t<script>alert(11)</script>\n65\tbwuser\t2026-11-03 14:58:50\t<img src=x onerror=alert(21)>\n66\tbw",
+          "error": null,
+          "page_level": "high"
+        }
+      },
+      {
+        "level": "high",
+        "level_id": 2,
+        "face": "reflected",
+        "carrier": "script",
+        "role": "bee",
+        "n": 51,
+        "http": {
+          "status": 200,
+          "payload_in": false,
+          "addslashes_escaped": false,
+          "payload_exact": false,
+          "tag_intact": false,
+          "context": "Welcome &lt;script&gt;alert(51)&lt;/script&gt; x\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a href=\"http://be.linkedin.com/in/malikmesellem\" target=\"blan"
+        },
+        "browser": {
+          "payload_exact": false,
+          "tag_intact": false,
+          "executed": false,
+          "dialogs": [],
+          "dom_tag_intact": false,
+          "text": "XSS - Reflected (GET)\n\nEnter your first and last name:\n\nFirst name:\n\n\nLast name:\n\n\nGo\n\nWelcome <script>alert(51)</script> x",
+          "error": null,
+          "page_level": "high"
+        }
+      },
+      {
+        "level": "high",
+        "level_id": 2,
+        "face": "header",
+        "carrier": "script",
+        "role": "bee",
+        "n": 51,
+        "http": {
+          "status": 200,
+          "payload_in": false,
+          "addslashes_escaped": false,
+          "payload_exact": false,
+          "tag_intact": false,
+          "context": "Your User-Agent: <i>&lt;script&gt;alert(51)&lt;/script&gt;</i></p>\n\n</div>\n\n<div id=\"side\">\n\n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a href=\"http://be.linkedin.com/in/malikmesellem\" targe"
+        },
+        "browser": {
+          "payload_exact": false,
+          "tag_intact": false,
+          "executed": false,
+          "dialogs": [],
+          "dom_tag_intact": false,
+          "text": "XSS - Reflected (User-Agent)\n\nYour User-Agent: <script>alert(51)</script>",
+          "error": null,
+          "page_level": "high"
+        }
+      },
+      {
+        "level": "high",
+        "level_id": 2,
+        "face": "stored",
+        "carrier": "script",
+        "role": "bee",
+        "n": 51,
+        "http": {
+          "status": 200,
+          "payload_in": false,
+          "addslashes_escaped": false,
+          "payload_exact": false,
+          "tag_intact": false,
+          "context": " height=\"40\">\n\n            <td align=\"center\">68</td>\n            <td>bee</td>\n            <td>2026-11-03 14:59:17</td>\n            <td>&lt;script&gt;alert(51)&lt;/script&gt;</td>\n\n        </tr>\n\n    </table>\n\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\">"
+        },
+        "http_view": {
+          "status": 200,
+          "payload_in": false,
+          "addslashes_escaped": false,
+          "payload_exact": false,
+          "tag_intact": false,
+          "context": " height=\"40\">\n\n            <td align=\"center\">68</td>\n            <td>bee</td>\n            <td>2026-11-03 14:59:17</td>\n            <td>&lt;script&gt;alert(51)&lt;/script&gt;</td>\n\n        </tr>\n\n    </table>\n\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\">"
+        },
+        "browser": {
+          "payload_exact": false,
+          "tag_intact": false,
+          "executed": false,
+          "dialogs": [],
+          "dom_tag_intact": false,
+          "text": "XSS - Stored (Blog)\n\n\nSubmit\tAdd: \tShow all: \tDelete: \t\t\n\n\n#\tOwner\tDate\tEntry\n68\tbee\t2026-11-03 14:59:17\t<script>alert(51)</script>",
+          "error": null,
+          "page_level": "high"
+        }
+      },
+      {
+        "level": "high",
+        "level_id": 2,
+        "face": "reflected",
+        "carrier": "img",
+        "role": "bee",
+        "n": 61,
+        "http": {
+          "status": 200,
+          "payload_in": false,
+          "addslashes_escaped": false,
+          "payload_exact": false,
+          "tag_intact": false,
+          "context": "Welcome &lt;img src=x onerror=alert(61)&gt; x\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a href=\"http://be.linkedin.com/in/malikmesellem\" target=\"blank_\""
+        },
+        "browser": {
+          "payload_exact": false,
+          "tag_intact": false,
+          "executed": false,
+          "dialogs": [],
+          "dom_tag_intact": false,
+          "text": "XSS - Reflected (GET)\n\nEnter your first and last name:\n\nFirst name:\n\n\nLast name:\n\n\nGo\n\nWelcome <img src=x onerror=alert(61)> x",
+          "error": null,
+          "page_level": "high"
+        }
+      },
+      {
+        "level": "high",
+        "level_id": 2,
+        "face": "header",
+        "carrier": "img",
+        "role": "bee",
+        "n": 61,
+        "http": {
+          "status": 200,
+          "payload_in": false,
+          "addslashes_escaped": false,
+          "payload_exact": false,
+          "tag_intact": false,
+          "context": "Your User-Agent: <i>&lt;img src=x onerror=alert(61)&gt;</i></p>\n\n</div>\n\n<div id=\"side\">\n\n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a href=\"http://be.linkedin.com/in/malikmesellem\" target=\""
+        },
+        "browser": {
+          "payload_exact": false,
+          "tag_intact": false,
+          "executed": false,
+          "dialogs": [],
+          "dom_tag_intact": false,
+          "text": "XSS - Reflected (User-Agent)\n\nYour User-Agent: <img src=x onerror=alert(61)>",
+          "error": null,
+          "page_level": "high"
+        }
+      },
+      {
+        "level": "high",
+        "level_id": 2,
+        "face": "stored",
+        "carrier": "img",
+        "role": "bee",
+        "n": 61,
+        "http": {
+          "status": 200,
+          "payload_in": false,
+          "addslashes_escaped": false,
+          "payload_exact": false,
+          "tag_intact": false,
+          "context": "\"40\">\n\n            <td align=\"center\">69</td>\n            <td>bee</td>\n            <td>2026-11-03 14:59:26</td>\n            <td>&lt;img src=x onerror=alert(61)&gt;</td>\n\n        </tr>\n\n    </table>\n\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a"
+        },
+        "http_view": {
+          "status": 200,
+          "payload_in": false,
+          "addslashes_escaped": false,
+          "payload_exact": false,
+          "tag_intact": false,
+          "context": "\"40\">\n\n            <td align=\"center\">69</td>\n            <td>bee</td>\n            <td>2026-11-03 14:59:26</td>\n            <td>&lt;img src=x onerror=alert(61)&gt;</td>\n\n        </tr>\n\n    </table>\n\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a"
+        },
+        "browser": {
+          "payload_exact": false,
+          "tag_intact": false,
+          "executed": false,
+          "dialogs": [],
+          "dom_tag_intact": false,
+          "text": "XSS - Stored (Blog)\n\n\nSubmit\tAdd: \tShow all: \tDelete: \t\t\n\n\n#\tOwner\tDate\tEntry\n68\tbee\t2026-11-03 14:59:17\t<script>alert(51)</script>\n69\tbee\t2026-11-03 14:59:26\t<img src=x onerror=alert(61)>",
+          "error": null,
+          "page_level": "high"
+        }
+      },
+      {
+        "level": "high",
+        "level_id": 2,
+        "face": "reflected",
+        "carrier": "svg",
+        "role": "bee",
+        "n": 71,
+        "http": {
+          "status": 200,
+          "payload_in": false,
+          "addslashes_escaped": false,
+          "payload_exact": false,
+          "tag_intact": false,
+          "context": "Welcome &lt;svg onload=alert(71)&gt; x\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a href=\"http://be.linkedin.com/in/malikmesellem\" target=\"blank_\" class="
+        },
+        "browser": {
+          "payload_exact": false,
+          "tag_intact": false,
+          "executed": false,
+          "dialogs": [],
+          "dom_tag_intact": false,
+          "text": "XSS - Reflected (GET)\n\nEnter your first and last name:\n\nFirst name:\n\n\nLast name:\n\n\nGo\n\nWelcome <svg onload=alert(71)> x",
+          "error": null,
+          "page_level": "high"
+        }
+      },
+      {
+        "level": "high",
+        "level_id": 2,
+        "face": "header",
+        "carrier": "svg",
+        "role": "bee",
+        "n": 71,
+        "http": {
+          "status": 200,
+          "payload_in": false,
+          "addslashes_escaped": false,
+          "payload_exact": false,
+          "tag_intact": false,
+          "context": "Your User-Agent: <i>&lt;svg onload=alert(71)&gt;</i></p>\n\n</div>\n\n<div id=\"side\">\n\n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a href=\"http://be.linkedin.com/in/malikmesellem\" target=\"blank_\""
+        },
+        "browser": {
+          "payload_exact": false,
+          "tag_intact": false,
+          "executed": false,
+          "dialogs": [],
+          "dom_tag_intact": false,
+          "text": "XSS - Reflected (User-Agent)\n\nYour User-Agent: <svg onload=alert(71)>",
+          "error": null,
+          "page_level": "high"
+        }
+      },
+      {
+        "level": "high",
+        "level_id": 2,
+        "face": "stored",
+        "carrier": "svg",
+        "role": "bee",
+        "n": 71,
+        "http": {
+          "status": 200,
+          "payload_in": false,
+          "addslashes_escaped": false,
+          "payload_exact": false,
+          "tag_intact": false,
+          "context": "height=\"40\">\n\n            <td align=\"center\">70</td>\n            <td>bee</td>\n            <td>2026-11-03 14:59:35</td>\n            <td>&lt;svg onload=alert(71)&gt;</td>\n\n        </tr>\n\n    </table>\n\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a"
+        },
+        "http_view": {
+          "status": 200,
+          "payload_in": false,
+          "addslashes_escaped": false,
+          "payload_exact": false,
+          "tag_intact": false,
+          "context": "height=\"40\">\n\n            <td align=\"center\">70</td>\n            <td>bee</td>\n            <td>2026-11-03 14:59:35</td>\n            <td>&lt;svg onload=alert(71)&gt;</td>\n\n        </tr>\n\n    </table>\n\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a"
+        },
+        "browser": {
+          "payload_exact": false,
+          "tag_intact": false,
+          "executed": false,
+          "dialogs": [],
+          "dom_tag_intact": false,
+          "text": "XSS - Stored (Blog)\n\n\nSubmit\tAdd: \tShow all: \tDelete: \t\t\n\n\n#\tOwner\tDate\tEntry\n68\tbee\t2026-11-03 14:59:17\t<script>alert(51)</script>\n69\tbee\t2026-11-03 14:59:26\t<img src=x onerror=alert(61)>\n70\tbee\t2026",
+          "error": null,
+          "page_level": "high"
+        }
+      },
+      {
+        "level": "high",
+        "level_id": 2,
+        "face": "reflected",
+        "carrier": "attr-escape",
+        "role": "bee",
+        "n": 81,
+        "http": {
+          "status": 200,
+          "payload_in": false,
+          "addslashes_escaped": false,
+          "payload_exact": false,
+          "tag_intact": false,
+          "context": "Welcome &quot;&gt;&lt;img src=x onerror=alert(81)&gt; x\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a href=\"http://be.linkedin.com/in/malikmesellem\" targe"
+        },
+        "browser": {
+          "payload_exact": false,
+          "tag_intact": false,
+          "executed": false,
+          "dialogs": [],
+          "dom_tag_intact": false,
+          "text": "XSS - Reflected (GET)\n\nEnter your first and last name:\n\nFirst name:\n\n\nLast name:\n\n\nGo\n\nWelcome \"><img src=x onerror=alert(81)> x",
+          "error": null,
+          "page_level": "high"
+        }
+      },
+      {
+        "level": "high",
+        "level_id": 2,
+        "face": "header",
+        "carrier": "attr-escape",
+        "role": "bee",
+        "n": 81,
+        "http": {
+          "status": 200,
+          "payload_in": false,
+          "addslashes_escaped": false,
+          "payload_exact": false,
+          "tag_intact": false,
+          "context": "Your User-Agent: <i>&quot;&gt;&lt;img src=x onerror=alert(81)&gt;</i></p>\n\n</div>\n\n<div id=\"side\">\n\n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a href=\"http://be.linkedin.com/in/malikmesellem"
+        },
+        "browser": {
+          "payload_exact": false,
+          "tag_intact": false,
+          "executed": false,
+          "dialogs": [],
+          "dom_tag_intact": false,
+          "text": "XSS - Reflected (User-Agent)\n\nYour User-Agent: \"><img src=x onerror=alert(81)>",
+          "error": null,
+          "page_level": "high"
+        }
+      },
+      {
+        "level": "high",
+        "level_id": 2,
+        "face": "stored",
+        "carrier": "attr-escape",
+        "role": "bee",
+        "n": 81,
+        "http": {
+          "status": 200,
+          "payload_in": false,
+          "addslashes_escaped": false,
+          "payload_exact": false,
+          "tag_intact": false,
+          "context": "         <td align=\"center\">71</td>\n            <td>bee</td>\n            <td>2026-11-03 14:59:44</td>\n            <td>&quot;&gt;&lt;img src=x onerror=alert(81)&gt;</td>\n\n        </tr>\n\n    </table>\n\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a"
+        },
+        "http_view": {
+          "status": 200,
+          "payload_in": false,
+          "addslashes_escaped": false,
+          "payload_exact": false,
+          "tag_intact": false,
+          "context": "         <td align=\"center\">71</td>\n            <td>bee</td>\n            <td>2026-11-03 14:59:44</td>\n            <td>&quot;&gt;&lt;img src=x onerror=alert(81)&gt;</td>\n\n        </tr>\n\n    </table>\n\n</div>\n    \n<div id=\"side\">    \n    \n    <a href=\"http://twitter.com/MME_IT\" target=\"blank_\" class=\"button\"><img src=\"./images/twitter.png\"></a>\n    <a"
+        },
+        "browser": {
+          "payload_exact": false,
+          "tag_intact": false,
+          "executed": false,
+          "dialogs": [],
+          "dom_tag_intact": false,
+          "text": "XSS - Stored (Blog)\n\n\nSubmit\tAdd: \tShow all: \tDelete: \t\t\n\n\n#\tOwner\tDate\tEntry\n68\tbee\t2026-11-03 14:59:17\t<script>alert(51)</script>\n69\tbee\t2026-11-03 14:59:26\t<img src=x onerror=alert(61)>\n70\tbee\t2026",
+          "error": null,
+          "page_level": "high"
+        }
+      }
+    ],
+    "cross_role": [
+      {
+        "level": "low",
+        "level_id": 0,
+        "viewer": "bee",
+        "writer": "bwuser",
+        "visible_without_show_all": [],
+        "visible_with_show_all": [
+          "script",
+          "img",
+          "svg",
+          "attr-escape"
+        ],
+        "show_all_http_status": 200,
+        "dialogs": [
+          "51",
+          "61",
+          "81",
+          "71",
+          "11",
+          "51",
+          "21",
+          "81",
+          "41",
+          "61",
+          "71",
+          "31"
+        ],
+        "bwuser_alerts_executed": [
+          11,
+          21,
+          31,
+          41
+        ],
+        "bee_alerts_executed": [
+          51,
+          61,
+          71,
+          81
+        ],
+        "error": null
+      },
+      {
+        "level": "medium",
+        "level_id": 1,
+        "viewer": "bee",
+        "writer": "bwuser",
+        "visible_without_show_all": [],
+        "visible_with_show_all": [
+          "script",
+          "img",
+          "svg",
+          "attr-escape"
+        ],
+        "show_all_http_status": 200,
+        "dialogs": [
+          "51",
+          "61",
+          "81",
+          "71",
+          "11",
+          "51",
+          "21",
+          "41",
+          "81",
+          "61",
+          "31",
+          "71"
+        ],
+        "bwuser_alerts_executed": [
+          11,
+          21,
+          31,
+          41
+        ],
+        "bee_alerts_executed": [
+          51,
+          61,
+          71,
+          81
+        ],
+        "error": null
+      },
+      {
+        "level": "high",
+        "level_id": 2,
+        "viewer": "bee",
+        "writer": "bwuser",
+        "visible_without_show_all": [],
+        "visible_with_show_all": [
+          "script",
+          "img",
+          "svg",
+          "attr-escape"
+        ],
+        "show_all_http_status": 200,
+        "dialogs": [],
+        "bwuser_alerts_executed": [],
+        "bee_alerts_executed": [],
+        "error": null
+      }
+    ]
+  },
+  "scan": {
+    "generated": "2026-11-03T23:03:27",
+    "scans": [
+      {
+        "level": "low",
+        "level_id": 0,
+        "face": "reflected",
+        "role": "bwuser",
+        "default": {
+          "detected": true,
+          "hits": [
+            {
+              "type": "reflected",
+              "param": "firstname",
+              "severity": "high",
+              "confidence": "high",
+              "payload": "<img/src=\"x\"/onerror=alert('xssv_28a84a97')//>",
+              "context": "html_element",
+              "detail": "token reflected in context 'event_handler' | no browser replay available; execution unverified",
+              "evidence_class": "browser-unavailable",
+              "url": "http://127.0.0.1:8081/xss_get.php",
+              "method": "GET"
+            },
+            {
+              "type": "reflected",
+              "param": "lastname",
+              "severity": "high",
+              "confidence": "high",
+              "payload": "<img/src=\"x\"/onerror=alert('xssv_112933ed')//>",
+              "context": "html_element",
+              "detail": "token reflected in context 'event_handler' | no browser replay available; execution unverified",
+              "evidence_class": "browser-unavailable",
+              "url": "http://127.0.0.1:8081/xss_get.php",
+              "method": "GET"
+            }
+          ],
+          "seconds": 1.6,
+          "rc": 0,
+          "timeout": false,
+          "all_findings": [
+            {
+              "type": "reflected",
+              "param": "firstname",
+              "severity": "high",
+              "confidence": "high",
+              "payload": "<img/src=\"x\"/onerror=alert('xssv_28a84a97')//>",
+              "context": "html_element",
+              "detail": "token reflected in context 'event_handler' | no browser replay available; execution unverified",
+              "evidence_class": "browser-unavailable",
+              "url": "http://127.0.0.1:8081/xss_get.php",
+              "method": "GET"
+            },
+            {
+              "type": "reflected",
+              "param": "lastname",
+              "severity": "high",
+              "confidence": "high",
+              "payload": "<img/src=\"x\"/onerror=alert('xssv_112933ed')//>",
+              "context": "html_element",
+              "detail": "token reflected in context 'event_handler' | no browser replay available; execution unverified",
+              "evidence_class": "browser-unavailable",
+              "url": "http://127.0.0.1:8081/xss_get.php",
+              "method": "GET"
+            }
+          ]
+        },
+        "headless": {
+          "detected": true,
+          "hits": [
+            {
+              "type": "reflected",
+              "param": "lastname",
+              "severity": "high",
+              "confidence": "low",
+              "payload": "<img/src=\"x\"/onerror=alert('xssv_fc7970d7')//>",
+              "context": "html_element",
+              "detail": "token reflected in context 'event_handler' | browser replay did NOT reproduce execution: report as unconfirmed, and note this is not proof of absence",
+              "evidence_class": "browser-refuted",
+              "url": "http://127.0.0.1:8081/xss_get.php",
+              "method": "GET"
+            },
+            {
+              "type": "reflected",
+              "param": "firstname",
+              "severity": "high",
+              "confidence": "low",
+              "payload": "<img/src=\"x\"/onerror=alert('xssv_e42cda47')//>",
+              "context": "html_element",
+              "detail": "token reflected in context 'event_handler' | browser replay did NOT reproduce execution: report as unconfirmed, and note this is not proof of absence",
+              "evidence_class": "browser-refuted",
+              "url": "http://127.0.0.1:8081/xss_get.php",
+              "method": "GET"
+            }
+          ],
+          "seconds": 6.1,
+          "rc": 0,
+          "timeout": false,
+          "all_findings": [
+            {
+              "type": "reflected",
+              "param": "lastname",
+              "severity": "high",
+              "confidence": "low",
+              "payload": "<img/src=\"x\"/onerror=alert('xssv_fc7970d7')//>",
+              "context": "html_element",
+              "detail": "token reflected in context 'event_handler' | browser replay did NOT reproduce execution: report as unconfirmed, and note this is not proof of absence",
+              "evidence_class": "browser-refuted",
+              "url": "http://127.0.0.1:8081/xss_get.php",
+              "method": "GET"
+            },
+            {
+              "type": "reflected",
+              "param": "firstname",
+              "severity": "high",
+              "confidence": "low",
+              "payload": "<img/src=\"x\"/onerror=alert('xssv_e42cda47')//>",
+              "context": "html_element",
+              "detail": "token reflected in context 'event_handler' | browser replay did NOT reproduce execution: report as unconfirmed, and note this is not proof of absence",
+              "evidence_class": "browser-refuted",
+              "url": "http://127.0.0.1:8081/xss_get.php",
+              "method": "GET"
+            }
+          ]
+        }
+      },
+      {
+        "level": "low",
+        "level_id": 0,
+        "face": "stored",
+        "role": "bwuser",
+        "default": {
+          "detected": true,
+          "hits": [
+            {
+              "type": "stored",
+              "param": "entry",
+              "severity": "high",
+              "confidence": "high",
+              "payload": "<img/src=\"x\"/onerror=alert('xssv_c82d69ab')//>",
+              "context": "stored_view",
+              "detail": "payload persisted and rendered in an executable context in http://127.0.0.1:8081/xss_stored_1.php (token reflected in context 'event_handler'; explicit viewer page rendered the payload) | no browser replay available; execution unverified",
+              "evidence_class": "browser-unavailable",
+              "url": "http://127.0.0.1:8081/xss_stored_1.php",
+              "method": "POST"
+            }
+          ],
+          "seconds": 1.3,
+          "rc": 0,
+          "timeout": false,
+          "all_findings": [
+            {
+              "type": "stored",
+              "param": "entry",
+              "severity": "high",
+              "confidence": "high",
+              "payload": "<img/src=\"x\"/onerror=alert('xssv_c82d69ab')//>",
+              "context": "stored_view",
+              "detail": "payload persisted and rendered in an executable context in http://127.0.0.1:8081/xss_stored_1.php (token reflected in context 'event_handler'; explicit viewer page rendered the payload) | no browser replay available; execution unverified",
+              "evidence_class": "browser-unavailable",
+              "url": "http://127.0.0.1:8081/xss_stored_1.php",
+              "method": "POST"
+            }
+          ]
+        },
+        "headless": {
+          "detected": true,
+          "hits": [
+            {
+              "type": "stored",
+              "param": "entry",
+              "severity": "high",
+              "confidence": "low",
+              "payload": "<img/src=\"x\"/onerror=alert('xssv_78484000')//>",
+              "context": "stored_view",
+              "detail": "payload persisted and rendered in an executable context in http://127.0.0.1:8081/xss_stored_1.php (token reflected in context 'event_handler'; explicit viewer page rendered the payload) | no browser replay available; execution unverified | browser replay did NOT reproduce execution: report as unconfirmed, and note this is not proof of absence",
+              "evidence_class": "browser-refuted",
+              "url": "http://127.0.0.1:8081/xss_stored_1.php",
+              "method": "POST"
+            }
+          ],
+          "seconds": 2.6,
+          "rc": 0,
+          "timeout": false,
+          "all_findings": [
+            {
+              "type": "stored",
+              "param": "entry",
+              "severity": "high",
+              "confidence": "low",
+              "payload": "<img/src=\"x\"/onerror=alert('xssv_78484000')//>",
+              "context": "stored_view",
+              "detail": "payload persisted and rendered in an executable context in http://127.0.0.1:8081/xss_stored_1.php (token reflected in context 'event_handler'; explicit viewer page rendered the payload) | no browser replay available; execution unverified | browser replay did NOT reproduce execution: report as unconfirmed, and note this is not proof of absence",
+              "evidence_class": "browser-refuted",
+              "url": "http://127.0.0.1:8081/xss_stored_1.php",
+              "method": "POST"
+            }
+          ]
+        }
+      },
+      {
+        "level": "low",
+        "level_id": 0,
+        "face": "header",
+        "role": "bwuser",
+        "default": {
+          "detected": true,
+          "hits": [
+            {
+              "type": "header_xss",
+              "param": "(header:User-Agent)",
+              "severity": "medium",
+              "confidence": "high",
+              "payload": "<svg/onload=alert('xsshd_d6bc38')>",
+              "context": "text",
+              "detail": "payload reflected from User-Agent header: token reflected in context 'event_handler' | severity capped to medium: high claim with neither browser evidence nor a verifiable proof (evidence-shape rule)",
+              "evidence_class": "browser-unavailable",
+              "url": "http://127.0.0.1:8081/xss_user_agent.php",
+              "method": "GET"
+            }
+          ],
+          "seconds": 1.4,
+          "rc": 0,
+          "timeout": false,
+          "all_findings": [
+            {
+              "type": "header_xss",
+              "param": "(header:User-Agent)",
+              "severity": "medium",
+              "confidence": "high",
+              "payload": "<svg/onload=alert('xsshd_d6bc38')>",
+              "context": "text",
+              "detail": "payload reflected from User-Agent header: token reflected in context 'event_handler' | severity capped to medium: high claim with neither browser evidence nor a verifiable proof (evidence-shape rule)",
+              "evidence_class": "browser-unavailable",
+              "url": "http://127.0.0.1:8081/xss_user_agent.php",
+              "method": "GET"
+            }
+          ]
+        },
+        "headless": {
+          "detected": true,
+          "hits": [
+            {
+              "type": "header_xss",
+              "param": "(header:User-Agent)",
+              "severity": "medium",
+              "confidence": "low",
+              "payload": "<svg/onload=alert('xsshd_1445ba')>",
+              "context": "text",
+              "detail": "payload reflected from User-Agent header: token reflected in context 'event_handler' | browser replay did NOT reproduce execution: report as unconfirmed, and note this is not proof of absence | severity capped to medium: high claim with neither browser evidence nor a verifiable proof (evidence-shape rule)",
+              "evidence_class": "browser-refuted",
+              "url": "http://127.0.0.1:8081/xss_user_agent.php",
+              "method": "GET"
+            }
+          ],
+          "seconds": 2.7,
+          "rc": 0,
+          "timeout": false,
+          "all_findings": [
+            {
+              "type": "header_xss",
+              "param": "(header:User-Agent)",
+              "severity": "medium",
+              "confidence": "low",
+              "payload": "<svg/onload=alert('xsshd_1445ba')>",
+              "context": "text",
+              "detail": "payload reflected from User-Agent header: token reflected in context 'event_handler' | browser replay did NOT reproduce execution: report as unconfirmed, and note this is not proof of absence | severity capped to medium: high claim with neither browser evidence nor a verifiable proof (evidence-shape rule)",
+              "evidence_class": "browser-refuted",
+              "url": "http://127.0.0.1:8081/xss_user_agent.php",
+              "method": "GET"
+            }
+          ]
+        }
+      },
+      {
+        "level": "low",
+        "level_id": 0,
+        "face": "reflected",
+        "role": "bee",
+        "default": {
+          "detected": true,
+          "hits": [
+            {
+              "type": "reflected",
+              "param": "lastname",
+              "severity": "high",
+              "confidence": "high",
+              "payload": "<img/src=\"x\"/onerror=alert('xssv_da3ffa6f')//>",
+              "context": "html_element",
+              "detail": "token reflected in context 'event_handler' | no browser replay available; execution unverified",
+              "evidence_class": "browser-unavailable",
+              "url": "http://127.0.0.1:8081/xss_get.php",
+              "method": "GET"
+            },
+            {
+              "type": "reflected",
+              "param": "firstname",
+              "severity": "high",
+              "confidence": "high",
+              "payload": "<img/src=\"x\"/onerror=alert('xssv_53b29eba')//>",
+              "context": "html_element",
+              "detail": "token reflected in context 'event_handler' | no browser replay available; execution unverified",
+              "evidence_class": "browser-unavailable",
+              "url": "http://127.0.0.1:8081/xss_get.php",
+              "method": "GET"
+            }
+          ],
+          "seconds": 1.5,
+          "rc": 0,
+          "timeout": false,
+          "all_findings": [
+            {
+              "type": "reflected",
+              "param": "lastname",
+              "severity": "high",
+              "confidence": "high",
+              "payload": "<img/src=\"x\"/onerror=alert('xssv_da3ffa6f')//>",
+              "context": "html_element",
+              "detail": "token reflected in context 'event_handler' | no browser replay available; execution unverified",
+              "evidence_class": "browser-unavailable",
+              "url": "http://127.0.0.1:8081/xss_get.php",
+              "method": "GET"
+            },
+            {
+              "type": "reflected",
+              "param": "firstname",
+              "severity": "high",
+              "confidence": "high",
+              "payload": "<img/src=\"x\"/onerror=alert('xssv_53b29eba')//>",
+              "context": "html_element",
+              "detail": "token reflected in context 'event_handler' | no browser replay available; execution unverified",
+              "evidence_class": "browser-unavailable",
+              "url": "http://127.0.0.1:8081/xss_get.php",
+              "method": "GET"
+            }
+          ]
+        },
+        "headless": {
+          "detected": true,
+          "hits": [
+            {
+              "type": "reflected",
+              "param": "lastname",
+              "severity": "high",
+              "confidence": "low",
+              "payload": "<img/src=\"x\"/onerror=alert('xssv_23c12a43')//>",
+              "context": "html_element",
+              "detail": "token reflected in context 'event_handler' | browser replay did NOT reproduce execution: report as unconfirmed, and note this is not proof of absence",
+              "evidence_class": "browser-refuted",
+              "url": "http://127.0.0.1:8081/xss_get.php",
+              "method": "GET"
+            },
+            {
+              "type": "reflected",
+              "param": "firstname",
+              "severity": "high",
+              "confidence": "low",
+              "payload": "<img/src=\"x\"/onerror=alert('xssv_3cfc2ffa')//>",
+              "context": "html_element",
+              "detail": "token reflected in context 'event_handler' | browser replay did NOT reproduce execution: report as unconfirmed, and note this is not proof of absence",
+              "evidence_class": "browser-refuted",
+              "url": "http://127.0.0.1:8081/xss_get.php",
+              "method": "GET"
+            }
+          ],
+          "seconds": 4.7,
+          "rc": 0,
+          "timeout": false,
+          "all_findings": [
+            {
+              "type": "reflected",
+              "param": "lastname",
+              "severity": "high",
+              "confidence": "low",
+              "payload": "<img/src=\"x\"/onerror=alert('xssv_23c12a43')//>",
+              "context": "html_element",
+              "detail": "token reflected in context 'event_handler' | browser replay did NOT reproduce execution: report as unconfirmed, and note this is not proof of absence",
+              "evidence_class": "browser-refuted",
+              "url": "http://127.0.0.1:8081/xss_get.php",
+              "method": "GET"
+            },
+            {
+              "type": "reflected",
+              "param": "firstname",
+              "severity": "high",
+              "confidence": "low",
+              "payload": "<img/src=\"x\"/onerror=alert('xssv_3cfc2ffa')//>",
+              "context": "html_element",
+              "detail": "token reflected in context 'event_handler' | browser replay did NOT reproduce execution: report as unconfirmed, and note this is not proof of absence",
+              "evidence_class": "browser-refuted",
+              "url": "http://127.0.0.1:8081/xss_get.php",
+              "method": "GET"
+            }
+          ]
+        }
+      },
+      {
+        "level": "low",
+        "level_id": 0,
+        "face": "stored",
+        "role": "bee",
+        "default": {
+          "detected": true,
+          "hits": [
+            {
+              "type": "stored",
+              "param": "entry",
+              "severity": "high",
+              "confidence": "high",
+              "payload": "<img/src=\"x\"/onerror=alert('xssv_8ea12048')//>",
+              "context": "stored_view",
+              "detail": "payload persisted and rendered in an executable context in http://127.0.0.1:8081/xss_stored_1.php (token reflected in context 'event_handler'; explicit viewer page rendered the payload) | no browser replay available; execution unverified",
+              "evidence_class": "browser-unavailable",
+              "url": "http://127.0.0.1:8081/xss_stored_1.php",
+              "method": "POST"
+            }
+          ],
+          "seconds": 1.4,
+          "rc": 0,
+          "timeout": false,
+          "all_findings": [
+            {
+              "type": "stored",
+              "param": "entry",
+              "severity": "high",
+              "confidence": "high",
+              "payload": "<img/src=\"x\"/onerror=alert('xssv_8ea12048')//>",
+              "context": "stored_view",
+              "detail": "payload persisted and rendered in an executable context in http://127.0.0.1:8081/xss_stored_1.php (token reflected in context 'event_handler'; explicit viewer page rendered the payload) | no browser replay available; execution unverified",
+              "evidence_class": "browser-unavailable",
+              "url": "http://127.0.0.1:8081/xss_stored_1.php",
+              "method": "POST"
+            }
+          ]
+        },
+        "headless": {
+          "detected": true,
+          "hits": [
+            {
+              "type": "stored",
+              "param": "entry",
+              "severity": "high",
+              "confidence": "low",
+              "payload": "<img/src=\"x\"/onerror=alert('xssv_e155ff09')//>",
+              "context": "stored_view",
+              "detail": "payload persisted and rendered in an executable context in http://127.0.0.1:8081/xss_stored_1.php (token reflected in context 'event_handler'; explicit viewer page rendered the payload) | no browser replay available; execution unverified | browser replay did NOT reproduce execution: report as unconfirmed, and note this is not proof of absence",
+              "evidence_class": "browser-refuted",
+              "url": "http://127.0.0.1:8081/xss_stored_1.php",
+              "method": "POST"
+            }
+          ],
+          "seconds": 2.7,
+          "rc": 0,
+          "timeout": false,
+          "all_findings": [
+            {
+              "type": "stored",
+              "param": "entry",
+              "severity": "high",
+              "confidence": "low",
+              "payload": "<img/src=\"x\"/onerror=alert('xssv_e155ff09')//>",
+              "context": "stored_view",
+              "detail": "payload persisted and rendered in an executable context in http://127.0.0.1:8081/xss_stored_1.php (token reflected in context 'event_handler'; explicit viewer page rendered the payload) | no browser replay available; execution unverified | browser replay did NOT reproduce execution: report as unconfirmed, and note this is not proof of absence",
+              "evidence_class": "browser-refuted",
+              "url": "http://127.0.0.1:8081/xss_stored_1.php",
+              "method": "POST"
+            }
+          ]
+        }
+      },
+      {
+        "level": "low",
+        "level_id": 0,
+        "face": "header",
+        "role": "bee",
+        "default": {
+          "detected": true,
+          "hits": [
+            {
+              "type": "header_xss",
+              "param": "(header:User-Agent)",
+              "severity": "medium",
+              "confidence": "high",
+              "payload": "<svg/onload=alert('xsshd_c3b91b')>",
+              "context": "text",
+              "detail": "payload reflected from User-Agent header: token reflected in context 'event_handler' | severity capped to medium: high claim with neither browser evidence nor a verifiable proof (evidence-shape rule)",
+              "evidence_class": "browser-unavailable",
+              "url": "http://127.0.0.1:8081/xss_user_agent.php",
+              "method": "GET"
+            }
+          ],
+          "seconds": 1.4,
+          "rc": 0,
+          "timeout": false,
+          "all_findings": [
+            {
+              "type": "header_xss",
+              "param": "(header:User-Agent)",
+              "severity": "medium",
+              "confidence": "high",
+              "payload": "<svg/onload=alert('xsshd_c3b91b')>",
+              "context": "text",
+              "detail": "payload reflected from User-Agent header: token reflected in context 'event_handler' | severity capped to medium: high claim with neither browser evidence nor a verifiable proof (evidence-shape rule)",
+              "evidence_class": "browser-unavailable",
+              "url": "http://127.0.0.1:8081/xss_user_agent.php",
+              "method": "GET"
+            }
+          ]
+        },
+        "headless": {
+          "detected": true,
+          "hits": [
+            {
+              "type": "header_xss",
+              "param": "(header:User-Agent)",
+              "severity": "medium",
+              "confidence": "low",
+              "payload": "<svg/onload=alert('xsshd_f9991a')>",
+              "context": "text",
+              "detail": "payload reflected from User-Agent header: token reflected in context 'event_handler' | browser replay did NOT reproduce execution: report as unconfirmed, and note this is not proof of absence | severity capped to medium: high claim with neither browser evidence nor a verifiable proof (evidence-shape rule)",
+              "evidence_class": "browser-refuted",
+              "url": "http://127.0.0.1:8081/xss_user_agent.php",
+              "method": "GET"
+            }
+          ],
+          "seconds": 2.7,
+          "rc": 0,
+          "timeout": false,
+          "all_findings": [
+            {
+              "type": "header_xss",
+              "param": "(header:User-Agent)",
+              "severity": "medium",
+              "confidence": "low",
+              "payload": "<svg/onload=alert('xsshd_f9991a')>",
+              "context": "text",
+              "detail": "payload reflected from User-Agent header: token reflected in context 'event_handler' | browser replay did NOT reproduce execution: report as unconfirmed, and note this is not proof of absence | severity capped to medium: high claim with neither browser evidence nor a verifiable proof (evidence-shape rule)",
+              "evidence_class": "browser-refuted",
+              "url": "http://127.0.0.1:8081/xss_user_agent.php",
+              "method": "GET"
+            }
+          ]
+        }
+      },
+      {
+        "level": "medium",
+        "level_id": 1,
+        "face": "reflected",
+        "role": "bwuser",
+        "default": {
+          "detected": false,
+          "hits": [],
+          "seconds": 5.0,
+          "rc": 0,
+          "timeout": false,
+          "all_findings": []
+        },
+        "headless": {
+          "detected": false,
+          "hits": [],
+          "seconds": 4.8,
+          "rc": 0,
+          "timeout": false,
+          "all_findings": []
+        }
+      },
+      {
+        "level": "medium",
+        "level_id": 1,
+        "face": "stored",
+        "role": "bwuser",
+        "default": {
+          "detected": true,
+          "hits": [
+            {
+              "type": "stored",
+              "param": "entry",
+              "severity": "high",
+              "confidence": "high",
+              "payload": "%00<svg%00/onload=alert(%00'xssv_f96e6ac3%00')%00>",
+              "context": "stored_view",
+              "detail": "payload persisted and rendered in an executable context in http://127.0.0.1:8081/xss_stored_1.php (token reflected inside <script> element text; explicit viewer page rendered the payload) | no browser replay available; execution unverified",
+              "evidence_class": "browser-unavailable",
+              "url": "http://127.0.0.1:8081/xss_stored_1.php",
+              "method": "POST"
+            }
+          ],
+          "seconds": 1.8,
+          "rc": 0,
+          "timeout": false,
+          "all_findings": [
+            {
+              "type": "stored",
+              "param": "entry",
+              "severity": "high",
+              "confidence": "high",
+              "payload": "%00<svg%00/onload=alert(%00'xssv_f96e6ac3%00')%00>",
+              "context": "stored_view",
+              "detail": "payload persisted and rendered in an executable context in http://127.0.0.1:8081/xss_stored_1.php (token reflected inside <script> element text; explicit viewer page rendered the payload) | no browser replay available; execution unverified",
+              "evidence_class": "browser-unavailable",
+              "url": "http://127.0.0.1:8081/xss_stored_1.php",
+              "method": "POST"
+            }
+          ]
+        },
+        "headless": {
+          "detected": true,
+          "hits": [
+            {
+              "type": "stored",
+              "param": "entry",
+              "severity": "high",
+              "confidence": "low",
+              "payload": "%00<svg%00/onload=alert(%00'xssv_9adfb1c4%00')%00>",
+              "context": "stored_view",
+              "detail": "payload persisted and rendered in an executable context in http://127.0.0.1:8081/xss_stored_1.php (token reflected inside <script> element text; explicit viewer page rendered the payload) | no browser replay available; execution unverified | browser replay did NOT reproduce execution: report as unconfirmed, and note this is not proof of absence",
+              "evidence_class": "browser-refuted",
+              "url": "http://127.0.0.1:8081/xss_stored_1.php",
+              "method": "POST"
+            }
+          ],
+          "seconds": 3.2,
+          "rc": 0,
+          "timeout": false,
+          "all_findings": [
+            {
+              "type": "stored",
+              "param": "entry",
+              "severity": "high",
+              "confidence": "low",
+              "payload": "%00<svg%00/onload=alert(%00'xssv_9adfb1c4%00')%00>",
+              "context": "stored_view",
+              "detail": "payload persisted and rendered in an executable context in http://127.0.0.1:8081/xss_stored_1.php (token reflected inside <script> element text; explicit viewer page rendered the payload) | no browser replay available; execution unverified | browser replay did NOT reproduce execution: report as unconfirmed, and note this is not proof of absence",
+              "evidence_class": "browser-refuted",
+              "url": "http://127.0.0.1:8081/xss_stored_1.php",
+              "method": "POST"
+            }
+          ]
+        }
+      },
+      {
+        "level": "medium",
+        "level_id": 1,
+        "face": "header",
+        "role": "bwuser",
+        "default": {
+          "detected": false,
+          "hits": [],
+          "seconds": 1.4,
+          "rc": 0,
+          "timeout": false,
+          "all_findings": []
+        },
+        "headless": {
+          "detected": false,
+          "hits": [],
+          "seconds": 1.3,
+          "rc": 0,
+          "timeout": false,
+          "all_findings": []
+        }
+      },
+      {
+        "level": "medium",
+        "level_id": 1,
+        "face": "reflected",
+        "role": "bee",
+        "default": {
+          "detected": false,
+          "hits": [],
+          "seconds": 4.9,
+          "rc": 0,
+          "timeout": false,
+          "all_findings": []
+        },
+        "headless": {
+          "detected": false,
+          "hits": [],
+          "seconds": 4.9,
+          "rc": 0,
+          "timeout": false,
+          "all_findings": [
+            {
+              "type": "polyglot_reflection",
+              "param": "firstname",
+              "severity": "medium",
+              "confidence": "medium",
+              "payload": "\">\"</script></style>-->><marquee onstart=alert('xss_poly_b8c4c47c')>",
+              "context": "event_handler",
+              "evidence_class": "model-only",
+              "url": "http://127.0.0.1:8081/xss_get.php",
+              "method": "GET"
+            }
+          ]
+        }
+      },
+      {
+        "level": "medium",
+        "level_id": 1,
+        "face": "stored",
+        "role": "bee",
+        "default": {
+          "detected": true,
+          "hits": [
+            {
+              "type": "stored",
+              "param": "entry",
+              "severity": "high",
+              "confidence": "high",
+              "payload": "%00<svg%00/onload=alert(%00'xssv_ea54c3aa%00')%00>",
+              "context": "stored_view",
+              "detail": "payload persisted and rendered in an executable context in http://127.0.0.1:8081/xss_stored_1.php (token reflected inside <script> element text; explicit viewer page rendered the payload) | no browser replay available; execution unverified",
+              "evidence_class": "browser-unavailable",
+              "url": "http://127.0.0.1:8081/xss_stored_1.php",
+              "method": "POST"
+            }
+          ],
+          "seconds": 1.8,
+          "rc": 0,
+          "timeout": false,
+          "all_findings": [
+            {
+              "type": "stored",
+              "param": "entry",
+              "severity": "high",
+              "confidence": "high",
+              "payload": "%00<svg%00/onload=alert(%00'xssv_ea54c3aa%00')%00>",
+              "context": "stored_view",
+              "detail": "payload persisted and rendered in an executable context in http://127.0.0.1:8081/xss_stored_1.php (token reflected inside <script> element text; explicit viewer page rendered the payload) | no browser replay available; execution unverified",
+              "evidence_class": "browser-unavailable",
+              "url": "http://127.0.0.1:8081/xss_stored_1.php",
+              "method": "POST"
+            }
+          ]
+        },
+        "headless": {
+          "detected": true,
+          "hits": [
+            {
+              "type": "stored",
+              "param": "entry",
+              "severity": "high",
+              "confidence": "low",
+              "payload": "%00<svg%00/onload=alert(%00'xssv_fbeffc32%00')%00>",
+              "context": "stored_view",
+              "detail": "payload persisted and rendered in an executable context in http://127.0.0.1:8081/xss_stored_1.php (token reflected inside <script> element text; explicit viewer page rendered the payload) | no browser replay available; execution unverified | browser replay did NOT reproduce execution: report as unconfirmed, and note this is not proof of absence",
+              "evidence_class": "browser-refuted",
+              "url": "http://127.0.0.1:8081/xss_stored_1.php",
+              "method": "POST"
+            }
+          ],
+          "seconds": 3.2,
+          "rc": 0,
+          "timeout": false,
+          "all_findings": [
+            {
+              "type": "stored",
+              "param": "entry",
+              "severity": "high",
+              "confidence": "low",
+              "payload": "%00<svg%00/onload=alert(%00'xssv_fbeffc32%00')%00>",
+              "context": "stored_view",
+              "detail": "payload persisted and rendered in an executable context in http://127.0.0.1:8081/xss_stored_1.php (token reflected inside <script> element text; explicit viewer page rendered the payload) | no browser replay available; execution unverified | browser replay did NOT reproduce execution: report as unconfirmed, and note this is not proof of absence",
+              "evidence_class": "browser-refuted",
+              "url": "http://127.0.0.1:8081/xss_stored_1.php",
+              "method": "POST"
+            }
+          ]
+        }
+      },
+      {
+        "level": "medium",
+        "level_id": 1,
+        "face": "header",
+        "role": "bee",
+        "default": {
+          "detected": false,
+          "hits": [],
+          "seconds": 1.4,
+          "rc": 0,
+          "timeout": false,
+          "all_findings": []
+        },
+        "headless": {
+          "detected": false,
+          "hits": [],
+          "seconds": 1.3,
+          "rc": 0,
+          "timeout": false,
+          "all_findings": []
+        }
+      },
+      {
+        "level": "high",
+        "level_id": 2,
+        "face": "reflected",
+        "role": "bwuser",
+        "default": {
+          "detected": false,
+          "hits": [],
+          "seconds": 1.9,
+          "rc": 0,
+          "timeout": false,
+          "all_findings": []
+        },
+        "headless": {
+          "detected": false,
+          "hits": [],
+          "seconds": 1.9,
+          "rc": 0,
+          "timeout": false,
+          "all_findings": []
+        }
+      },
+      {
+        "level": "high",
+        "level_id": 2,
+        "face": "stored",
+        "role": "bwuser",
+        "default": {
+          "detected": false,
+          "hits": [],
+          "seconds": 16.2,
+          "rc": 0,
+          "timeout": false,
+          "all_findings": []
+        },
+        "headless": {
+          "detected": false,
+          "hits": [],
+          "seconds": 36.5,
+          "rc": 0,
+          "timeout": false,
+          "all_findings": [
+            {
+              "type": "trusted_types_no_policy",
+              "param": null,
+              "severity": "medium",
+              "confidence": "high",
+              "payload": "(TT: tt_no_policy)",
+              "context": "trusted_types_eval",
+              "detail": "Page uses dangerous DOM sinks without Trusted Types; if a sink receives user-controlled data, DOM XSS is trivially exploitable (TT is the only reliable DOM-XSS mitigation) | align=\"center\">258</td>\n            <td>bwuser</td>\n            <td>2026-11-03 15:01:27</td>\n            <td>javascript:eval(location.hash.slice(1))#alert(&#039;xssv_e5a372fd&#039;)</td>\n\n        </tr",
+              "evidence_class": "browser-unavailable",
+              "url": "http://127.0.0.1:8081/xss_stored_1.php",
+              "method": "GET"
+            }
+          ]
+        }
+      },
+      {
+        "level": "high",
+        "level_id": 2,
+        "face": "header",
+        "role": "bwuser",
+        "default": {
+          "detected": false,
+          "hits": [],
+          "seconds": 2.1,
+          "rc": 0,
+          "timeout": false,
+          "all_findings": []
+        },
+        "headless": {
+          "detected": false,
+          "hits": [],
+          "seconds": 2.0,
+          "rc": 0,
+          "timeout": false,
+          "all_findings": []
+        }
+      },
+      {
+        "level": "high",
+        "level_id": 2,
+        "face": "reflected",
+        "role": "bee",
+        "default": {
+          "detected": false,
+          "hits": [],
+          "seconds": 2.8,
+          "rc": 0,
+          "timeout": false,
+          "all_findings": []
+        },
+        "headless": {
+          "detected": false,
+          "hits": [],
+          "seconds": 14.3,
+          "rc": 0,
+          "timeout": false,
+          "all_findings": []
+        }
+      },
+      {
+        "level": "high",
+        "level_id": 2,
+        "face": "stored",
+        "role": "bee",
+        "default": {
+          "detected": false,
+          "hits": [],
+          "seconds": 16.3,
+          "rc": 0,
+          "timeout": false,
+          "all_findings": []
+        },
+        "headless": {
+          "detected": false,
+          "hits": [],
+          "seconds": 35.0,
+          "rc": 0,
+          "timeout": false,
+          "all_findings": [
+            {
+              "type": "trusted_types_no_policy",
+              "param": null,
+              "severity": "medium",
+              "confidence": "high",
+              "payload": "(TT: tt_no_policy)",
+              "context": "trusted_types_eval",
+              "detail": "Page uses dangerous DOM sinks without Trusted Types; if a sink receives user-controlled data, DOM XSS is trivially exploitable (TT is the only reliable DOM-XSS mitigation) | td align=\"center\">666</td>\n            <td>bee</td>\n            <td>2026-11-03 15:02:41</td>\n            <td>javascript:eval(location.hash.slice(1))#alert(&#039;xssv_2cd487b1&#039;)</td>\n\n        </tr",
+              "evidence_class": "browser-unavailable",
+              "url": "http://127.0.0.1:8081/xss_stored_1.php",
+              "method": "GET"
+            }
+          ]
+        }
+      },
+      {
+        "level": "high",
+        "level_id": 2,
+        "face": "header",
+        "role": "bee",
+        "default": {
+          "detected": false,
+          "hits": [],
+          "seconds": 1.3,
+          "rc": 0,
+          "timeout": false,
+          "all_findings": []
+        },
+        "headless": {
+          "detected": false,
+          "hits": [],
+          "seconds": 1.4,
+          "rc": 0,
+          "timeout": false,
+          "all_findings": []
+        }
+      }
+    ]
+  }
+}

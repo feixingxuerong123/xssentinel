@@ -1,0 +1,34 @@
+{
+  "reflect-vuln": {
+    "token_seen": true,
+    "dialogs": [
+      "sh_cf5779"
+    ]
+  },
+  "reflect-safe": {
+    "token_seen": false,
+    "dialogs": []
+  },
+  "stored-admin": {
+    "token_seen": true,
+    "dialogs": [
+      "sh_cf5779"
+    ]
+  },
+  "stored-alice": {
+    "token_seen": true,
+    "dialogs": [
+      "sh_cf5779"
+    ]
+  },
+  "header-vuln": {
+    "token_seen": true,
+    "dialogs": [
+      "sh_cf5779"
+    ]
+  },
+  "header-safe": {
+    "token_seen": false,
+    "dialogs": []
+  }
+}

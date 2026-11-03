@@ -49,6 +49,11 @@ class SessionManager:
         # later be replicated in clients that do NOT go through
         # requests.Session -- currently the real-browser DOM engine.
         self.auth_header_names: set = set()
+        # Phase 289b: JSON login returns a token that SPA route guards read
+        # from localStorage.  Keep it on the manager so both the browser arm
+        # and the async scanner inherit it without the operator repeating
+        # --browser-local-storage.
+        self.browser_local_storage: dict = {}
         # Phase 194 (dalfox --session-check / --on-session-loss parity):
         # an optional response-BODY regex that means the session died (a
         # 200 page saying "please log in" defeats every status-based

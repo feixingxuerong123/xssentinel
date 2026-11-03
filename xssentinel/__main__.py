@@ -664,6 +664,15 @@ def build_parser(mode: str = "scan"):
                            "confidence=medium.")
     g_bs.add_argument("--stored-inject", default=None,
                       help="Stored-XSS inject URL (POST)")
+    g_bs.add_argument("--no-stored-auto", dest="stored_auto",
+                      action="store_false", default=True,
+                      help="Disable automatic stored-XSS viewer discovery "
+                           "(sync engine). By default each scanned HTML page's "
+                           "same-origin POST forms are exercised, the POST "
+                           "redirect and viewer-shaped links are followed, and "
+                           "the rendering site is located by ETag/Last-Modified/"
+                           "body-digest diff + token polling. Explicit "
+                           "--stored-inject implies off.")
     g_bs.add_argument("--stored-view", default=None,
                       help="Stored-XSS view URL")
     g_bs.add_argument("--stored-param", default="q")
@@ -1623,7 +1632,9 @@ def _main_impl(argv=None):
         if session_mgr is not None:
             _hdrs, _ = session_mgr.auth_browser_state()
         _ckies = _jar_cookie_dicts(_req_session)
-        _ls = {}
+        # JSON-login tokens live in localStorage for SPA route guards; seed
+        # them from the login response, then let explicit flags override.
+        _ls = dict(getattr(session_mgr, "browser_local_storage", None) or {})
         for _kv in (getattr(args, "browser_local_storage", None) or []):
             _k, _, _v = _kv.partition("=")
             if _k.strip():

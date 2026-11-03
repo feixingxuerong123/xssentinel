@@ -1,0 +1,75 @@
+[
+  {
+    "level": "low",
+    "carrier": "script",
+    "token": "lvl_low_script_cb3ea4",
+    "reflected_http_has_raw_payload": true,
+    "reflected_dialog": true,
+    "stored_http_has_raw_payload": true,
+    "stored_dialog": true,
+    "dialogs_sample": [
+      "lvl_low_script_cb3ea4"
+    ]
+  },
+  {
+    "level": "low",
+    "carrier": "img",
+    "token": "lvl_low_img_551d38",
+    "reflected_http_has_raw_payload": true,
+    "reflected_dialog": true,
+    "stored_http_has_raw_payload": true,
+    "stored_dialog": true,
+    "dialogs_sample": [
+      "lvl_low_script_cb3ea4",
+      "lvl_low_img_551d38"
+    ]
+  },
+  {
+    "level": "medium",
+    "carrier": "script",
+    "token": "lvl_medium_script_670104",
+    "reflected_http_has_raw_payload": false,
+    "reflected_dialog": false,
+    "stored_http_has_raw_payload": false,
+    "stored_dialog": false,
+    "dialogs_sample": [
+      "lvl_low_script_cb3ea4"
+    ]
+  },
+  {
+    "level": "medium",
+    "carrier": "img",
+    "token": "lvl_medium_img_795af2",
+    "reflected_http_has_raw_payload": true,
+    "reflected_dialog": true,
+    "stored_http_has_raw_payload": false,
+    "stored_dialog": false,
+    "dialogs_sample": [
+      "lvl_low_script_cb3ea4"
+    ]
+  },
+  {
+    "level": "high",
+    "carrier": "script",
+    "token": "lvl_high_script_27edc9",
+    "reflected_http_has_raw_payload": false,
+    "reflected_dialog": false,
+    "stored_http_has_raw_payload": false,
+    "stored_dialog": false,
+    "dialogs_sample": [
+      "lvl_low_script_cb3ea4"
+    ]
+  },
+  {
+    "level": "high",
+    "carrier": "img",
+    "token": "lvl_high_img_35b99a",
+    "reflected_http_has_raw_payload": true,
+    "reflected_dialog": true,
+    "stored_http_has_raw_payload": false,
+    "stored_dialog": false,
+    "dialogs_sample": [
+      "lvl_low_script_cb3ea4"
+    ]
+  }
+]

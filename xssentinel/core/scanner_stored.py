@@ -8,11 +8,14 @@ from __future__ import annotations
 
 import re
 import secrets
+import time
 from typing import TYPE_CHECKING
 
 from . import payloads
 from . import verifier
 from . import transform
+from .stored_discovery import (STORED_AUTO_BASES, resp_fingerprint,
+                              same_origin, view_poll_delays)
 from . import csp as csp_mod  # noqa: F401  (Mixin 运行时引用:scanner 由 Mixin 组合,静态分析看不见)
 from . import jsonp as jsonp_mod  # noqa: F401  (Mixin 运行时引用:scanner 由 Mixin 组合,静态分析看不见)
 from . import mutation as mxss_mod  # noqa: F401  (Mixin 运行时引用:scanner 由 Mixin 组合,静态分析看不见)
@@ -103,9 +106,20 @@ class StoredBlindMixin:
                     data_json: bool = False,
                     extra_view_urls: list | None = None,
                     extra_fields: dict | None = None,
-                    header_param: str | None = None):
+                    header_param: str | None = None,
+                    auto: bool = False, poll: bool = False,
+                    api_views: set | None = None):
         """Inject a payload, then re-fetch a 'view' page to detect persisted
         (stored) XSS. The view page must render previously stored entries.
+
+        ``auto``/``poll``/``api_views`` are the Phase 352 auto-discovery
+        contract: a small shape-diverse base set, an identity transform
+        ladder, and a before-write fingerprint snapshot per candidate view.
+        Only views whose ETag/Last-Modified/digest CHANGED are polled, so an
+        unchanged (non-rendering) candidate costs exactly one GET.  A view
+        listed in ``api_views`` is accepted only when it actually answered
+        with JSON -- a JSON string containing the token is not an HTML
+        execution context on its own.
 
         Phase 274: ``extra_fields`` are companion fields the write endpoint
         demands (rating, captchaId, csrf, ...) and ride along in BOTH the
@@ -163,12 +177,21 @@ class StoredBlindMixin:
         # decision instead of being smuggled into a speed pass.  Measured
         # cost of the status quo: 588 (payload x transform) pairs, of which
         # 238 survive -- see the two filters below.
-        bases = (payloads.by_context("html_element")
-                 + payloads.by_context("script_block")
-                 + payloads.by_context("event_handler")
-                 + payloads.by_context("svg_context"))[:self.max_payloads]
-        bases += [p for p in payloads.all_polyglots()
-                  if "html_element" in p.get("contexts", [])]
+        if auto:
+            # Phase 352: a stored sink is a rendering context, not a WAF
+            # puzzle.  Seven raw shapes cover element / attribute / RCDATA /
+            # text-node breakouts, and the identity transform keeps the
+            # request count at one POST + one GET per view per shape.
+            bases = [dict(p) for p in STORED_AUTO_BASES]
+            transform_cap = 1
+        else:
+            bases = (payloads.by_context("html_element")
+                     + payloads.by_context("script_block")
+                     + payloads.by_context("event_handler")
+                     + payloads.by_context("svg_context"))[:self.max_payloads]
+            bases += [p for p in payloads.all_polyglots()
+                      if "html_element" in p.get("contexts", [])]
+            transform_cap = self.max_transforms
         # Phase 156: skip pairs that prove nothing new.  Measured on
         # benchmark neg-stored-01 (49 payloads x 12 transform sets):
         #
@@ -185,13 +208,67 @@ class StoredBlindMixin:
         # arm can judge them all in ONE render per view instead of one render
         # per (variant, view).
         injected: list = []
+        # Phase 352: fingerprint the candidate views BEFORE the write.  A
+        # viewer whose ETag/Last-Modified/digest does not change after the
+        # POST is the wrong viewer, and is not worth semantic analysis or
+        # polling.  One GET per candidate, once per scan.
+        view_set = [view_url]
+        for u in (extra_view_urls or []):
+            if u and u not in view_set and len(view_set) < 9:
+                view_set.append(u)
+        baseline: dict = {}
+        if poll:
+            for cand in view_set:
+                try:
+                    snap = view_req.get(cand, cache_get=False)
+                    self._bump()
+                    baseline[cand] = resp_fingerprint(snap)
+                except Exception:
+                    baseline[cand] = None
+        # Phase 356: marker-form fan-out.  A stored view that applies
+        # addslashes turns alert('tok') into a syntax error while leaving the
+        # unquoted/double/backtick shapes executable.  Each base payload gets
+        # its own form list (the first form preserves the payload's own alert
+        # style, so operator payloads are not rewritten), but only the first
+        # three bases pay for the extra shapes -- the rest keep the single
+        # form + transform ladder and the request budget stays bounded.
+        expanded_bases = []
+        for _bi, _base in enumerate(bases):
+            _budget = 4 if _bi < 3 else 1
+            # Phase 356: forms on by default; XSS_MARKER_FORMS=0 = legacy A/B.
+            _probe_forms = verifier.stamp_forms_or_legacy(
+                _base["payload"], "xssv_" + "0" * 8, _budget)
+            _primary = _probe_forms[0][0]
+            # One FRESH token per (form, transform) pair: variants of the same
+            # base used to share a token, so a view page that accumulated
+            # several writes let a dead variant borrow the live variant's
+            # confirmation (measured: the inert %00<svg%00/onload=...> variant
+            # was reported because its sibling identity row carried the token).
+            for _form, _e0, _m0 in _probe_forms:
+                _tsets = (None if _form == _primary
+                          else [["marker:" + _form]])
+                for _tset in (_tsets or _DEFAULT_TRANSFORMS[:transform_cap]):
+                    _token = "xssv_" + secrets.token_hex(4)
+                    _marked, _eff, _used = verifier.stamp_form(
+                        _base["payload"], _token, _form)
+                    _item = dict(_base)
+                    _item["_marked"] = _marked
+                    _item["_token"] = _eff
+                    _item["_form"] = _form
+                    _item["_tsets"] = [_tset]
+                    expanded_bases.append(_item)
+        bases = expanded_bases
         for base in bases:
-            token = "xssv_" + secrets.token_hex(4)
-            marked = verifier.mark(base["payload"], token)
-            for tset in _DEFAULT_TRANSFORMS[:self.max_transforms]:
-                variant = marked
-                for t in tset:
-                    variant = transform.apply(t, variant)
+            token = base.get("_token") or ("xssv_" + secrets.token_hex(4))
+            marked = base.get("_marked") or verifier.mark(base["payload"], token)
+            for tset in (base.get("_tsets") or
+                         _DEFAULT_TRANSFORMS[:transform_cap]):
+                if any(t.startswith("marker:") for t in tset):
+                    variant = marked
+                else:
+                    variant = marked
+                    for t in tset:
+                        variant = transform.apply(t, variant)
                 # A transform that rewrites the token (url/hex encoding,
                 # case flips, ...) makes this pair UNCONFIRMABLE --
                 # verify_semantic() matches the token with a plain substring
@@ -203,10 +280,11 @@ class StoredBlindMixin:
                 # Dedupe on what is actually SENT, with the token
                 # normalised out: two corpus entries that differ only in
                 # their alert() argument are the same probe.
-                key = _TOKEN_RE.sub("TOKEN", variant)
+                key = re.sub(re.escape(token), "TOKEN", variant)
                 if key in seen_variants:
                     continue
                 seen_variants.add(key)
+                presp = None
                 try:
                     if header_param:
                         # Phase 277: header-borne writes.  Some endpoints take
@@ -219,10 +297,10 @@ class StoredBlindMixin:
                         hdrs = {header_param: variant}
                         extras_body = dict(extra_fields or {})
                         if method.upper() == "POST" and extras_body:
-                            req.request(method, inject_url, data=extras_body,
-                                        headers=hdrs)
+                            presp = req.request(method, inject_url,
+                                                data=extras_body, headers=hdrs)
                         else:
-                            req.request(method, inject_url, headers=hdrs)
+                            presp = req.request(method, inject_url, headers=hdrs)
                     elif method.upper() != "GET":
                         # Phase 241: data_json sends the injection as a JSON
                         # body, matching the encoding the page itself used
@@ -236,11 +314,12 @@ class StoredBlindMixin:
                         body = dict(extra_fields or {})
                         body[param] = variant
                         if data_json:
-                            req.request(method, inject_url, json=body)
+                            presp = req.request(method, inject_url, json=body)
                         else:
-                            req.request(method, inject_url, data=body)
+                            presp = req.request(method, inject_url, data=body)
                     else:
-                        req.request(method, inject_url, params={param: variant})
+                        presp = req.request(method, inject_url,
+                                            params={param: variant})
                     injected.append((variant, token, tset))
                     self._bump()
                     # Phase 21-3: invalidate any cached GET for the view URL
@@ -267,6 +346,12 @@ class StoredBlindMixin:
                     for u in (extra_view_urls or []):
                         if u and u not in views and len(views) < 9:
                             views.append(u)
+                    # Phase 352: a 302 after the write is itself a viewer
+                    # locator -- the app tells us where it re-renders.
+                    landing = str(getattr(presp, "url", "") or "")
+                    if (poll and landing and landing not in views
+                            and same_origin(landing, inject_url)):
+                        views.insert(1, landing)
                     vresp = None
                     v = None
                     hit_view = None
@@ -276,18 +361,58 @@ class StoredBlindMixin:
                     # "no browser evidence" and correctly but uselessly
                     # downgrades a fired payload to low.
                     browser_evidence = None
+
+                    def _confirm_on(cand, resp):
+                        """Semantic confirmation, with the JSON-API gate.
+
+                        A JSON body is not an HTML execution context; only a
+                        candidate the page's own JS fetches *and* writes into
+                        a sink may be judged on its JSON text (that sink is
+                        what makes the stored value executable).
+                        """
+                        if cand in (api_views or set()):
+                            hdrs = dict(getattr(resp, "headers", {}) or {})
+                            ctype = str(hdrs.get("Content-Type")
+                                        or hdrs.get("content-type") or "").lower()
+                            if "json" not in ctype:
+                                return None
+                        return verifier.verify_semantic(
+                            resp.text, token,
+                            response_headers=dict(resp.headers))
+
                     for cand in views:
                         try:
                             vresp = view_req.get(cand, cache_get=False)
                             self._bump()
                         except Exception:
                             continue
-                        cand_v = verifier.verify_semantic(
-                            vresp.text, token,
-                            response_headers=dict(vresp.headers))
-                        if cand_v.get("confirmed"):
+                        cand_v = _confirm_on(cand, vresp)
+                        if cand_v and cand_v.get("confirmed"):
                             v, hit_view = cand_v, cand
                             break
+                        # Phase 352: poll ONLY a viewer that the write
+                        # actually changed.  Fingerprint equality (ETag,
+                        # Last-Modified, body digest) means this page is not
+                        # a rendering site for the value just written, so
+                        # retrying it would be pure noise.
+                        base_fp = baseline.get(cand)
+                        if poll and base_fp is not None:
+                            now_fp = resp_fingerprint(vresp)
+                            if now_fp == base_fp:
+                                continue
+                            for delay in view_poll_delays(vresp.text):
+                                time.sleep(delay)
+                                try:
+                                    vresp = view_req.get(cand, cache_get=False)
+                                    self._bump()
+                                except Exception:
+                                    break
+                                cand_v = _confirm_on(cand, vresp)
+                                if cand_v and cand_v.get("confirmed"):
+                                    v, hit_view = cand_v, cand
+                                    break
+                            if v is not None:
+                                break
                         # The browser arm is NOT here any more: rendering
                         # per (variant, view) is 24 x 8 x ~2.5s (measured well
                         # over 20 minutes for one face).  It runs once per
@@ -300,7 +425,7 @@ class StoredBlindMixin:
                         confidence = "high"
                         note = ("persistence CONFIRMED from a fresh "
                                 "cookie-free viewer session")
-                    elif not explicit_view and view_url == inject_url:
+                    elif (not explicit_view or auto) and view_url == inject_url:
                         confidence = "medium"
                         note = ("same-session self-view: the payload renders "
                                 "on the inject page itself, which does NOT "

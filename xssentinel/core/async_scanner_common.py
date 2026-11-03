@@ -15,6 +15,8 @@ from urllib.parse import urljoin
 from .scanner import Finding
 from .scanner_layers import AdvancedLayerMixin
 from .scanner_crawl import CrawlMixin
+from .scanner_stored import StoredBlindMixin
+from .scanner_stored_auto import StoredAutoMixin
 from .requester import JsonBody
 from . import layer_guard
 from .budget import BudgetExhausted, CircuitOpen
@@ -274,7 +276,8 @@ class _FakeResp:
         self.text = text
         self.status_code = status
         self.headers = headers
-class _AsyncScannerShim(AdvancedLayerMixin, CrawlMixin):
+class _AsyncScannerShim(StoredBlindMixin, StoredAutoMixin,
+                        AdvancedLayerMixin, CrawlMixin):
     """Minimal scanner-like object for sync detection modules.
 
     The sync ``advanced_layers`` / ``jsonp`` / ``csp`` modules expect a
@@ -400,6 +403,23 @@ class _AsyncScannerShim(AdvancedLayerMixin, CrawlMixin):
         self._oob_started = bool(getattr(async_scanner, "_oob_started", False))
         # Phase 133: CrawlMixin._mine_hidden_params reads these.
         self.max_payloads = getattr(async_scanner, "max_payloads", 14)
+        # Phase 354: stored round-trip parity -- StoredBlindMixin/StoredAutoMixin
+        # read these off the combination surface.
+        self.stored_auto = bool(getattr(async_scanner, "stored_auto", True))
+        self.max_transforms = getattr(async_scanner, "max_transforms", 12)
+        self.use_headless = bool(getattr(async_scanner, "use_headless", False))
+        self.auth_headers = dict(getattr(async_scanner, "auth_headers", None)
+                                 or {})
+        self.auth_local_storage = dict(
+            getattr(async_scanner, "auth_local_storage", None) or {})
+        # StoredBlindMixin.collect_oob reads these (the contract gate counts
+        # the getattr string form).  CLI sets them on the async scanner;
+        # proxy the intent, defaults mirror the sync core.  None-guard:
+        # stubs answer None for absent names, so getattr's default is moot.
+        _oob_t = getattr(async_scanner, "oob_timeout", None)
+        self.oob_timeout = float(_oob_t) if _oob_t is not None else 12.0
+        self.oob_keep_listening = bool(
+            getattr(async_scanner, "oob_keep_listening", False))
         self.param_wordlist = None      # --param-wordlist stays sync-only
         self.bav = False                # --bav is documented sync-only
         # --skip-param / --audit-xs-leaks 的组合契约口(tests/test_mixin_contracts.py
@@ -437,6 +457,12 @@ class _AsyncScannerShim(AdvancedLayerMixin, CrawlMixin):
         parity 而生),语义与 async 自己的 DOM 层一致:``--dom-engine static``
         或 Playwright 不可用时返回 None,调用方照旧跳过 L6。
         """
+        return self._async._resolve_dom_engine()
+
+    def _resolve_dom_engine(self):
+        """``StoredBlindMixin`` 的引擎口;与 ``_dom_engine`` 同一形状的契约
+        缺口、同一处置:委托 async 侧同名解析器,static 或 Playwright 不可用
+        即 None,stored 往返照旧按纯 HTTP 证据判定。"""
         return self._async._resolve_dom_engine()
 
     def _add(self, finding: Finding) -> None:

@@ -345,7 +345,9 @@ def test_dom_browser_is_pointed_at_a_url_that_carries_the_params(monkeypatch):
     seen = {}
 
     class _FakeEngine:
-        def analyze(self, url):
+        # Phase 355: the layer passes page_text (source-gate parity with
+        # sync); accept the real analyze() call shape.
+        def analyze(self, url, page_text=None, **kw):
             seen["url"] = url
             return []
 

@@ -152,6 +152,7 @@ def _do_login(requester, args) -> "SessionManager | None":
                     mgr.logged_in = True
                     mgr.login_time = time.time()
                     mgr.auth_header_names.add("Authorization")
+                    mgr.browser_local_storage = dict(_store or {})
                     try:
                         requester.session.headers.update(_hdrs)
                     except Exception:
@@ -531,7 +532,12 @@ def _run_scan(args, url: str, requester, oob, progress, checkpoint,
         xsleak_audit=getattr(args, "xsleak_audit", False),
         auth_headers=(auth_state or (None, None, None))[0],
         auth_cookies=(auth_state or (None, None, None))[1],
-        auth_local_storage=(auth_state or (None, None, None))[2])
+        auth_local_storage=(auth_state or (None, None, None))[2],
+        # Phase 352: auto stored discovery is the default sync path; an
+        # explicit --stored-inject run already names the write/view pair, so
+        # auto would only re-prove it with extra requests.
+        stored_auto=(getattr(args, "stored_auto", True)
+                     and not getattr(args, "stored_inject", None)))
     # Phase 46: JSON-carrier mode (see _run_scan docstring above).
     if json_body is not None:
         scanner.json_body = json_body
@@ -996,6 +1002,7 @@ def _run_async_scan(args, url: str, oob, progress, checkpoint,
         # stream is wrapped with real browser confirmations (deduped,
         # bounded by headless_concurrency).
         use_headless=getattr(args, "headless", False),
+        stored_auto=getattr(args, "stored_auto", True),
         skip_params=_operator_skip_params(args),
         # Phase 320: custom-payload channel parity with sync.
         custom_payloads=_operator_custom_payloads(args),
@@ -1195,6 +1202,7 @@ def _run_async_batch(args, urls: list[str], requester, oob, progress,
         # stream is wrapped with real browser confirmations (deduped,
         # bounded by headless_concurrency).
         use_headless=getattr(args, "headless", False),
+        stored_auto=getattr(args, "stored_auto", True),
         skip_params=_operator_skip_params(args),
         # Phase 320: custom-payload channel parity with sync.
         custom_payloads=_operator_custom_payloads(args),

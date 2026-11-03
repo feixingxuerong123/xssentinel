@@ -1,7 +1,7 @@
 {
   "meta": {
     "range": "range4",
-    "generated": "2026-10-04 22:31:02",
+    "generated": "2026-11-03 00:13:28",
     "engines": [
       "sync",
       "async"
@@ -34,7 +34,8 @@
       "verdict": "TP",
       "findings": 12,
       "confirmed": 12,
-      "elapsed_s": 16.1,
+      "elapsed_s": 13.6,
+      "retries": 0,
       "findings_detail": [
         {
           "type": "reflected",
@@ -117,7 +118,8 @@
       "verdict": "TN",
       "findings": 0,
       "confirmed": 0,
-      "elapsed_s": 10.2,
+      "elapsed_s": 9.1,
+      "retries": 0,
       "findings_detail": [],
       "error": ""
     },
@@ -127,7 +129,8 @@
       "verdict": "TP",
       "findings": 12,
       "confirmed": 12,
-      "elapsed_s": 16.0,
+      "elapsed_s": 13.4,
+      "retries": 0,
       "findings_detail": [
         {
           "type": "reflected",
@@ -210,7 +213,8 @@
       "verdict": "TN",
       "findings": 0,
       "confirmed": 0,
-      "elapsed_s": 10.2,
+      "elapsed_s": 8.9,
+      "retries": 0,
       "findings_detail": [],
       "error": ""
     },
@@ -218,140 +222,75 @@
       "engine": "async",
       "case_id": "r4-pos-react-dsi",
       "verdict": "TP",
-      "findings": 23,
-      "confirmed": 23,
-      "elapsed_s": 23.9,
+      "findings": 13,
+      "confirmed": 12,
+      "elapsed_s": 22.0,
+      "retries": 0,
       "findings_detail": [
         {
           "type": "reflected",
           "severity": "high",
-          "context": "script_block",
+          "context": "script_string_sq",
           "headless_outcome": "fired"
         },
         {
           "type": "reflected",
           "severity": "high",
-          "context": "script_block",
+          "context": "script_string_sq",
           "headless_outcome": "fired"
         },
         {
           "type": "reflected",
           "severity": "high",
-          "context": "script_block",
+          "context": "script_string_sq",
           "headless_outcome": "fired"
         },
         {
           "type": "reflected",
           "severity": "high",
-          "context": "script_block",
+          "context": "script_string_sq",
           "headless_outcome": "fired"
         },
         {
           "type": "reflected",
           "severity": "high",
-          "context": "script_block",
+          "context": "script_string_sq",
           "headless_outcome": "fired"
         },
         {
           "type": "reflected",
           "severity": "high",
-          "context": "script_block",
+          "context": "script_string_sq",
           "headless_outcome": "fired"
         },
         {
           "type": "reflected",
           "severity": "high",
-          "context": "script_block",
+          "context": "script_string_sq",
           "headless_outcome": "fired"
         },
         {
           "type": "reflected",
           "severity": "high",
-          "context": "script_block",
+          "context": "script_string_sq",
           "headless_outcome": "fired"
         },
         {
           "type": "reflected",
           "severity": "high",
-          "context": "script_block",
+          "context": "script_string_sq",
           "headless_outcome": "fired"
         },
         {
           "type": "reflected",
           "severity": "high",
-          "context": "script_block",
+          "context": "script_string_sq",
           "headless_outcome": "fired"
         },
         {
           "type": "reflected",
           "severity": "high",
-          "context": "script_block",
-          "headless_outcome": "fired"
-        },
-        {
-          "type": "polyglot_reflection",
-          "severity": "medium",
-          "context": "event_handler",
-          "headless_outcome": "fired"
-        },
-        {
-          "type": "polyglot_reflection",
-          "severity": "medium",
-          "context": "event_handler",
-          "headless_outcome": "fired"
-        },
-        {
-          "type": "polyglot_reflection",
-          "severity": "medium",
-          "context": "event_handler",
-          "headless_outcome": "fired"
-        },
-        {
-          "type": "polyglot_reflection",
-          "severity": "medium",
-          "context": "event_handler",
-          "headless_outcome": "fired"
-        },
-        {
-          "type": "polyglot_reflection",
-          "severity": "medium",
-          "context": "event_handler",
-          "headless_outcome": "fired"
-        },
-        {
-          "type": "polyglot_reflection",
-          "severity": "medium",
-          "context": "event_handler",
-          "headless_outcome": "fired"
-        },
-        {
-          "type": "polyglot_reflection",
-          "severity": "medium",
-          "context": "event_handler",
-          "headless_outcome": "fired"
-        },
-        {
-          "type": "polyglot_reflection",
-          "severity": "medium",
-          "context": "event_handler",
-          "headless_outcome": "fired"
-        },
-        {
-          "type": "polyglot_reflection",
-          "severity": "medium",
-          "context": "event_handler",
-          "headless_outcome": "fired"
-        },
-        {
-          "type": "polyglot_reflection",
-          "severity": "medium",
-          "context": "event_handler",
-          "headless_outcome": "fired"
-        },
-        {
-          "type": "polyglot_reflection",
-          "severity": "medium",
-          "context": "event_handler",
+          "context": "script_string_sq",
           "headless_outcome": "fired"
         },
         {
@@ -359,6 +298,12 @@
           "severity": "high",
           "context": "Element.innerHTML",
           "headless_outcome": "fired"
+        },
+        {
+          "type": "dom_sink_reachability",
+          "severity": "low",
+          "context": "Element.innerHTML",
+          "headless_outcome": "not-fired"
         }
       ],
       "error": ""
@@ -369,7 +314,8 @@
       "verdict": "TN",
       "findings": 0,
       "confirmed": 0,
-      "elapsed_s": 10.4,
+      "elapsed_s": 14.8,
+      "retries": 0,
       "findings_detail": [],
       "error": ""
     },
@@ -377,140 +323,75 @@
       "engine": "async",
       "case_id": "r4-pos-vue-vhtml",
       "verdict": "TP",
-      "findings": 23,
-      "confirmed": 23,
-      "elapsed_s": 23.9,
+      "findings": 13,
+      "confirmed": 12,
+      "elapsed_s": 22.3,
+      "retries": 0,
       "findings_detail": [
         {
           "type": "reflected",
           "severity": "high",
-          "context": "script_block",
+          "context": "script_string_sq",
           "headless_outcome": "fired"
         },
         {
           "type": "reflected",
           "severity": "high",
-          "context": "script_block",
+          "context": "script_string_sq",
           "headless_outcome": "fired"
         },
         {
           "type": "reflected",
           "severity": "high",
-          "context": "script_block",
+          "context": "script_string_sq",
           "headless_outcome": "fired"
         },
         {
           "type": "reflected",
           "severity": "high",
-          "context": "script_block",
+          "context": "script_string_sq",
           "headless_outcome": "fired"
         },
         {
           "type": "reflected",
           "severity": "high",
-          "context": "script_block",
+          "context": "script_string_sq",
           "headless_outcome": "fired"
         },
         {
           "type": "reflected",
           "severity": "high",
-          "context": "script_block",
+          "context": "script_string_sq",
           "headless_outcome": "fired"
         },
         {
           "type": "reflected",
           "severity": "high",
-          "context": "script_block",
+          "context": "script_string_sq",
           "headless_outcome": "fired"
         },
         {
           "type": "reflected",
           "severity": "high",
-          "context": "script_block",
+          "context": "script_string_sq",
           "headless_outcome": "fired"
         },
         {
           "type": "reflected",
           "severity": "high",
-          "context": "script_block",
+          "context": "script_string_sq",
           "headless_outcome": "fired"
         },
         {
           "type": "reflected",
           "severity": "high",
-          "context": "script_block",
+          "context": "script_string_sq",
           "headless_outcome": "fired"
         },
         {
           "type": "reflected",
           "severity": "high",
-          "context": "script_block",
-          "headless_outcome": "fired"
-        },
-        {
-          "type": "polyglot_reflection",
-          "severity": "medium",
-          "context": "event_handler",
-          "headless_outcome": "fired"
-        },
-        {
-          "type": "polyglot_reflection",
-          "severity": "medium",
-          "context": "event_handler",
-          "headless_outcome": "fired"
-        },
-        {
-          "type": "polyglot_reflection",
-          "severity": "medium",
-          "context": "event_handler",
-          "headless_outcome": "fired"
-        },
-        {
-          "type": "polyglot_reflection",
-          "severity": "medium",
-          "context": "event_handler",
-          "headless_outcome": "fired"
-        },
-        {
-          "type": "polyglot_reflection",
-          "severity": "medium",
-          "context": "event_handler",
-          "headless_outcome": "fired"
-        },
-        {
-          "type": "polyglot_reflection",
-          "severity": "medium",
-          "context": "event_handler",
-          "headless_outcome": "fired"
-        },
-        {
-          "type": "polyglot_reflection",
-          "severity": "medium",
-          "context": "event_handler",
-          "headless_outcome": "fired"
-        },
-        {
-          "type": "polyglot_reflection",
-          "severity": "medium",
-          "context": "event_handler",
-          "headless_outcome": "fired"
-        },
-        {
-          "type": "polyglot_reflection",
-          "severity": "medium",
-          "context": "event_handler",
-          "headless_outcome": "fired"
-        },
-        {
-          "type": "polyglot_reflection",
-          "severity": "medium",
-          "context": "event_handler",
-          "headless_outcome": "fired"
-        },
-        {
-          "type": "polyglot_reflection",
-          "severity": "medium",
-          "context": "event_handler",
+          "context": "script_string_sq",
           "headless_outcome": "fired"
         },
         {
@@ -518,6 +399,12 @@
           "severity": "high",
           "context": "Element.innerHTML",
           "headless_outcome": "fired"
+        },
+        {
+          "type": "dom_sink_reachability",
+          "severity": "low",
+          "context": "Element.innerHTML",
+          "headless_outcome": "not-fired"
         }
       ],
       "error": ""
@@ -528,7 +415,8 @@
       "verdict": "TN",
       "findings": 0,
       "confirmed": 0,
-      "elapsed_s": 10.4,
+      "elapsed_s": 14.7,
+      "retries": 0,
       "findings_detail": [],
       "error": ""
     }

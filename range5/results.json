@@ -1,7 +1,7 @@
 {
   "meta": {
     "range": "range5",
-    "generated": "2026-10-11 20:28:20",
+    "generated": "2026-11-03 00:11:19",
     "engines": [
       "sync",
       "async"
@@ -34,7 +34,8 @@
       "verdict": "TP",
       "findings": 2,
       "confirmed": 1,
-      "elapsed_s": 11.4,
+      "elapsed_s": 5.3,
+      "retries": 0,
       "findings_detail": [
         {
           "type": "dom_dynamic",
@@ -57,7 +58,8 @@
       "verdict": "TN",
       "findings": 0,
       "confirmed": 0,
-      "elapsed_s": 11.7,
+      "elapsed_s": 9.2,
+      "retries": 0,
       "findings_detail": [],
       "error": ""
     },
@@ -67,7 +69,8 @@
       "verdict": "TP",
       "findings": 2,
       "confirmed": 1,
-      "elapsed_s": 11.2,
+      "elapsed_s": 11.4,
+      "retries": 0,
       "findings_detail": [
         {
           "type": "framework_lit_xss",
@@ -90,7 +93,8 @@
       "verdict": "TN",
       "findings": 0,
       "confirmed": 0,
-      "elapsed_s": 11.1,
+      "elapsed_s": 14.9,
+      "retries": 0,
       "findings_detail": [],
       "error": ""
     }

@@ -392,8 +392,8 @@ class AsyncDetectionLayersMixin:
                                               else "?") + qs
                     except Exception:
                         pass
-                dyn_findings = await asyncio.to_thread(engine.analyze,
-                                                       page_url)
+                dyn_findings = await asyncio.to_thread(
+                    engine.analyze, page_url, page_text=page_text)
 
             dyn_sinks: set = set()
             for d in dyn_findings:

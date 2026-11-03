@@ -1,0 +1,17 @@
+{
+  "app": "OWASP Juice Shop 20.2.0 (NODE_ENV=unsafe)",
+  "accounting": {
+    "reachable": false,
+    "reason": "no accounting role in this version; /rest/accounting and /api/Accounting return 500, /#/accounting SPA route is not a role gate",
+    "not_ground_truth_polluting": "no database edits were made"
+  },
+  "deluxe": {
+    "reachable": true,
+    "path": "POST /rest/deluxe-membership (official freeDeluxeChallenge route); customer JWT -> deluxe JWT",
+    "initial_role": "customer",
+    "post_status": 200,
+    "new_role": "deluxe",
+    "get_status_after": 400,
+    "note": "application logic path, not a DB edit or auth bypass; GET returns 400 because the user is already deluxe"
+  }
+}

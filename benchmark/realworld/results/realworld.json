@@ -1,0 +1,414 @@
+{
+  "generated": "2026-11-03T00:21:49",
+  "target": "http://127.0.0.1:3000",
+  "app": {
+    "name": "OWASP Juice Shop",
+    "version": "20.2.0",
+    "image": "bkimminich/juice-shop:v20.2.0",
+    "image_digest": "sha256:8739101ade29358abb5469ee66ae78e582c97ed0a5543a4ad102e5fa5193526b",
+    "base_url": "http://127.0.0.1:3000",
+    "start": "docker run -d --name juice-official -p 127.0.0.1:3000:3000 bkimminich/juice-shop:v20.2.0"
+  },
+  "cases": [
+    {
+      "id": "js-dom-search-iframe",
+      "url": "/#/search?q=<iframe src=\"javascript:alert(1)\">",
+      "ground_truth": "vulnerable",
+      "source": "Juice Shop challenge localXssChallenge (DOM XSS)",
+      "evidence": "Playwright Chromium, 2026-11-02: dialog '1' captured",
+      "note": "location.hash -> search result innerHTML; browser-executed only"
+    },
+    {
+      "id": "js-dom-search-onerror",
+      "url": "/#/search?q=<img src=x onerror=alert(1)>",
+      "ground_truth": "vulnerable",
+      "source": "Same sink as localXssChallenge, second carrier",
+      "evidence": "Playwright Chromium, 2026-11-02: dialog '1' captured",
+      "note": "img onerror survives an innerHTML insertion"
+    },
+    {
+      "id": "js-dom-search-script-tag",
+      "url": "/#/search?q=<script>alert(1)</script>",
+      "ground_truth": "vulnerable",
+      "source": "Same sink as localXssChallenge; script-via-innerHTML is inert, but the attacker controls the string and can swap the carrier",
+      "evidence": "Playwright Chromium, 2026-11-02: 0 dialogs for THIS payload; the endpoint stays vulnerable (official challenge)",
+      "note": "endpoint-level ground truth: an inert payload does not make a live sink safe; the browser carrier arm is allowed to prove the sink with a different carrier"
+    },
+    {
+      "id": "js-root",
+      "url": "/",
+      "ground_truth": "safe",
+      "source": "Application root",
+      "evidence": "No attacker-controlled input in the page",
+      "note": "baseline control"
+    },
+    {
+      "id": "js-api-search",
+      "url": "/rest/products/search?q=apple",
+      "ground_truth": "safe",
+      "source": "Product search REST endpoint (JSON)",
+      "evidence": "JSON response, no HTML execution context",
+      "note": "control for JSON reflections"
+    },
+    {
+      "id": "js-api-search-payload",
+      "url": "/rest/products/search?q=<script>alert(1)</script>",
+      "ground_truth": "safe",
+      "source": "Product search REST endpoint (JSON)",
+      "evidence": "JSON answer has no matching product and never renders the query as HTML",
+      "note": "payload-carrying control: a reflection in JSON is not XSS"
+    },
+    {
+      "id": "js-track-order",
+      "url": "/rest/track-order/1234",
+      "ground_truth": "safe",
+      "source": "Order tracking REST endpoint (JSON)",
+      "evidence": "JSON response, no HTML execution context",
+      "note": "control for path segment reflections"
+    }
+  ],
+  "tools": {
+    "xssentinel": {
+      "version": "repo HEAD (editable install)",
+      "rows": [
+        {
+          "detected": true,
+          "xss": [
+            [
+              "dom_dynamic",
+              "high",
+              "high",
+              "browser-executed"
+            ]
+          ],
+          "rc": 0,
+          "seconds": 6.4,
+          "note": "",
+          "case": "js-dom-search-iframe",
+          "gt": "vulnerable",
+          "verdict": "TP"
+        },
+        {
+          "detected": true,
+          "xss": [
+            [
+              "dom_dynamic",
+              "high",
+              "high",
+              "browser-executed"
+            ]
+          ],
+          "rc": 0,
+          "seconds": 6.3,
+          "note": "",
+          "case": "js-dom-search-onerror",
+          "gt": "vulnerable",
+          "verdict": "TP"
+        },
+        {
+          "detected": true,
+          "xss": [
+            [
+              "dom_dynamic",
+              "high",
+              "high",
+              "browser-executed"
+            ]
+          ],
+          "rc": 0,
+          "seconds": 6.4,
+          "note": "",
+          "case": "js-dom-search-script-tag",
+          "gt": "vulnerable",
+          "verdict": "TP"
+        },
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 4.8,
+          "note": "",
+          "case": "js-root",
+          "gt": "safe",
+          "verdict": "TN"
+        },
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 2.5,
+          "note": "",
+          "case": "js-api-search",
+          "gt": "safe",
+          "verdict": "TN"
+        },
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 2.4,
+          "note": "",
+          "case": "js-api-search-payload",
+          "gt": "safe",
+          "verdict": "TN"
+        },
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 1.6,
+          "note": "",
+          "case": "js-track-order",
+          "gt": "safe",
+          "verdict": "TN"
+        }
+      ]
+    },
+    "xssentinel-headless": {
+      "version": "repo HEAD (editable install)",
+      "rows": [
+        {
+          "detected": true,
+          "xss": [
+            [
+              "dom_dynamic",
+              "high",
+              "high",
+              "browser-executed"
+            ]
+          ],
+          "rc": 0,
+          "seconds": 6.3,
+          "note": "",
+          "case": "js-dom-search-iframe",
+          "gt": "vulnerable",
+          "verdict": "TP"
+        },
+        {
+          "detected": true,
+          "xss": [
+            [
+              "dom_dynamic",
+              "high",
+              "high",
+              "browser-executed"
+            ]
+          ],
+          "rc": 0,
+          "seconds": 6.4,
+          "note": "",
+          "case": "js-dom-search-onerror",
+          "gt": "vulnerable",
+          "verdict": "TP"
+        },
+        {
+          "detected": true,
+          "xss": [
+            [
+              "dom_dynamic",
+              "high",
+              "high",
+              "browser-executed"
+            ]
+          ],
+          "rc": 0,
+          "seconds": 6.3,
+          "note": "",
+          "case": "js-dom-search-script-tag",
+          "gt": "vulnerable",
+          "verdict": "TP"
+        },
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 4.6,
+          "note": "",
+          "case": "js-root",
+          "gt": "safe",
+          "verdict": "TN"
+        },
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 2.5,
+          "note": "",
+          "case": "js-api-search",
+          "gt": "safe",
+          "verdict": "TN"
+        },
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 2.5,
+          "note": "",
+          "case": "js-api-search-payload",
+          "gt": "safe",
+          "verdict": "TN"
+        },
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 1.8,
+          "note": "",
+          "case": "js-track-order",
+          "gt": "safe",
+          "verdict": "TN"
+        }
+      ]
+    },
+    "dalfox": {
+      "version": "░█▒               ",
+      "rows": [
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 2.1,
+          "note": "",
+          "case": "js-dom-search-iframe",
+          "gt": "vulnerable",
+          "verdict": "FN"
+        },
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 2.0,
+          "note": "",
+          "case": "js-dom-search-onerror",
+          "gt": "vulnerable",
+          "verdict": "FN"
+        },
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 1.9,
+          "note": "",
+          "case": "js-dom-search-script-tag",
+          "gt": "vulnerable",
+          "verdict": "FN"
+        },
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 0.7,
+          "note": "",
+          "case": "js-root",
+          "gt": "safe",
+          "verdict": "TN"
+        },
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 23.1,
+          "note": "",
+          "case": "js-api-search",
+          "gt": "safe",
+          "verdict": "TN"
+        },
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 24.8,
+          "note": "",
+          "case": "js-api-search-payload",
+          "gt": "safe",
+          "verdict": "TN"
+        },
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 4.7,
+          "note": "",
+          "case": "js-track-order",
+          "gt": "safe",
+          "verdict": "TN"
+        }
+      ]
+    },
+    "nuclei": {
+      "version": "v3.9.0",
+      "rows": [
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 0.5,
+          "note": "",
+          "case": "js-dom-search-iframe",
+          "gt": "vulnerable",
+          "verdict": "FN"
+        },
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 0.3,
+          "note": "",
+          "case": "js-dom-search-onerror",
+          "gt": "vulnerable",
+          "verdict": "FN"
+        },
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 0.3,
+          "note": "",
+          "case": "js-dom-search-script-tag",
+          "gt": "vulnerable",
+          "verdict": "FN"
+        },
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 0.3,
+          "note": "",
+          "case": "js-root",
+          "gt": "safe",
+          "verdict": "TN"
+        },
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 4.4,
+          "note": "",
+          "case": "js-api-search",
+          "gt": "safe",
+          "verdict": "TN"
+        },
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 2.1,
+          "note": "",
+          "case": "js-api-search-payload",
+          "gt": "safe",
+          "verdict": "TN"
+        },
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 0.4,
+          "note": "",
+          "case": "js-track-order",
+          "gt": "safe",
+          "verdict": "TN"
+        }
+      ]
+    }
+  }
+}

@@ -92,6 +92,9 @@ LAYERS: list[tuple[str, str, str]] = [
     ("L1_csp_gate",            "CSP gate probe",                   "L1"),
     ("L1_pre_encoded",         "Pre-encoded payload pass",         "L1"),
     ("L1_reflection_profile", "Reflection profiling",             "L1"),
+    # Phase 356: marker-form fan-out probe (one plain probe per quoting
+    # shape before the transform ladder).
+    ("L1_marker_forms",       "Marker-form fan-out probe",        "L1"),
     ("L2_position_shift",     "Position-shift evasion",           "L2"),
     ("L7_cors",               "CORS misconfiguration",            "L7"),
     ("L7_nonce_bypass",       "Nonce bypass",                     "L7"),

@@ -124,11 +124,21 @@ class AsyncCrawlMixin:
         req = getattr(self, "_sync_requester", None)
         if req is None:
             from .requester import Requester
+            _headers = dict(self.headers)
+            # Phase 354: the stored auto round-trip runs on this requester,
+            # so the authenticated state the browser layer already carries
+            # must ride here too (login headers + the cookie jar captured
+            # by the CLI's auth flow).
+            _headers.update(dict(getattr(self, "auth_headers", None) or {}))
+            _cookies = dict(self.cookies)
+            for _c in (getattr(self, "auth_cookies", None) or []):
+                if isinstance(_c, dict) and _c.get("name"):
+                    _cookies[str(_c["name"])] = str(_c.get("value") or "")
             req = Requester(
                 timeout=self.timeout,
                 proxy=self._next_proxy(),
-                headers=dict(self.headers),
-                cookies=dict(self.cookies),
+                headers=_headers,
+                cookies=_cookies,
                 verify_ssl=self.verify_ssl,
                 rate_limit=self.rate_limit,
                 jitter=self.jitter_ratio,
@@ -465,6 +475,13 @@ class AsyncCrawlMixin:
             # findings._norm drops fragments, so sync registers /x#a and
             # /x#b as ONE endpoint; two browser passes would be cost without
             # information.
+            if origin == "link":
+                # Phase 354: remember the reachable page for stored auto
+                # discovery (the sync engine's auto pass uses crawled pages
+                # the same way).
+                _p = current_url.split("#", 1)[0]
+                if _p not in self._crawl_pages and len(self._crawl_pages) < 2:
+                    self._crawl_pages.append(_p)
             if origin == "link" and self.advanced_layers:
                 layer_key = current_url.split("#", 1)[0]
                 if layer_key not in layered_seen:

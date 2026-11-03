@@ -1,0 +1,62 @@
+[
+  {
+    "name": "iframe-srcdoc",
+    "sent": "<iframe srcdoc=\"<script>alert(2)</script>\"></iframe>",
+    "post": "",
+    "stored": ""
+  },
+  {
+    "name": "svg-animate",
+    "sent": "<svg><animate attributeName=\"href\" values=\"javascript:alert(3)\"></animate></svg>",
+    "post": "",
+    "stored": ""
+  },
+  {
+    "name": "math-href",
+    "sent": "<math href=\"javascript:alert(4)\">x</math>",
+    "post": "x",
+    "stored": "x"
+  },
+  {
+    "name": "form-action",
+    "sent": "<form action=\"javascript:alert(5)\"><button>go</button></form>",
+    "post": "go",
+    "stored": "go"
+  },
+  {
+    "name": "meta-refresh",
+    "sent": "<meta http-equiv=\"refresh\" content=\"0;url=javascript:alert(6)\">",
+    "post": "",
+    "stored": ""
+  },
+  {
+    "name": "object-data",
+    "sent": "<object data=\"javascript:alert(7)\"></object>",
+    "post": "",
+    "stored": ""
+  },
+  {
+    "name": "embed-src",
+    "sent": "<embed src=\"javascript:alert(8)\">",
+    "post": "",
+    "stored": ""
+  },
+  {
+    "name": "data-uri-anchor",
+    "sent": "<a href=\"data:text/html,<script>alert(9)</script>\">x</a>",
+    "post": "<a>x</a>",
+    "stored": "<a>x</a>"
+  },
+  {
+    "name": "style-expression",
+    "sent": "<style>a{width:expression(alert(10))}</style>",
+    "post": "",
+    "stored": ""
+  },
+  {
+    "name": "svg-script",
+    "sent": "<svg><script>alert(11)</script></svg>",
+    "post": "",
+    "stored": ""
+  }
+]

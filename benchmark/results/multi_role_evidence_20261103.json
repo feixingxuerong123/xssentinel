@@ -1,0 +1,64 @@
+{
+  "dvwa": {
+    "session": {
+      "low_cookie": {
+        "PHPSESSID": "98d64b773fc552c5e8d73ccbad529230",
+        "security": "low"
+      },
+      "admin_cookie": {
+        "PHPSESSID": "958e09d0a22afc787bed5882804114db",
+        "security": "low"
+      },
+      "storage": "PHPSESSID cookie + security cookie"
+    },
+    "low": {
+      "token_seen": true,
+      "dialogs_sample": [
+        "1",
+        "1",
+        "xssv_ba20913c",
+        "1",
+        "1",
+        "1",
+        "xssv_156277de",
+        "xssv_18243598"
+      ]
+    },
+    "admin": {
+      "token_seen": true,
+      "dialogs_sample": [
+        "1",
+        "1",
+        "1",
+        "xssv_ba20913c",
+        "1",
+        "1",
+        "1",
+        "xssv_18243598"
+      ]
+    }
+  },
+  "juice": {
+    "register_status": 201,
+    "session": {
+      "storage": "JWT in localStorage + Bearer header",
+      "admin_token_prefix": "eyJ0eXAiOiJK",
+      "low_token_prefix": "eyJ0eXAiOiJK",
+      "low_admin_api_status": 200
+    },
+    "admin": {
+      "token_seen": true,
+      "payload_in_html": true,
+      "dialogs_sample": [
+        "xss",
+        "role_eb3d3a",
+        "role_e1fc4d"
+      ]
+    },
+    "low": {
+      "token_seen": false,
+      "payload_in_html": false,
+      "dialogs_sample": []
+    }
+  }
+}

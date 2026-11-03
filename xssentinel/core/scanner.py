@@ -13,6 +13,7 @@ tools):
 """
 from __future__ import annotations
 
+import os
 import re
 import secrets
 import threading
@@ -84,6 +85,7 @@ from .findings import (Finding, EVIDENCE_OOB, _DEFAULT_TRANSFORMS,  # noqa: E402
                        _safe_snippet, cap_unverified_severity,
                        extract_replay_token)
 from .scanner_stored import StoredBlindMixin  # noqa: E402
+from .scanner_stored_auto import StoredAutoMixin  # noqa: E402
 from .scanner_layers import AdvancedLayerMixin  # noqa: E402
 from .scanner_crawl import CrawlMixin  # noqa: E402
 from .stealth import marker as _stem_marker  # noqa: E402
@@ -124,7 +126,7 @@ def _set_json_leaf(obj, path: str, value) -> None:
     cur[tokens[-1]] = value
 
 
-class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
+class Scanner(StoredBlindMixin, StoredAutoMixin, AdvancedLayerMixin, CrawlMixin):
     # Which engine produced these findings.  Until this existed the artifact
     # could not answer the question at all: `--async` with aiohttp missing
     # falls back to this class (cli_runner._run_async_scan returns None), and
@@ -160,7 +162,8 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
                  auth_headers: dict | None = None,
                  auth_cookies: list | None = None,
                  auth_local_storage: dict | None = None,
-                 skip_params: set | None = None):
+                 skip_params: set | None = None,
+                 stored_auto: bool = True):
         self.req = requester or Requester()
         # Phase 184: parameters the operator asked to skip entirely
         # (--skip-param).  Applied to the L1 probe loop AND hidden-param
@@ -171,6 +174,11 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
         self.use_headless = use_headless
         self.max_transforms = max_transforms
         self.max_payloads = max_payloads
+        # Phase 352: when the operator did not name a stored view, scan the
+        # page's own write forms and locate the viewer automatically.  Off
+        # only via --no-stored-auto (or on the async shim, which does not run
+        # scan_target at all).
+        self.stored_auto = bool(stored_auto)
         self.crawl = crawl
         self.crawl_depth = max(0, int(crawl_depth))
         # Phase 315: parameter names the target URL itself carried MORE
@@ -386,6 +394,18 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
                     if urlparse(ep_url).fragment:
                         merged.append((ep_url, ep_method, ep_params, ep_data))
                         continue
+                    # Phase 353: hidden-parameter mining is a discovery
+                    # ladder (14 candidates).  An endpoint that already has
+                    # visible parameters has a known input surface; the
+                    # miner's historical yield there is zero on the 40-case
+                    # sample, so it is reserved for param-less pages unless
+                    # --bav explicitly asked for adjacent probes.
+                    _mine_ok = (not ep_params and not ep_data) or self.bav \
+                        or os.environ.get("XSS_ADAPTIVE_MINING", "1") == "0" \
+                        or os.environ.get("XSS_BUDGET_V2", "1") == "0"
+                    if not _mine_ok:
+                        merged.append((ep_url, ep_method, ep_params, ep_data))
+                        continue
                     extra_params = self._mine_hidden_params(
                         ep_url, ep_method, ep_params, ep_data,
                         bav=self.bav)
@@ -414,6 +434,7 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
         total = len(endpoints)
         if self._progress:
             self._progress.on_start(total)
+        stopped = False
         if self.threads > 1 and len(endpoints) > 1:
             from .budget import BudgetExhausted, CircuitOpen
 
@@ -463,6 +484,7 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
             except (BudgetExhausted, CircuitOpen) as e:
                 _log.warning("[!] Scan stopped early (%s) -- findings so "
                              "far: %d", e, len(self.findings))
+                stopped = True
         else:
             from .budget import BudgetExhausted, CircuitOpen
             for i, ep in enumerate(endpoints):
@@ -474,6 +496,7 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
                 except (BudgetExhausted, CircuitOpen) as e:
                     _log.warning("[!] Scan stopped early (%s) -- findings "
                                  "so far: %d", e, len(self.findings))
+                    stopped = True
                     break
                 after = len(self.findings)
                 if self._checkpoint:
@@ -484,6 +507,21 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
                     self._checkpoint.save()
                 if self._progress:
                     self._progress.on_endpoint_done(ep[0], after - before)
+        # Phase 352: stored-XSS viewer auto-discovery.  Runs after the
+        # endpoint passes so a finding-needing viewer does not compete with
+        # the reflected budget, and only when the scan was not stopped by
+        # the budget/breaker (a dead target has no page to re-render).
+        if self.stored_auto and not stopped and not self._checkpoint:
+            try:
+                _auto_ran = self.scan_stored_auto_pages(
+                    url, endpoints, max_pages=(3 if self.crawl else 1))
+                if _auto_ran and self.verbose:
+                    _log.debug("[*] stored auto: %d form/field pair(s)",
+                               _auto_ran)
+            except (BudgetExhausted, CircuitOpen) as e:
+                _log.warning("[!] Stored auto pass stopped early (%s)", e)
+            except Exception as e:
+                _log.warning("stored auto pass failed (continuing): %s", e)
         if self.oob and oob_collect:
             self.collect_oob()
         if self._progress:
@@ -594,7 +632,9 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
         #     to avoid a redundant duplicate GET for the same URL.
         #   - mXSS / DOM clobber / template SSTI are tied to reflection, so
         #     they run inside _scan_param when a marker is reflected.
-        self._scan_jsonp(req, url, method, params, data)
+        self._scan_jsonp(req, url, method, params, data,
+                         page_text=page_text,
+                         resp_headers=dict(getattr(page_resp, "headers", {}) or {}))
         self._scan_csp(req, url, resp=page_resp)
         # Phase 51: target-level CORS audit (once per origin, two probes).
         self._scan_cors(req, url)
@@ -773,6 +813,20 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
             _prof_store = {}
             self._reflection_profiles = _prof_store
         _prof_store[(url, param)] = profile
+        # Phase 353 adaptive transform budget: a full raw reflection with no
+        # WAF means the server is not filtering the special characters the
+        # ladder exists to restore, so only the first four families are worth
+        # paying for.  XSS_ADAPTIVE_BUDGET=0 is the A/B switch.
+        _adaptive_cap = None
+        if (os.environ.get("XSS_ADAPTIVE_BUDGET", "1") != "0"
+                and os.environ.get("XSS_BUDGET_V2", "1") != "0"):
+            try:
+                if (isinstance(profile, dict)
+                        and profile.get("full_reflection")
+                        and not (waf_info or {}).get("waf")):
+                    _adaptive_cap = 4
+            except Exception:
+                _adaptive_cap = None
         # Phase 96: RCDATA breakout surfacing.  When the marker reflected
         # inside <textarea>/<title>/<xmp>, direct injections are inert
         # (the verifier correctly rejects them) while the closing-tag
@@ -865,12 +919,34 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
             effective_max = 4
         else:
             effective_max = self.max_payloads
+        # Phase 356: quote-escaping (PHP addslashes and friends) kills the
+        # single-quoted marker while leaving the unquoted/double/backtick
+        # shapes executable.  One probe buys the fan-out only on the targets
+        # that actually need it; healthy endpoints and encoded reflections
+        # keep paying exactly what they paid before.
+        quote_escaped = False
+        if (verifier.marker_forms_enabled() and not marker_escaped
+                and not csp_strict):
+            quote_escaped = self._detect_quote_escaping(
+                req, url, method, params, data, param, is_body)
+            if quote_escaped:
+                self.coverage.touch_layer(
+                    url, "L1_marker_forms", method,
+                    detail=("quote-escaping filter detected -> marker form "
+                            "fan-out (single/double/backtick/numeric)"))
         tried = 0
         for base in ([] if confirmed else bases):
             if tried >= effective_max:
                 break
             self._check_cancel()
             tried += 1
+            # Budget trim: form fan-out pays only for the first two candidate
+            # payloads.  The primary form already preserves the payload's own
+            # style (numeric for alert(1)), so a quote-escaping target usually
+            # confirms on the first plain probe; the extra shapes exist for
+            # operator payloads whose author wrote a quoted argument, and
+            # scanning every corpus entry in four shapes was a 4x slowdown.
+            marker_form_budget = 4 if (quote_escaped and tried <= 2) else 1
             # Phase 20-3: record the payload class being dispatched.
             pc_name = base.get("context", context) if isinstance(base, dict) else context
             self.coverage.record_param(url, param, in_body=is_body,
@@ -879,8 +955,13 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
                                        payloads_sent=1)
             if self._try_payload(req, url, method, params, data, param, is_body,
                                  base["payload"], context, waf_info,
-                                 max_transforms_override=2 if marker_escaped else None,
-                                 transform_priority=transform_priority):
+                                 max_transforms_override=(
+                                     2 if marker_escaped else _adaptive_cap),
+                                 transform_priority=transform_priority,
+                                 marker_forms=marker_form_budget,
+                                 preserve_style=bool(
+                                     isinstance(base, dict)
+                                     and base.get("id") == "custom")):
                 # Phase 20-3: mark this param as confirmed.
                 self.coverage.record_param(url, param, in_body=is_body,
                                            method=method, confirmed=True)
@@ -1574,14 +1655,53 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
 
     def _try_payload(self, req, url, method, params, data, param, is_body,
                      payload, context, waf_info, max_transforms_override=None,
-                     transform_priority=None):
+                     transform_priority=None, marker_forms=1,
+                     preserve_style=False):
         token = "xssv_" + secrets.token_hex(4)
-        marked = verifier.mark(payload, token)
+        if marker_forms > 1 or preserve_style:
+            forms = verifier.stamp_forms_or_legacy(payload, token,
+                                                   max(1, marker_forms))
+        else:
+            forms = [("single", token, verifier.mark(payload, token))]
+        primary_form, token, marked = forms[0]
+        extra_forms = forms[1:]
 
         # Phase 27-1: allow the caller to override max_transforms (used when
         # the marker is HTML-encoded -- no point trying 12 transform chains
         # on a reflection that will be escaped anyway).
         effective_max_transforms = max_transforms_override or self.max_transforms
+
+        # Marker-form fan-out: the same injection point is probed once per
+        # quoting shape BEFORE any transform ladder.  A quote-escaping filter
+        # (PHP addslashes turns alert('tok') into alert(\'tok\')) kills the
+        # single-quoted form but leaves alert(tok)/alert(`tok`)/alert("tok")
+        # executable; trying 12 transforms under each shape would multiply
+        # requests by 4, one plain probe per shape does not.  The primary
+        # shape is the payload's OWN style, so an operator payload is never
+        # rewritten into a form its author did not write.
+        plain_probes = [(primary_form, token, marked, [])] + [
+            (form, eff, fm, ["marker:" + form])
+            for form, eff, fm in extra_forms if eff in fm]
+        if token not in marked:
+            plain_probes = []
+        for form, eff, probe_payload, chain in plain_probes:
+            probe = self._set_param(params, data, param, probe_payload, is_body)
+            try:
+                presp = req.request(method, url, params=probe["params"],
+                                    data=probe["data"])
+                self._bump()
+            except (BudgetExhausted, CircuitOpen):
+                raise
+            except Exception:
+                continue
+            v = verifier.verify_semantic(
+                presp.text or "", eff,
+                response_headers=dict(getattr(presp, "headers", {}) or {}))
+            if v["confirmed"] and verifier.payload_survived(
+                    presp.text or "", probe_payload):
+                self._record(req, url, method, param, is_body, "reflected",
+                             context, probe_payload, chain, v, presp, eff)
+                return True
 
         # Build the variant list.  We combine three sources, in order:
         #   1. The static _DEFAULT_TRANSFORMS list (backwards-compatible,
@@ -1598,22 +1718,32 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
         # total at effective_max_transforms to bound request count.
         variants: list[tuple[list[str], str]] = []
 
+        # The identity shape was already sent as the first plain marker probe,
+        # so the ladder starts at transform set #1 and its own cap shrinks by
+        # one: total spend stays at effective_max_transforms.
+        remaining_max = max(0, effective_max_transforms - 1)
         # Source 1: static transforms (always included).
-        for tset in _DEFAULT_TRANSFORMS[:effective_max_transforms]:
+        for tset in _DEFAULT_TRANSFORMS[1:1 + remaining_max]:
             variant = marked
             for t in tset:
                 variant = transform.apply(t, variant)
+            # Phase 353: some families are no-ops on a payload with none of
+            # their target characters; sending the identical string twice
+            # buys nothing and still costs a request.
+            if (os.environ.get("XSS_BUDGET_V2", "1") != "0"
+                    and any(v == variant for _, v in variants)):
+                continue
             variants.append((tset, variant))
 
         # Source 2: context-aware mutations (Phase 13b).
         # Only add if we have budget left and the context is recognized.
-        if len(variants) < effective_max_transforms:
+        if len(variants) < remaining_max:
             try:
                 ctx_variants = ctx_mut.mutate_for_context(
                     marked, context,
-                    max_variants=max(4, effective_max_transforms - len(variants)))
+                    max_variants=max(4, remaining_max - len(variants)))
                 for chain, variant in ctx_variants:
-                    if len(variants) >= effective_max_transforms:
+                    if len(variants) >= remaining_max:
                         break
                     # Skip duplicates (same payload already in list).
                     if not any(v == variant for _, v in variants):
@@ -1626,14 +1756,14 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
         # Only add if we have budget left AND a WAF was detected (these
         # chains are most useful when a WAF is decoding specific encodings).
         waf_name = waf_info.get("waf") if waf_info else None
-        if len(variants) < effective_max_transforms and (waf_name or self.waf_name):
+        if len(variants) < remaining_max and (waf_name or self.waf_name):
             try:
                 target_waf = waf_name or self.waf_name
                 me_variants = me_mod.all_chain_variants(
                     marked, context, target_waf,
-                    max_variants=max(2, effective_max_transforms - len(variants)))
+                    max_variants=max(2, remaining_max - len(variants)))
                 for name, steps, variant in me_variants:
-                    if len(variants) >= effective_max_transforms:
+                    if len(variants) >= remaining_max:
                         break
                     if not any(v == variant for _, v in variants):
                         variants.append(([f"me:{name}"], variant))
@@ -1646,12 +1776,12 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
         # defeat real-world WAFs (Cloudflare, AWS, ModSecurity, etc.).
         # Only injected when a WAF was detected -- otherwise the generic
         # chains from Source 1 already cover the common cases.
-        if len(variants) < effective_max_transforms and (waf_name or self.waf_name):
+        if len(variants) < remaining_max and (waf_name or self.waf_name):
             try:
                 target_waf = waf_name or self.waf_name
                 waf_chains = bypass_mod.chains_for_waf(target_waf)
                 for _waf, base, chain, _why in waf_chains:
-                    if len(variants) >= effective_max_transforms:
+                    if len(variants) >= remaining_max:
                         break
                     # Apply the chain to the MARKED payload (so we can
                     # still verify execution via the token).  This lets
@@ -1864,6 +1994,34 @@ class Scanner(StoredBlindMixin, AdvancedLayerMixin, CrawlMixin):
                 }))
                 return True
         return False
+
+    def _detect_quote_escaping(self, req, url, method, params, data,
+                               param, is_body):
+        """One probe: does the target backslash-escape quotes (addslashes)?
+
+        ``addslashes`` rewrites ``alert('tok')`` into ``alert(\\'tok\\')`` -- a
+        JS syntax error -- while ``alert(tok)`` / ``alert(`tok`)`` /
+        ``alert("tok")`` still execute.  The signal is the literal backslash
+        the encoder inserted before the quote, measured on the response, not
+        a guess about the filter's name.  One request per parameter buys the
+        marker-form fan-out only where it can matter.
+        """
+        t1 = "xssq_" + secrets.token_hex(3)
+        t2 = "xssq_" + secrets.token_hex(3)
+        probe_payload = "<script>alert('%s');alert(\"%s\")</script>" % (t1, t2)
+        send = self._set_param(params, data, param, probe_payload, is_body)
+        send_params, send_data = self._skip_filtered(
+            send["params"], send["data"])
+        try:
+            resp = req.request(method, url, params=send_params,
+                               data=send_data)
+            self._bump()
+            self.coverage.record_request(url, method)
+        except Exception:
+            return False
+        text = getattr(resp, "text", "") or ""
+        return bool(re.search(r"\\+['\"]" + re.escape(t1), text)
+                    or re.search(r"\\+['\"]" + re.escape(t2), text))
 
     def _probe_reflection_profile(self, req, url, method, params, data,
                                   param, is_body):

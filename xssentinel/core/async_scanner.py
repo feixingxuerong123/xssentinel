@@ -232,7 +232,8 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
                  use_headless: bool = False,
                  headless_concurrency: int = 1,
                  skip_params: set | None = None,
-                 custom_payloads: list[str] | None = None):
+                 custom_payloads: list[str] | None = None,
+                 stored_auto: bool = True):
         # Phase 322: custom-payload channel parity with sync (operator
         # wordlist / --nuclei-dast bridge).  Consumed by
         # _build_probe_candidates with the same queue-tail semantics.
@@ -243,6 +244,10 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
         # for it.  headless_concurrency bounds BOTH in-flight replays and
         # total Chromium instances (one per pool worker thread).
         self.use_headless = bool(use_headless)
+        # Phase 354: sync parity -- stored auto-discovery is on by default;
+        # an explicit --stored-inject (sync-only today) or --no-stored-auto
+        # disables it.
+        self.stored_auto = bool(stored_auto)
         # Phase 184: parity with the sync engine's --skip-param handling
         # (probe-loop filter in _probe_params + mining via the shared
         # scanner_crawl hook).
@@ -350,6 +355,9 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
         self.dom_engine = dom_engine
         self.waf_name = waf_name
         self.requests_made = 0
+        # Phase 354: pages the async crawler reached, for stored auto
+        # discovery (capped by the caller).  Entry URL is added separately.
+        self._crawl_pages: list[str] = []
         # Phase 208: async parity for the completeness gate.  The sync engine
         # reports both `attempted` and `failed` (Requester.tally), and
         # __main__'s exit-3 rule needs the pair: "attempted N, M of them never
@@ -841,6 +849,30 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
                     async for finding in self._crawl_and_scan(session, url, text):
                         await self._add_finding(finding)
                         yield finding
+
+                # 5) Phase 354: stored-XSS viewer auto-discovery (sync parity).
+                # The round-trip itself is the sync StoredBlindMixin reused
+                # through the shim; it runs in a worker thread because it
+                # speaks the blocking Requester.  The entry page always
+                # participates; crawled pages add up to two more candidates.
+                if self.stored_auto and stop is None:
+                    try:
+                        _shim = _AsyncScannerShim(self)
+                        _shim.req = self._get_sync_requester()
+                        _pages = [url] + list(
+                            getattr(self, "_crawl_pages", []))[:2]
+                        _eps = [(p, "GET", {}, {}) for p in _pages]
+                        await asyncio.to_thread(
+                            _shim.scan_stored_auto_pages, url, _eps,
+                            3 if self.crawl else 1)
+                        for finding in list(_shim._findings):
+                            await self._add_finding(finding)
+                            yield finding
+                    except (BudgetExhausted, CircuitOpen):
+                        raise
+                    except Exception as e:
+                        _log.warning("async stored auto pass failed "
+                                     "(continuing): %s", e)
         except (BudgetExhausted, CircuitOpen) as e:
             # Phase 86: graceful early stop (sync parity: scanner.py logs and
             # keeps its findings).  Findings already yielded above stay with

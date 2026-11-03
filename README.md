@@ -16,6 +16,85 @@
 
 XSSentinel 的目标是**在开源/自研工具中做到检测维度最全、架构最干净、最易扩展**：它把通常被单点工具割裂的能力整合进一个流水线，并且每一层都可单独替换/增强。它在以下方面优于常见的单技术 XSS 脚本：
 
+### 成熟度声明（2026-11-02 实测口径：**Beta**）
+
+本项目的 `pyproject.toml` 分类自 2026-11-02 起为 `Development Status :: 4 - Beta`，
+不再声称 `Production/Stable`。按当前可复现实测：
+
+- **已具备**：反射/DOM/存储三类主路径的语义确认；第三方 XSSMaze v0.3.0 同靶
+  **TP944 / FN69 / FP0（P 1.000 / R 0.932 / F1 0.965）**；27 条控制例本轮
+  sync/async 复跑均 **0/27**；本仓库自编 194 例矩阵 sync/async 双引擎 FP0/FN0；
+  存储自动发现官方靶 **sync 9/9、async 9/9**（2026-11-03 实测）；async stored
+  洁净复测 **19.2s vs sync 15.9s（1.21×）**，在 ≤2× 目标内；真实应用 v2.2
+  22 例 / 5 个 app（登录后反射、持久化反馈、API-only、Header 注入、自建四面靶、
+  bWAPP）xssentinel **13 TP / 0 FP / 9 TN**，每例有官方 challenge/源码/
+  bWAPP `bugs.txt` 或自建靶构造 + 独立 Playwright ground truth。
+- **尚未具备（因此不是 Production/Stable）**：① 多角色只覆盖 admin + 一个低权限
+  账号（DVWA `gordonb`、Juice customer/deluxe、bWAPP `bwuser`），未覆盖完整权限
+  矩阵；低权限写入→高权限查看的 stored XSS 已验证；Juice deluxe 经官方
+  `freeDeluxeChallenge` 路由（`POST /rest/deluxe-membership`）合法可达，
+  accounting 在本版本不存在；
+  ② **没有与商业工具（Burp Pro / Acunetix）的对跑**，本机无安装/授权；
+  OWASP ZAP 已永久标注 `unavailable`（ghcr denied / Docker Hub 镜像 TLS /
+  GitHub 超时 / PyPI 包仅 74KB 客户端），不暗示优于商业工具；③ Juice Shop 的
+  持久化反馈在 Docker + unsafe 配置下由**服务端** `sanitize-html` 在入库时剥离
+  （POST 响应即可见空值），18 个载体逐一测试 0 个可执行，不是前端渲染问题；
+  该类别由 DVWA guestbook、bWAPP blog 与 Juice 商品描述覆盖；结论已定，
+  不再投入实验；XVWA 不可达；
+  ④ 40 例分层样本最终代码 A/B 实测
+  **83.7s → 51.8s（1.62×）**，落在 40–53s 目标区间；剩余成本
+  在进程启动与必须开浏览器的 DOM 正例，transform 阶梯已不是主成本（剪枝实验
+  无收益，已回退）。
+- **适用边界**：授权范围内的单目标/小批量 XSS 专项测试与 CI 回归可用；
+  大规模生产资产测绘、需登录的多角色工作流、以及"零漏报"承诺不在当前能力内。
+- 本轮（2026-11-03）完整验收数据（27 控制例、ruff、真实应用 v2、A/B、strict
+  门禁、async stored 对齐）见 `benchmark/results/round2_report_20261103.md`；
+  三个缺口补测（Juice 反馈归因、ZAP 可用性、多角色）见
+  `benchmark/results/round3_gap_report_20261103.md`；async 归因、自建四面靶、
+  DVWA 三档权限矩阵见 `benchmark/results/round4_gap_report_20261103.md`；
+  bWAPP 接入、XVWA/ZAP 最终处置、Juice deluxe 合法路径见
+  `benchmark/results/round5_bwapp_report_20261103.md`。
+
+### DOM 静态分析层的能力边界（Phase 354，2026-11-03 实测）
+
+DOM 静态层是 **AST 优先、正则兜底**：`esprima` 可用时先走 `js_ast` 的跨语句
+污点链；解析失败（压缩/混淆/语法扩展）才回退到 `dom.py` 的正则窗口。正则是
+**启发式**，它给出的是"值得人工复核的线索"，不是执行证明。本轮按真实页面
+（Juice Shop、DVWA）与真实框架写法做了规则精度收敛：
+
+| 形态 | 调整前 | 调整后 | 依据 |
+|---|---|---|---|
+| `document.title = location.hash`（SPA 标题路由） | medium（会报） | 不再命中 | title 只写文本，不解析 HTML |
+| `setAttribute('aria-label', location.hash)` | medium（会报） | 不再命中 | 非可执行属性 |
+| `$('#m').attr('title', location.hash)` / `.val(...)` | medium（会报） | 不再命中 | 非标记/非可执行属性 |
+| `$('#m').attr('href', location.hash)` / `.prop('innerHTML', …)` | medium | medium（保留） | 可执行属性/属性 |
+| `setAttribute('onclick', location.hash)` | medium | medium（保留） | 事件处理器 |
+| `el.appendChild(location.hash)` | medium（会报） | low（抑制） | appendChild 本身不解析标记；真正 sink 是创建该元素的那一步 |
+| `innerHTML = location.hash` / `document.write(location.hash)` | medium / high | 不变 | 真 sink |
+
+证据（本次实测，不是沿用文档）：在 DVWA guestbook 页面（+登录、security=low）
+上静态层产生 **120 条 low 线索、0 条 medium/high**，扫描器对 low 全部抑制，
+因此该页在无浏览器模式下不会产生 DOM 告警；Juice Shop 首页/搜索页为 0 条。
+同一轮把上述 5 类"真实框架写法"注入为 `<script>` 片段，收敛前 5/5 被判
+medium、收敛后 0/5 进入报告，而 `innerHTML`/`document.write`/`attr('href')`/
+`setAttribute('onclick')` 仍为 medium/high（回归见
+`tests/test_dom_static_precision.py`）。
+
+**仍然收敛不了的边界（明示，不假装解决）：**
+
+- **计算属性名**：`el.setAttribute(nameVar, tainted)`、`el[nameVar] = tainted`
+  这类属性名本身是变量的写法，正则与当前 AST sink 名单都无法判断是否危险；
+  置信度按 low 处理，交给浏览器臂或人工。
+- **跨语句对象身份**：`const d = new DOMParser()…; el.appendChild(d.body)`
+  是否可执行取决于 `d` 的创建方式，正则跟不了对象身份——这正是 AST 层存在
+  的原因，AST 解析失败时该形态可能漏报。
+- **外部 bundle**：静态层只分析内联 `<script>`，不下载/解析外部 JS；SPA 的
+  sink 通常在 bundle 里（例如 Juice Shop），这类只能靠 `--headless` 浏览
+  器臂在真实 DOM 上观察执行。
+- **置信度语义**：无 Playwright 时 medium = "源码级可疑，需人工确认"；
+  只有浏览器臂的 `browser-executed` 才是"已执行"证据。low 一律不进入告警。
+
+
 <details>
 <summary><b>展开完整能力清单（含实现出处与标定历史）</b></summary>
 

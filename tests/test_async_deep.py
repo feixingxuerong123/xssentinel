@@ -366,7 +366,9 @@ class TestAsyncDomParity:
             # the dynamic layer silently falls back to static-only.
             fake_engine = type("E", (), {
                 "__init__": lambda self, *a, **k: None,
-                "analyze": staticmethod(lambda url: [{
+                # Phase 355: the layer passes page_text (source-gate parity
+                # with sync); the fake must accept the real analyze() shape.
+                "analyze": staticmethod(lambda url, page_text=None, **k: [{
                     "sink": "Element.innerHTML", "snippet": "MARK",
                     "confidence": "high", "detail": "marker executed"}]),
             })

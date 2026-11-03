@@ -43,7 +43,14 @@ class _Resp:
 
 
 class _RecordingRequester:
-    """Records which header names were actually put on the wire."""
+    """Records which header names were actually put on the wire.
+
+    Phase 355: the layer runs an all-header reflection canary before
+    probing, so the response must echo the sent header VALUES (wrapped in
+    an HTML comment: reflected for the canary, never ``confirmed`` by the
+    verifier, so the probe loop cannot early-exit before covering the
+    whole declared list).
+    """
 
     def __init__(self, text: str = ""):
         self.sent: list[dict] = []
@@ -51,7 +58,8 @@ class _RecordingRequester:
 
     def get(self, url, headers=None, **kw):
         self.sent.append(dict(headers or {}))
-        return _Resp(self._text)
+        echoed = "".join(f"<!-- {v} -->" for v in (headers or {}).values())
+        return _Resp(self._text + echoed)
 
 
 class _FakeCoverage:

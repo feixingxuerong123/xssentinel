@@ -82,6 +82,7 @@ COVERAGE = {
     "L1_csp_gate": (["csp_*"], "helper: runs before CSP-sensitive probes"),
     "L1_pre_encoded": (["pe_vuln"], "added in Phase 122 (param_value container)"),
     "L1_reflection_profile": (["raw_*", "attr_*"], "helper: runs on every reflection case"),
+    "L1_marker_forms": (["raw_*", "attr_*"], "helper: Phase 356 fan-out, one plain probe per quoting shape before the transform ladder"),
     "L2_position_shift": (["pshift_vuln"], "added in Phase 122 (WAF guards body only)"),
     "L7_cors": (["cors_reflect"], "added in Phase 113"),
     "L7_nonce_bypass": (["csp_nonce_*"], "partial (nonce-leak chain)"),

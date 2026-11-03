@@ -37,7 +37,19 @@ class _FakeReq:
 
     def request(self, method, url, params=None, data=None, headers=None):
         self.params_seen.extend((params or {}).keys())
-        return _Resp("<html>ok</html>")
+        # Phase 355: the JSONP layer now skips its probe ladder unless the
+        # page carries callback evidence -- and those probes were this
+        # fixture's request carrier.  A callback-shaped body keeps the
+        # ladder on so the wire contract below stays exercised.
+        return _Resp("<html><body>callback</body></html>")
+
+    def get(self, url, params=None, headers=None, **kw):
+        # _scan_dom fetches the page via req.get; without this the page
+        # text stayed empty and the Phase 353 evidence gates read "" --
+        # the fixture predated the .get call site, the real Requester
+        # has both methods.
+        return self.request("GET", url, params=params, data=None,
+                            headers=headers)
 
 
 def test_mine_params_skips_noise_and_operator_set():

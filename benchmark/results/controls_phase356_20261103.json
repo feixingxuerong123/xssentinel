@@ -1,0 +1,340 @@
+{
+  "sync": {
+    "controls": 27,
+    "fp": 0,
+    "seconds": 48.7,
+    "rows": [
+      {
+        "url": "http://127.0.0.1:3001/bugbounty/level10/?msg=hi",
+        "timeout": false,
+        "seconds": 1.18,
+        "findings": []
+      },
+      {
+        "url": "http://127.0.0.1:3001/csp/level3/?query=a",
+        "timeout": false,
+        "seconds": 1.19,
+        "findings": []
+      },
+      {
+        "url": "http://127.0.0.1:3001/csp/level4/?query=a",
+        "timeout": false,
+        "seconds": 2.76,
+        "findings": []
+      },
+      {
+        "url": "http://127.0.0.1:3001/cspbypass/level3/?query=a",
+        "timeout": false,
+        "seconds": 1.21,
+        "findings": []
+      },
+      {
+        "url": "http://127.0.0.1:3001/dom/level10/",
+        "timeout": false,
+        "seconds": 1.12,
+        "findings": []
+      },
+      {
+        "url": "http://127.0.0.1:3001/encmix/level2/?query=a",
+        "timeout": false,
+        "seconds": 1.15,
+        "findings": []
+      },
+      {
+        "url": "http://127.0.0.1:3001/encoding-bypass/level6/?query=a",
+        "timeout": false,
+        "seconds": 1.52,
+        "findings": []
+      },
+      {
+        "url": "http://127.0.0.1:3001/json/level2/?query=a",
+        "timeout": false,
+        "seconds": 1.18,
+        "findings": []
+      },
+      {
+        "url": "http://127.0.0.1:3001/json/level3/?query=a",
+        "timeout": false,
+        "seconds": 1.15,
+        "findings": []
+      },
+      {
+        "url": "http://127.0.0.1:3001/metarefresh/level2/?url=a",
+        "timeout": false,
+        "seconds": 1.57,
+        "findings": []
+      },
+      {
+        "url": "http://127.0.0.1:3001/mutfilter/level1/?query=a",
+        "timeout": false,
+        "seconds": 1.17,
+        "findings": []
+      },
+      {
+        "url": "http://127.0.0.1:3001/nonce/level2/?query=a",
+        "timeout": false,
+        "seconds": 1.32,
+        "findings": []
+      },
+      {
+        "url": "http://127.0.0.1:3001/realworld/level6/?query=a",
+        "timeout": false,
+        "seconds": 1.12,
+        "findings": []
+      },
+      {
+        "url": "http://127.0.0.1:3001/realworld-input/level4/?url=https://example.com",
+        "timeout": false,
+        "seconds": 2.29,
+        "findings": []
+      },
+      {
+        "url": "http://127.0.0.1:3001/redirect/level1/?query=/",
+        "timeout": false,
+        "seconds": 2.75,
+        "findings": []
+      },
+      {
+        "url": "http://127.0.0.1:3001/redirect/level2/?query=/",
+        "timeout": false,
+        "seconds": 3.09,
+        "findings": []
+      },
+      {
+        "url": "http://127.0.0.1:3001/redirect/level3/?query=/",
+        "timeout": false,
+        "seconds": 2.78,
+        "findings": []
+      },
+      {
+        "url": "http://127.0.0.1:3001/redirect/level4/?query=/",
+        "timeout": false,
+        "seconds": 2.84,
+        "findings": []
+      },
+      {
+        "url": "http://127.0.0.1:3001/sanitizer/level5/?query=a",
+        "timeout": false,
+        "seconds": 1.65,
+        "findings": []
+      },
+      {
+        "url": "http://127.0.0.1:3001/stored/level2/",
+        "timeout": false,
+        "seconds": 3.88,
+        "findings": []
+      },
+      {
+        "url": "http://127.0.0.1:3001/waf-bypass/level3/?query=a",
+        "timeout": false,
+        "seconds": 1.66,
+        "findings": []
+      },
+      {
+        "url": "http://127.0.0.1:3001/waf-bypass/level5/?query=a",
+        "timeout": false,
+        "seconds": 1.54,
+        "findings": []
+      },
+      {
+        "url": "http://127.0.0.1:3001/xsleak/search?q=admin",
+        "timeout": false,
+        "seconds": 3.2,
+        "findings": []
+      },
+      {
+        "url": "http://127.0.0.1:3001/xsleak/frame?q=admin",
+        "timeout": false,
+        "seconds": 1.09,
+        "findings": []
+      },
+      {
+        "url": "http://127.0.0.1:3001/xsleak/avatar.gif?q=admin",
+        "timeout": false,
+        "seconds": 1.12,
+        "findings": []
+      },
+      {
+        "url": "http://127.0.0.1:3001/xsleak/timing?q=admin",
+        "timeout": false,
+        "seconds": 2.08,
+        "findings": []
+      },
+      {
+        "url": "http://127.0.0.1:3001/xsleak/redirect?q=admin",
+        "timeout": false,
+        "seconds": 1.11,
+        "findings": []
+      }
+    ]
+  },
+  "async": {
+    "controls": 27,
+    "fp": 0,
+    "seconds": 170.0,
+    "rows": [
+      {
+        "url": "http://127.0.0.1:3001/bugbounty/level10/?msg=hi",
+        "timeout": false,
+        "seconds": 1.35,
+        "findings": []
+      },
+      {
+        "url": "http://127.0.0.1:3001/csp/level3/?query=a",
+        "timeout": false,
+        "seconds": 1.55,
+        "findings": []
+      },
+      {
+        "url": "http://127.0.0.1:3001/csp/level4/?query=a",
+        "timeout": false,
+        "seconds": 2.76,
+        "findings": []
+      },
+      {
+        "url": "http://127.0.0.1:3001/cspbypass/level3/?query=a",
+        "timeout": false,
+        "seconds": 1.54,
+        "findings": []
+      },
+      {
+        "url": "http://127.0.0.1:3001/dom/level10/",
+        "timeout": false,
+        "seconds": 2.94,
+        "findings": []
+      },
+      {
+        "url": "http://127.0.0.1:3001/encmix/level2/?query=a",
+        "timeout": false,
+        "seconds": 1.38,
+        "findings": []
+      },
+      {
+        "url": "http://127.0.0.1:3001/encoding-bypass/level6/?query=a",
+        "timeout": false,
+        "seconds": 1.83,
+        "findings": []
+      },
+      {
+        "url": "http://127.0.0.1:3001/json/level2/?query=a",
+        "timeout": false,
+        "seconds": 1.4,
+        "findings": []
+      },
+      {
+        "url": "http://127.0.0.1:3001/json/level3/?query=a",
+        "timeout": false,
+        "seconds": 1.34,
+        "findings": []
+      },
+      {
+        "url": "http://127.0.0.1:3001/metarefresh/level2/?url=a",
+        "timeout": false,
+        "seconds": 1.73,
+        "findings": []
+      },
+      {
+        "url": "http://127.0.0.1:3001/mutfilter/level1/?query=a",
+        "timeout": false,
+        "seconds": 1.35,
+        "findings": []
+      },
+      {
+        "url": "http://127.0.0.1:3001/nonce/level2/?query=a",
+        "timeout": false,
+        "seconds": 1.6,
+        "findings": []
+      },
+      {
+        "url": "http://127.0.0.1:3001/realworld/level6/?query=a",
+        "timeout": false,
+        "seconds": 1.35,
+        "findings": []
+      },
+      {
+        "url": "http://127.0.0.1:3001/realworld-input/level4/?url=https://example.com",
+        "timeout": false,
+        "seconds": 1.68,
+        "findings": []
+      },
+      {
+        "url": "http://127.0.0.1:3001/redirect/level1/?query=/",
+        "timeout": false,
+        "seconds": 17.17,
+        "findings": []
+      },
+      {
+        "url": "http://127.0.0.1:3001/redirect/level2/?query=/",
+        "timeout": false,
+        "seconds": 17.05,
+        "findings": []
+      },
+      {
+        "url": "http://127.0.0.1:3001/redirect/level3/?query=/",
+        "timeout": false,
+        "seconds": 17.15,
+        "findings": []
+      },
+      {
+        "url": "http://127.0.0.1:3001/redirect/level4/?query=/",
+        "timeout": false,
+        "seconds": 17.2,
+        "findings": []
+      },
+      {
+        "url": "http://127.0.0.1:3001/sanitizer/level5/?query=a",
+        "timeout": false,
+        "seconds": 8.32,
+        "findings": []
+      },
+      {
+        "url": "http://127.0.0.1:3001/stored/level2/",
+        "timeout": false,
+        "seconds": 4.11,
+        "findings": []
+      },
+      {
+        "url": "http://127.0.0.1:3001/waf-bypass/level3/?query=a",
+        "timeout": false,
+        "seconds": 1.56,
+        "findings": []
+      },
+      {
+        "url": "http://127.0.0.1:3001/waf-bypass/level5/?query=a",
+        "timeout": false,
+        "seconds": 1.87,
+        "findings": []
+      },
+      {
+        "url": "http://127.0.0.1:3001/xsleak/search?q=admin",
+        "timeout": false,
+        "seconds": 3.44,
+        "findings": []
+      },
+      {
+        "url": "http://127.0.0.1:3001/xsleak/frame?q=admin",
+        "timeout": false,
+        "seconds": 1.79,
+        "findings": []
+      },
+      {
+        "url": "http://127.0.0.1:3001/xsleak/avatar.gif?q=admin",
+        "timeout": false,
+        "seconds": 1.9,
+        "findings": []
+      },
+      {
+        "url": "http://127.0.0.1:3001/xsleak/timing?q=admin",
+        "timeout": false,
+        "seconds": 52.22,
+        "findings": []
+      },
+      {
+        "url": "http://127.0.0.1:3001/xsleak/redirect?q=admin",
+        "timeout": false,
+        "seconds": 2.4,
+        "findings": []
+      }
+    ]
+  }
+}

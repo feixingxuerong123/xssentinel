@@ -1,0 +1,1600 @@
+{
+  "generated": "2026-11-03T20:43:28",
+  "cases_version": "2.1",
+  "apps": {
+    "juice": {
+      "name": "OWASP Juice Shop",
+      "version": "20.2.0",
+      "image": "bkimminich/juice-shop:v20.2.0",
+      "image_digest": "sha256:8739101ade29358abb5469ee66ae78e582c97ed0a5543a4ad102e5fa5193526b",
+      "base_url": "http://127.0.0.1:3000",
+      "start": "docker run -d --name juice-official -p 127.0.0.1:3000:3000 bkimminich/juice-shop:v20.2.0",
+      "note": "anonymous surfaces; default config"
+    },
+    "juice_unsafe": {
+      "name": "OWASP Juice Shop (unsafe config)",
+      "version": "20.2.0",
+      "image": "bkimminich/juice-shop:v20.2.0",
+      "image_digest": "sha256:8739101ade29358abb5469ee66ae78e582c97ed0a5543a4ad102e5fa5193526b",
+      "base_url": "http://127.0.0.1:3003",
+      "start": "docker run -d --name juice-unsafe -p 127.0.0.1:3003:3000 -e NODE_ENV=unsafe bkimminich/juice-shop:v20.2.0",
+      "note": "NODE_ENV=unsafe loads config/unsafe.yml (challenges.safetyMode=disabled). Docker-disabled challenges (restfulXssChallenge, httpHeaderXssChallenge) are then active; verified against build/models/product.js and build/routes/saveLoginIp.js. Admin session admin@juice-sh.op / admin123."
+    },
+    "bwapp": {
+      "name": "bWAPP",
+      "version": "2.2",
+      "image": "docker.1ms.run/raesene/bwapp@sha256:2f41183ea9f9e8fb36678d7a2a0c8a9db9a59f4569cee02fe6664b419b2600ee",
+      "image_digest": "sha256:2f41183ea9f9e8fb36678d7a2a0c8a9db9a59f4569cee02fe6664b419b2600ee",
+      "base_url": "http://127.0.0.1:8081",
+      "start": "docker run -d --name bwapp -p 127.0.0.1:8081:80 docker.1ms.run/raesene/bwapp@sha256:2f41183ea9f9e8fb36678d7a2a0c8a9db9a59f4569cee02fe6664b419b2600ee ; curl 'http://127.0.0.1:8081/install.php?install=yes'",
+      "note": "Login bee/bug; security_level=0 (low). The image ships MySQL but needs install.php; after install, official bugs.txt is the ground-truth catalogue. Non-admin user bwuser/bwpass123 was created via the official user_new.php form (admin=0)."
+    },
+    "selfhosted": {
+      "name": "Self-hosted XSS lab (third-party-style, four faces)",
+      "version": "1.0",
+      "image": "local source (no container image)",
+      "base_url": "http://127.0.0.1:8090",
+      "start": "python benchmark/realworld/selfhosted/app.py --port 8090",
+      "note": "Deliberately independent of the 194-case fixture. Reflected /reflect, stored /guestbook (SQLite, shared across sessions), header /header (User-Agent + X-Forwarded-For), login admin/adminpass (admin) and alice/alicepass (user). Safe twins /reflect-safe and /header-safe. Ground truth by construction + independent Playwright dialog check (2026-11-03)."
+    },
+    "dvwa": {
+      "name": "Damn Vulnerable Web Application",
+      "version": "ghcr.io/digininja/dvwa:latest (digest-pinned)",
+      "image": "ghcr.io/digininja/dvwa@sha256:1af2cedda7617e4d22937e61c98bbf71d8b74b98e46f5e41dd6aa0a5183311b0",
+      "db_image": "mariadb:11 (sha256:6422478cb8e159f080fb1d8ccf65101e26fe51385787fde7d16c3b165a331f15)",
+      "base_url": "http://127.0.0.1:8080",
+      "start": "docker network create dvwa-net; docker run -d --name dvwa-db --network dvwa-net -e MARIADB_ROOT_PASSWORD=rootpass -e MARIADB_DATABASE=dvwa -e MARIADB_USER=dvwa -e MARIADB_PASSWORD=p@ssw0rd mariadb:11; docker run -d --name dvwa-official --network dvwa-net -p 127.0.0.1:8080:80 -e DB_SERVER=dvwa-db -e DEFAULT_SECURITY_LEVEL=low ghcr.io/digininja/dvwa@sha256:1af2cedda7617e4d22937e61c98bbf71d8b74b98e46f5e41dd6aa0a5183311b0",
+      "note": "login admin/password; security level forced to low via security.php. The digest is the real pin; the :latest tag is only what was pulled."
+    }
+  },
+  "cases": [
+    {
+      "id": "js-dom-search-iframe",
+      "app": "juice",
+      "category": "dom",
+      "url": "/#/search?q=<iframe src=\"javascript:alert(1)\">",
+      "ground_truth": "vulnerable",
+      "source": "Juice Shop challenge localXssChallenge (DOM XSS)",
+      "evidence": "Playwright Chromium, 2026-11-02: dialog '1' captured",
+      "note": "location.hash -> search result innerHTML; browser-executed only"
+    },
+    {
+      "id": "js-dom-search-onerror",
+      "app": "juice",
+      "category": "dom",
+      "url": "/#/search?q=<img src=x onerror=alert(1)>",
+      "ground_truth": "vulnerable",
+      "source": "Same sink as localXssChallenge, second carrier",
+      "evidence": "Playwright Chromium, 2026-11-02: dialog '1' captured",
+      "note": "img onerror survives an innerHTML insertion"
+    },
+    {
+      "id": "js-dom-search-script-tag",
+      "app": "juice",
+      "category": "dom",
+      "url": "/#/search?q=<script>alert(1)</script>",
+      "ground_truth": "vulnerable",
+      "source": "Same sink as localXssChallenge; script-via-innerHTML is inert, but the attacker controls the string and can swap the carrier",
+      "evidence": "Playwright Chromium, 2026-11-02: 0 dialogs for THIS payload; the endpoint stays vulnerable (official challenge)",
+      "note": "endpoint-level ground truth: an inert payload does not make a live sink safe; the browser carrier arm is allowed to prove the sink with a different carrier"
+    },
+    {
+      "id": "js-root",
+      "app": "juice",
+      "category": "control",
+      "url": "/",
+      "ground_truth": "safe",
+      "source": "Application root",
+      "evidence": "No attacker-controlled input in the page",
+      "note": "baseline control"
+    },
+    {
+      "id": "js-api-search",
+      "app": "juice",
+      "category": "control",
+      "url": "/rest/products/search?q=apple",
+      "ground_truth": "safe",
+      "source": "Product search REST endpoint (JSON)",
+      "evidence": "JSON response, no HTML execution context",
+      "note": "control for JSON reflections"
+    },
+    {
+      "id": "js-api-search-payload",
+      "app": "juice",
+      "category": "control",
+      "url": "/rest/products/search?q=<script>alert(1)</script>",
+      "ground_truth": "safe",
+      "source": "Product search REST endpoint (JSON)",
+      "evidence": "JSON answer has no matching product and never renders the query as HTML",
+      "note": "payload-carrying control: a reflection in JSON is not XSS"
+    },
+    {
+      "id": "js-track-order",
+      "app": "juice",
+      "category": "control",
+      "url": "/rest/track-order/1234",
+      "ground_truth": "safe",
+      "source": "Order tracking REST endpoint (JSON)",
+      "evidence": "JSON response, no HTML execution context",
+      "note": "control for path segment reflections"
+    },
+    {
+      "id": "js-unsafe-api-only",
+      "app": "juice_unsafe",
+      "category": "api_only",
+      "url": "/#/search?q=Apple",
+      "ground_truth": "vulnerable",
+      "auth": "juice",
+      "setup": [
+        "reset_product"
+      ],
+      "xssentinel": {
+        "stored": {
+          "inject": "/api/Products/1",
+          "method": "PUT",
+          "json": true,
+          "param": "description",
+          "view": "/#/search?q=Apple",
+          "view_click": "mat-card",
+          "dom": true
+        }
+      },
+      "blocked_tools": {
+        "dalfox": "requires an authenticated API write followed by an SPA product-dialog render; dalfox has a body injector but no authenticated write/render workflow",
+        "nuclei": "requires an authenticated PUT /api/Products/:id followed by SPA rendering; DAST templates have no write workflow"
+      },
+      "source": "Juice Shop challenge restfulXssChallenge (API-only XSS)",
+      "evidence": "Independent Playwright Chromium, 2026-11-03: PUT /api/Products/1 description=<iframe src=javascript:alert(`xss`)>, then /#/search?q=Apple + product-card click -> dialog 'xss' captured",
+      "note": "persisted description; the view is an Angular dialog opened by clicking the product card"
+    },
+    {
+      "id": "js-unsafe-header",
+      "app": "juice_unsafe",
+      "category": "header",
+      "url": "/#/privacy-security/last-login-ip",
+      "ground_truth": "vulnerable",
+      "auth": "juice",
+      "setup": [
+        "save_login_ip"
+      ],
+      "xssentinel": {
+        "stored": {
+          "inject": "/rest/saveLoginIp",
+          "method": "GET",
+          "header": "True-Client-IP",
+          "view": "/#/privacy-security/last-login-ip",
+          "dom": true,
+          "relogin": true
+        }
+      },
+      "blocked_tools": {
+        "dalfox": "requires an authenticated GET /rest/saveLoginIp with a persisted request header and an SPA render; there is no header-injection workflow in dalfox's URL scanner",
+        "nuclei": "requires an authenticated saveLoginIp header write plus SPA rendering of /#/privacy-security/last-login-ip"
+      },
+      "source": "Juice Shop challenge httpHeaderXssChallenge (HTTP-header XSS)",
+      "evidence": "Independent Playwright Chromium, 2026-11-03: GET /rest/saveLoginIp with True-Client-IP=<iframe src=javascript:alert(`xss`)>, fresh login (JWT snapshots lastLoginIp), then /#/privacy-security/last-login-ip -> dialog 'xss' captured",
+      "note": "the value is snapshotted into the JWT at login; a re-login after the write is mandatory (the tool's --stored-relogin)"
+    },
+    {
+      "id": "js-unsafe-product-json-control",
+      "app": "juice_unsafe",
+      "category": "control",
+      "url": "/api/Products/1",
+      "ground_truth": "safe",
+      "auth": "juice",
+      "setup": [
+        "seed_product"
+      ],
+      "source": "Same PUT endpoint as restfulXssChallenge, read back as JSON",
+      "evidence": "Independent Playwright/requests, 2026-11-03: response is application/json and contains the payload string; it is never parsed as HTML by the SPA",
+      "note": "stored-payload-in-JSON control: a JSON echo must not be reported as XSS"
+    },
+    {
+      "id": "dvwa-auth-reflected",
+      "app": "dvwa",
+      "category": "reflected",
+      "url": "/vulnerabilities/xss_r/?name=xssprobe",
+      "ground_truth": "vulnerable",
+      "auth": "dvwa",
+      "source": "DVWA vulnerabilities/xss_r/source/low.php (echo '<pre>Hello ' . $_GET['name'] . '</pre>')",
+      "evidence": "Independent Playwright Chromium, 2026-11-03: /vulnerabilities/xss_r/?name=<script>alert(1)</script> -> dialog '1' captured; HTTP body shows <pre>Hello <script>alert(1)</script></pre>",
+      "note": "login required (admin/password), security=low"
+    },
+    {
+      "id": "dvwa-auth-stored",
+      "app": "dvwa",
+      "category": "stored",
+      "url": "/vulnerabilities/xss_s/",
+      "ground_truth": "vulnerable",
+      "auth": "dvwa",
+      "xssentinel": {
+        "stored": {
+          "inject": "/vulnerabilities/xss_s/",
+          "method": "POST",
+          "param": "mtxMessage",
+          "view": "/vulnerabilities/xss_s/",
+          "extra": {
+            "txtName": "xssprobe",
+            "btnSign": "Sign Guestbook"
+          }
+        }
+      },
+      "dalfox": {
+        "method": "POST",
+        "data": "txtName=xssprobe&mtxMessage=probe&btnSign=Sign+Guestbook"
+      },
+      "blocked_tools": {
+        "nuclei": "the guestbook write is a POST form; the DAST xss templates only fuzz GET parameters, so they never reach this sink"
+      },
+      "source": "DVWA vulnerabilities/xss_s/source/low.php (INSERT INTO guestbook + echo without escaping)",
+      "evidence": "Independent Playwright Chromium, 2026-11-03: POST txtName=xssprobe&mtxMessage=<script>alert(1)</script>&btnSign=Sign Guestbook, then GET the guestbook page -> dialog '1' captured",
+      "note": "persistent comment; low security required"
+    },
+    {
+      "id": "dvwa-index-control",
+      "app": "dvwa",
+      "category": "control",
+      "url": "/index.php",
+      "ground_truth": "safe",
+      "auth": "dvwa",
+      "source": "DVWA landing page",
+      "evidence": "No attacker-controlled input; static welcome text",
+      "note": "authenticated baseline control"
+    },
+    {
+      "id": "sh-reflected",
+      "app": "selfhosted",
+      "category": "reflected",
+      "url": "/reflect?q=xssprobe",
+      "ground_truth": "vulnerable",
+      "source": "Self-hosted lab /reflect (raw q in an element body)",
+      "evidence": "Independent Playwright Chromium, 2026-11-03: /reflect?q=<script>alert('sh_token')</script> -> dialog captured",
+      "note": "four-face target: reflected"
+    },
+    {
+      "id": "sh-reflected-safe",
+      "app": "selfhosted",
+      "category": "control",
+      "url": "/reflect-safe?q=<script>alert(1)</script>",
+      "ground_truth": "safe",
+      "source": "Self-hosted lab /reflect-safe (html.escape)",
+      "evidence": "Playwright: same payload produces no dialog; response contains escaped text",
+      "note": "safe twin of sh-reflected"
+    },
+    {
+      "id": "sh-stored",
+      "app": "selfhosted",
+      "category": "stored",
+      "url": "/guestbook",
+      "ground_truth": "vulnerable",
+      "auth": "sh_alice",
+      "blocked_tools": {
+        "dalfox": "requires a login session plus a POST write and a re-read; the URL scanner has no stored workflow",
+        "nuclei": "requires a login session plus a POST write and a re-read; DAST templates do not submit forms"
+      },
+      "source": "Self-hosted lab /guestbook (SQLite insert + raw render)",
+      "evidence": "Playwright, 2026-11-03: alice POSTs <script>alert('sh_token')</script>, admin and alice both view the guestbook -> dialog captured",
+      "note": "four-face target: stored; shared across sessions"
+    },
+    {
+      "id": "sh-header",
+      "app": "selfhosted",
+      "category": "header",
+      "url": "/header",
+      "ground_truth": "vulnerable",
+      "auth": "sh_alice",
+      "blocked_tools": {
+        "dalfox": "requires a login cookie and an attacker-controlled User-Agent header; dalfox's URL arm has no header-injection workflow",
+        "nuclei": "requires a login cookie and a header-injection workflow; DAST xss templates only fuzz GET parameters"
+      },
+      "source": "Self-hosted lab /header (raw User-Agent / X-Forwarded-For)",
+      "evidence": "Playwright, 2026-11-03: alice session with User-Agent=<script>alert('sh_token')</script> -> dialog captured",
+      "note": "four-face target: header injection"
+    },
+    {
+      "id": "sh-root-control",
+      "app": "selfhosted",
+      "category": "control",
+      "url": "/",
+      "ground_truth": "safe",
+      "source": "Self-hosted lab login page",
+      "evidence": "No attacker-controlled input; login form only",
+      "note": "anonymous baseline control"
+    },
+    {
+      "id": "bw-reflected",
+      "app": "bwapp",
+      "category": "reflected",
+      "url": "/xss_get.php?firstname=xssprobe&lastname=x&form=submit",
+      "ground_truth": "vulnerable",
+      "auth": "bwapp",
+      "source": "bWAPP bugs.txt: 'Cross-Site Scripting - Reflected (GET)', xss_get.php",
+      "evidence": "Independent Playwright, 2026-11-03: firstname=<script>alert('bw_token')</script> -> dialog captured; login bee/bug, security_level=0",
+      "note": "official bWAPP vulnerability label matched exactly"
+    },
+    {
+      "id": "bw-stored",
+      "app": "bwapp",
+      "category": "stored",
+      "url": "/xss_stored_1.php",
+      "ground_truth": "vulnerable",
+      "auth": "bwapp",
+      "xssentinel": {
+        "stored": {
+          "inject": "/xss_stored_1.php",
+          "method": "POST",
+          "param": "entry",
+          "view": "/xss_stored_1.php",
+          "extra": {
+            "blog": "submit",
+            "entry_add": ""
+          }
+        }
+      },
+      "blocked_tools": {
+        "dalfox": "requires a login session plus a POST blog write and a re-read; no stored workflow",
+        "nuclei": "requires a login session plus a POST blog write and a re-read; DAST templates do not submit forms"
+      },
+      "source": "bWAPP bugs.txt: 'Cross-Site Scripting - Stored (Blog)', xss_stored_1.php",
+      "evidence": "Playwright, 2026-11-03: bwuser writes <script>alert('bw_token')</script>; own view and admin 'Show all' view both dialog",
+      "note": "entries are per-owner by default; 'Show all' switch exposes cross-session view"
+    },
+    {
+      "id": "bw-header",
+      "app": "bwapp",
+      "category": "header",
+      "url": "/xss_user_agent.php",
+      "ground_truth": "vulnerable",
+      "auth": "bwapp",
+      "blocked_tools": {
+        "dalfox": "requires a login cookie and an attacker-controlled User-Agent; no header-injection workflow",
+        "nuclei": "requires a login cookie and header injection; DAST xss templates only fuzz GET parameters"
+      },
+      "source": "bWAPP bugs.txt: 'Cross-Site Scripting - Reflected (User-Agent)', xss_user_agent.php",
+      "evidence": "Playwright, 2026-11-03: bee session with User-Agent=<script>alert('bw_token')</script> -> dialog captured",
+      "note": "fourth face: header injection"
+    },
+    {
+      "id": "bw-portal-control",
+      "app": "bwapp",
+      "category": "control",
+      "url": "/portal.php",
+      "ground_truth": "safe",
+      "auth": "bwapp",
+      "source": "bWAPP portal.php landing page",
+      "evidence": "No attacker-controlled input in the portal body",
+      "note": "authenticated baseline control"
+    }
+  ],
+  "tools": {
+    "xssentinel": {
+      "version": "repo HEAD (editable install)",
+      "rows": [
+        {
+          "detected": true,
+          "xss": [
+            [
+              "dom_dynamic",
+              "high",
+              "high",
+              "browser-executed"
+            ]
+          ],
+          "rc": 0,
+          "seconds": 7.2,
+          "note": "",
+          "case": "js-dom-search-iframe",
+          "category": "dom",
+          "gt": "vulnerable",
+          "verdict": "TP"
+        },
+        {
+          "detected": true,
+          "xss": [
+            [
+              "dom_dynamic",
+              "high",
+              "high",
+              "browser-executed"
+            ]
+          ],
+          "rc": 0,
+          "seconds": 7.2,
+          "note": "",
+          "case": "js-dom-search-onerror",
+          "category": "dom",
+          "gt": "vulnerable",
+          "verdict": "TP"
+        },
+        {
+          "detected": true,
+          "xss": [
+            [
+              "dom_dynamic",
+              "high",
+              "high",
+              "browser-executed"
+            ]
+          ],
+          "rc": 0,
+          "seconds": 7.0,
+          "note": "",
+          "case": "js-dom-search-script-tag",
+          "category": "dom",
+          "gt": "vulnerable",
+          "verdict": "TP"
+        },
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 1.5,
+          "note": "",
+          "case": "js-root",
+          "category": "control",
+          "gt": "safe",
+          "verdict": "TN"
+        },
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 1.8,
+          "note": "",
+          "case": "js-api-search",
+          "category": "control",
+          "gt": "safe",
+          "verdict": "TN"
+        },
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 1.9,
+          "note": "",
+          "case": "js-api-search-payload",
+          "category": "control",
+          "gt": "safe",
+          "verdict": "TN"
+        },
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 2.0,
+          "note": "",
+          "case": "js-track-order",
+          "category": "control",
+          "gt": "safe",
+          "verdict": "TN"
+        },
+        {
+          "detected": true,
+          "xss": [
+            [
+              "dom_dynamic",
+              "high",
+              "high",
+              "browser-executed"
+            ]
+          ],
+          "rc": 0,
+          "seconds": 44.1,
+          "note": "",
+          "case": "js-unsafe-api-only",
+          "category": "api_only",
+          "gt": "vulnerable",
+          "verdict": "TP"
+        },
+        {
+          "detected": true,
+          "xss": [
+            [
+              "stored_dom",
+              "high",
+              "high",
+              "browser-executed"
+            ]
+          ],
+          "rc": 0,
+          "seconds": 6.0,
+          "note": "",
+          "case": "js-unsafe-header",
+          "category": "header",
+          "gt": "vulnerable",
+          "verdict": "TP"
+        },
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 1.8,
+          "note": "",
+          "case": "js-unsafe-product-json-control",
+          "category": "control",
+          "gt": "safe",
+          "verdict": "TN"
+        },
+        {
+          "detected": true,
+          "xss": [
+            [
+              "reflected",
+              "high",
+              "high",
+              "browser-unavailable"
+            ]
+          ],
+          "rc": 0,
+          "seconds": 1.3,
+          "note": "",
+          "case": "dvwa-auth-reflected",
+          "category": "reflected",
+          "gt": "vulnerable",
+          "verdict": "TP"
+        },
+        {
+          "detected": true,
+          "xss": [
+            [
+              "stored",
+              "high",
+              "high",
+              "browser-unavailable"
+            ]
+          ],
+          "rc": 0,
+          "seconds": 1.2,
+          "note": "",
+          "case": "dvwa-auth-stored",
+          "category": "stored",
+          "gt": "vulnerable",
+          "verdict": "TP"
+        },
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 1.2,
+          "note": "",
+          "case": "dvwa-index-control",
+          "category": "control",
+          "gt": "safe",
+          "verdict": "TN"
+        },
+        {
+          "detected": true,
+          "xss": [
+            [
+              "reflected",
+              "high",
+              "high",
+              "browser-unavailable"
+            ]
+          ],
+          "rc": 0,
+          "seconds": 1.3,
+          "note": "",
+          "case": "sh-reflected",
+          "category": "reflected",
+          "gt": "vulnerable",
+          "verdict": "TP"
+        },
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 1.4,
+          "note": "",
+          "case": "sh-reflected-safe",
+          "category": "control",
+          "gt": "safe",
+          "verdict": "TN"
+        },
+        {
+          "detected": true,
+          "xss": [
+            [
+              "stored",
+              "high",
+              "medium",
+              "browser-unavailable"
+            ]
+          ],
+          "rc": 0,
+          "seconds": 1.4,
+          "note": "",
+          "case": "sh-stored",
+          "category": "stored",
+          "gt": "vulnerable",
+          "verdict": "TP"
+        },
+        {
+          "detected": true,
+          "xss": [
+            [
+              "header_xss",
+              "medium",
+              "high",
+              "browser-unavailable"
+            ]
+          ],
+          "rc": 0,
+          "seconds": 1.3,
+          "note": "",
+          "case": "sh-header",
+          "category": "header",
+          "gt": "vulnerable",
+          "verdict": "TP"
+        },
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 0.8,
+          "note": "",
+          "case": "sh-root-control",
+          "category": "control",
+          "gt": "safe",
+          "verdict": "TN"
+        },
+        {
+          "detected": true,
+          "xss": [
+            [
+              "reflected",
+              "high",
+              "high",
+              "browser-unavailable"
+            ],
+            [
+              "reflected",
+              "high",
+              "high",
+              "browser-unavailable"
+            ]
+          ],
+          "rc": 0,
+          "seconds": 1.5,
+          "note": "",
+          "case": "bw-reflected",
+          "category": "reflected",
+          "gt": "vulnerable",
+          "verdict": "TP"
+        },
+        {
+          "detected": true,
+          "xss": [
+            [
+              "stored",
+              "high",
+              "high",
+              "browser-unavailable"
+            ]
+          ],
+          "rc": 0,
+          "seconds": 1.3,
+          "note": "",
+          "case": "bw-stored",
+          "category": "stored",
+          "gt": "vulnerable",
+          "verdict": "TP"
+        },
+        {
+          "detected": true,
+          "xss": [
+            [
+              "header_xss",
+              "medium",
+              "high",
+              "browser-unavailable"
+            ]
+          ],
+          "rc": 0,
+          "seconds": 1.3,
+          "note": "",
+          "case": "bw-header",
+          "category": "header",
+          "gt": "vulnerable",
+          "verdict": "TP"
+        },
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 1.3,
+          "note": "",
+          "case": "bw-portal-control",
+          "category": "control",
+          "gt": "safe",
+          "verdict": "TN"
+        }
+      ]
+    },
+    "xssentinel-headless": {
+      "version": "repo HEAD (editable install)",
+      "rows": [
+        {
+          "detected": true,
+          "xss": [
+            [
+              "dom_dynamic",
+              "high",
+              "high",
+              "browser-executed"
+            ]
+          ],
+          "rc": 0,
+          "seconds": 6.4,
+          "note": "",
+          "case": "js-dom-search-iframe",
+          "category": "dom",
+          "gt": "vulnerable",
+          "verdict": "TP"
+        },
+        {
+          "detected": true,
+          "xss": [
+            [
+              "dom_dynamic",
+              "high",
+              "high",
+              "browser-executed"
+            ]
+          ],
+          "rc": 0,
+          "seconds": 6.3,
+          "note": "",
+          "case": "js-dom-search-onerror",
+          "category": "dom",
+          "gt": "vulnerable",
+          "verdict": "TP"
+        },
+        {
+          "detected": true,
+          "xss": [
+            [
+              "dom_dynamic",
+              "high",
+              "high",
+              "browser-executed"
+            ]
+          ],
+          "rc": 0,
+          "seconds": 6.3,
+          "note": "",
+          "case": "js-dom-search-script-tag",
+          "category": "dom",
+          "gt": "vulnerable",
+          "verdict": "TP"
+        },
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 1.3,
+          "note": "",
+          "case": "js-root",
+          "category": "control",
+          "gt": "safe",
+          "verdict": "TN"
+        },
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 1.7,
+          "note": "",
+          "case": "js-api-search",
+          "category": "control",
+          "gt": "safe",
+          "verdict": "TN"
+        },
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 1.5,
+          "note": "",
+          "case": "js-api-search-payload",
+          "category": "control",
+          "gt": "safe",
+          "verdict": "TN"
+        },
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 1.5,
+          "note": "",
+          "case": "js-track-order",
+          "category": "control",
+          "gt": "safe",
+          "verdict": "TN"
+        },
+        {
+          "detected": true,
+          "xss": [
+            [
+              "dom_dynamic",
+              "high",
+              "high",
+              "browser-executed"
+            ]
+          ],
+          "rc": 0,
+          "seconds": 43.6,
+          "note": "",
+          "case": "js-unsafe-api-only",
+          "category": "api_only",
+          "gt": "vulnerable",
+          "verdict": "TP"
+        },
+        {
+          "detected": true,
+          "xss": [
+            [
+              "stored_dom",
+              "high",
+              "high",
+              "browser-executed"
+            ]
+          ],
+          "rc": 0,
+          "seconds": 6.1,
+          "note": "",
+          "case": "js-unsafe-header",
+          "category": "header",
+          "gt": "vulnerable",
+          "verdict": "TP"
+        },
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 2.0,
+          "note": "",
+          "case": "js-unsafe-product-json-control",
+          "category": "control",
+          "gt": "safe",
+          "verdict": "TN"
+        },
+        {
+          "detected": true,
+          "xss": [
+            [
+              "reflected",
+              "high",
+              "low",
+              "browser-refuted"
+            ]
+          ],
+          "rc": 0,
+          "seconds": 2.6,
+          "note": "",
+          "case": "dvwa-auth-reflected",
+          "category": "reflected",
+          "gt": "vulnerable",
+          "verdict": "TP"
+        },
+        {
+          "detected": true,
+          "xss": [
+            [
+              "stored",
+              "high",
+              "low",
+              "browser-refuted"
+            ]
+          ],
+          "rc": 0,
+          "seconds": 2.6,
+          "note": "",
+          "case": "dvwa-auth-stored",
+          "category": "stored",
+          "gt": "vulnerable",
+          "verdict": "TP"
+        },
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 1.1,
+          "note": "",
+          "case": "dvwa-index-control",
+          "category": "control",
+          "gt": "safe",
+          "verdict": "TN"
+        },
+        {
+          "detected": true,
+          "xss": [
+            [
+              "reflected",
+              "high",
+              "high",
+              "browser-executed"
+            ]
+          ],
+          "rc": 0,
+          "seconds": 2.5,
+          "note": "",
+          "case": "sh-reflected",
+          "category": "reflected",
+          "gt": "vulnerable",
+          "verdict": "TP"
+        },
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 1.4,
+          "note": "",
+          "case": "sh-reflected-safe",
+          "category": "control",
+          "gt": "safe",
+          "verdict": "TN"
+        },
+        {
+          "detected": true,
+          "xss": [
+            [
+              "stored",
+              "high",
+              "low",
+              "browser-refuted"
+            ]
+          ],
+          "rc": 0,
+          "seconds": 2.7,
+          "note": "",
+          "case": "sh-stored",
+          "category": "stored",
+          "gt": "vulnerable",
+          "verdict": "TP"
+        },
+        {
+          "detected": true,
+          "xss": [
+            [
+              "header_xss",
+              "medium",
+              "low",
+              "browser-refuted"
+            ]
+          ],
+          "rc": 0,
+          "seconds": 3.0,
+          "note": "",
+          "case": "sh-header",
+          "category": "header",
+          "gt": "vulnerable",
+          "verdict": "TP"
+        },
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 1.0,
+          "note": "",
+          "case": "sh-root-control",
+          "category": "control",
+          "gt": "safe",
+          "verdict": "TN"
+        },
+        {
+          "detected": true,
+          "xss": [
+            [
+              "reflected",
+              "high",
+              "low",
+              "browser-refuted"
+            ],
+            [
+              "reflected",
+              "high",
+              "low",
+              "browser-refuted"
+            ]
+          ],
+          "rc": 0,
+          "seconds": 6.0,
+          "note": "",
+          "case": "bw-reflected",
+          "category": "reflected",
+          "gt": "vulnerable",
+          "verdict": "TP"
+        },
+        {
+          "detected": true,
+          "xss": [
+            [
+              "stored",
+              "high",
+              "low",
+              "browser-refuted"
+            ]
+          ],
+          "rc": 0,
+          "seconds": 2.8,
+          "note": "",
+          "case": "bw-stored",
+          "category": "stored",
+          "gt": "vulnerable",
+          "verdict": "TP"
+        },
+        {
+          "detected": true,
+          "xss": [
+            [
+              "header_xss",
+              "medium",
+              "low",
+              "browser-refuted"
+            ]
+          ],
+          "rc": 0,
+          "seconds": 2.7,
+          "note": "",
+          "case": "bw-header",
+          "category": "header",
+          "gt": "vulnerable",
+          "verdict": "TP"
+        },
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 1.3,
+          "note": "",
+          "case": "bw-portal-control",
+          "category": "control",
+          "gt": "safe",
+          "verdict": "TN"
+        }
+      ]
+    },
+    "dalfox": {
+      "version": "░█▒               ",
+      "rows": [
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 2.0,
+          "note": "",
+          "case": "js-dom-search-iframe",
+          "category": "dom",
+          "gt": "vulnerable",
+          "verdict": "FN"
+        },
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 10.9,
+          "note": "",
+          "case": "js-dom-search-onerror",
+          "category": "dom",
+          "gt": "vulnerable",
+          "verdict": "FN"
+        },
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 2.1,
+          "note": "",
+          "case": "js-dom-search-script-tag",
+          "category": "dom",
+          "gt": "vulnerable",
+          "verdict": "FN"
+        },
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 0.7,
+          "note": "",
+          "case": "js-root",
+          "category": "control",
+          "gt": "safe",
+          "verdict": "TN"
+        },
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 26.3,
+          "note": "",
+          "case": "js-api-search",
+          "category": "control",
+          "gt": "safe",
+          "verdict": "TN"
+        },
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 31.6,
+          "note": "",
+          "case": "js-api-search-payload",
+          "category": "control",
+          "gt": "safe",
+          "verdict": "TN"
+        },
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 4.9,
+          "note": "",
+          "case": "js-track-order",
+          "category": "control",
+          "gt": "safe",
+          "verdict": "TN"
+        },
+        {
+          "detected": false,
+          "status": "blocked",
+          "reason": "requires an authenticated API write followed by an SPA product-dialog render; dalfox has a body injector but no authenticated write/render workflow",
+          "seconds": 0,
+          "xss": [],
+          "case": "js-unsafe-api-only",
+          "category": "api_only",
+          "gt": "vulnerable",
+          "verdict": "BLOCKED"
+        },
+        {
+          "detected": false,
+          "status": "blocked",
+          "reason": "requires an authenticated GET /rest/saveLoginIp with a persisted request header and an SPA render; there is no header-injection workflow in dalfox's URL scanner",
+          "seconds": 0,
+          "xss": [],
+          "case": "js-unsafe-header",
+          "category": "header",
+          "gt": "vulnerable",
+          "verdict": "BLOCKED"
+        },
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 6.4,
+          "note": "",
+          "case": "js-unsafe-product-json-control",
+          "category": "control",
+          "gt": "safe",
+          "verdict": "TN"
+        },
+        {
+          "detected": true,
+          "xss": [
+            [
+              "dalfox-V",
+              "High"
+            ]
+          ],
+          "rc": 0,
+          "seconds": 3.6,
+          "note": "",
+          "case": "dvwa-auth-reflected",
+          "category": "reflected",
+          "gt": "vulnerable",
+          "verdict": "TP"
+        },
+        {
+          "detected": true,
+          "xss": [
+            [
+              "dalfox-V",
+              "High"
+            ],
+            [
+              "dalfox-V",
+              "High"
+            ],
+            [
+              "dalfox-V",
+              "High"
+            ]
+          ],
+          "rc": 0,
+          "seconds": 26.2,
+          "note": "",
+          "case": "dvwa-auth-stored",
+          "category": "stored",
+          "gt": "vulnerable",
+          "verdict": "TP"
+        },
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 0.9,
+          "note": "",
+          "case": "dvwa-index-control",
+          "category": "control",
+          "gt": "safe",
+          "verdict": "TN"
+        },
+        {
+          "detected": true,
+          "xss": [
+            [
+              "dalfox-V",
+              "High"
+            ]
+          ],
+          "rc": 0,
+          "seconds": 0.7,
+          "note": "",
+          "case": "sh-reflected",
+          "category": "reflected",
+          "gt": "vulnerable",
+          "verdict": "TP"
+        },
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 0.8,
+          "note": "",
+          "case": "sh-reflected-safe",
+          "category": "control",
+          "gt": "safe",
+          "verdict": "TN"
+        },
+        {
+          "detected": false,
+          "status": "blocked",
+          "reason": "requires a login session plus a POST write and a re-read; the URL scanner has no stored workflow",
+          "seconds": 0,
+          "xss": [],
+          "case": "sh-stored",
+          "category": "stored",
+          "gt": "vulnerable",
+          "verdict": "BLOCKED"
+        },
+        {
+          "detected": false,
+          "status": "blocked",
+          "reason": "requires a login cookie and an attacker-controlled User-Agent header; dalfox's URL arm has no header-injection workflow",
+          "seconds": 0,
+          "xss": [],
+          "case": "sh-header",
+          "category": "header",
+          "gt": "vulnerable",
+          "verdict": "BLOCKED"
+        },
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 0.2,
+          "note": "",
+          "case": "sh-root-control",
+          "category": "control",
+          "gt": "safe",
+          "verdict": "TN"
+        },
+        {
+          "detected": true,
+          "xss": [
+            [
+              "dalfox-V",
+              "High"
+            ],
+            [
+              "dalfox-V",
+              "High"
+            ]
+          ],
+          "rc": 0,
+          "seconds": 14.8,
+          "note": "",
+          "case": "bw-reflected",
+          "category": "reflected",
+          "gt": "vulnerable",
+          "verdict": "TP"
+        },
+        {
+          "detected": false,
+          "status": "blocked",
+          "reason": "requires a login session plus a POST blog write and a re-read; no stored workflow",
+          "seconds": 0,
+          "xss": [],
+          "case": "bw-stored",
+          "category": "stored",
+          "gt": "vulnerable",
+          "verdict": "BLOCKED"
+        },
+        {
+          "detected": false,
+          "status": "blocked",
+          "reason": "requires a login cookie and an attacker-controlled User-Agent; no header-injection workflow",
+          "seconds": 0,
+          "xss": [],
+          "case": "bw-header",
+          "category": "header",
+          "gt": "vulnerable",
+          "verdict": "BLOCKED"
+        },
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 1.6,
+          "note": "",
+          "case": "bw-portal-control",
+          "category": "control",
+          "gt": "safe",
+          "verdict": "TN"
+        }
+      ]
+    },
+    "nuclei": {
+      "version": "v3.9.0",
+      "rows": [
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 0.6,
+          "note": "",
+          "case": "js-dom-search-iframe",
+          "category": "dom",
+          "gt": "vulnerable",
+          "verdict": "FN"
+        },
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 0.4,
+          "note": "",
+          "case": "js-dom-search-onerror",
+          "category": "dom",
+          "gt": "vulnerable",
+          "verdict": "FN"
+        },
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 0.4,
+          "note": "",
+          "case": "js-dom-search-script-tag",
+          "category": "dom",
+          "gt": "vulnerable",
+          "verdict": "FN"
+        },
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 0.4,
+          "note": "",
+          "case": "js-root",
+          "category": "control",
+          "gt": "safe",
+          "verdict": "TN"
+        },
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 0.5,
+          "note": "",
+          "case": "js-api-search",
+          "category": "control",
+          "gt": "safe",
+          "verdict": "TN"
+        },
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 0.5,
+          "note": "",
+          "case": "js-api-search-payload",
+          "category": "control",
+          "gt": "safe",
+          "verdict": "TN"
+        },
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 0.5,
+          "note": "",
+          "case": "js-track-order",
+          "category": "control",
+          "gt": "safe",
+          "verdict": "TN"
+        },
+        {
+          "detected": false,
+          "status": "blocked",
+          "reason": "requires an authenticated PUT /api/Products/:id followed by SPA rendering; DAST templates have no write workflow",
+          "seconds": 0,
+          "xss": [],
+          "case": "js-unsafe-api-only",
+          "category": "api_only",
+          "gt": "vulnerable",
+          "verdict": "BLOCKED"
+        },
+        {
+          "detected": false,
+          "status": "blocked",
+          "reason": "requires an authenticated saveLoginIp header write plus SPA rendering of /#/privacy-security/last-login-ip",
+          "seconds": 0,
+          "xss": [],
+          "case": "js-unsafe-header",
+          "category": "header",
+          "gt": "vulnerable",
+          "verdict": "BLOCKED"
+        },
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 0.5,
+          "note": "",
+          "case": "js-unsafe-product-json-control",
+          "category": "control",
+          "gt": "safe",
+          "verdict": "TN"
+        },
+        {
+          "detected": true,
+          "xss": [
+            [
+              "reflected-xss",
+              "medium"
+            ]
+          ],
+          "rc": 0,
+          "seconds": 0.4,
+          "note": "",
+          "case": "dvwa-auth-reflected",
+          "category": "reflected",
+          "gt": "vulnerable",
+          "verdict": "TP"
+        },
+        {
+          "detected": false,
+          "status": "blocked",
+          "reason": "the guestbook write is a POST form; the DAST xss templates only fuzz GET parameters, so they never reach this sink",
+          "seconds": 0,
+          "xss": [],
+          "case": "dvwa-auth-stored",
+          "category": "stored",
+          "gt": "vulnerable",
+          "verdict": "BLOCKED"
+        },
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 0.4,
+          "note": "",
+          "case": "dvwa-index-control",
+          "category": "control",
+          "gt": "safe",
+          "verdict": "TN"
+        },
+        {
+          "detected": true,
+          "xss": [
+            [
+              "reflected-xss",
+              "medium"
+            ]
+          ],
+          "rc": 0,
+          "seconds": 0.5,
+          "note": "",
+          "case": "sh-reflected",
+          "category": "reflected",
+          "gt": "vulnerable",
+          "verdict": "TP"
+        },
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 0.4,
+          "note": "",
+          "case": "sh-reflected-safe",
+          "category": "control",
+          "gt": "safe",
+          "verdict": "TN"
+        },
+        {
+          "detected": false,
+          "status": "blocked",
+          "reason": "requires a login session plus a POST write and a re-read; DAST templates do not submit forms",
+          "seconds": 0,
+          "xss": [],
+          "case": "sh-stored",
+          "category": "stored",
+          "gt": "vulnerable",
+          "verdict": "BLOCKED"
+        },
+        {
+          "detected": false,
+          "status": "blocked",
+          "reason": "requires a login cookie and a header-injection workflow; DAST xss templates only fuzz GET parameters",
+          "seconds": 0,
+          "xss": [],
+          "case": "sh-header",
+          "category": "header",
+          "gt": "vulnerable",
+          "verdict": "BLOCKED"
+        },
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 0.4,
+          "note": "",
+          "case": "sh-root-control",
+          "category": "control",
+          "gt": "safe",
+          "verdict": "TN"
+        },
+        {
+          "detected": true,
+          "xss": [
+            [
+              "reflected-xss",
+              "medium"
+            ]
+          ],
+          "rc": 0,
+          "seconds": 0.4,
+          "note": "",
+          "case": "bw-reflected",
+          "category": "reflected",
+          "gt": "vulnerable",
+          "verdict": "TP"
+        },
+        {
+          "detected": false,
+          "status": "blocked",
+          "reason": "requires a login session plus a POST blog write and a re-read; DAST templates do not submit forms",
+          "seconds": 0,
+          "xss": [],
+          "case": "bw-stored",
+          "category": "stored",
+          "gt": "vulnerable",
+          "verdict": "BLOCKED"
+        },
+        {
+          "detected": false,
+          "status": "blocked",
+          "reason": "requires a login cookie and header injection; DAST xss templates only fuzz GET parameters",
+          "seconds": 0,
+          "xss": [],
+          "case": "bw-header",
+          "category": "header",
+          "gt": "vulnerable",
+          "verdict": "BLOCKED"
+        },
+        {
+          "detected": false,
+          "xss": [],
+          "rc": 0,
+          "seconds": 0.4,
+          "note": "",
+          "case": "bw-portal-control",
+          "category": "control",
+          "gt": "safe",
+          "verdict": "TN"
+        }
+      ]
+    }
+  }
+}

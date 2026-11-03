@@ -22,6 +22,17 @@ import re
 from xssentinel.core.scanner_stored import StoredBlindMixin
 
 _TOKEN_RE = re.compile(r"xssv_[0-9a-f]{8}")
+# Phase 356: the unquoted marker form stamps a 10-digit numeric alias
+# (verifier.numeric_alias) in place of the xssv_ token, and the caller
+# records that alias as the effective token -- verify_semantic
+# substring-matches whatever token it is handed, so an alias-carrying
+# payload is confirmable the same way a token-carrying one is.  The match
+# is a bare 10-digit run on purpose: aliases ride inside percent-encoded
+# variants (``alert%28<alias>%29``) whose neighbouring characters are
+# digits themselves, so boundary lookarounds would miss them.  A mangled
+# ``xssv_`` variant never grows a 10-digit run of its own, so the guard's
+# teeth are unchanged; total cost stays bounded by the budget test below.
+_ALIAS_RE = re.compile(r"\d{10}")
 
 
 class _Resp:
@@ -80,12 +91,15 @@ def test_every_submitted_payload_carries_an_intact_token():
     """No pair may be sent whose token was mangled by a transform.
 
     Such a pair can never be confirmed (verify_semantic does a plain
-    substring match), so sending it is pure cost.
+    substring match), so sending it is pure cost.  Two token shapes are
+    confirmable: the ``xssv_`` token itself and Phase 356's 10-digit
+    numeric alias (stamped for the unquoted ``alert(1234567890)`` form,
+    tracked as the pair's effective token).
     """
     submitted = _submitted_payloads()
     assert submitted, "scan_stored submitted nothing"
     for value in submitted:
-        assert _TOKEN_RE.search(value), (
+        assert _TOKEN_RE.search(value) or _ALIAS_RE.search(value), (
             "submitted a payload whose token is missing or mangled: %r"
             % value[:80])
 
@@ -93,7 +107,8 @@ def test_every_submitted_payload_carries_an_intact_token():
 def test_no_duplicate_payload_is_submitted_twice():
     """Two pairs that are the same string after transformation are one test."""
     submitted = _submitted_payloads()
-    normalised = [_TOKEN_RE.sub("TOKEN", v) for v in submitted]
+    normalised = [_ALIAS_RE.sub("TOKEN", _TOKEN_RE.sub("TOKEN", v))
+                  for v in submitted]
     dupes = len(normalised) - len(set(normalised))
     assert dupes == 0, "%d duplicate payload(s) paid for twice" % dupes
 

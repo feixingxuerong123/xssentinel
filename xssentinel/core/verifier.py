@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import base64
 import binascii
+import hashlib
 import os
 import re
 import urllib.parse
@@ -49,6 +50,14 @@ _JS_URI_ACTIVATION = {("a", "href"), ("area", "href"),
 # the tagged-template call alert`...` (Phase 32): it executes WITHOUT
 # parentheses, so the generator uses it when ( ) are stripped/encoded.
 _ALERT_CALL_RE = re.compile(r"alert\s*\(([^()]*)\)|alert\s*`([^`]*)`")
+# Same shapes including the other dialog callables: a target that filters
+# ``alert`` specifically still fires ``confirm``/``prompt``.
+_STAMP_CALL_RE = re.compile(
+    r"(alert|confirm|prompt)\s*\(([^()]*)\)|\b(alert|confirm|prompt)\s*`([^`]*)`")
+#: Marker quoting shapes.  A filter that escapes quotes (PHP ``addslashes``)
+#: rewrites ``alert('tok')`` into ``alert(\'tok\')`` -- a JS syntax error --
+#: while leaving the unquoted, double-quoted and backtick forms executable.
+_MARKER_FORMS = ("single", "double", "backtick", "numeric", "concat")
 
 # RCDATA elements: content is treated as text by browsers, HTML tags inside
 # are NOT parsed/executed.  A <script> or <img onerror> inside these is inert.
@@ -134,6 +143,98 @@ def mark(payload: str, token: str, style: str = "plain") -> str:
             return f"alert('{token}')"
         return f"alert`{token}`"
     return _ALERT_CALL_RE.sub(_sub, payload, count=1)
+
+
+def numeric_alias(token: str) -> str:
+    """A stable 10-digit marker for the unquoted ``alert(1234567890)`` form.
+
+    Ten digits keeps the collision surface small (a page date like
+    20261103 is 8 digits and would have matched an 8-digit alias).
+    """
+    digest = hashlib.sha1(("xssentinel:" + token).encode("utf-8")).hexdigest()
+    return str(1000000000 + int(digest[:10], 16) % 9000000000)
+
+
+def _stamp_arg_style(arg: str) -> str:
+    a = (arg or "").strip()
+    if re.fullmatch(r"\d+", a):
+        return "numeric"
+    if len(a) >= 2 and a[0] == a[-1] and a[0] in ("'", '"', "`"):
+        return {"'": "single", '"': "double", "`": "backtick"}[a[0]]
+    return "single"
+
+
+def _marker_call(name: str, form: str, token: str) -> str:
+    if form == "numeric":
+        return "%s(%s)" % (name, numeric_alias(token))
+    if form == "double":
+        return '%s("%s")' % (name, token)
+    if form == "backtick":
+        return "%s`%s`" % (name, token)
+    return "%s('%s')" % (name, token)
+
+
+def stamp_form(payload: str, token: str, form: str) -> tuple:
+    """Stamp ONE marker form.  Returns ``(marked, effective_token, form)``.
+
+    ``effective_token`` is what the dialog/response must contain: the caller
+    token for quoted/backtick forms, a numeric alias for the unquoted form.
+    A payload with no callable is returned unchanged (nothing to stamp).
+    """
+    if form == "concat":
+        marked = mark(payload, token, style="concat")
+        return marked, token, form
+    m = _STAMP_CALL_RE.search(payload)
+    if not m:
+        return payload, token, form
+    name = m.group(1) or m.group(3) or "alert"
+    call = _marker_call(name, form, token)
+    eff = numeric_alias(token) if form == "numeric" else token
+    return payload[:m.start()] + call + payload[m.end():], eff, form
+
+
+def marker_forms_enabled() -> bool:
+    """A/B switch for the Phase 356 marker-form work (default on)."""
+    return os.environ.get("XSS_MARKER_FORMS", "1") != "0"
+
+
+def stamp_forms(payload: str, token: str, budget: int = 4) -> list:
+    """Marker variants for the SAME injection point, budget-trimmed.
+
+    The FIRST entry preserves the payload's own alert-argument style: an
+    operator payload ``<svg/onload=alert(999)>`` stays unquoted (stamped
+    ``alert(<numeric>)``) instead of being rewritten to ``alert('xssv_…')``,
+    which ``addslashes`` turns into a syntax error.  The remaining entries
+    fan out over the other quoting shapes; callers send them as one batch
+    before the transform ladder, so a filtered target pays one probe per
+    shape rather than a full ladder per shape.
+    """
+    forms = []
+    m = _STAMP_CALL_RE.search(payload)
+    if m:
+        forms.append(_stamp_arg_style(m.group(2) if m.group(1) else m.group(4)))
+    for f in _MARKER_FORMS:
+        if f not in forms:
+            forms.append(f)
+    out = []
+    seen = set()
+    for f in forms:
+        marked, eff, used = stamp_form(payload, token, f)
+        if marked == payload or marked in seen:
+            continue
+        seen.add(marked)
+        out.append((used, eff, marked))
+        if len(out) >= max(1, budget):
+            break
+    return out
+
+
+def stamp_forms_or_legacy(payload: str, token: str, budget: int = 4) -> list:
+    """stamp_forms with the A/B switch; legacy mark() when disabled."""
+    if not marker_forms_enabled():
+        return [("single", token, mark(payload, token))]
+    forms = stamp_forms(payload, token, budget)
+    return forms or [("single", token, mark(payload, token))]
 
 
 def _attribute_hosting_token(soup, token: str):
@@ -635,6 +736,14 @@ def _verify_semantic_impl(response_text: str, token: str,
         return {"confirmed": False, "context": None,
                 "detail": "token not reflected"}
 
+    # A %00-mangled <script%00> is inert in a browser.  bs4 normalises the
+    # tag and then reads the REST OF THE PAGE as its script text, which made
+    # later-row tokens look executable (bWAPP stored medium: the inert
+    # %00<svg%00/onload=…> row was confirmed via a sibling <script%00> row).
+    if _mangled_script_tag(response_text, token):
+        return {"confirmed": False, "context": "html_element",
+                "detail": "token inside a %00-mangled tag name (inert)"}
+
     # -- CSP gate: if a strict Content-Security-Policy blocks inline scripts,
     #    reflected <script>/on* handlers won't execute in a real browser.
     #    Both delivery channels count: the response header AND a
@@ -752,6 +861,32 @@ def _verify_semantic_impl(response_text: str, token: str,
     }
 
 
+def _mangled_script_tag(response_text: str, token: str) -> bool:
+    """True when the token's nearest preceding ``<script`` has a mangled name.
+
+    ``%00<script%00>…%00<%00/script%00>`` (the null-byte transform) is inert
+    in a browser: the element is named ``script%00``, which has no script
+    semantics, and ``</script%00>`` closes nothing.  bs4 normalises the tag
+    to ``<script>`` and then reads the REST OF THE TABLE as script text, so a
+    token from a later row looked like it was "inside <script> element text"
+    (measured on bWAPP's stored view: the inert ``%00<svg%00/onload=…>``
+    variant was reported because a sibling ``<script%00>`` row swallowed it).
+    """
+    idx = response_text.find(token)
+    if idx == -1:
+        return False
+    start = response_text.lower().rfind("<script", 0, idx)
+    if start == -1:
+        return False
+    head_end = response_text.find(">", start)
+    if head_end == -1 or head_end > idx:
+        return False
+    head = response_text[start:head_end + 1]
+    m = re.match(r"<script([^\s/>]*)", head, re.I)
+    tail = m.group(1) if m else ""
+    return ("%" in tail) or ("\x00" in tail)
+
+
 def _structural_confirm(soup, token: str, csp_blocks: bool,
                         response_headers: dict | None,
                         html: str | None = None) -> dict | None:
@@ -761,6 +896,10 @@ def _structural_confirm(soup, token: str, csp_blocks: bool,
     # 1) token inside a real <script> element's text
     for s in soup.find_all("script"):
         if token in (s.get_text() or ""):
+            # A mangled <script%00> start tag is NOT a script element in a
+            # browser; bs4 normalises it and swallows the rest of the page.
+            if html and _mangled_script_tag(html, token):
+                continue
             # RCDATA guard: <script> inside textarea/title/xmp is inert
             if _is_in_rcdata(s):
                 continue
@@ -1025,6 +1164,15 @@ def _event_handler_raw_confirmed(response_text: str, idx: int,
     tag = response_text[start:end]
     if token not in tag:
         return False
+    # A tag name carrying a percent triplet (the null-byte transform's
+    # ``%00`` escape) is not the element the payload intended: browsers
+    # name it ``svg%00``, an unknown element that has no load event, so
+    # the on* attribute below can never fire.  Measured on bWAPP's
+    # ``%00<svg%00/onload=…>`` stored variant: confirmed as event_handler,
+    # zero dialogs in Playwright.
+    name_m = re.match(r"<\s*([^\s/>]+)", tag)
+    if name_m and ("%" in name_m.group(1) or "\x00" in name_m.group(1)):
+        return False
     for m in _ON_ATTR_RE.finditer(tag):
         if not _on_attr_is_real(tag, m.start()):
             continue  # still inside a quoted value -- inert text
@@ -1042,6 +1190,10 @@ def _fallback_executable(response_text: str, idx: int, token: str,
     provably inert.  Unknown contexts keep the classifier's verdict.
     """
     if c in ("script_string_dq", "script_string_sq", "script_block"):
+        # A %00-mangled <script%00> is inert in a browser even though bs4
+        # (and the raw regex) read its body as script text.
+        if _mangled_script_tag(response_text, token):
+            return False
         # Extra verification: ensure the token actually broke out of the JS
         # string and is in executable code position.  If it's still trapped
         # inside a properly escaped string assignment, don't confirm.

@@ -1,0 +1,65 @@
+[
+  {
+    "name": "benign-b",
+    "sent": "<b>bold</b>",
+    "post_comment": "<b>bold</b>",
+    "stored_comment": "<b>bold</b>",
+    "post_status": 201
+  },
+  {
+    "name": "benign-i",
+    "sent": "<i>italic</i>",
+    "post_comment": "<i>italic</i>",
+    "stored_comment": "<i>italic</i>",
+    "post_status": 201
+  },
+  {
+    "name": "img-onerror",
+    "sent": "<img src=x onerror=alert(1)>",
+    "post_comment": "",
+    "stored_comment": "",
+    "post_status": 201
+  },
+  {
+    "name": "iframe-official",
+    "sent": "<iframe src=\"javascript:alert(`xss`)\">",
+    "post_comment": "",
+    "stored_comment": "",
+    "post_status": 201
+  },
+  {
+    "name": "anchor-jsuri",
+    "sent": "<a href=\"javascript:alert(1)\">click</a>",
+    "post_comment": "<a>click</a>",
+    "stored_comment": "<a>click</a>",
+    "post_status": 201
+  },
+  {
+    "name": "svg-onload",
+    "sent": "<svg onload=alert(1)>",
+    "post_comment": "",
+    "stored_comment": "",
+    "post_status": 201
+  },
+  {
+    "name": "math-table-mxss",
+    "sent": "<math><mtext><table><mglyph><style><img src=x onerror=alert(1)>",
+    "post_comment": "<table></table>",
+    "stored_comment": "<table></table>",
+    "post_status": 201
+  },
+  {
+    "name": "noscript-mxss",
+    "sent": "<noscript><p title=\"</noscript><img src=x onerror=alert(1)>\">",
+    "post_comment": "<p></p>",
+    "stored_comment": "<p></p>",
+    "post_status": 201
+  },
+  {
+    "name": "plain-text",
+    "sent": "plain feedback text",
+    "post_comment": "plain feedback text",
+    "stored_comment": "plain feedback text",
+    "post_status": 201
+  }
+]

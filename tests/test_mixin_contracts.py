@@ -40,6 +40,7 @@ HIERARCHIES = {
     "Scanner (sync)": (
         ("scanner.py", "Scanner"),
         ("scanner_stored.py", "StoredBlindMixin"),
+        ("scanner_stored_auto.py", "StoredAutoMixin"),
         ("scanner_layers.py", "AdvancedLayerMixin"),
         ("scanner_crawl.py", "CrawlMixin"),
     ),
@@ -51,6 +52,8 @@ HIERARCHIES = {
     ),
     "_AsyncScannerShim (async CLI 的 sync-mixin 适配体)": (
         ("async_scanner_common.py", "_AsyncScannerShim"),
+        ("scanner_stored.py", "StoredBlindMixin"),
+        ("scanner_stored_auto.py", "StoredAutoMixin"),
         ("scanner_layers.py", "AdvancedLayerMixin"),
         ("scanner_crawl.py", "CrawlMixin"),
     ),

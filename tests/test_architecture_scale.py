@@ -34,10 +34,19 @@ _CORE = os.path.join(_ROOT, "xssentinel", "core")
 #: 2026-11-01 measured values are in AGENTS.md; the ceiling is that value plus
 #: ~10%, which is roughly one feature's worth of headroom before a decision.
 BUDGETS = {
-    "scanner.py": 2400,
+    # Phase 356 (2026-11-03) raise: marker-form fan-out is interleaved inside
+    # _try_payload and _detect_quote_escaping sits next to its sibling probe
+    # _probe_reflection_profile -- the reflection path already lives in this
+    # file, so the ceiling follows the table convention (measured + ~10%)
+    # instead of splitting half a method into another file.  Measured at
+    # raise time: 2438 / 1107.
+    "scanner.py": 2650,
     "scanner_layers.py": 1050,
     "scanner_crawl.py": 550,
-    "scanner_stored.py": 1100,
+    "scanner_stored.py": 1200,
+    # Phase 352: stored auto-discovery is its own Mixin (125 lines measured)
+    # so the stored round-trip file stays under its ceiling.
+    "scanner_stored_auto.py": 150,
     "findings.py": 450,
     "async_scanner.py": 1600,
     "async_scanner_layers.py": 2350,

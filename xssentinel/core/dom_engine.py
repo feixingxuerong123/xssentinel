@@ -32,8 +32,10 @@ from __future__ import annotations
 import atexit
 import json
 import logging
+import os
 import re
 import secrets
+import sys
 import threading
 import time
 
@@ -973,6 +975,48 @@ _HTML_EXEC_RE = re.compile(
     re.I)
 
 
+def page_has_external_script(html: str) -> bool:
+    return bool(_EXT_SCRIPT_RE.search(html or ""))
+
+
+def page_source_hints(html: str) -> dict:
+    """Which attacker-controlled DOM sources does this page actually read?
+
+    Phase 352 budget gate.  The probe set is the browser cost multiplier
+    (each goto probe pays navigation + settle); a page that never mentions
+    ``document.cookie`` cannot be reached through a cookie.  This is a
+    *source* gate, not a sink gate: an unknown construct still receives the
+    conservative location fallback, and an external bundle always keeps
+    hash+search because its router source read is invisible in the HTML.
+    """
+    low = (html or "").lower()
+    ext = bool(_EXT_SCRIPT_RE.search(html or ""))
+    has_hash = any(t in low for t in ("location.hash", "hashchange",
+                                      "location['hash']", 'location["hash"]',
+                                      ".fragment"))
+    has_search = any(t in low for t in ("location.search", "urlsearchparams",
+                                        "location.query", ".searchparams"))
+    has_href = any(t in low for t in ("location.href", "document.url",
+                                      "document.documenturi"))
+    has_path = "location.pathname" in low
+    has_ref = "document.referrer" in low
+    has_cookie = "document.cookie" in low
+    has_name = any(t in low for t in ("window.name", "window['name']",
+                                      'window["name"]'))
+    has_pm = (("addeventlistener" in low and "message" in low)
+              or "onmessage" in low or ".postmessage(" in low)
+    mentions_location = "location" in low
+    # A generic `location` read with no property name is the conservative
+    # fallback: a dynamically built accessor (location["ha"+"sh"]) must not
+    # lose its probes.  When NO location mention exists at all, only the
+    # explicitly read sources (cookie/referrer/name/message) remain.
+    if mentions_location and not (has_hash or has_search or has_href or has_path):
+        has_hash = has_search = True
+    return {"hash": has_hash, "search": has_search, "href": has_href,
+            "path": has_path, "referrer": has_ref, "cookie": has_cookie,
+            "window_name": has_name, "postmessage": has_pm, "external": ext}
+
+
 def page_can_run_sink(html: str) -> bool:
     """Pre-filter: can this page execute code that could reach a sink?
 
@@ -1007,6 +1051,59 @@ _MAX_SEARCH_PARAM_PROBES = 4
 # probe set has ~8, so the cost is bounded and only paid when the DOM engine
 # is actually enabled.
 _DOM_SETTLE_MS = 700
+# Phase 353: synchronous fixture pages (no external script, no timers, no
+# fetch/promise) render on the load event; 700ms is pure wait.  The longer
+# settle stays for anything that can render after load.
+_DOM_SETTLE_QUICK_MS = 200
+# Inline async code needs less than an external bundle's network+parse.
+_DOM_SETTLE_ASYNC_MS = 350
+_ASYNC_PAGE_RE = re.compile(
+    r"setTimeout|setInterval|requestAnimationFrame|"
+    r"fetch\s*\(|XMLHttpRequest|\bPromise\b|\.then\s*\(|\basync\b|\bawait\b|"
+    r"addEventListener", re.I)
+
+
+def dom_settle_ms(html: str) -> int:
+    """Adaptive post-navigation settle, by the page's own load evidence."""
+    if not html:
+        return _DOM_SETTLE_MS
+    if _EXT_SCRIPT_RE.search(html):
+        return _DOM_SETTLE_MS          # network + parse of a bundle
+    if _ASYNC_PAGE_RE.search(html):
+        return _DOM_SETTLE_ASYNC_MS    # inline timer/fetch
+    return _DOM_SETTLE_QUICK_MS        # synchronous render
+
+
+_CARRIER_EVAL_RE = re.compile(
+    r"\beval\s*\(|new\s+Function\s*\(|setTimeout\s*\(\s*['\"]|"
+    r"setInterval\s*\(\s*['\"]", re.I)
+_CARRIER_URL_RE = re.compile(
+    r"location\.(?:assign|replace|href)\s*=|window\.open\s*\(|"
+    r"javascript:", re.I)
+_CARRIER_MXSS_RE = re.compile(r"sanitiz|DOMPurify|mXSS|mglyph", re.I)
+_CARRIER_MODULE_RE = re.compile(r"\bimport\s*\(|type\s*=\s*['\"]module", re.I)
+
+
+def carrier_shapes(html: str) -> tuple:
+    """Carrier subset for the exploratory wave, chosen from page features.
+
+    A safe page used to replay all six carriers, each with a navigation +
+    settle, to prove nothing fires.  The page's own code decides which shapes
+    can execute: html/svg cover element injection, ``js`` needs a
+    string-eval sink, ``url`` needs a navigation sink, ``mxss`` needs a
+    sanitizer, ``data-module`` needs dynamic import.  Hit-driven waves still
+    use the full set -- there the channel already delivered.
+    """
+    shapes = [s for s in _CARRIER_SHAPES if s[0] in ("html", "svg")]
+    if _CARRIER_EVAL_RE.search(html or ""):
+        shapes += [s for s in _CARRIER_SHAPES if s[0] == "js"]
+    if _CARRIER_URL_RE.search(html or ""):
+        shapes += [s for s in _CARRIER_SHAPES if s[0] == "url"]
+    if _CARRIER_MXSS_RE.search(html or ""):
+        shapes += [s for s in _CARRIER_SHAPES if s[0] == "mxss"]
+    if _CARRIER_MODULE_RE.search(html or ""):
+        shapes += [s for s in _CARRIER_SHAPES if s[0] == "data-module"]
+    return tuple(shapes)
 
 # Phase 241: write-face reaping.  A modern SPA has no <form action> -- its
 # write requests are emitted by component code when the operator clicks
@@ -1622,7 +1719,7 @@ class DynamicDomAnalyzer:
                 # empty harvest (no render => no live input face).
                 _recover_nav(page)
             try:
-                page.wait_for_timeout(_DOM_SETTLE_MS)
+                page.wait_for_timeout(getattr(self, "_settle_ms", _DOM_SETTLE_MS))
             except Exception:
                 pass
             try:
@@ -1700,14 +1797,32 @@ class DynamicDomAnalyzer:
           * document.cookie
           * window.name (cross-page persistence)
           * postMessage
+
+        Phase 352: when the caller supplied the page text, probes are gated by
+        the sources the page actually READS.  A page that never mentions
+        ``document.cookie`` cannot be reached through a cookie, so paying a
+        navigation + 700ms settle for that probe buys nothing.  The gate falls
+        back to the full set when no text is available (the pure probe-URL
+        tests and any caller that cannot supply a body), and external bundles
+        keep hash+search because a compiled router's source read is not
+        visible in the HTML.
         """
         from urllib.parse import urlparse, urlunparse, quote
         probes = []
         parsed = urlparse(url)
         base = url.split("#")[0].split("?")[0]
+        hints = page_source_hints(getattr(self, "_caller_page_text", "") or "")
+        gated = bool(getattr(self, "_caller_page_text", ""))
+        # A/B switch for benchmark bisects: XSS_DOM_SOURCE_GATE=0 restores the
+        # pre-Phase-352 full probe set byte-for-byte.
+        if os.environ.get("XSS_DOM_SOURCE_GATE", "1") == "0":
+            gated = False
+        if not gated:
+            hints = {k: True for k in hints}
         # location.hash
-        probes.append({"kind": "goto", "url": base + "#" + marker,
-                       "source": "location.hash"})
+        if not gated or hints["hash"] or hints["external"] or "#" in url:
+            probes.append({"kind": "goto", "url": base + "#" + marker,
+                           "source": "location.hash"})
         # location.search
         # NOTE: ``base`` has already been stripped of both the fragment and
         # the query, so the separator must be derived from ``base`` -- not
@@ -1716,19 +1831,21 @@ class DynamicDomAnalyzer:
         # string, i.e. a path with no query at all, which silently disabled
         # this probe on every URL a real scan visits.
         sep = "&" if "?" in base else "?"
-        probes.append({"kind": "goto", "url": base + sep + "__xss__=" + marker,
-                       "source": "location.search", "param": "__xss__"})
+        if not gated or hints["search"] or hints["external"]:
+            probes.append({"kind": "goto", "url": base + sep + "__xss__=" + marker,
+                           "source": "location.search", "param": "__xss__"})
         # A page reads a *specific* parameter (``?q=``), so the generic
         # ``__xss__`` probe above only helps pages that read any parameter.
         # Replay the original query with each real parameter's value swapped
         # for the marker; capped so the browser cost stays bounded.
-        for name in _query_param_names(url)[:_MAX_SEARCH_PARAM_PROBES]:
-            if name == "__xss__":
-                continue
-            probes.append({"kind": "goto",
-                           "url": _with_param_value(url, name, marker),
-                           "source": "location.search",
-                           "param": name})
+        if not gated or hints["search"] or hints["external"]:
+            for name in _query_param_names(url)[:_MAX_SEARCH_PARAM_PROBES]:
+                if name == "__xss__":
+                    continue
+                probes.append({"kind": "goto",
+                               "url": _with_param_value(url, name, marker),
+                               "source": "location.search",
+                               "param": name})
         # SPA hash routing: the parameters live inside the fragment
         # (``#/search?q=``).  Nothing above reaches them -- ``base`` has the
         # fragment stripped, ``urlparse().query`` is empty, and an HTTP
@@ -1741,32 +1858,39 @@ class DynamicDomAnalyzer:
         # request ever sees it, so report/poc/verify_fix must not treat it
         # as one).  Without it the report's param column was empty and the
         # fixer could not tell which key to escape.
-        for name in _hash_param_names(url)[:_MAX_SEARCH_PARAM_PROBES]:
-            probes.append({"kind": "goto",
-                           "url": _with_hash_param_value(url, name, marker),
-                           "source": "location.hash",
-                           "param": name + "@hash"})
+        if not gated or hints["hash"] or hints["external"]:
+            for name in _hash_param_names(url)[:_MAX_SEARCH_PARAM_PROBES]:
+                probes.append({"kind": "goto",
+                               "url": _with_hash_param_value(url, name, marker),
+                               "source": "location.hash",
+                               "param": name + "@hash"})
         # location.href (full URL reflected as-is)
-        href_url = base + sep + "__xss__=" + quote(marker) + "#" + marker
-        probes.append({"kind": "goto", "url": href_url,
-                       "source": "location.href"})
+        if not gated or hints["href"]:
+            href_url = base + sep + "__xss__=" + quote(marker) + "#" + marker
+            probes.append({"kind": "goto", "url": href_url,
+                           "source": "location.href"})
         # location.pathname (path segment injected)
-        path_marker = base.rstrip("/") + "/" + quote(marker, safe="")
-        probes.append({"kind": "goto", "url": path_marker,
-                       "source": "location.pathname"})
+        if not gated or hints["path"]:
+            path_marker = base.rstrip("/") + "/" + quote(marker, safe="")
+            probes.append({"kind": "goto", "url": path_marker,
+                           "source": "location.pathname"})
         # document.referrer (set via Referer header on navigation)
         origin = urlunparse((parsed.scheme, parsed.netloc, "", "", "", ""))
-        probes.append({"kind": "referer", "url": url, "origin": origin,
-                       "referer_value": href_url,
-                       "source": "document.referrer"})
+        if not gated or hints["referrer"]:
+            probes.append({"kind": "referer", "url": url, "origin": origin,
+                           "referer_value": base + sep + "__xss__=" + quote(marker) + "#" + marker,
+                           "source": "document.referrer"})
         # document.cookie
-        probes.append({"kind": "cookie", "url": url, "origin": origin,
-                       "source": "document.cookie"})
+        if not gated or hints["cookie"]:
+            probes.append({"kind": "cookie", "url": url, "origin": origin,
+                           "source": "document.cookie"})
         # window.name (persists across navigations within the same tab)
-        probes.append({"kind": "window_name", "url": url,
-                       "source": "window.name"})
+        if not gated or hints["window_name"]:
+            probes.append({"kind": "window_name", "url": url,
+                           "source": "window.name"})
         # postMessage
-        probes.append({"kind": "postmsg", "url": url, "source": "postMessage"})
+        if not gated or hints["postmessage"]:
+            probes.append({"kind": "postmsg", "url": url, "source": "postMessage"})
         return probes
 
     def _bounded_goto(self, page, url: str, deadline: float) -> None:
@@ -1857,7 +1981,8 @@ class DynamicDomAnalyzer:
             return False
 
     def _try_carriers(self, page, probe: dict, marker: str, numtok: str,
-                      dialog_msgs: list, deadline: float) -> tuple[bool, str]:
+                      dialog_msgs: list, deadline: float,
+                      shapes=None) -> tuple[bool, str]:
         """Replay ``probe``'s channel with executable carriers (Phase 226).
 
         Returns ``(executed, carrier_name)``.  ``executed`` is True only when
@@ -1873,7 +1998,7 @@ class DynamicDomAnalyzer:
         the original in exactly one variable: the payload shape.
         """
         kind = probe["kind"]
-        for name, tpl in _CARRIER_SHAPES:
+        for name, tpl in (shapes or _CARRIER_SHAPES):
             carrier = tpl % int(numtok)
             if time.monotonic() > deadline:
                 return False, ""
@@ -1902,20 +2027,20 @@ class DynamicDomAnalyzer:
                     if same_doc:
                         self._bounded_goto(page, "about:blank", deadline)
                     self._bounded_goto(page, target, deadline)
-                    page.wait_for_timeout(_DOM_SETTLE_MS)
+                    page.wait_for_timeout(getattr(self, "_settle_ms", _DOM_SETTLE_MS))
                 elif kind == "cookie":
                     page.context.add_cookies(
                         [{"name": "__xss__", "value": carrier,
                           "url": probe["origin"]}])
                     self._bounded_goto(page, probe["url"], deadline)
-                    page.wait_for_timeout(_DOM_SETTLE_MS)
+                    page.wait_for_timeout(getattr(self, "_settle_ms", _DOM_SETTLE_MS))
                 elif kind == "referer":
                     hdrs = dict(self.auth_headers)
                     hdrs["Referer"] = probe["referer_value"].replace(marker, carrier)
                     page.context.set_extra_http_headers(hdrs)
                     try:
                         self._bounded_goto(page, probe["url"], deadline)
-                        page.wait_for_timeout(_DOM_SETTLE_MS)
+                        page.wait_for_timeout(getattr(self, "_settle_ms", _DOM_SETTLE_MS))
                     finally:
                         page.context.set_extra_http_headers(
                             dict(self.auth_headers))
@@ -1928,7 +2053,7 @@ class DynamicDomAnalyzer:
                     finally:
                         page.evaluate("window.__xss_dom_harness = 0;")
                     self._bounded_goto(page, probe["url"], deadline)
-                    page.wait_for_timeout(_DOM_SETTLE_MS)
+                    page.wait_for_timeout(getattr(self, "_settle_ms", _DOM_SETTLE_MS))
                 elif kind == "postmsg":
                     # Fresh document (state from wave 0 is not reused), then
                     # re-dispatch every handler recorded by the init script
@@ -1953,7 +2078,7 @@ class DynamicDomAnalyzer:
                                });
                              });
                            }""", carrier)
-                    page.wait_for_timeout(_DOM_SETTLE_MS)
+                    page.wait_for_timeout(getattr(self, "_settle_ms", _DOM_SETTLE_MS))
                 else:
                     return False, ""
             except Exception:
@@ -1996,7 +2121,37 @@ class DynamicDomAnalyzer:
         # (measured on XSSMaze navsink-3: the gate read the post-navigation
         # 404 and skipped the wave that would have proven the sink).
         self._caller_page_text = page_text
+        # Phase 353 adaptive budget: sync fixtures settle at 300ms, anything
+        # with async code keeps 700ms; the exploratory carrier wave only
+        # replays shapes the page can actually execute.
+        self._settle_ms = dom_settle_ms(page_text or "")
+        self._exploratory_shapes = carrier_shapes(page_text or "")
+        if os.environ.get("XSS_DOM_TRACE") == "1":
+            print(f"[dom] settle={self._settle_ms} shapes="
+                  f"{[s[0] for s in (self._exploratory_shapes or _CARRIER_SHAPES)]}",
+                  file=sys.stderr)
+        # A/B switch for the second budget pass: XSS_DOM_BUDGET=0 (or the
+        # umbrella XSS_BUDGET_V2=0) restores the 700ms settle and the full
+        # six-carrier exploratory wave.
+        if (os.environ.get("XSS_DOM_BUDGET", "1") == "0"
+                or os.environ.get("XSS_BUDGET_V2", "1") == "0"):
+            self._settle_ms = _DOM_SETTLE_MS
+            self._exploratory_shapes = None
         marker = marker or (_stem_marker("xssentinel_dom_") + secrets.token_hex(4))
+        # Phase 352: no attacker-controlled SOURCE read on this page means no
+        # URL-delivered DOM taint is possible -- skip the browser instead of
+        # paying ~1-6s to prove it has nothing to deliver into.
+        if (url_probes and page_text
+                and os.environ.get("XSS_DOM_SOURCE_GATE", "1") != "0"):
+            try:
+                if not self._probes(url, marker):
+                    return []
+            except Exception as exc:
+                # Fail open: an indecisive source gate must not suppress the
+                # browser -- but say so instead of swallowing silently (the
+                # silent form is what test_silent_except_ratchet exists for).
+                _log.debug("dom: source gate probe failed (%s); running "
+                           "full browser", exc)
         # Phase 226: the decimal token carrier dialogs carry (see
         # _carrier_token).  Dialogs are attributed by EITHER token: the
         # string marker (a page alerting the value it received) or the
@@ -2080,6 +2235,10 @@ class DynamicDomAnalyzer:
                                "source": "stored_view"}]
                 consumed_hits = 0   # Phase 317: sessionStorage slice cursor
                 _exploratory_done = False   # Phase 319: one exploratory wave max
+                if os.environ.get("XSS_DOM_TRACE") == "1":
+                    print(f"[dom] probes={len(probes)} "
+                          f"{[p.get('source') for p in probes]}",
+                          file=sys.stderr)
                 for probe in probes:
                     if time.monotonic() > deadline:
                         _log.debug(
@@ -2105,7 +2264,7 @@ class DynamicDomAnalyzer:
                             # blocked indefinitely by one third-party script.
                             self._bounded_goto(page, probe["url"], deadline)
                             # Let the route render (see _DOM_SETTLE_MS).
-                            page.wait_for_timeout(_DOM_SETTLE_MS)
+                            page.wait_for_timeout(getattr(self, "_settle_ms", _DOM_SETTLE_MS))
                             if click_selector and not clicked:
                                 clicked = True
                                 # Phase 284: a LIST of selectors is clicked
@@ -2129,7 +2288,7 @@ class DynamicDomAnalyzer:
                                         # (15 cards).
                                         page.locator(sel).first.click(
                                             timeout=5000)
-                                        page.wait_for_timeout(_DOM_SETTLE_MS)
+                                        page.wait_for_timeout(getattr(self, "_settle_ms", _DOM_SETTLE_MS))
                                     except Exception:
                                         # Phase 284: a click that cannot be
                                         # performed (a consent overlay makes
@@ -2152,7 +2311,7 @@ class DynamicDomAnalyzer:
                                 [{"name": "__xss__", "value": marker,
                                   "url": probe["origin"]}])
                             self._bounded_goto(page, probe["url"], deadline)
-                            page.wait_for_timeout(_DOM_SETTLE_MS)
+                            page.wait_for_timeout(getattr(self, "_settle_ms", _DOM_SETTLE_MS))
                         elif probe["kind"] == "postmsg":
                             self._bounded_goto(page, probe["url"], deadline)
                             page.wait_for_timeout(400)
@@ -2170,7 +2329,7 @@ class DynamicDomAnalyzer:
                             except Exception:
                                 pass
                             self._bounded_goto(page, probe["url"], deadline)
-                            page.wait_for_timeout(_DOM_SETTLE_MS)
+                            page.wait_for_timeout(getattr(self, "_settle_ms", _DOM_SETTLE_MS))
                             try:
                                 page.context.set_extra_http_headers(
                                     dict(self.auth_headers))
@@ -2217,7 +2376,7 @@ class DynamicDomAnalyzer:
                                         "window.__xss_dom_harness = 0;")
                                 self._bounded_goto(page, probe["url"],
                                                    deadline)
-                                page.wait_for_timeout(_DOM_SETTLE_MS)
+                                page.wait_for_timeout(getattr(self, "_settle_ms", _DOM_SETTLE_MS))
                             except Exception:
                                 continue
                     except Exception:
@@ -2351,7 +2510,8 @@ class DynamicDomAnalyzer:
                         _exploratory_done = True
                         carrier_waves += 1
                         executed, carrier_used = self._try_carriers(
-                            page, probe, marker, numtok, dialog_msgs, deadline)
+                            page, probe, marker, numtok, dialog_msgs, deadline,
+                            shapes=self._exploratory_shapes)
                         if executed:
                             findings.append({
                                 "type": "dom_dynamic",

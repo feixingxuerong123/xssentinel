@@ -1,0 +1,22 @@
+{
+  "app": "bWAPP 2.2",
+  "accounts": {
+    "admin": "bee/bug (admin=1)",
+    "user": "bwuser/bwpass123 (admin=0, created via official user_new.php form)"
+  },
+  "stored_cross_session": {
+    "writer": "bwuser",
+    "viewer": "bee",
+    "default_view": "per-owner; bee does not see bwuser entry without the Show all switch",
+    "show_all_view": "bee POSTs entry_all; the page renders all blog rows and executes bwuser's <script> payload",
+    "bee_show_all_token_seen": true,
+    "dialogs_sample": ["bw_8468a9", "bwx_4bbc60"]
+  },
+  "faces": {
+    "reflected": "/xss_get.php?firstname=...&lastname=...&form=submit (dialog)",
+    "stored": "/xss_stored_1.php (own view and Show all view both dialog)",
+    "header": "/xss_user_agent.php raw User-Agent (dialog)",
+    "login": "bee/bug and bwuser/bwpass123, security_level=0"
+  },
+  "official_ground_truth": "bWAPP bugs.txt: Reflected (GET), Stored (Blog), Reflected (User-Agent)"
+}

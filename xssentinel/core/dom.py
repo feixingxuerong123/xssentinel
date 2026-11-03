@@ -29,20 +29,43 @@ SOURCES = [
 ]
 
 # Sinks: writing data into an executable context.
+#
+# Phase 354 (rule-precision pass): two classes of regex sink were removed or
+# narrowed after real-page measurement:
+#   * `document.title =` writes text, never markup.  A router doing
+#     `document.title = location.hash` was graded medium -- a false positive
+#     that would be reported (low hints are suppressed).
+#   * `.val()` only sets a form value; `.appendChild()` does not parse markup
+#     (the creating sink carries the payload); `.attr('title', x)` and
+#     `.setAttribute('aria-label', x)` are inert.  The generic `.attr` /
+#     `.prop` / `.setAttribute` patterns therefore require an attribute name
+#     that can actually execute (`on*`, `href`, `src`, `srcdoc`, `xlink:href`)
+#     or a dangerous property (`innerHTML`/`outerHTML`/`srcdoc`/`href`/`src`).
+# What regex still cannot decide is stated in README's capability boundary:
+# cross-statement flows belong to the AST layer, and a value written through
+# `.attr()` with a computed attribute name is left to the AST/browser arms.
 SINKS = [
     r"\.innerHTML", r"\.outerHTML", r"\.insertAdjacentHTML",
     r"\.setHTMLUnsafe\s*\(", r"parseHTMLUnsafe\s*\(",
     r"document\.write(?:ln)?", r"\.src\s*=", r"\.href\s*=",
     r"\.data\s*=", r"eval\s*\(", r"setTimeout\s*\(", r"setInterval\s*\(",
     r"new\s+Function\s*\(", r"\.appendChild\s*\(", r"\.html\s*\(",
-    r"\.attr\s*\(", r"\.append\s*\(", r"\.prepend\s*\(",
+    r"\.attr\s*\(\s*['\"](?:on\w+|href|src|srcdoc|xlink:href)",
+    r"\.append\s*\(", r"\.prepend\s*\(",
     r"\.after\s*\(", r"\.before\s*\(", r"\.replaceWith\s*\(", r"\.load\s*\(",
-    r"\.prop\s*\(", r"\.val\s*\(", r"document\.title\s*=",
-    r"\.setAttribute", r"location\.(href|assign|replace)\s*=",
+    r"\.prop\s*\(\s*['\"](?:innerHTML|outerHTML|srcdoc|href|src)",
+    r"\.setAttribute\s*\(\s*['\"](?:on\w+|href|src|srcdoc|xlink:href)",
+    r"location\.(href|assign|replace)\s*=",
     r"\.srcdoc\s*=",
     r"window\.open", r"dangerouslySetInnerHTML", r"v-html", r"ng-bind-html",
     r"\$sce",
 ]
+
+# `.appendChild()` never parses HTML itself: the payload must already be an
+# Element (created by innerHTML/DOMParser/createElement+text), and that creating
+# sink is the one that should carry confidence.  Regex cannot follow the object
+# identity, so the hint is capped at low and left to the AST/browser layers.
+_APPEND_ONLY_RE = re.compile(r"\.appendChild\s*\(", re.I)
 
 _VAR_RE = re.compile(r"(?:var|let|const|window\.|globalThis\.)\s*([A-Za-z_$][\w$]*)\s*=\s*([^;]+);")
 _SOURCE_RE = re.compile("(" + "|".join(SOURCES) + ")", re.I)
@@ -63,6 +86,16 @@ _URL_PROP_SINK_RE = re.compile(r"\.(?:src|data)\s*(?:=|$)")
 _ID_ATTR_RE = re.compile(r"<([a-zA-Z][\w-]*)\b[^>]*\bid\s*=\s*(['\"])(.*?)\2",
                          re.S | re.I)
 _GET_BY_ID_RE = re.compile(r"getElementById\(\s*(['\"])(.*?)\1")
+
+
+def _grade_inert_regex_sink(finding: dict) -> None:
+    """Cap regex-only sinks that cannot execute on their own."""
+    if not _APPEND_ONLY_RE.search(finding.get("sink") or ""):
+        return
+    finding["confidence"] = "low"
+    finding["detail"] = (finding.get("detail") or "") + (
+        " | appendChild does not parse markup; the creating sink carries the "
+        "payload (regex cannot follow object identity)")
 
 
 def _grade_url_property(finding: dict, id_tags: dict) -> None:
@@ -149,7 +182,7 @@ def analyze_script(code: str) -> list[dict]:
         if ast_findings and any(f["sink"] == sink.strip() and f["source"]
                                 for f in findings):
             continue
-        findings.append({
+        finding = {
             "type": "dom_sink",
             "line": line,
             "sink": sink.strip(),
@@ -159,7 +192,9 @@ def analyze_script(code: str) -> list[dict]:
             "detail": (f"sink '{sink.strip()}' fed by source '{source}'"
                        if source else
                        f"sink '{sink.strip()}' found (no obvious source in window)"),
-        })
+        }
+        _grade_inert_regex_sink(finding)
+        findings.append(finding)
     # postMessage -> sink flow (strong DOM XSS signal)
     if _POSTMSG_RE.search(code):
         for m in _POSTMSG_RE.finditer(code):

@@ -7,6 +7,7 @@ _scan_template and _scan_polyglot.
 from __future__ import annotations
 
 import copy
+import os
 import secrets
 from typing import TYPE_CHECKING
 
@@ -131,6 +132,10 @@ class AdvancedLayerMixin:
             _req_url, getattr(resp, "url", ""), bool(_hist))
         _no_exec = csp_mod.script_execution_blocked(
             dict(getattr(resp, "headers", {}) or {}), text)
+        # _all_hints is read by the browser-skip decision below even when the
+        # static layer is skipped (redirect landing / CSP no-exec), so it must
+        # exist on every path.  Gate neg-tb-01 caught the UnboundLocalError.
+        _all_hints = 0
         if _landing or _no_exec:
             static_results = []
             _why = ("redirect landing page dropped the injected parameters"
@@ -162,8 +167,26 @@ class AdvancedLayerMixin:
         # whitelist (its first version was, and that cost real coverage --
         # see dom_engine.py).  It answers "is this page provably inert?", so
         # the pair skips ONLY pages that cannot execute anything at all.
+        # Phase 353: a page whose only code is an external bundle, with zero
+        # static sink hints and no hash route, gives the browser nothing to
+        # confirm from a server-delivered parameter.  Hash routes (SPA
+        # frameworks read the fragment) and pages with static hints keep the
+        # browser.  The layer is recorded as skipped so the coverage matrix
+        # says "not examined" rather than "clean".
+        _external_only = (not static_results
+                          and dom_engine.page_has_external_script(text)
+                          and "#" not in url)
+        # Phase 353: only low-confidence static hints (no-source sink
+        # inventories, inert URL-property shapes) and no hash route: the
+        # static model already says nothing executable carries a source.
+        # dom-level18 (iframe.src, executable) grades medium and keeps the
+        # browser; dom-level10 (img.src, inert) grades low and is skipped.
+        _low_only = bool(_all_hints) and not static_results and "#" not in url
+        _budget_v2 = os.environ.get("XSS_BUDGET_V2", "1") != "0"
+        _browser_pointless = _budget_v2 and (_external_only or _low_only)
         if (engine is not None and dom_engine.page_has_client_js(text)
-                and dom_engine.page_can_run_sink(text)):
+                and dom_engine.page_can_run_sink(text)
+                and not _browser_pointless):
             # The layer is recorded only once it has actually run.  This used to
             # `touch_layer` BEFORE `engine.analyze()` and swallow the exception,
             # so a browser that failed to launch (no chromium binary, dead
@@ -185,6 +208,12 @@ class AdvancedLayerMixin:
                              "on this page were NOT examined", url,
                              type(e).__name__, e)
 
+        elif _browser_pointless:
+            self.coverage.record_layer(
+                url, "L6_dom_dynamic", "GET", status="skipped",
+                detail=("static model found no executable sink; page code is "
+                        "external-only" if _external_only else
+                        "static hints are low-confidence/no-source only"))
         # Collect normalized dynamic sinks for dedup against static hints.
         dyn_sinks: set = set()
         for d in dyn_findings:
@@ -281,7 +310,9 @@ class AdvancedLayerMixin:
     # them (_set_param/_record) were missing the newer JSON-body
     # handling that Scanner has.  Scanner is the single source of truth.
     # -- L7 advanced detection layers (Phase 1+) ---------------------------
-    def _scan_jsonp(self, req, url, method, params, data):
+    def _scan_jsonp(self, req, url, method, params, data,
+                    page_text: str | None = None,
+                    resp_headers: dict | None = None):
         """JSONP callback XSS detection.
 
         Probes common callback parameter names (callback, jsonp, cb, ...)
@@ -298,6 +329,24 @@ class AdvancedLayerMixin:
         existing = set(params.keys()) | set(data.keys())
         # Test existing callback-like params first, then probe candidates.
         existing_cb = [p for p in existing if p in jsonp_mod.candidate_params()]
+        # Phase 353: without a callback-like parameter in the URL and without
+        # a JS/JSONP-shaped document, the eight candidate names cannot make
+        # this endpoint JSONP.  The page text is the response evidence.
+        if (os.environ.get("XSS_ADAPTIVE_LAYERS", "1") != "0"
+                and os.environ.get("XSS_BUDGET_V2", "1") != "0"
+                and not existing_cb):
+            _ct = ""
+            for k, v in (resp_headers or {}).items():
+                if str(k).lower() == "content-type":
+                    _ct = str(v).lower()
+                    break
+            _pt = (page_text or "").lower()
+            if ("javascript" not in _ct and "callback" not in _pt
+                    and "jsonp" not in _pt):
+                self.coverage.record_layer(
+                    url, "L7_jsonp", method, status="skipped",
+                    detail="no callback param / JS document evidence")
+                return
         candidates = existing_cb + [p for p in jsonp_mod.candidate_params()
                                     if p not in existing][:8]
         marker = jsonp_mod.confirm_marker()

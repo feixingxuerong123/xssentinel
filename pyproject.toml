@@ -19,7 +19,12 @@ license = "MIT"
 authors = [{ name = "XSSentinel authors and contributors" }]
 keywords = ["xss", "security", "scanner", "dast", "web-security", "vulnerability-scanner"]
 classifiers = [
-    "Development Status :: 5 - Production/Stable",
+    # 2026-11-02: downgraded from "5 - Production/Stable". The measured state
+    # does not support that claim yet: stored XSS needs a viewer the operator
+    # or auto-discovery can reach, no commercial-tool comparison exists, and
+    # the real-world regression set is a 7-case anonymous Juice Shop smoke
+    # corpus. "4 - Beta" is what the evidence supports.
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Information Technology",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",

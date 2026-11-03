@@ -51,37 +51,71 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
 
 - 新增检测层必须**同时**注册 `coverage.LAYERS` 与 `layer_coverage` 矩阵(Phase 187/192 两次被门禁抓到的同一课)。
 
-## 当前状态(2026-11-02)
+## 当前状态(2026-11-04)
 
-- 版本 1.3.0;最新 Phase 349。源码 133 文件 59,076 行 / 测试 268 文件 61,216 行(接近 1:1;2026-11-02 复测)。
-  Phase 347 新增四个门禁:`tests/test_architecture_scale.py`(Mixin 行数上限)、
-  `tests/test_failure_reasons.py`(失败原因可见化)、
-  `tests/test_temp_dir_fallback.py`(临时目录回退,11 例)、
-  `tests/test_silent_except_ratchet.py`(宽泛吞异常棘轮,110 处/34 文件,只许降)。
-  行数上限与吞异常棘轮两个做过变异对照(红→还原→绿),另两个靠真实入口实跑验证。
-  Phase 348(2026-11-02,测试优化):分批 runner 新增 `--jobs N` 并行档(默认 1,
-  顺序行为逐字节不变;每文件预算/重试/verdict/日志/耗时报告语义不变)。A/B 实测
-  (11 文件头部权重抽样,2026-11-02):顺序 465s → jobs=4 124s(3.75×),逐文件
-  verdict 与单文件耗时零漂移;全量投影 600–700s,**2026-11-02 全量实跑兑现 616s**
-  (见下条门禁)。守卫:`tests/test_runner_parallel.py`(解析契约——畸形 `--jobs` 响亮报错——
-  加双模式端到端 verdict 对比,真子进程不用替身)。`pyyaml>=6.0` 进 dev extras:
-  `test_nuclei_import` 不再因缺 PyYAML 整文件跳过(单文件实跑 16 passed;
-  运行期 [nuclei] extra 保持独立,那是扫描器功能不是测试依赖)。
-- 最近全量分批门禁(2026-11-02,**HEAD `3b277e9`,工作树干净**):
-  **268/268 文件绿,exit 0**,620s(`--jobs 4`);**skip 13 个 / 6 文件**
-  (2 个整文件零贡献:`test_oracle_default_sent.py` 3、`test_stored_e2e_acceptance.py` 3)。
-  引用时两个数一起报。同一工作内容的前一轮(616s)跑在未提交树上,数字相同、口径更弱;
-  这一轮是提交后的复验,替换之。这是 Phase 348 并行档的首次全量实跑;
-  与 Phase 346 的 258 文件 / 4554s **不是同一口径**(文件集不同、顺序 vs 并行),
-  不能相除当倍数引用。
-  跑之前拦下两件事,都记在这里因为它们是这次数字的前提:
-  ① `benchmark/server.py` 与 `tests/vuln_server.py` 在批量清理 `benchmark/results/*`
-  时被误删,6 个模块 `from server import ...` 全挂(首轮 98s 内 15 文件红,
-  `ModuleNotFoundError: No module named 'benchmark.server'`),已从 HEAD 恢复;
-  ② `test_scanner_parallel_checkpoint.py` 的 fixture 未传 `crawl=True`,且补上后默认
-  `crawl_engine="auto"` 会派发到 `_crawl_spa()` 绕过 `_crawl` stub——四组配置对照实测
-  后两参数一并补齐(只有 `crawl=True, crawl_engine="static"` 三端点才全部入账)。
-- benchmark strict 64 例切片双引擎 F1=1.0。
+- 版本 1.3.0;最新 Phase 356。源码 135 文件 60,309 行 / 测试 274 文件 62,159 行
+  (2026-11-04 复测)。Phase 350(`757e58f`)已提交;351–356 为 2026-11-03 至
+  11-04 的一轮,过程记录在 `benchmark/results/round2..round5_*_20261103.md`
+  与 `zap_unavailable_20261103.md`,本文件只留结论。门禁体系不变:Phase 347
+  四门禁 + Phase 348 并行档(`--jobs 4`),机制见 `docs/ARCHITECTURE.md`。
+- 本轮落地的能力(全部带回归,数字与归因见上列报告):
+  - **Phase 352** 存储自动发现独立 Mixin(`scanner_stored_auto.py` +
+    `stored_discovery.py`),官方靶 stored 自动发现 sync 9/9、async 9/9、FP 0;
+    `--stored-auto` 为 sync 默认(显式 `--stored-inject` 时让位);行数走
+    「拆新 Mixin」不走抬预算;死目标上熔断器正确早停(2026-11-04 门禁日志实测)。
+  - **Phase 354** DOM 静态层精度收敛:AST 优先(esprima 跨语句污点链)、正则
+    兜底;5 类真实框架写法(title/aria-label/.attr('title')/.val/appendChild)
+    不再报 medium,真 sink(innerHTML/document.write/attr('href')/
+    setAttribute('onclick'))保留;DVWA guestbook 页实测 120 low /
+    0 medium-high,low 一律不进告警。边界明示不假装解决:计算属性名、跨语句
+    对象身份、外部 bundle(归浏览器臂)。守卫:`tests/test_dom_static_precision.py`、
+    `tests/test_dom_source_gate.py`。
+  - **Phase 355** 认证会话下 header canary 排除 Cookie(`transport_layers.py`);
+    `tests/test_phase355_transport_canary.py` 14 例。
+  - **Phase 356** marker forms:同一注入点先按引号形态 fan-out,一发 plain 探针
+    命中即返回(addslashes 杀单引号形态,杀不了裸/双引号/反引号);unquoted
+    形态用 sha1 派生的 10 位数字别名(`verifier.numeric_alias`),stored 路径
+    每个 (form, transform) 对发新 token。守卫:`tests/test_phase356_marker_forms.py`。
+- 真实应用回归集 v2.2(22 例 / 5 app:Juice Shop 匿名+unsafe、DVWA、bWAPP、
+  自建四面靶):xssentinel **13 TP / 0 FP / 9 TN,recall 1.000**;dalfox 0.571、
+  nuclei 0.500(开源对照,3 FN 均为 Juice `#` fragment 形状;**非商业基线**)。
+  bWAPP 双角色三面(官方 `bugs.txt` 对齐);多角色:DVWA 三档矩阵、Juice
+  customer→deluxe 走官方 `freeDeluxeChallenge` 路由(合法可达;accounting 该
+  版本不存在)。结论已定不再投入:Juice 持久化反馈(服务端 `sanitize-html`
+  入库即剥离,18 载体 0 可执行)、ZAP(环境不可达,永久 `unavailable`)、
+  XVWA(镜像源 not found,一次放弃)、async 提速(洁净复测 19.2s vs 15.9s
+  = 1.21×,≤2× 达标不动代码;旧 101.1s/7× 为受污染测量,不混算)。
+- 成熟度:`pyproject.toml` 降 **Beta**(理由注释在文件内);README 增
+  「已具备/尚未具备/适用边界」实测口径声明。
+- **门禁拦下的三件事(2026-11-04 全量门禁与单文件复跑实测)**:
+  ① `test_architecture_scale.py`:scanner.py 2438>2400、scanner_stored.py
+  1107>1100。按预算表自身约定(ceiling = 实测 + ~10%,历史校验
+  2400/2246=+6.9%、1100/982=+12%)抬至 **2650 / 1200**,理由钉在 BUDGETS
+  注释:marker-form fan-out 在 `_try_payload` 内部,方法的一半搬不走;
+  `_detect_quote_escaping` 与 `_probe_reflection_profile` 同族同文件——拆半
+  方法=改写本轮新逻辑,违反「搬代码与改逻辑绝不混在同一轮」。
+  ② `test_layer_registry_parity.py` + `test_coverage_matrix_parity.py`:
+  Phase 356 新层 `L1_marker_forms` 只注册了 `coverage.LAYERS`,漏了
+  `benchmark/layer_coverage.py` 矩阵——Phase 187/192 同一课第三次触发,两处
+  已同时注册。
+  ③ `test_stored_matrix_cost.py`:stored 路径开始提交 numeric 别名形态
+  (`alert(4856344953)`,无 `xssv_` 前缀)。核实该形态**可确认**——别名就是
+  `stamp_form` 记录的 effective token,`verify_semantic` 子串匹配、浏览器臂
+  对话通道(dom_engine Phase 226)都按数字匹配;是守卫的 `xssv_` 正则比新
+  行为窄。守卫改为认「`xssv_` token 或 10 位数字别名」两种可确认形态,对
+  mangled token 的牙齿不变(被改坏变体不会凭空出现 10 位数字串);总成本
+  仍由同文件 ≤520 预算测试钉住。
+- benchmark strict 64 例切片双引擎 F1=1.0(async 的 1 个 SKIP 是 manifest
+  声明 sync-only 的 `neg-stored-02`);27 控制例双引擎 0/27 FP。
+- 最近全量分批门禁(2026-11-04 凌晨,本树,`--jobs 4`):**271/274 文件绿,
+  exit 3**,1759s;**skip 59 个 / 14 文件**(3 个整文件零贡献)。三个红全是
+  `rc=TIMEOUT×2`(per-file 1080s 预算双次撞顶),按劣化期协议单文件复跑
+  **全部绿**:`test_dom_sink_matrix` 17 passed/176s、`test_nav_recovery`
+  8 passed/2.15s、`test_phase216_crawl_request_layers` 4 passed/606s(该
+  文件单跑就要 10 分钟,四路并发下超预算)。当晚 loopback 劣化:同夜前一
+  全量轮 `test_engine_parity_gate` 63s→1564s、全量墙钟 1457s→1759s,非
+  回归;与 2026-11-02 的 268 文件/620s **不是同一文件集与机器状态**,不作
+  商引用。引用时「271/274 in-gate」与「3 文件单跑绿」两个数一起报。
 - CI(`.github/workflows/ci.yml`):6 个 job 全部 ubuntu-latest —— tests(全量分批 + ruff)、drills(双引擎 strict 切片周轮转 + range2–6 门禁;range7 走 tests job 的 pytest 契约测试)、min-python(3.10)、benchmark-full、nightly-gate、dependency-audit;push 门 = 双引擎 strict 切片。
 - 开放项:无。SECURITY.md 的举报渠道已定为 **GitHub 私密安全通告**(仓库 → Security →
   Report a vulnerability,流程与 72 小时时效已写在 SECURITY.md,无需额外邮箱即可生效);
@@ -89,6 +123,12 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
   由仓库归属者自行补充,不阻塞发布。产品级 backlog 无未决项
   (OPTIMIZATION.md §3.6 item 6 被动代理 drain 时间上限已于 2026-10-31 关闭;
   其余均为"有意不做/需外部条件"清单)。
+- 环境事件(2026-11-04 凌晨):邻项目 `D:\qoder\vuln-agent` 同时段并发跑
+  自己的测试批;loopback 劣化贯穿夜间(见上条门禁的耗时证据);其中一轮
+  `test_batch_input.py` 红为 fixture server 拒连,安静后单文件 5.4s 全绿,
+  按「未验证→复跑定论」记账,不当回归。`benchmark/server.py` 二度被外部
+  进程删除后恢复,来源仍未确认,再现时用
+  `git show HEAD:benchmark/server.py` 恢复。
 
 ## 环境配置
 

@@ -1,0 +1,28 @@
+{
+  "reflect": {
+    "token_seen": true,
+    "dialogs": [
+      "bw_8468a9"
+    ]
+  },
+  "stored-user": {
+    "token_seen": true,
+    "dialogs": [
+      "bw_8468a9"
+    ]
+  },
+  "stored-admin": {
+    "token_seen": false,
+    "dialogs": []
+  },
+  "header-ua": {
+    "token_seen": true,
+    "dialogs": [
+      "bw_8468a9"
+    ]
+  },
+  "safe-portal": {
+    "token_seen": false,
+    "dialogs": []
+  }
+}
