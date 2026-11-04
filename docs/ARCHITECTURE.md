@@ -75,7 +75,7 @@ async 引擎复用 sync 检测代码的方式，是把 sync 的两个 Mixin 混�
 | **全量分批门** | 每次 run 只跑一次：CI `tests`（push/PR，60min ceiling）或 `nightly-gate`（schedule/workflow_dispatch，150min ceiling），两者事件条件互补；本地 `tests/run_all_batched.py --quiet` | 逐文件 pytest，单文件 540s 预算 + 一次重试，失败/超时证据落盘 `benchmark/results/regression_logs/` | 裸跑单进程 pytest 会卡死；runner 让"一个文件挂死"只烧自己的预算；**skip 数必须与通过数一起报**——整文件 skip 的门禁什么都不曾贡献；`test_ci_no_duplicate_gate` 钉住「同一事件只有一个 job 跑门禁」，防 2026-11-04 之前 schedule run 把同一入口跑两遍（CI #18 实测 45m36s + 29m38s） |
 | **行为契约靶场** | CI `drills` 的 range2–6；range7 走 `tests` job 的 pytest 契约测试 | ground truth 从**服务器行为**独立撰写的异形靶场，双引擎 100%/100% | 用自家靶自证的"满分"——靶场修复说明与 FN 复盘全部对着独立真值写 |
 | **外部效度** | `benchmark-full` / 手动 | XSSMaze（第三方靶，官方 runner 与 ground truth）；跨工具同靶对照（dalfox / nuclei） | "别人出的题"只到位一半的自我认知：内部满分 ≠ 真实世界检出 |
-| **结构棘轮** | 随全量分批门一起跑 | 行数上限（`test_architecture_scale`）、宽泛吞异常只许降（`test_silent_except_ratchet`）、组合契约（`test_mixin_contracts`）、文档数字 == 代码（`test_quick_gate_slice`）、F401 抑制必须带原因（`test_noqa_hygiene`） | 架构在无人报警时劣化（四周核心 +20%、stored +70% 的实测教训）；守卫本身空转（五种失效形状，见 AGENTS.md「工程纪律」） |
+| **结构棘轮** | 随全量分批门一起跑 | 行数上限（`test_architecture_scale`）、宽泛吞异常只许降（`test_silent_except_ratchet`）、组合契约（`test_mixin_contracts`）、文档数字 == 代码（`test_quick_gate_slice`）、F401 抑制必须带原因（`test_noqa_hygiene`）；2026-11-04 新增的 CI/文档契约守卫：`test_doc_gate_parity`（中英门禁口径同源）、`test_ci_no_duplicate_gate`（全量门禁与安装面按事件互补）、`test_dependency_audit_setuptools`（审计门不许缩窄） | 架构在无人报警时劣化（四周核心 +20%、stored +70% 的实测教训）；守卫本身空转（五种失效形状，见 AGENTS.md「工程纪律」）；同一契约被手写两遍、判定依赖量具而非被测物 |
 
 ### 证据纪律（门禁之上的门禁）
 
