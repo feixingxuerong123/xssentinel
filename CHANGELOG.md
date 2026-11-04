@@ -16,6 +16,16 @@
 
 ## [Unreleased]
 
+### Fixed
+- async 引擎补齐 Phase 356 的引号形态 fan-out(bWAPP `security_level=medium`
+  的 `addslashes` 曾让 reflected/header 24 组全漏报),并让每个变体使用自己的
+  effective token 验证。
+- `%00`/NUL 破损标签名改在**原始源码**上、先于 HTML 解析判定,消除 linux
+  libxml2 与 Windows 解析器给出相反结论的 CI 红(run 41699972311)。
+- numeric 别名形态 `alert(<10 位数字>)` 无法被 headless replay 归属,导致
+  Range #3 的浏览器证据门误红(run 41799682389);`findings.
+  extract_replay_token` 补齐该形态后 run 41809643713 全绿。
+
 ## [1.4.0] - 2026-11-04
 
 存储自动发现与 marker-form 轮(Phase 345–356,含 Phase 347/348 的门禁与

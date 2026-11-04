@@ -12,7 +12,7 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
 |---|---|
 | 逐 Phase 过程日志(176f–345,每项改动的归因、门禁证据、自我纠正) | `docs/archive/AGENTS_phase_log_to_20261031.md` |
 | README 历史 Phase 叙事(基线演化、缺陷家族、自我纠正;2026-11-01 蒸馏出库) | `docs/archive/README_phase_log_to_20261101.md` |
-| Phase 350–356 轮次报告(345 之后的逐轮实测数字与归因) | `benchmark/results/round2..round5_*_20261103.md`、`zap_unavailable_20261103.md` |
+| Phase 350–357 轮次报告(345 之后的逐轮实测数字与归因) | `benchmark/results/round2..round5_*_20261103.md`、`zap_unavailable_20261103.md`;Phase 357 证据见 `benchmark/results/benchmark_full_{sync,async}_20261104.json`、`bwapp_matrix_pre_fix_20261103.md` 与提交 `f80af43` |
 | 开发约定 / 回归靶场 / 架构约定 | `CONTRIBUTING.md` |
 | 门禁体系如何运作 / Mixin 隐式契约 | `docs/ARCHITECTURE.md` |
 | 优化 backlog(含明确不做清单) | `docs/OPTIMIZATION.md` |
@@ -54,12 +54,13 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
 
 ## 当前状态(2026-11-04)
 
-- 版本 1.3.0;最新 Phase 356。源码 135 文件 60,309 行 / 测试 274 文件 62,159 行
-  (2026-11-04 复测)。Phase 350(`757e58f`)已提交;351–356 为 2026-11-03 至
-  11-04 的一轮,过程记录在 `benchmark/results/round2..round5_*_20261103.md`
-  与 `zap_unavailable_20261103.md`,本文件只留结论。门禁体系不变:Phase 347
-  四门禁 + Phase 348 并行档(`--jobs 4`),机制见 `docs/ARCHITECTURE.md`。
-- 本轮落地的能力(全部带回归,数字与归因见上列报告):
+- 版本 1.4.0;最新 Phase 357。源码 135 文件 60,440 行 / 测试 275 文件 62,544 行
+  (2026-11-04 复测)。Phase 350(`757e58f`)已提交;351–356 已随 1.4.0
+  (`bad66b2`)发布,过程记录在 `benchmark/results/round2..round5_*_20261103.md`
+  与 `zap_unavailable_20261103.md`;Phase 357 为 2026-11-04 的收口轮
+  (`f80af43`),本文件只留结论。门禁体系不变:Phase 347 四门禁 + Phase 348
+  并行档(`--jobs 4`),机制见 `docs/ARCHITECTURE.md`。
+- 1.4.0 轮落地的能力(Phase 351–356,全部带回归,数字与归因见上列报告):
   - **Phase 352** 存储自动发现独立 Mixin(`scanner_stored_auto.py` +
     `stored_discovery.py`),官方靶 stored 自动发现 sync 9/9、async 9/9、FP 0;
     `--stored-auto` 为 sync 默认(显式 `--stored-inject` 时让位);行数走
@@ -77,6 +78,46 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
     命中即返回(addslashes 杀单引号形态,杀不了裸/双引号/反引号);unquoted
     形态用 sha1 派生的 10 位数字别名(`verifier.numeric_alias`),stored 路径
     每个 (form, transform) 对发新 token。守卫:`tests/test_phase356_marker_forms.py`。
+- **Phase 357(收口轮,`f80af43`)** 同一族问题又出现两次:「同一契约被手写两遍」
+  与「判定依赖页面特征而非原始字节」:
+  - async 仍用 `verifier.mark(payload, marker)` 单形态并以 base marker 验证,
+    sync 的引号形态 fan-out 没过去 ⇒ bWAPP medium(PHP `addslashes`)的
+    reflected/header 24 组全是 FN。补齐 `_detect_quote_escaping_async`(每参数
+    一次探针)、主形态保留载荷自身的 alert 参数风格、extra 形态作为
+    `marker:<form>` plain 变体、**每个变体用自己的 effective token** 验证
+    (numeric 形态是 10 位别名)。健康目标 budget 仍为 1,请求数不变。
+  - CI run `41699972311` 唯一红 `test_phase356_marker_forms.py`:
+    `<svg%00/onload=…>` 在 linux libxml2 里保留为带 handler 的元素、Windows
+    wheel 丢整个标签 ⇒ 依赖解析树的结构规则给出跨平台相反结论。
+    `verifier._token_in_mangled_tag_head` 改在**原始源码**上、且**先于**
+    BeautifulSoup 解析判定,只看 tag name(属性里的 `%00` 不算)。
+  - 守卫 `tests/test_phase357_async_marker_parity.py`(22 例):AST 钉住双引擎
+    调用点(共用 helper / effective token / budget / concat 闸门 / raw-source
+    检查位置)、真实 `_probe_param` 行为、A/B 开关、numeric replay token;
+    变异对照 baseline 绿 → 改回 base marker + 关闭 helper 红 3 例 →
+    restored 绿;numeric 规则另做一次变异(`\d{10}`→`\d{11}`)红 2 例。
+  - **本轮首次推送 CI run `41799682389`:tests job 绿,drills 的 Range #3 红**
+    (上次 `41699972311` 的 drills 是 success ⇒ 真回归,非环境抖动)。
+    async 主形态改成 `alert(<10 位别名>)` 后,
+    `findings.extract_replay_token` 只认引号 token / `xss` 前缀 token,
+    取不到别名 ⇒ `_headless_verify_finding` 以「不可归属复验」整段跳过,
+    range3 唯一的 `fired` 行消失(本地复现 TP17/FP0/TN7/FN0 但
+    `confirmed=0`)。修法:共享契约补 numeric 形态
+    `(?:alert|confirm|prompt)\(\d{10}\)`(只认 10 位,`alert(999)` 不算),
+    sync/async 两侧同时受益;本地 Range3 gate exit 0,async fired 11/11。
+    **教训:新增 marker 形态时,凡是「从 payload 反推 token」的消费者都要
+    一起过一遍**——Phase 356 补了 stored 成本守卫与浏览器对话通道,漏了
+    headless replay 提取器,这一课与「同一契约手写两遍」同族。
+  - 证据:全量 **194 例** strict 门双引擎 exit 0(sync 113/0/81/0、0 SKIP、
+    389.7s;async 107/0/75/0、12 SKIP、394.1s;产物
+    `benchmark/results/benchmark_full_{sync,async}_20261104.json`);quick 64
+    双引擎 F1=1.0、27 控制例 0 FP;bWAPP 72 组矩阵修前/修后
+    (`bwapp_matrix_pre_fix_20261103.md`)medium 24 FN→TP、high 24 TN 不变;
+    关联测试 60 passed。manifest 现为 **194 例**,旧记录的「192 例全量」是
+    历史口径,引用时以本次产物为准。修复 headless replay 后按同规矩再跑一次
+    全量 194 双引擎(产物 `benchmark_full_{sync,async}_20261104_r2.json`):
+    381.6s / 388.9s,TP/FP/TN/FN 与上一轮完全一致、exit 0;
+    Range3 本地 gate exit 0(async r3-pos-utf7 fired 11/11)。
 - 真实应用回归集 v2.2(22 例 / 5 app:Juice Shop 匿名+unsafe、DVWA、bWAPP、
   自建四面靶):xssentinel **13 TP / 0 FP / 9 TN,recall 1.000**;dalfox 0.571、
   nuclei 0.500(开源对照,3 FN 均为 Juice `#` fragment 形状;**非商业基线**)。
@@ -118,7 +159,14 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
   并发污染不引用;另有一轮 runner 本体无总结退出(exit 1、无 _timings,
   stderr 未捕获,当晚仅一次)。与 2026-11-02 的 268 文件/620s/13 skip
   **不是同一机器状态**,不作商引用。
-- CI(`.github/workflows/ci.yml`):6 个 job 全部 ubuntu-latest —— tests(全量分批 + ruff)、drills(双引擎 strict 切片周轮转 + range2–6 门禁;range7 走 tests job 的 pytest 契约测试)、min-python(3.10)、benchmark-full、nightly-gate、dependency-audit;push 门 = 双引擎 strict 切片。
+- CI(`.github/workflows/ci.yml`):7 个 job(6 个 ubuntu-latest +
+  `windows-smoke` 走 windows-latest)—— tests(全量分批 + ruff)、drills(双引擎
+  strict 切片周轮转 + range2–6 门禁;range7 走 tests job 的 pytest 契约测试)、
+  min-python(3.10)、benchmark-full、nightly-gate、dependency-audit、
+  windows-smoke;push 门 = 双引擎 strict 切片。
+- **本轮 CI 复验**:`41799682389`(`f80af43`)tests 绿、drills 的 Range #3 红
+  (归因见 Phase 357 段);修复 `906ed11` 后 `41809643713` **整体 success**
+  (tests / drills / windows-smoke / min-python 全绿,其余按设计 skipped)。
 - 开放项:无。SECURITY.md 的举报渠道已定为 **GitHub 私密安全通告**(仓库 → Security →
   Report a vulnerability,流程与 72 小时时效已写在 SECURITY.md,无需额外邮箱即可生效);
   原「联系方式待仓库归属者填写」一项于 2026-11-01 关闭。如需增加邮箱等第三方渠道,
@@ -133,7 +181,13 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
   02:23 两次,各 1s,只跑 `test_quick_gate_slice` + `test_doc_code_counts`,
   0 失败,来源未确认,疑似另一个会话的观察进程);④ runner 本体一次无总结
   退出(exit 1,见上条);⑤ `benchmark/server.py` 二度被外部进程删除后恢复,
-  来源仍未确认,再现时用 `git show HEAD:benchmark/server.py` 恢复。
+  来源仍未确认,再现时用 `git show HEAD:benchmark/server.py` 恢复;
+  ⑥ 2026-11-04 16:09 该文件第三次被删(关联测试收集期报
+  `OSError [Errno 9] Bad file descriptor`)。恢复用
+  `git cat-file blob HEAD:benchmark/server.py` 或
+  `git checkout -- benchmark/server.py`;注意 `core.autocrlf=true`,直接
+  `git show HEAD:... > file` 落 LF 会产生 2704 行整文件级假 diff,
+  只有 `git checkout --` 会还原工作区应为的 CRLF。
 
 ## 环境配置
 
