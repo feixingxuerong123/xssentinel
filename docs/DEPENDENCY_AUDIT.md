@@ -112,3 +112,36 @@ is rejected by pip (`3.9.4 not in '>=3.10'`), and the built wheel's
 
 `dev/_pip_audit_p328b.json` is the raw local artifact (ignored, not
 committed); this document is the durable record.
+
+## 2026-11-04: first real blocking finding — the runner's setuptools
+
+手动 `workflow_dispatch` run `41817920644` (@`dc5ad1f`) 的 `dependency-audit`
+**红了**:日志两次 `Found 3 known vulnerabilities in 1 package`,重试无效 ⇒
+真实告警,不是 OSV 传输抖动。artifact `pip-audit.json` 定位:
+
+| 包 | 版本 | 告警 | 修复版本 |
+|---|---|---|---|
+| setuptools(runner 预装,非项目声明依赖) | 79.0.1 | PYSEC-2026-3447 / CVE-2026-59890 / GHSA-h35f-9h28-mq5c(两条同源记录) | 83.0.0 |
+| 同上 | 79.0.1 | GHSA-xmj3-9gf7-h52w(Windows wheel 安装路径可写出目标目录) | 84.1.0 |
+
+**归因**:`pip-audit` 默认审整个已安装环境,`setup-python` 的 ubuntu-latest
+镜像自带 setuptools 79.0.1。它不是 `requirements.txt` / `pyproject.toml` 的
+运行时依赖,但 `[build-system] requires = ["setuptools>=77"]` 确实把 setuptools
+当构建后端 —— 所以这个环境里的漏洞是真实的,不是量具误报,不能用「不是我们的依赖」
+一句话打发。
+
+**处置(择一,选了前者)**:
+
+- ✅ **升级工具链**:`dependency-audit` job 在所有 install 之后
+  `pip install -U "setuptools>=84.1.0"`,让 pip-audit 看到的最终环境无已知告警。
+  不动 `[build-system] requires` —— 抬构建下限按版本策略是 BREAKING(major),
+  且 pip 的 build isolation 本就解析到最新版本,与本红无关。
+- ❌ 给 `pip-audit` 加 `--ignore-vuln` 或把 runner 预装包排除出审计面:等于
+  引入豁免名单、缩窄门,下一次工具链真出漏洞会被藏起来(与 Phase 207
+  「不引入豁免名单」同族)。
+
+**口径**:上文 2026-10-26 / 11-01 的「0 advisories」是带日期的历史记录,按规矩
+保留不改 —— 它们量的是**声明的 venv**,不是 ubuntu-latest runner 的完整环境。
+自本次起 CI 的 audit job 审计「升级工具链后的整个环境」,两把尺子不同,引用时
+必须带日期与范围。守卫 `tests/test_dependency_audit_setuptools.py` 钉住升级
+步骤、版本下限、审计命令未被缩窄、job 触发条件,以及文档与 workflow 同源。

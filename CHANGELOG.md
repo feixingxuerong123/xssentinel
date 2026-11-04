@@ -25,6 +25,12 @@
 - numeric 别名形态 `alert(<10 位数字>)` 无法被 headless replay 归属,导致
   Range #3 的浏览器证据门误红(run 41799682389);`findings.
   extract_replay_token` 补齐该形态后 run 41809643713 全绿。
+- `dependency-audit` 首次真实红(手动 dispatch run `41817920644`):runner 预装
+  setuptools 79.0.1 触发 CVE-2026-59890 / GHSA-xmj3-9gf7-h52w 共 3 条告警,
+  两次重试无效。在 audit job 所有 install 之后升级到 `setuptools>=84.1.0`,
+  不给 pip-audit 加豁免;`docs/DEPENDENCY_AUDIT.md` 追加本节并澄清
+  「0 advisories」历史口径只覆盖声明的 venv。守卫
+  `tests/test_dependency_audit_setuptools.py` 钉住升级步骤、下限与门未被缩窄。
 
 ### Changed
 - 中英 README 的全量门禁口径同步到 2026-11-04 夜间引用值(274/274 有效绿、
