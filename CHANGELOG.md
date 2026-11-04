@@ -33,6 +33,9 @@
   现在时回潮即红(变异对照 baseline 绿 → 三个变异红 → restored 绿),
   OPTIMIZATION.md §7 item 4 关闭。EN 版补 Beta 成熟度声明、194 例双引擎
   与真实应用 v2.2 口径,修正 15.4% 的语义误读与 `--no-stored-auto` 默认行为说明。
+- 量化 `OPTIMIZATION.md` §7 item 2:实测 schedule run 内 `tests` 与 `nightly-gate`
+  重复跑同一个全量文件门禁(45m36s + 29m38s),补三种处置建议与推荐项;
+  `ci.yml` 未改,仍按「需归属者决策」挂起。
 
 ## [1.4.0] - 2026-11-04
 
