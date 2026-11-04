@@ -308,6 +308,12 @@ pip install playwright && playwright install chromium
 > advisory 的旧版本（实测见 [docs/DEPENDENCY_AUDIT.md](docs/DEPENDENCY_AUDIT.md)）。
 > 自 Phase 328d 起不再支持 3.9（CI 使用 3.11，另有 3.10 下限冒烟门）。
 
+> **发布状态（2026-11-04）**：本项目**尚未发布到 PyPI**
+> （`pypi.org/project/xssentinel` 返回 404），当前请使用上面的源码安装方式。
+> `.github/workflows/pypi-publish.yml` 已就绪，但需仓库归属者在 pypi.org 完成
+> 一次性 Trusted Publisher 配置，之后推送 `v*` tag 才会真正上传；配置完成前
+> publish job 会以 403 失败。Beta 成熟度与能力边界见上文「定位与诚实声明」。
+
 ---
 
 ## 快速使用

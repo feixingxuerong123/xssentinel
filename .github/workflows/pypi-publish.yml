@@ -3,14 +3,26 @@ name: pypi
 # Publishes sdist + wheel to PyPI on a version tag via Trusted Publishing (OIDC;
 # no API token stored in the repo).
 #
+# Release status (2026-11-04): the package is NOT on PyPI yet --
+# https://pypi.org/pypi/xssentinel/json returns 404. This workflow is wired up
+# but has never published anything: no v1.4.x tag was pushed from this repo.
+# Installing from source (README "Install") is the supported path until an
+# owner completes the setup below and pushes a tag.
+#
 # ONE-TIME owner setup on pypi.org (account -> Publishing -> add a pending
 # publisher), otherwise the publish job fails with a 403 from PyPI:
 #   owner:        feixingxuerong123
 #   repository:   xssentinel
 #   workflow:     pypi-publish.yml
 #   environment:  pypi
+# This is an action on pypi.org, not something a commit can do.
 #
-# Tag a release with:  git tag v1.3.0 && git push origin v1.3.0
+# CAUTION: EVERY `v*` tag push triggers this workflow, including a historical
+# tag created after the fact (e.g. back-filling v1.4.0). Once Trusted
+# Publishing is configured, pushing such a tag really does try to upload that
+# older version. Push only the tag you intend to publish.
+#
+# Tag a release with:  git tag v1.4.1 && git push origin v1.4.1
 
 on:
   push:

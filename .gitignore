@@ -116,3 +116,10 @@ nuclei/config.yaml
 # 入库会造出第二个真相——贡献者按锁装、CI 按下限装,版本一漂移两边都自称"对",
 # 而没有任何门禁能发现分歧。本机 `uv pip install` 仍会生成并使用它,只是不入库。
 uv.lock
+
+# 本地下载的 CI run 日志与压缩包(2026-11-04 交付快照清理):是某一次历史 run
+# 的只读证据,留在仓库根目录会被误读成当前门禁状态(ci_tests_log.txt 属于
+# 11-03 的红色 run 41699972311)。已移入 benchmark/results/_local_archive/
+# (同样不入库、不删除);这里再钉一条防复发。
+/ci_*_log.txt
+/ci_*_logs.zip

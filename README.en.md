@@ -188,6 +188,13 @@ Optional JS AST data-flow: `pip install xssentinel[ast]`.
 > [docs/DEPENDENCY_AUDIT.md](docs/DEPENDENCY_AUDIT.md)). 3.9 support was
 > dropped in Phase 328d (CI uses 3.11, with a 3.10 floor smoke job).
 
+> **Release status (2026-11-04)**: this project is **not published on PyPI**
+> yet (`pypi.org/project/xssentinel` returns 404) -- install from source as
+> shown above. `.github/workflows/pypi-publish.yml` is ready, but the repo
+> owner must finish the one-time Trusted Publisher setup on pypi.org before a
+> `v*` tag push can upload anything (until then the publish job fails with
+> 403). See the maturity statement above for the Beta status and limits.
+
 ---
 
 ## Quick start
