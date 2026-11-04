@@ -8,6 +8,7 @@ source and compares it against the pre-split snapshot.
 """
 from __future__ import annotations
 import asyncio
+import re
 import secrets
 from typing import AsyncIterator
 from urllib.parse import urlencode
@@ -1771,6 +1772,43 @@ class AsyncDetectionLayersMixin:
             except Exception:
                 pass
         return cands, marker_escaped, prof, families
+
+    async def _detect_quote_escaping_async(self, session, url, method, params,
+                                           data, param, is_body):
+        """One probe: does the target backslash-escape quotes (addslashes)?
+
+        Sync parity with ``Scanner._detect_quote_escaping`` (Phase 357):
+        ``addslashes`` rewrites ``alert('tok')`` into ``alert(\\'tok\\')`` --
+        a JS syntax error -- while ``alert(tok)`` / ``alert(`tok`)`` /
+        ``alert("tok")`` still execute.  The signal is the literal backslash
+        the encoder inserted before the quote, measured on the response.
+        One request per parameter buys the marker-form fan-out only where
+        it can matter.
+        """
+        t1 = "xssq_" + secrets.token_hex(3)
+        t2 = "xssq_" + secrets.token_hex(3)
+        probe_payload = "<script>alert('%s');alert(\"%s\")</script>" % (t1, t2)
+        send_params, send_data = self._probe_kv(
+            params, data, param, probe_payload, is_body)
+        try:
+            async with self._semaphore:
+                await self._throttle(url)
+                async with session.request(
+                    method, url, params=send_params or None,
+                    headers=self._req_headers(self.headers),
+                    proxy=self._next_proxy(),
+                    **_body_kwargs(send_data),
+                ) as resp:
+                    text = await _read_text(resp)
+                    self.requests_made += 1
+                    self._record_status(getattr(resp, "status", 200))
+        except (BudgetExhausted, CircuitOpen):
+            raise
+        except Exception:
+            return False
+        return bool(re.search(r"\\+['\"]" + re.escape(t1), text)
+                    or re.search(r"\\+['\"]" + re.escape(t2), text))
+
     async def _fire_probe_variants(self, session, url, method, param,
                                    params, data, is_body, context, marker,
                                    cands, marker_escaped, families, st,
@@ -1788,6 +1826,24 @@ class AsyncDetectionLayersMixin:
         text = st.text
         resp_headers = st.resp_headers
 
+        # Phase 357 (sync parity, scanner.py:922): quote-escaping filters
+        # (PHP addslashes and friends) turn ``alert('tok')`` into
+        # ``alert(\'tok\')`` -- a JS syntax error -- while the unquoted /
+        # double-quoted / backtick shapes still execute.  One probe per
+        # parameter buys the marker-form fan-out only on the targets that
+        # actually need it; healthy endpoints keep their previous request
+        # count.  Gated exactly like sync: no fan-out on an already
+        # encoded reflection.
+        quote_escaped = False
+        if verifier.marker_forms_enabled() and not marker_escaped:
+            quote_escaped = await self._detect_quote_escaping_async(
+                session, url, method, params, data, param, is_body)
+            if quote_escaped:
+                self._touch_coverage(
+                    url, "L1_marker_forms", method,
+                    detail=("quote-escaping filter detected -> marker form "
+                            "fan-out (single/double/backtick/numeric)"))
+
         # Phase 132: ``return`` on the first confirmed payload used to end
         # ``_probe_param`` outright, so the position shift, the CSP-nonce
         # exploit AND the L7 parameter layers were all skipped on exactly
@@ -1798,10 +1854,25 @@ class AsyncDetectionLayersMixin:
         # ``not confirmed`` and reaches _run_advanced_layers unconditionally),
         # so this mirrors that: flag + break, later stages gated on the flag.
         param_confirmed = False
+        tried = 0
         for payload in cands:
             if param_confirmed:
                 break
-            marked = verifier.mark(payload, marker)
+            tried += 1
+            # Phase 357 (sync parity): the primary form preserves the
+            # payload's OWN alert() argument style -- an operator payload
+            # ``<svg/onload=alert(999)>`` stays unquoted instead of being
+            # rewritten to ``alert('tok')``, which addslashes would break.
+            # Extra quote shapes are probed only on a quote-escaping target
+            # and only for the first two candidates (budget trim, same as
+            # sync scanner.py:949).
+            if verifier.marker_forms_enabled():
+                _budget = 4 if (quote_escaped and tried <= 2) else 1
+                forms = verifier.stamp_forms_or_legacy(payload, marker, _budget)
+            else:
+                forms = [("single", marker, verifier.mark(payload, marker))]
+            _primary_form, token, marked = forms[0]
+            extra_forms = forms[1:]
             # Phase 310/311 (sync parity, scanner.py:824): one row per base
             # payload dispatched, stamped with the payload's real corpus
             # family (Phase 311 tagged sampler).  Derived strings the
@@ -1819,10 +1890,24 @@ class AsyncDetectionLayersMixin:
             # never sent -- self.max_transforms was stored but unused, which
             # left async with a large false-negative gap on filtered targets.
             variants = await asyncio.to_thread(
-                self._build_variants, marked, context, marker,
+                self._build_variants, marked, context, token,
                 2 if marker_escaped else None)
+            # Phase 357: the extra marker shapes ride as plain probes right
+            # after the primary identity variant and before the ladder -- the
+            # payload's own style always gets the first word (sync parity).
+            # Each variant carries its own effective token (the unquoted
+            # shape verifies on a numeric alias), so the verifier must look
+            # for that token, not the base marker.
+            variant_tokens = {}
+            _insert_at = 1
+            for _form, _eff, _fm in extra_forms:
+                if _eff in _fm:
+                    variants.insert(_insert_at, (["marker:" + _form], _fm))
+                    variant_tokens[_fm] = _eff
+                    _insert_at += 1
 
             for tchain, variant in variants:
+                _tok = variant_tokens.get(variant, token)
                 send_params, send_data = self._probe_kv(
                     params, data, param, variant, is_body)
                 try:
@@ -1849,7 +1934,7 @@ class AsyncDetectionLayersMixin:
                     continue
                 # Verify execution (CPU-bound) -- run in thread.
                 v = await asyncio.to_thread(verifier.verify_semantic,
-                                            text, marker,
+                                            text, _tok,
                                             response_headers=resp_headers)
                 # Phase 165 (sync parity, scanner._try_payload): the token
                 # survived -- did the PAYLOAD?  Keep looking otherwise.
@@ -1870,8 +1955,8 @@ class AsyncDetectionLayersMixin:
                         sink_context=v.get("context"),
                         payload=variant,
                         severity=_sev,
-                        evidence=text[max(0, text.find(marker)-30):
-                                      text.find(marker)+len(marker)+30],
+                        evidence=text[max(0, text.find(_tok)-30):
+                                      text.find(_tok)+len(_tok)+30],
                         type=("polyglot_reflection" if _is_poly
                               else "reflected"),
                         confidence=_conf,
@@ -1900,7 +1985,7 @@ class AsyncDetectionLayersMixin:
             # eats the concat variant just as dead as the plain one, and the
             # Phase 27-1 convergence budget must not grow by 2/payload
             # (test_async_escaped_convergence pins that ceiling).
-            if not param_confirmed and not marker_escaped:
+            if not param_confirmed and not marker_escaped and not quote_escaped:
                 concat_marked = verifier.mark(payload, marker, style="concat")
                 if concat_marked != marked:
                     concat_retry: list = [([], concat_marked)]

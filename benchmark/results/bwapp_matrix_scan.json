@@ -1,5 +1,5 @@
 {
-  "generated": "2026-11-03T23:03:27",
+  "generated": "2026-11-04T05:08:38",
   "scans": [
     {
       "level": "low",
@@ -14,7 +14,7 @@
             "param": "firstname",
             "severity": "high",
             "confidence": "high",
-            "payload": "<img/src=\"x\"/onerror=alert('xssv_28a84a97')//>",
+            "payload": "<img/src=\"x\"/onerror=alert('xssv_707eb0e7')//>",
             "context": "html_element",
             "detail": "token reflected in context 'event_handler' | no browser replay available; execution unverified",
             "evidence_class": "browser-unavailable",
@@ -26,277 +26,7 @@
             "param": "lastname",
             "severity": "high",
             "confidence": "high",
-            "payload": "<img/src=\"x\"/onerror=alert('xssv_112933ed')//>",
-            "context": "html_element",
-            "detail": "token reflected in context 'event_handler' | no browser replay available; execution unverified",
-            "evidence_class": "browser-unavailable",
-            "url": "http://127.0.0.1:8081/xss_get.php",
-            "method": "GET"
-          }
-        ],
-        "seconds": 1.6,
-        "rc": 0,
-        "timeout": false,
-        "all_findings": [
-          {
-            "type": "reflected",
-            "param": "firstname",
-            "severity": "high",
-            "confidence": "high",
-            "payload": "<img/src=\"x\"/onerror=alert('xssv_28a84a97')//>",
-            "context": "html_element",
-            "detail": "token reflected in context 'event_handler' | no browser replay available; execution unverified",
-            "evidence_class": "browser-unavailable",
-            "url": "http://127.0.0.1:8081/xss_get.php",
-            "method": "GET"
-          },
-          {
-            "type": "reflected",
-            "param": "lastname",
-            "severity": "high",
-            "confidence": "high",
-            "payload": "<img/src=\"x\"/onerror=alert('xssv_112933ed')//>",
-            "context": "html_element",
-            "detail": "token reflected in context 'event_handler' | no browser replay available; execution unverified",
-            "evidence_class": "browser-unavailable",
-            "url": "http://127.0.0.1:8081/xss_get.php",
-            "method": "GET"
-          }
-        ]
-      },
-      "headless": {
-        "detected": true,
-        "hits": [
-          {
-            "type": "reflected",
-            "param": "lastname",
-            "severity": "high",
-            "confidence": "low",
-            "payload": "<img/src=\"x\"/onerror=alert('xssv_fc7970d7')//>",
-            "context": "html_element",
-            "detail": "token reflected in context 'event_handler' | browser replay did NOT reproduce execution: report as unconfirmed, and note this is not proof of absence",
-            "evidence_class": "browser-refuted",
-            "url": "http://127.0.0.1:8081/xss_get.php",
-            "method": "GET"
-          },
-          {
-            "type": "reflected",
-            "param": "firstname",
-            "severity": "high",
-            "confidence": "low",
-            "payload": "<img/src=\"x\"/onerror=alert('xssv_e42cda47')//>",
-            "context": "html_element",
-            "detail": "token reflected in context 'event_handler' | browser replay did NOT reproduce execution: report as unconfirmed, and note this is not proof of absence",
-            "evidence_class": "browser-refuted",
-            "url": "http://127.0.0.1:8081/xss_get.php",
-            "method": "GET"
-          }
-        ],
-        "seconds": 6.1,
-        "rc": 0,
-        "timeout": false,
-        "all_findings": [
-          {
-            "type": "reflected",
-            "param": "lastname",
-            "severity": "high",
-            "confidence": "low",
-            "payload": "<img/src=\"x\"/onerror=alert('xssv_fc7970d7')//>",
-            "context": "html_element",
-            "detail": "token reflected in context 'event_handler' | browser replay did NOT reproduce execution: report as unconfirmed, and note this is not proof of absence",
-            "evidence_class": "browser-refuted",
-            "url": "http://127.0.0.1:8081/xss_get.php",
-            "method": "GET"
-          },
-          {
-            "type": "reflected",
-            "param": "firstname",
-            "severity": "high",
-            "confidence": "low",
-            "payload": "<img/src=\"x\"/onerror=alert('xssv_e42cda47')//>",
-            "context": "html_element",
-            "detail": "token reflected in context 'event_handler' | browser replay did NOT reproduce execution: report as unconfirmed, and note this is not proof of absence",
-            "evidence_class": "browser-refuted",
-            "url": "http://127.0.0.1:8081/xss_get.php",
-            "method": "GET"
-          }
-        ]
-      }
-    },
-    {
-      "level": "low",
-      "level_id": 0,
-      "face": "stored",
-      "role": "bwuser",
-      "default": {
-        "detected": true,
-        "hits": [
-          {
-            "type": "stored",
-            "param": "entry",
-            "severity": "high",
-            "confidence": "high",
-            "payload": "<img/src=\"x\"/onerror=alert('xssv_c82d69ab')//>",
-            "context": "stored_view",
-            "detail": "payload persisted and rendered in an executable context in http://127.0.0.1:8081/xss_stored_1.php (token reflected in context 'event_handler'; explicit viewer page rendered the payload) | no browser replay available; execution unverified",
-            "evidence_class": "browser-unavailable",
-            "url": "http://127.0.0.1:8081/xss_stored_1.php",
-            "method": "POST"
-          }
-        ],
-        "seconds": 1.3,
-        "rc": 0,
-        "timeout": false,
-        "all_findings": [
-          {
-            "type": "stored",
-            "param": "entry",
-            "severity": "high",
-            "confidence": "high",
-            "payload": "<img/src=\"x\"/onerror=alert('xssv_c82d69ab')//>",
-            "context": "stored_view",
-            "detail": "payload persisted and rendered in an executable context in http://127.0.0.1:8081/xss_stored_1.php (token reflected in context 'event_handler'; explicit viewer page rendered the payload) | no browser replay available; execution unverified",
-            "evidence_class": "browser-unavailable",
-            "url": "http://127.0.0.1:8081/xss_stored_1.php",
-            "method": "POST"
-          }
-        ]
-      },
-      "headless": {
-        "detected": true,
-        "hits": [
-          {
-            "type": "stored",
-            "param": "entry",
-            "severity": "high",
-            "confidence": "low",
-            "payload": "<img/src=\"x\"/onerror=alert('xssv_78484000')//>",
-            "context": "stored_view",
-            "detail": "payload persisted and rendered in an executable context in http://127.0.0.1:8081/xss_stored_1.php (token reflected in context 'event_handler'; explicit viewer page rendered the payload) | no browser replay available; execution unverified | browser replay did NOT reproduce execution: report as unconfirmed, and note this is not proof of absence",
-            "evidence_class": "browser-refuted",
-            "url": "http://127.0.0.1:8081/xss_stored_1.php",
-            "method": "POST"
-          }
-        ],
-        "seconds": 2.6,
-        "rc": 0,
-        "timeout": false,
-        "all_findings": [
-          {
-            "type": "stored",
-            "param": "entry",
-            "severity": "high",
-            "confidence": "low",
-            "payload": "<img/src=\"x\"/onerror=alert('xssv_78484000')//>",
-            "context": "stored_view",
-            "detail": "payload persisted and rendered in an executable context in http://127.0.0.1:8081/xss_stored_1.php (token reflected in context 'event_handler'; explicit viewer page rendered the payload) | no browser replay available; execution unverified | browser replay did NOT reproduce execution: report as unconfirmed, and note this is not proof of absence",
-            "evidence_class": "browser-refuted",
-            "url": "http://127.0.0.1:8081/xss_stored_1.php",
-            "method": "POST"
-          }
-        ]
-      }
-    },
-    {
-      "level": "low",
-      "level_id": 0,
-      "face": "header",
-      "role": "bwuser",
-      "default": {
-        "detected": true,
-        "hits": [
-          {
-            "type": "header_xss",
-            "param": "(header:User-Agent)",
-            "severity": "medium",
-            "confidence": "high",
-            "payload": "<svg/onload=alert('xsshd_d6bc38')>",
-            "context": "text",
-            "detail": "payload reflected from User-Agent header: token reflected in context 'event_handler' | severity capped to medium: high claim with neither browser evidence nor a verifiable proof (evidence-shape rule)",
-            "evidence_class": "browser-unavailable",
-            "url": "http://127.0.0.1:8081/xss_user_agent.php",
-            "method": "GET"
-          }
-        ],
-        "seconds": 1.4,
-        "rc": 0,
-        "timeout": false,
-        "all_findings": [
-          {
-            "type": "header_xss",
-            "param": "(header:User-Agent)",
-            "severity": "medium",
-            "confidence": "high",
-            "payload": "<svg/onload=alert('xsshd_d6bc38')>",
-            "context": "text",
-            "detail": "payload reflected from User-Agent header: token reflected in context 'event_handler' | severity capped to medium: high claim with neither browser evidence nor a verifiable proof (evidence-shape rule)",
-            "evidence_class": "browser-unavailable",
-            "url": "http://127.0.0.1:8081/xss_user_agent.php",
-            "method": "GET"
-          }
-        ]
-      },
-      "headless": {
-        "detected": true,
-        "hits": [
-          {
-            "type": "header_xss",
-            "param": "(header:User-Agent)",
-            "severity": "medium",
-            "confidence": "low",
-            "payload": "<svg/onload=alert('xsshd_1445ba')>",
-            "context": "text",
-            "detail": "payload reflected from User-Agent header: token reflected in context 'event_handler' | browser replay did NOT reproduce execution: report as unconfirmed, and note this is not proof of absence | severity capped to medium: high claim with neither browser evidence nor a verifiable proof (evidence-shape rule)",
-            "evidence_class": "browser-refuted",
-            "url": "http://127.0.0.1:8081/xss_user_agent.php",
-            "method": "GET"
-          }
-        ],
-        "seconds": 2.7,
-        "rc": 0,
-        "timeout": false,
-        "all_findings": [
-          {
-            "type": "header_xss",
-            "param": "(header:User-Agent)",
-            "severity": "medium",
-            "confidence": "low",
-            "payload": "<svg/onload=alert('xsshd_1445ba')>",
-            "context": "text",
-            "detail": "payload reflected from User-Agent header: token reflected in context 'event_handler' | browser replay did NOT reproduce execution: report as unconfirmed, and note this is not proof of absence | severity capped to medium: high claim with neither browser evidence nor a verifiable proof (evidence-shape rule)",
-            "evidence_class": "browser-refuted",
-            "url": "http://127.0.0.1:8081/xss_user_agent.php",
-            "method": "GET"
-          }
-        ]
-      }
-    },
-    {
-      "level": "low",
-      "level_id": 0,
-      "face": "reflected",
-      "role": "bee",
-      "default": {
-        "detected": true,
-        "hits": [
-          {
-            "type": "reflected",
-            "param": "lastname",
-            "severity": "high",
-            "confidence": "high",
-            "payload": "<img/src=\"x\"/onerror=alert('xssv_da3ffa6f')//>",
-            "context": "html_element",
-            "detail": "token reflected in context 'event_handler' | no browser replay available; execution unverified",
-            "evidence_class": "browser-unavailable",
-            "url": "http://127.0.0.1:8081/xss_get.php",
-            "method": "GET"
-          },
-          {
-            "type": "reflected",
-            "param": "firstname",
-            "severity": "high",
-            "confidence": "high",
-            "payload": "<img/src=\"x\"/onerror=alert('xssv_53b29eba')//>",
+            "payload": "<img/src=\"x\"/onerror=alert('xssv_b1ec5448')//>",
             "context": "html_element",
             "detail": "token reflected in context 'event_handler' | no browser replay available; execution unverified",
             "evidence_class": "browser-unavailable",
@@ -305,15 +35,17 @@
           }
         ],
         "seconds": 1.5,
+        "requests": 50,
+        "requests_attempted": 48,
         "rc": 0,
         "timeout": false,
         "all_findings": [
           {
             "type": "reflected",
-            "param": "lastname",
+            "param": "firstname",
             "severity": "high",
             "confidence": "high",
-            "payload": "<img/src=\"x\"/onerror=alert('xssv_da3ffa6f')//>",
+            "payload": "<img/src=\"x\"/onerror=alert('xssv_707eb0e7')//>",
             "context": "html_element",
             "detail": "token reflected in context 'event_handler' | no browser replay available; execution unverified",
             "evidence_class": "browser-unavailable",
@@ -322,10 +54,10 @@
           },
           {
             "type": "reflected",
-            "param": "firstname",
+            "param": "lastname",
             "severity": "high",
             "confidence": "high",
-            "payload": "<img/src=\"x\"/onerror=alert('xssv_53b29eba')//>",
+            "payload": "<img/src=\"x\"/onerror=alert('xssv_b1ec5448')//>",
             "context": "html_element",
             "detail": "token reflected in context 'event_handler' | no browser replay available; execution unverified",
             "evidence_class": "browser-unavailable",
@@ -339,10 +71,10 @@
         "hits": [
           {
             "type": "reflected",
-            "param": "lastname",
+            "param": "firstname",
             "severity": "high",
             "confidence": "low",
-            "payload": "<img/src=\"x\"/onerror=alert('xssv_23c12a43')//>",
+            "payload": "<img/src=\"x\"/onerror=alert('xssv_170b79a3')//>",
             "context": "html_element",
             "detail": "token reflected in context 'event_handler' | browser replay did NOT reproduce execution: report as unconfirmed, and note this is not proof of absence",
             "evidence_class": "browser-refuted",
@@ -351,10 +83,10 @@
           },
           {
             "type": "reflected",
-            "param": "firstname",
+            "param": "lastname",
             "severity": "high",
             "confidence": "low",
-            "payload": "<img/src=\"x\"/onerror=alert('xssv_3cfc2ffa')//>",
+            "payload": "<img/src=\"x\"/onerror=alert('xssv_4ba5de0f')//>",
             "context": "html_element",
             "detail": "token reflected in context 'event_handler' | browser replay did NOT reproduce execution: report as unconfirmed, and note this is not proof of absence",
             "evidence_class": "browser-refuted",
@@ -362,16 +94,18 @@
             "method": "GET"
           }
         ],
-        "seconds": 4.7,
+        "seconds": 6.0,
+        "requests": 50,
+        "requests_attempted": 48,
         "rc": 0,
         "timeout": false,
         "all_findings": [
           {
             "type": "reflected",
-            "param": "lastname",
+            "param": "firstname",
             "severity": "high",
             "confidence": "low",
-            "payload": "<img/src=\"x\"/onerror=alert('xssv_23c12a43')//>",
+            "payload": "<img/src=\"x\"/onerror=alert('xssv_170b79a3')//>",
             "context": "html_element",
             "detail": "token reflected in context 'event_handler' | browser replay did NOT reproduce execution: report as unconfirmed, and note this is not proof of absence",
             "evidence_class": "browser-refuted",
@@ -380,10 +114,292 @@
           },
           {
             "type": "reflected",
+            "param": "lastname",
+            "severity": "high",
+            "confidence": "low",
+            "payload": "<img/src=\"x\"/onerror=alert('xssv_4ba5de0f')//>",
+            "context": "html_element",
+            "detail": "token reflected in context 'event_handler' | browser replay did NOT reproduce execution: report as unconfirmed, and note this is not proof of absence",
+            "evidence_class": "browser-refuted",
+            "url": "http://127.0.0.1:8081/xss_get.php",
+            "method": "GET"
+          }
+        ]
+      }
+    },
+    {
+      "level": "low",
+      "level_id": 0,
+      "face": "stored",
+      "role": "bwuser",
+      "default": {
+        "detected": true,
+        "hits": [
+          {
+            "type": "stored",
+            "param": "entry",
+            "severity": "high",
+            "confidence": "high",
+            "payload": "<img/src=\"x\"/onerror=alert(8900080833)//>",
+            "context": "stored_view",
+            "detail": "payload persisted and rendered in an executable context in http://127.0.0.1:8081/xss_stored_1.php (token reflected in context 'event_handler'; explicit viewer page rendered the payload) | no browser replay available; execution unverified",
+            "evidence_class": "browser-unavailable",
+            "url": "http://127.0.0.1:8081/xss_stored_1.php",
+            "method": "POST"
+          }
+        ],
+        "seconds": 1.3,
+        "requests": 25,
+        "requests_attempted": 37,
+        "rc": 0,
+        "timeout": false,
+        "all_findings": [
+          {
+            "type": "stored",
+            "param": "entry",
+            "severity": "high",
+            "confidence": "high",
+            "payload": "<img/src=\"x\"/onerror=alert(8900080833)//>",
+            "context": "stored_view",
+            "detail": "payload persisted and rendered in an executable context in http://127.0.0.1:8081/xss_stored_1.php (token reflected in context 'event_handler'; explicit viewer page rendered the payload) | no browser replay available; execution unverified",
+            "evidence_class": "browser-unavailable",
+            "url": "http://127.0.0.1:8081/xss_stored_1.php",
+            "method": "POST"
+          }
+        ]
+      },
+      "headless": {
+        "detected": true,
+        "hits": [
+          {
+            "type": "stored",
+            "param": "entry",
+            "severity": "high",
+            "confidence": "high",
+            "payload": "<img/src=\"x\"/onerror=alert(5131326403)//>",
+            "context": "stored_view",
+            "detail": "payload persisted and rendered in an executable context in http://127.0.0.1:8081/xss_stored_1.php (token reflected in context 'event_handler'; explicit viewer page rendered the payload) | no browser replay available; execution unverified",
+            "evidence_class": "browser-unavailable",
+            "url": "http://127.0.0.1:8081/xss_stored_1.php",
+            "method": "POST"
+          }
+        ],
+        "seconds": 1.3,
+        "requests": 25,
+        "requests_attempted": 37,
+        "rc": 0,
+        "timeout": false,
+        "all_findings": [
+          {
+            "type": "stored",
+            "param": "entry",
+            "severity": "high",
+            "confidence": "high",
+            "payload": "<img/src=\"x\"/onerror=alert(5131326403)//>",
+            "context": "stored_view",
+            "detail": "payload persisted and rendered in an executable context in http://127.0.0.1:8081/xss_stored_1.php (token reflected in context 'event_handler'; explicit viewer page rendered the payload) | no browser replay available; execution unverified",
+            "evidence_class": "browser-unavailable",
+            "url": "http://127.0.0.1:8081/xss_stored_1.php",
+            "method": "POST"
+          }
+        ]
+      }
+    },
+    {
+      "level": "low",
+      "level_id": 0,
+      "face": "header",
+      "role": "bwuser",
+      "default": {
+        "detected": true,
+        "hits": [
+          {
+            "type": "header_xss",
+            "param": "(header:User-Agent)",
+            "severity": "medium",
+            "confidence": "high",
+            "payload": "<svg/onload=alert(6150269086)>",
+            "context": "text",
+            "detail": "payload reflected from User-Agent header: token reflected in context 'event_handler' | severity capped to medium: high claim with neither browser evidence nor a verifiable proof (evidence-shape rule)",
+            "evidence_class": "browser-unavailable",
+            "url": "http://127.0.0.1:8081/xss_user_agent.php",
+            "method": "GET"
+          }
+        ],
+        "seconds": 1.3,
+        "requests": 25,
+        "requests_attempted": 37,
+        "rc": 0,
+        "timeout": false,
+        "all_findings": [
+          {
+            "type": "header_xss",
+            "param": "(header:User-Agent)",
+            "severity": "medium",
+            "confidence": "high",
+            "payload": "<svg/onload=alert(6150269086)>",
+            "context": "text",
+            "detail": "payload reflected from User-Agent header: token reflected in context 'event_handler' | severity capped to medium: high claim with neither browser evidence nor a verifiable proof (evidence-shape rule)",
+            "evidence_class": "browser-unavailable",
+            "url": "http://127.0.0.1:8081/xss_user_agent.php",
+            "method": "GET"
+          }
+        ]
+      },
+      "headless": {
+        "detected": true,
+        "hits": [
+          {
+            "type": "header_xss",
+            "param": "(header:User-Agent)",
+            "severity": "medium",
+            "confidence": "high",
+            "payload": "<svg/onload=alert(2530168609)>",
+            "context": "text",
+            "detail": "payload reflected from User-Agent header: token reflected in context 'event_handler' | severity capped to medium: high claim with neither browser evidence nor a verifiable proof (evidence-shape rule)",
+            "evidence_class": "browser-unavailable",
+            "url": "http://127.0.0.1:8081/xss_user_agent.php",
+            "method": "GET"
+          }
+        ],
+        "seconds": 1.2,
+        "requests": 25,
+        "requests_attempted": 37,
+        "rc": 0,
+        "timeout": false,
+        "all_findings": [
+          {
+            "type": "header_xss",
+            "param": "(header:User-Agent)",
+            "severity": "medium",
+            "confidence": "high",
+            "payload": "<svg/onload=alert(2530168609)>",
+            "context": "text",
+            "detail": "payload reflected from User-Agent header: token reflected in context 'event_handler' | severity capped to medium: high claim with neither browser evidence nor a verifiable proof (evidence-shape rule)",
+            "evidence_class": "browser-unavailable",
+            "url": "http://127.0.0.1:8081/xss_user_agent.php",
+            "method": "GET"
+          }
+        ]
+      }
+    },
+    {
+      "level": "low",
+      "level_id": 0,
+      "face": "reflected",
+      "role": "bee",
+      "default": {
+        "detected": true,
+        "hits": [
+          {
+            "type": "reflected",
+            "param": "lastname",
+            "severity": "high",
+            "confidence": "high",
+            "payload": "<img/src=\"x\"/onerror=alert('xssv_aec62de5')//>",
+            "context": "html_element",
+            "detail": "token reflected in context 'event_handler' | no browser replay available; execution unverified",
+            "evidence_class": "browser-unavailable",
+            "url": "http://127.0.0.1:8081/xss_get.php",
+            "method": "GET"
+          },
+          {
+            "type": "reflected",
+            "param": "firstname",
+            "severity": "high",
+            "confidence": "high",
+            "payload": "<img/src=\"x\"/onerror=alert('xssv_ef120b5f')//>",
+            "context": "html_element",
+            "detail": "token reflected in context 'event_handler' | no browser replay available; execution unverified",
+            "evidence_class": "browser-unavailable",
+            "url": "http://127.0.0.1:8081/xss_get.php",
+            "method": "GET"
+          }
+        ],
+        "seconds": 1.5,
+        "requests": 50,
+        "requests_attempted": 48,
+        "rc": 0,
+        "timeout": false,
+        "all_findings": [
+          {
+            "type": "reflected",
+            "param": "lastname",
+            "severity": "high",
+            "confidence": "high",
+            "payload": "<img/src=\"x\"/onerror=alert('xssv_aec62de5')//>",
+            "context": "html_element",
+            "detail": "token reflected in context 'event_handler' | no browser replay available; execution unverified",
+            "evidence_class": "browser-unavailable",
+            "url": "http://127.0.0.1:8081/xss_get.php",
+            "method": "GET"
+          },
+          {
+            "type": "reflected",
+            "param": "firstname",
+            "severity": "high",
+            "confidence": "high",
+            "payload": "<img/src=\"x\"/onerror=alert('xssv_ef120b5f')//>",
+            "context": "html_element",
+            "detail": "token reflected in context 'event_handler' | no browser replay available; execution unverified",
+            "evidence_class": "browser-unavailable",
+            "url": "http://127.0.0.1:8081/xss_get.php",
+            "method": "GET"
+          }
+        ]
+      },
+      "headless": {
+        "detected": true,
+        "hits": [
+          {
+            "type": "reflected",
             "param": "firstname",
             "severity": "high",
             "confidence": "low",
-            "payload": "<img/src=\"x\"/onerror=alert('xssv_3cfc2ffa')//>",
+            "payload": "<img/src=\"x\"/onerror=alert('xssv_c8c3ec50')//>",
+            "context": "html_element",
+            "detail": "token reflected in context 'event_handler' | browser replay did NOT reproduce execution: report as unconfirmed, and note this is not proof of absence",
+            "evidence_class": "browser-refuted",
+            "url": "http://127.0.0.1:8081/xss_get.php",
+            "method": "GET"
+          },
+          {
+            "type": "reflected",
+            "param": "lastname",
+            "severity": "high",
+            "confidence": "low",
+            "payload": "<img/src=\"x\"/onerror=alert('xssv_1287f8b5')//>",
+            "context": "html_element",
+            "detail": "token reflected in context 'event_handler' | browser replay did NOT reproduce execution: report as unconfirmed, and note this is not proof of absence",
+            "evidence_class": "browser-refuted",
+            "url": "http://127.0.0.1:8081/xss_get.php",
+            "method": "GET"
+          }
+        ],
+        "seconds": 4.6,
+        "requests": 50,
+        "requests_attempted": 48,
+        "rc": 0,
+        "timeout": false,
+        "all_findings": [
+          {
+            "type": "reflected",
+            "param": "firstname",
+            "severity": "high",
+            "confidence": "low",
+            "payload": "<img/src=\"x\"/onerror=alert('xssv_c8c3ec50')//>",
+            "context": "html_element",
+            "detail": "token reflected in context 'event_handler' | browser replay did NOT reproduce execution: report as unconfirmed, and note this is not proof of absence",
+            "evidence_class": "browser-refuted",
+            "url": "http://127.0.0.1:8081/xss_get.php",
+            "method": "GET"
+          },
+          {
+            "type": "reflected",
+            "param": "lastname",
+            "severity": "high",
+            "confidence": "low",
+            "payload": "<img/src=\"x\"/onerror=alert('xssv_1287f8b5')//>",
             "context": "html_element",
             "detail": "token reflected in context 'event_handler' | browser replay did NOT reproduce execution: report as unconfirmed, and note this is not proof of absence",
             "evidence_class": "browser-refuted",
@@ -406,7 +422,7 @@
             "param": "entry",
             "severity": "high",
             "confidence": "high",
-            "payload": "<img/src=\"x\"/onerror=alert('xssv_8ea12048')//>",
+            "payload": "<img/src=\"x\"/onerror=alert(5787061562)//>",
             "context": "stored_view",
             "detail": "payload persisted and rendered in an executable context in http://127.0.0.1:8081/xss_stored_1.php (token reflected in context 'event_handler'; explicit viewer page rendered the payload) | no browser replay available; execution unverified",
             "evidence_class": "browser-unavailable",
@@ -414,7 +430,9 @@
             "method": "POST"
           }
         ],
-        "seconds": 1.4,
+        "seconds": 1.3,
+        "requests": 25,
+        "requests_attempted": 37,
         "rc": 0,
         "timeout": false,
         "all_findings": [
@@ -423,7 +441,7 @@
             "param": "entry",
             "severity": "high",
             "confidence": "high",
-            "payload": "<img/src=\"x\"/onerror=alert('xssv_8ea12048')//>",
+            "payload": "<img/src=\"x\"/onerror=alert(5787061562)//>",
             "context": "stored_view",
             "detail": "payload persisted and rendered in an executable context in http://127.0.0.1:8081/xss_stored_1.php (token reflected in context 'event_handler'; explicit viewer page rendered the payload) | no browser replay available; execution unverified",
             "evidence_class": "browser-unavailable",
@@ -439,16 +457,18 @@
             "type": "stored",
             "param": "entry",
             "severity": "high",
-            "confidence": "low",
-            "payload": "<img/src=\"x\"/onerror=alert('xssv_e155ff09')//>",
+            "confidence": "high",
+            "payload": "<img/src=\"x\"/onerror=alert(9714986881)//>",
             "context": "stored_view",
-            "detail": "payload persisted and rendered in an executable context in http://127.0.0.1:8081/xss_stored_1.php (token reflected in context 'event_handler'; explicit viewer page rendered the payload) | no browser replay available; execution unverified | browser replay did NOT reproduce execution: report as unconfirmed, and note this is not proof of absence",
-            "evidence_class": "browser-refuted",
+            "detail": "payload persisted and rendered in an executable context in http://127.0.0.1:8081/xss_stored_1.php (token reflected in context 'event_handler'; explicit viewer page rendered the payload) | no browser replay available; execution unverified",
+            "evidence_class": "browser-unavailable",
             "url": "http://127.0.0.1:8081/xss_stored_1.php",
             "method": "POST"
           }
         ],
-        "seconds": 2.7,
+        "seconds": 1.4,
+        "requests": 25,
+        "requests_attempted": 37,
         "rc": 0,
         "timeout": false,
         "all_findings": [
@@ -456,11 +476,11 @@
             "type": "stored",
             "param": "entry",
             "severity": "high",
-            "confidence": "low",
-            "payload": "<img/src=\"x\"/onerror=alert('xssv_e155ff09')//>",
+            "confidence": "high",
+            "payload": "<img/src=\"x\"/onerror=alert(9714986881)//>",
             "context": "stored_view",
-            "detail": "payload persisted and rendered in an executable context in http://127.0.0.1:8081/xss_stored_1.php (token reflected in context 'event_handler'; explicit viewer page rendered the payload) | no browser replay available; execution unverified | browser replay did NOT reproduce execution: report as unconfirmed, and note this is not proof of absence",
-            "evidence_class": "browser-refuted",
+            "detail": "payload persisted and rendered in an executable context in http://127.0.0.1:8081/xss_stored_1.php (token reflected in context 'event_handler'; explicit viewer page rendered the payload) | no browser replay available; execution unverified",
+            "evidence_class": "browser-unavailable",
             "url": "http://127.0.0.1:8081/xss_stored_1.php",
             "method": "POST"
           }
@@ -480,7 +500,7 @@
             "param": "(header:User-Agent)",
             "severity": "medium",
             "confidence": "high",
-            "payload": "<svg/onload=alert('xsshd_c3b91b')>",
+            "payload": "<svg/onload=alert(6564460988)>",
             "context": "text",
             "detail": "payload reflected from User-Agent header: token reflected in context 'event_handler' | severity capped to medium: high claim with neither browser evidence nor a verifiable proof (evidence-shape rule)",
             "evidence_class": "browser-unavailable",
@@ -488,395 +508,638 @@
             "method": "GET"
           }
         ],
-        "seconds": 1.4,
-        "rc": 0,
-        "timeout": false,
-        "all_findings": [
-          {
-            "type": "header_xss",
-            "param": "(header:User-Agent)",
-            "severity": "medium",
-            "confidence": "high",
-            "payload": "<svg/onload=alert('xsshd_c3b91b')>",
-            "context": "text",
-            "detail": "payload reflected from User-Agent header: token reflected in context 'event_handler' | severity capped to medium: high claim with neither browser evidence nor a verifiable proof (evidence-shape rule)",
-            "evidence_class": "browser-unavailable",
-            "url": "http://127.0.0.1:8081/xss_user_agent.php",
-            "method": "GET"
-          }
-        ]
-      },
-      "headless": {
-        "detected": true,
-        "hits": [
-          {
-            "type": "header_xss",
-            "param": "(header:User-Agent)",
-            "severity": "medium",
-            "confidence": "low",
-            "payload": "<svg/onload=alert('xsshd_f9991a')>",
-            "context": "text",
-            "detail": "payload reflected from User-Agent header: token reflected in context 'event_handler' | browser replay did NOT reproduce execution: report as unconfirmed, and note this is not proof of absence | severity capped to medium: high claim with neither browser evidence nor a verifiable proof (evidence-shape rule)",
-            "evidence_class": "browser-refuted",
-            "url": "http://127.0.0.1:8081/xss_user_agent.php",
-            "method": "GET"
-          }
-        ],
-        "seconds": 2.7,
-        "rc": 0,
-        "timeout": false,
-        "all_findings": [
-          {
-            "type": "header_xss",
-            "param": "(header:User-Agent)",
-            "severity": "medium",
-            "confidence": "low",
-            "payload": "<svg/onload=alert('xsshd_f9991a')>",
-            "context": "text",
-            "detail": "payload reflected from User-Agent header: token reflected in context 'event_handler' | browser replay did NOT reproduce execution: report as unconfirmed, and note this is not proof of absence | severity capped to medium: high claim with neither browser evidence nor a verifiable proof (evidence-shape rule)",
-            "evidence_class": "browser-refuted",
-            "url": "http://127.0.0.1:8081/xss_user_agent.php",
-            "method": "GET"
-          }
-        ]
-      }
-    },
-    {
-      "level": "medium",
-      "level_id": 1,
-      "face": "reflected",
-      "role": "bwuser",
-      "default": {
-        "detected": false,
-        "hits": [],
-        "seconds": 5.0,
-        "rc": 0,
-        "timeout": false,
-        "all_findings": []
-      },
-      "headless": {
-        "detected": false,
-        "hits": [],
-        "seconds": 4.8,
-        "rc": 0,
-        "timeout": false,
-        "all_findings": []
-      }
-    },
-    {
-      "level": "medium",
-      "level_id": 1,
-      "face": "stored",
-      "role": "bwuser",
-      "default": {
-        "detected": true,
-        "hits": [
-          {
-            "type": "stored",
-            "param": "entry",
-            "severity": "high",
-            "confidence": "high",
-            "payload": "%00<svg%00/onload=alert(%00'xssv_f96e6ac3%00')%00>",
-            "context": "stored_view",
-            "detail": "payload persisted and rendered in an executable context in http://127.0.0.1:8081/xss_stored_1.php (token reflected inside <script> element text; explicit viewer page rendered the payload) | no browser replay available; execution unverified",
-            "evidence_class": "browser-unavailable",
-            "url": "http://127.0.0.1:8081/xss_stored_1.php",
-            "method": "POST"
-          }
-        ],
-        "seconds": 1.8,
-        "rc": 0,
-        "timeout": false,
-        "all_findings": [
-          {
-            "type": "stored",
-            "param": "entry",
-            "severity": "high",
-            "confidence": "high",
-            "payload": "%00<svg%00/onload=alert(%00'xssv_f96e6ac3%00')%00>",
-            "context": "stored_view",
-            "detail": "payload persisted and rendered in an executable context in http://127.0.0.1:8081/xss_stored_1.php (token reflected inside <script> element text; explicit viewer page rendered the payload) | no browser replay available; execution unverified",
-            "evidence_class": "browser-unavailable",
-            "url": "http://127.0.0.1:8081/xss_stored_1.php",
-            "method": "POST"
-          }
-        ]
-      },
-      "headless": {
-        "detected": true,
-        "hits": [
-          {
-            "type": "stored",
-            "param": "entry",
-            "severity": "high",
-            "confidence": "low",
-            "payload": "%00<svg%00/onload=alert(%00'xssv_9adfb1c4%00')%00>",
-            "context": "stored_view",
-            "detail": "payload persisted and rendered in an executable context in http://127.0.0.1:8081/xss_stored_1.php (token reflected inside <script> element text; explicit viewer page rendered the payload) | no browser replay available; execution unverified | browser replay did NOT reproduce execution: report as unconfirmed, and note this is not proof of absence",
-            "evidence_class": "browser-refuted",
-            "url": "http://127.0.0.1:8081/xss_stored_1.php",
-            "method": "POST"
-          }
-        ],
-        "seconds": 3.2,
-        "rc": 0,
-        "timeout": false,
-        "all_findings": [
-          {
-            "type": "stored",
-            "param": "entry",
-            "severity": "high",
-            "confidence": "low",
-            "payload": "%00<svg%00/onload=alert(%00'xssv_9adfb1c4%00')%00>",
-            "context": "stored_view",
-            "detail": "payload persisted and rendered in an executable context in http://127.0.0.1:8081/xss_stored_1.php (token reflected inside <script> element text; explicit viewer page rendered the payload) | no browser replay available; execution unverified | browser replay did NOT reproduce execution: report as unconfirmed, and note this is not proof of absence",
-            "evidence_class": "browser-refuted",
-            "url": "http://127.0.0.1:8081/xss_stored_1.php",
-            "method": "POST"
-          }
-        ]
-      }
-    },
-    {
-      "level": "medium",
-      "level_id": 1,
-      "face": "header",
-      "role": "bwuser",
-      "default": {
-        "detected": false,
-        "hits": [],
-        "seconds": 1.4,
-        "rc": 0,
-        "timeout": false,
-        "all_findings": []
-      },
-      "headless": {
-        "detected": false,
-        "hits": [],
         "seconds": 1.3,
+        "requests": 25,
+        "requests_attempted": 37,
         "rc": 0,
         "timeout": false,
-        "all_findings": []
+        "all_findings": [
+          {
+            "type": "header_xss",
+            "param": "(header:User-Agent)",
+            "severity": "medium",
+            "confidence": "high",
+            "payload": "<svg/onload=alert(6564460988)>",
+            "context": "text",
+            "detail": "payload reflected from User-Agent header: token reflected in context 'event_handler' | severity capped to medium: high claim with neither browser evidence nor a verifiable proof (evidence-shape rule)",
+            "evidence_class": "browser-unavailable",
+            "url": "http://127.0.0.1:8081/xss_user_agent.php",
+            "method": "GET"
+          }
+        ]
+      },
+      "headless": {
+        "detected": true,
+        "hits": [
+          {
+            "type": "header_xss",
+            "param": "(header:User-Agent)",
+            "severity": "medium",
+            "confidence": "high",
+            "payload": "<svg/onload=alert(7021702249)>",
+            "context": "text",
+            "detail": "payload reflected from User-Agent header: token reflected in context 'event_handler' | severity capped to medium: high claim with neither browser evidence nor a verifiable proof (evidence-shape rule)",
+            "evidence_class": "browser-unavailable",
+            "url": "http://127.0.0.1:8081/xss_user_agent.php",
+            "method": "GET"
+          }
+        ],
+        "seconds": 1.3,
+        "requests": 25,
+        "requests_attempted": 37,
+        "rc": 0,
+        "timeout": false,
+        "all_findings": [
+          {
+            "type": "header_xss",
+            "param": "(header:User-Agent)",
+            "severity": "medium",
+            "confidence": "high",
+            "payload": "<svg/onload=alert(7021702249)>",
+            "context": "text",
+            "detail": "payload reflected from User-Agent header: token reflected in context 'event_handler' | severity capped to medium: high claim with neither browser evidence nor a verifiable proof (evidence-shape rule)",
+            "evidence_class": "browser-unavailable",
+            "url": "http://127.0.0.1:8081/xss_user_agent.php",
+            "method": "GET"
+          }
+        ]
       }
     },
     {
       "level": "medium",
       "level_id": 1,
       "face": "reflected",
-      "role": "bee",
+      "role": "bwuser",
       "default": {
-        "detected": false,
-        "hits": [],
-        "seconds": 4.9,
-        "rc": 0,
-        "timeout": false,
-        "all_findings": []
-      },
-      "headless": {
-        "detected": false,
-        "hits": [],
-        "seconds": 4.9,
-        "rc": 0,
-        "timeout": false,
-        "all_findings": [
+        "detected": true,
+        "hits": [
           {
-            "type": "polyglot_reflection",
+            "type": "reflected",
             "param": "firstname",
-            "severity": "medium",
-            "confidence": "medium",
-            "payload": "\">\"</script></style>-->><marquee onstart=alert('xss_poly_b8c4c47c')>",
-            "context": "event_handler",
-            "evidence_class": "model-only",
+            "severity": "high",
+            "confidence": "high",
+            "payload": "<script>alert(7791798918)</script>",
+            "context": "html_element",
+            "detail": "token reflected inside <script> element text | no browser replay available; execution unverified",
+            "evidence_class": "browser-unavailable",
+            "url": "http://127.0.0.1:8081/xss_get.php",
+            "method": "GET"
+          },
+          {
+            "type": "reflected",
+            "param": "lastname",
+            "severity": "high",
+            "confidence": "high",
+            "payload": "<script>alert(3376750888)</script>",
+            "context": "html_element",
+            "detail": "token reflected inside <script> element text | no browser replay available; execution unverified",
+            "evidence_class": "browser-unavailable",
             "url": "http://127.0.0.1:8081/xss_get.php",
             "method": "GET"
           }
-        ]
-      }
-    },
-    {
-      "level": "medium",
-      "level_id": 1,
-      "face": "stored",
-      "role": "bee",
-      "default": {
-        "detected": true,
-        "hits": [
-          {
-            "type": "stored",
-            "param": "entry",
-            "severity": "high",
-            "confidence": "high",
-            "payload": "%00<svg%00/onload=alert(%00'xssv_ea54c3aa%00')%00>",
-            "context": "stored_view",
-            "detail": "payload persisted and rendered in an executable context in http://127.0.0.1:8081/xss_stored_1.php (token reflected inside <script> element text; explicit viewer page rendered the payload) | no browser replay available; execution unverified",
-            "evidence_class": "browser-unavailable",
-            "url": "http://127.0.0.1:8081/xss_stored_1.php",
-            "method": "POST"
-          }
         ],
-        "seconds": 1.8,
-        "rc": 0,
-        "timeout": false,
-        "all_findings": [
-          {
-            "type": "stored",
-            "param": "entry",
-            "severity": "high",
-            "confidence": "high",
-            "payload": "%00<svg%00/onload=alert(%00'xssv_ea54c3aa%00')%00>",
-            "context": "stored_view",
-            "detail": "payload persisted and rendered in an executable context in http://127.0.0.1:8081/xss_stored_1.php (token reflected inside <script> element text; explicit viewer page rendered the payload) | no browser replay available; execution unverified",
-            "evidence_class": "browser-unavailable",
-            "url": "http://127.0.0.1:8081/xss_stored_1.php",
-            "method": "POST"
-          }
-        ]
-      },
-      "headless": {
-        "detected": true,
-        "hits": [
-          {
-            "type": "stored",
-            "param": "entry",
-            "severity": "high",
-            "confidence": "low",
-            "payload": "%00<svg%00/onload=alert(%00'xssv_fbeffc32%00')%00>",
-            "context": "stored_view",
-            "detail": "payload persisted and rendered in an executable context in http://127.0.0.1:8081/xss_stored_1.php (token reflected inside <script> element text; explicit viewer page rendered the payload) | no browser replay available; execution unverified | browser replay did NOT reproduce execution: report as unconfirmed, and note this is not proof of absence",
-            "evidence_class": "browser-refuted",
-            "url": "http://127.0.0.1:8081/xss_stored_1.php",
-            "method": "POST"
-          }
-        ],
-        "seconds": 3.2,
-        "rc": 0,
-        "timeout": false,
-        "all_findings": [
-          {
-            "type": "stored",
-            "param": "entry",
-            "severity": "high",
-            "confidence": "low",
-            "payload": "%00<svg%00/onload=alert(%00'xssv_fbeffc32%00')%00>",
-            "context": "stored_view",
-            "detail": "payload persisted and rendered in an executable context in http://127.0.0.1:8081/xss_stored_1.php (token reflected inside <script> element text; explicit viewer page rendered the payload) | no browser replay available; execution unverified | browser replay did NOT reproduce execution: report as unconfirmed, and note this is not proof of absence",
-            "evidence_class": "browser-refuted",
-            "url": "http://127.0.0.1:8081/xss_stored_1.php",
-            "method": "POST"
-          }
-        ]
-      }
-    },
-    {
-      "level": "medium",
-      "level_id": 1,
-      "face": "header",
-      "role": "bee",
-      "default": {
-        "detected": false,
-        "hits": [],
-        "seconds": 1.4,
-        "rc": 0,
-        "timeout": false,
-        "all_findings": []
-      },
-      "headless": {
-        "detected": false,
-        "hits": [],
-        "seconds": 1.3,
-        "rc": 0,
-        "timeout": false,
-        "all_findings": []
-      }
-    },
-    {
-      "level": "high",
-      "level_id": 2,
-      "face": "reflected",
-      "role": "bwuser",
-      "default": {
-        "detected": false,
-        "hits": [],
-        "seconds": 1.9,
-        "rc": 0,
-        "timeout": false,
-        "all_findings": []
-      },
-      "headless": {
-        "detected": false,
-        "hits": [],
-        "seconds": 1.9,
-        "rc": 0,
-        "timeout": false,
-        "all_findings": []
-      }
-    },
-    {
-      "level": "high",
-      "level_id": 2,
-      "face": "stored",
-      "role": "bwuser",
-      "default": {
-        "detected": false,
-        "hits": [],
-        "seconds": 16.2,
-        "rc": 0,
-        "timeout": false,
-        "all_findings": []
-      },
-      "headless": {
-        "detected": false,
-        "hits": [],
-        "seconds": 36.5,
-        "rc": 0,
-        "timeout": false,
-        "all_findings": [
-          {
-            "type": "trusted_types_no_policy",
-            "param": null,
-            "severity": "medium",
-            "confidence": "high",
-            "payload": "(TT: tt_no_policy)",
-            "context": "trusted_types_eval",
-            "detail": "Page uses dangerous DOM sinks without Trusted Types; if a sink receives user-controlled data, DOM XSS is trivially exploitable (TT is the only reliable DOM-XSS mitigation) | align=\"center\">258</td>\n            <td>bwuser</td>\n            <td>2026-11-03 15:01:27</td>\n            <td>javascript:eval(location.hash.slice(1))#alert(&#039;xssv_e5a372fd&#039;)</td>\n\n        </tr",
-            "evidence_class": "browser-unavailable",
-            "url": "http://127.0.0.1:8081/xss_stored_1.php",
-            "method": "GET"
-          }
-        ]
-      }
-    },
-    {
-      "level": "high",
-      "level_id": 2,
-      "face": "header",
-      "role": "bwuser",
-      "default": {
-        "detected": false,
-        "hits": [],
-        "seconds": 2.1,
-        "rc": 0,
-        "timeout": false,
-        "all_findings": []
-      },
-      "headless": {
-        "detected": false,
-        "hits": [],
-        "seconds": 2.0,
-        "rc": 0,
-        "timeout": false,
-        "all_findings": []
-      }
-    },
-    {
-      "level": "high",
-      "level_id": 2,
-      "face": "reflected",
-      "role": "bee",
-      "default": {
-        "detected": false,
-        "hits": [],
         "seconds": 2.8,
+        "requests": 68,
+        "requests_attempted": 66,
+        "rc": 0,
+        "timeout": false,
+        "all_findings": [
+          {
+            "type": "reflected",
+            "param": "firstname",
+            "severity": "high",
+            "confidence": "high",
+            "payload": "<script>alert(7791798918)</script>",
+            "context": "html_element",
+            "detail": "token reflected inside <script> element text | no browser replay available; execution unverified",
+            "evidence_class": "browser-unavailable",
+            "url": "http://127.0.0.1:8081/xss_get.php",
+            "method": "GET"
+          },
+          {
+            "type": "reflected",
+            "param": "lastname",
+            "severity": "high",
+            "confidence": "high",
+            "payload": "<script>alert(3376750888)</script>",
+            "context": "html_element",
+            "detail": "token reflected inside <script> element text | no browser replay available; execution unverified",
+            "evidence_class": "browser-unavailable",
+            "url": "http://127.0.0.1:8081/xss_get.php",
+            "method": "GET"
+          }
+        ]
+      },
+      "headless": {
+        "detected": true,
+        "hits": [
+          {
+            "type": "reflected",
+            "param": "lastname",
+            "severity": "high",
+            "confidence": "low",
+            "payload": "<script>alert(1351574219)</script>",
+            "context": "html_element",
+            "detail": "token reflected inside <script> element text | browser replay did NOT reproduce execution: report as unconfirmed, and note this is not proof of absence",
+            "evidence_class": "browser-refuted",
+            "url": "http://127.0.0.1:8081/xss_get.php",
+            "method": "GET"
+          },
+          {
+            "type": "reflected",
+            "param": "firstname",
+            "severity": "high",
+            "confidence": "low",
+            "payload": "<script>alert(9306504722)</script>",
+            "context": "html_element",
+            "detail": "token reflected inside <script> element text | browser replay did NOT reproduce execution: report as unconfirmed, and note this is not proof of absence",
+            "evidence_class": "browser-refuted",
+            "url": "http://127.0.0.1:8081/xss_get.php",
+            "method": "GET"
+          }
+        ],
+        "seconds": 14.6,
+        "requests": 68,
+        "requests_attempted": 66,
+        "rc": 0,
+        "timeout": false,
+        "all_findings": [
+          {
+            "type": "reflected",
+            "param": "lastname",
+            "severity": "high",
+            "confidence": "low",
+            "payload": "<script>alert(1351574219)</script>",
+            "context": "html_element",
+            "detail": "token reflected inside <script> element text | browser replay did NOT reproduce execution: report as unconfirmed, and note this is not proof of absence",
+            "evidence_class": "browser-refuted",
+            "url": "http://127.0.0.1:8081/xss_get.php",
+            "method": "GET"
+          },
+          {
+            "type": "reflected",
+            "param": "firstname",
+            "severity": "high",
+            "confidence": "low",
+            "payload": "<script>alert(9306504722)</script>",
+            "context": "html_element",
+            "detail": "token reflected inside <script> element text | browser replay did NOT reproduce execution: report as unconfirmed, and note this is not proof of absence",
+            "evidence_class": "browser-refuted",
+            "url": "http://127.0.0.1:8081/xss_get.php",
+            "method": "GET"
+          }
+        ]
+      }
+    },
+    {
+      "level": "medium",
+      "level_id": 1,
+      "face": "stored",
+      "role": "bwuser",
+      "default": {
+        "detected": true,
+        "hits": [
+          {
+            "type": "stored",
+            "param": "entry",
+            "severity": "high",
+            "confidence": "high",
+            "payload": "<script>alert(3782105522)</script>",
+            "context": "stored_view",
+            "detail": "payload persisted and rendered in an executable context in http://127.0.0.1:8081/xss_stored_1.php (token reflected inside <script> element text; explicit viewer page rendered the payload) | no browser replay available; execution unverified",
+            "evidence_class": "browser-unavailable",
+            "url": "http://127.0.0.1:8081/xss_stored_1.php",
+            "method": "POST"
+          }
+        ],
+        "seconds": 11.3,
+        "requests": 45,
+        "requests_attempted": 57,
+        "rc": 0,
+        "timeout": false,
+        "all_findings": [
+          {
+            "type": "stored",
+            "param": "entry",
+            "severity": "high",
+            "confidence": "high",
+            "payload": "<script>alert(3782105522)</script>",
+            "context": "stored_view",
+            "detail": "payload persisted and rendered in an executable context in http://127.0.0.1:8081/xss_stored_1.php (token reflected inside <script> element text; explicit viewer page rendered the payload) | no browser replay available; execution unverified",
+            "evidence_class": "browser-unavailable",
+            "url": "http://127.0.0.1:8081/xss_stored_1.php",
+            "method": "POST"
+          }
+        ]
+      },
+      "headless": {
+        "detected": true,
+        "hits": [
+          {
+            "type": "stored",
+            "param": "entry",
+            "severity": "high",
+            "confidence": "high",
+            "payload": "<script>alert(9899400903)</script>",
+            "context": "stored_view",
+            "detail": "payload persisted and rendered in an executable context in http://127.0.0.1:8081/xss_stored_1.php (token reflected inside <script> element text; explicit viewer page rendered the payload) | no browser replay available; execution unverified",
+            "evidence_class": "browser-unavailable",
+            "url": "http://127.0.0.1:8081/xss_stored_1.php",
+            "method": "POST"
+          }
+        ],
+        "seconds": 1.7,
+        "requests": 45,
+        "requests_attempted": 57,
+        "rc": 0,
+        "timeout": false,
+        "all_findings": [
+          {
+            "type": "stored",
+            "param": "entry",
+            "severity": "high",
+            "confidence": "high",
+            "payload": "<script>alert(9899400903)</script>",
+            "context": "stored_view",
+            "detail": "payload persisted and rendered in an executable context in http://127.0.0.1:8081/xss_stored_1.php (token reflected inside <script> element text; explicit viewer page rendered the payload) | no browser replay available; execution unverified",
+            "evidence_class": "browser-unavailable",
+            "url": "http://127.0.0.1:8081/xss_stored_1.php",
+            "method": "POST"
+          }
+        ]
+      }
+    },
+    {
+      "level": "medium",
+      "level_id": 1,
+      "face": "header",
+      "role": "bwuser",
+      "default": {
+        "detected": true,
+        "hits": [
+          {
+            "type": "header_xss",
+            "param": "(header:User-Agent)",
+            "severity": "medium",
+            "confidence": "high",
+            "payload": "<svg/onload=alert(2622420792)>",
+            "context": "text",
+            "detail": "payload reflected from User-Agent header: token reflected in context 'event_handler' | severity capped to medium: high claim with neither browser evidence nor a verifiable proof (evidence-shape rule)",
+            "evidence_class": "browser-unavailable",
+            "url": "http://127.0.0.1:8081/xss_user_agent.php",
+            "method": "GET"
+          }
+        ],
+        "seconds": 1.2,
+        "requests": 25,
+        "requests_attempted": 37,
+        "rc": 0,
+        "timeout": false,
+        "all_findings": [
+          {
+            "type": "header_xss",
+            "param": "(header:User-Agent)",
+            "severity": "medium",
+            "confidence": "high",
+            "payload": "<svg/onload=alert(2622420792)>",
+            "context": "text",
+            "detail": "payload reflected from User-Agent header: token reflected in context 'event_handler' | severity capped to medium: high claim with neither browser evidence nor a verifiable proof (evidence-shape rule)",
+            "evidence_class": "browser-unavailable",
+            "url": "http://127.0.0.1:8081/xss_user_agent.php",
+            "method": "GET"
+          }
+        ]
+      },
+      "headless": {
+        "detected": true,
+        "hits": [
+          {
+            "type": "header_xss",
+            "param": "(header:User-Agent)",
+            "severity": "medium",
+            "confidence": "high",
+            "payload": "<svg/onload=alert(6504501139)>",
+            "context": "text",
+            "detail": "payload reflected from User-Agent header: token reflected in context 'event_handler' | severity capped to medium: high claim with neither browser evidence nor a verifiable proof (evidence-shape rule)",
+            "evidence_class": "browser-unavailable",
+            "url": "http://127.0.0.1:8081/xss_user_agent.php",
+            "method": "GET"
+          }
+        ],
+        "seconds": 1.2,
+        "requests": 25,
+        "requests_attempted": 37,
+        "rc": 0,
+        "timeout": false,
+        "all_findings": [
+          {
+            "type": "header_xss",
+            "param": "(header:User-Agent)",
+            "severity": "medium",
+            "confidence": "high",
+            "payload": "<svg/onload=alert(6504501139)>",
+            "context": "text",
+            "detail": "payload reflected from User-Agent header: token reflected in context 'event_handler' | severity capped to medium: high claim with neither browser evidence nor a verifiable proof (evidence-shape rule)",
+            "evidence_class": "browser-unavailable",
+            "url": "http://127.0.0.1:8081/xss_user_agent.php",
+            "method": "GET"
+          }
+        ]
+      }
+    },
+    {
+      "level": "medium",
+      "level_id": 1,
+      "face": "reflected",
+      "role": "bee",
+      "default": {
+        "detected": true,
+        "hits": [
+          {
+            "type": "reflected",
+            "param": "lastname",
+            "severity": "high",
+            "confidence": "high",
+            "payload": "<script>alert(4302250969)</script>",
+            "context": "html_element",
+            "detail": "token reflected inside <script> element text | no browser replay available; execution unverified",
+            "evidence_class": "browser-unavailable",
+            "url": "http://127.0.0.1:8081/xss_get.php",
+            "method": "GET"
+          },
+          {
+            "type": "reflected",
+            "param": "firstname",
+            "severity": "high",
+            "confidence": "high",
+            "payload": "<script>alert(7677911360)</script>",
+            "context": "html_element",
+            "detail": "token reflected inside <script> element text | no browser replay available; execution unverified",
+            "evidence_class": "browser-unavailable",
+            "url": "http://127.0.0.1:8081/xss_get.php",
+            "method": "GET"
+          }
+        ],
+        "seconds": 6.5,
+        "requests": 68,
+        "requests_attempted": 66,
+        "rc": 0,
+        "timeout": false,
+        "all_findings": [
+          {
+            "type": "reflected",
+            "param": "lastname",
+            "severity": "high",
+            "confidence": "high",
+            "payload": "<script>alert(4302250969)</script>",
+            "context": "html_element",
+            "detail": "token reflected inside <script> element text | no browser replay available; execution unverified",
+            "evidence_class": "browser-unavailable",
+            "url": "http://127.0.0.1:8081/xss_get.php",
+            "method": "GET"
+          },
+          {
+            "type": "reflected",
+            "param": "firstname",
+            "severity": "high",
+            "confidence": "high",
+            "payload": "<script>alert(7677911360)</script>",
+            "context": "html_element",
+            "detail": "token reflected inside <script> element text | no browser replay available; execution unverified",
+            "evidence_class": "browser-unavailable",
+            "url": "http://127.0.0.1:8081/xss_get.php",
+            "method": "GET"
+          }
+        ]
+      },
+      "headless": {
+        "detected": true,
+        "hits": [
+          {
+            "type": "reflected",
+            "param": "firstname",
+            "severity": "high",
+            "confidence": "low",
+            "payload": "<script>alert(5602152174)</script>",
+            "context": "html_element",
+            "detail": "token reflected inside <script> element text | browser replay did NOT reproduce execution: report as unconfirmed, and note this is not proof of absence",
+            "evidence_class": "browser-refuted",
+            "url": "http://127.0.0.1:8081/xss_get.php",
+            "method": "GET"
+          },
+          {
+            "type": "reflected",
+            "param": "lastname",
+            "severity": "high",
+            "confidence": "low",
+            "payload": "<script>alert(6966552876)</script>",
+            "context": "html_element",
+            "detail": "token reflected inside <script> element text | browser replay did NOT reproduce execution: report as unconfirmed, and note this is not proof of absence",
+            "evidence_class": "browser-refuted",
+            "url": "http://127.0.0.1:8081/xss_get.php",
+            "method": "GET"
+          }
+        ],
+        "seconds": 35.8,
+        "requests": 68,
+        "requests_attempted": 66,
+        "rc": 0,
+        "timeout": false,
+        "all_findings": [
+          {
+            "type": "reflected",
+            "param": "firstname",
+            "severity": "high",
+            "confidence": "low",
+            "payload": "<script>alert(5602152174)</script>",
+            "context": "html_element",
+            "detail": "token reflected inside <script> element text | browser replay did NOT reproduce execution: report as unconfirmed, and note this is not proof of absence",
+            "evidence_class": "browser-refuted",
+            "url": "http://127.0.0.1:8081/xss_get.php",
+            "method": "GET"
+          },
+          {
+            "type": "reflected",
+            "param": "lastname",
+            "severity": "high",
+            "confidence": "low",
+            "payload": "<script>alert(6966552876)</script>",
+            "context": "html_element",
+            "detail": "token reflected inside <script> element text | browser replay did NOT reproduce execution: report as unconfirmed, and note this is not proof of absence",
+            "evidence_class": "browser-refuted",
+            "url": "http://127.0.0.1:8081/xss_get.php",
+            "method": "GET"
+          }
+        ]
+      }
+    },
+    {
+      "level": "medium",
+      "level_id": 1,
+      "face": "stored",
+      "role": "bee",
+      "default": {
+        "detected": true,
+        "hits": [
+          {
+            "type": "stored",
+            "param": "entry",
+            "severity": "high",
+            "confidence": "high",
+            "payload": "<script>alert(1870657625)</script>",
+            "context": "stored_view",
+            "detail": "payload persisted and rendered in an executable context in http://127.0.0.1:8081/xss_stored_1.php (token reflected inside <script> element text; explicit viewer page rendered the payload) | no browser replay available; execution unverified",
+            "evidence_class": "browser-unavailable",
+            "url": "http://127.0.0.1:8081/xss_stored_1.php",
+            "method": "POST"
+          }
+        ],
+        "seconds": 3.8,
+        "requests": 45,
+        "requests_attempted": 57,
+        "rc": 0,
+        "timeout": false,
+        "all_findings": [
+          {
+            "type": "stored",
+            "param": "entry",
+            "severity": "high",
+            "confidence": "high",
+            "payload": "<script>alert(1870657625)</script>",
+            "context": "stored_view",
+            "detail": "payload persisted and rendered in an executable context in http://127.0.0.1:8081/xss_stored_1.php (token reflected inside <script> element text; explicit viewer page rendered the payload) | no browser replay available; execution unverified",
+            "evidence_class": "browser-unavailable",
+            "url": "http://127.0.0.1:8081/xss_stored_1.php",
+            "method": "POST"
+          }
+        ]
+      },
+      "headless": {
+        "detected": true,
+        "hits": [
+          {
+            "type": "stored",
+            "param": "entry",
+            "severity": "high",
+            "confidence": "high",
+            "payload": "<script>alert(5683528003)</script>",
+            "context": "stored_view",
+            "detail": "payload persisted and rendered in an executable context in http://127.0.0.1:8081/xss_stored_1.php (token reflected inside <script> element text; explicit viewer page rendered the payload) | no browser replay available; execution unverified",
+            "evidence_class": "browser-unavailable",
+            "url": "http://127.0.0.1:8081/xss_stored_1.php",
+            "method": "POST"
+          }
+        ],
+        "seconds": 1.7,
+        "requests": 45,
+        "requests_attempted": 57,
+        "rc": 0,
+        "timeout": false,
+        "all_findings": [
+          {
+            "type": "stored",
+            "param": "entry",
+            "severity": "high",
+            "confidence": "high",
+            "payload": "<script>alert(5683528003)</script>",
+            "context": "stored_view",
+            "detail": "payload persisted and rendered in an executable context in http://127.0.0.1:8081/xss_stored_1.php (token reflected inside <script> element text; explicit viewer page rendered the payload) | no browser replay available; execution unverified",
+            "evidence_class": "browser-unavailable",
+            "url": "http://127.0.0.1:8081/xss_stored_1.php",
+            "method": "POST"
+          }
+        ]
+      }
+    },
+    {
+      "level": "medium",
+      "level_id": 1,
+      "face": "header",
+      "role": "bee",
+      "default": {
+        "detected": true,
+        "hits": [
+          {
+            "type": "header_xss",
+            "param": "(header:User-Agent)",
+            "severity": "medium",
+            "confidence": "high",
+            "payload": "<svg/onload=alert(1959602297)>",
+            "context": "text",
+            "detail": "payload reflected from User-Agent header: token reflected in context 'event_handler' | severity capped to medium: high claim with neither browser evidence nor a verifiable proof (evidence-shape rule)",
+            "evidence_class": "browser-unavailable",
+            "url": "http://127.0.0.1:8081/xss_user_agent.php",
+            "method": "GET"
+          }
+        ],
+        "seconds": 1.3,
+        "requests": 25,
+        "requests_attempted": 37,
+        "rc": 0,
+        "timeout": false,
+        "all_findings": [
+          {
+            "type": "header_xss",
+            "param": "(header:User-Agent)",
+            "severity": "medium",
+            "confidence": "high",
+            "payload": "<svg/onload=alert(1959602297)>",
+            "context": "text",
+            "detail": "payload reflected from User-Agent header: token reflected in context 'event_handler' | severity capped to medium: high claim with neither browser evidence nor a verifiable proof (evidence-shape rule)",
+            "evidence_class": "browser-unavailable",
+            "url": "http://127.0.0.1:8081/xss_user_agent.php",
+            "method": "GET"
+          }
+        ]
+      },
+      "headless": {
+        "detected": true,
+        "hits": [
+          {
+            "type": "header_xss",
+            "param": "(header:User-Agent)",
+            "severity": "medium",
+            "confidence": "high",
+            "payload": "<svg/onload=alert(1420124268)>",
+            "context": "text",
+            "detail": "payload reflected from User-Agent header: token reflected in context 'event_handler' | severity capped to medium: high claim with neither browser evidence nor a verifiable proof (evidence-shape rule)",
+            "evidence_class": "browser-unavailable",
+            "url": "http://127.0.0.1:8081/xss_user_agent.php",
+            "method": "GET"
+          }
+        ],
+        "seconds": 1.2,
+        "requests": 25,
+        "requests_attempted": 37,
+        "rc": 0,
+        "timeout": false,
+        "all_findings": [
+          {
+            "type": "header_xss",
+            "param": "(header:User-Agent)",
+            "severity": "medium",
+            "confidence": "high",
+            "payload": "<svg/onload=alert(1420124268)>",
+            "context": "text",
+            "detail": "payload reflected from User-Agent header: token reflected in context 'event_handler' | severity capped to medium: high claim with neither browser evidence nor a verifiable proof (evidence-shape rule)",
+            "evidence_class": "browser-unavailable",
+            "url": "http://127.0.0.1:8081/xss_user_agent.php",
+            "method": "GET"
+          }
+        ]
+      }
+    },
+    {
+      "level": "high",
+      "level_id": 2,
+      "face": "reflected",
+      "role": "bwuser",
+      "default": {
+        "detected": false,
+        "hits": [],
+        "seconds": 10.9,
+        "requests": 60,
+        "requests_attempted": 58,
         "rc": 0,
         "timeout": false,
         "all_findings": []
@@ -884,7 +1147,100 @@
       "headless": {
         "detected": false,
         "hits": [],
-        "seconds": 14.3,
+        "seconds": 10.9,
+        "requests": 60,
+        "requests_attempted": 58,
+        "rc": 0,
+        "timeout": false,
+        "all_findings": []
+      }
+    },
+    {
+      "level": "high",
+      "level_id": 2,
+      "face": "stored",
+      "role": "bwuser",
+      "default": {
+        "detected": false,
+        "hits": [],
+        "seconds": 40.6,
+        "requests": 663,
+        "requests_attempted": 675,
+        "rc": 0,
+        "timeout": false,
+        "all_findings": []
+      },
+      "headless": {
+        "detected": false,
+        "hits": [],
+        "seconds": 72.5,
+        "requests": 663,
+        "requests_attempted": 675,
+        "rc": 0,
+        "timeout": false,
+        "all_findings": [
+          {
+            "type": "trusted_types_no_policy",
+            "param": null,
+            "severity": "medium",
+            "confidence": "high",
+            "payload": "(TT: tt_no_policy)",
+            "context": "trusted_types_eval",
+            "detail": "Page uses dangerous DOM sinks without Trusted Types; if a sink receives user-controlled data, DOM XSS is trivially exploitable (TT is the only reliable DOM-XSS mitigation) | lign=\"center\">2047</td>\n            <td>bwuser</td>\n            <td>2026-11-03 21:05:11</td>\n            <td>javascript:eval(location.hash.slice(1))#alert(8428627849)</td>\n\n        </tr>\n\n        <tr ",
+            "evidence_class": "browser-unavailable",
+            "url": "http://127.0.0.1:8081/xss_stored_1.php",
+            "method": "GET"
+          }
+        ]
+      }
+    },
+    {
+      "level": "high",
+      "level_id": 2,
+      "face": "header",
+      "role": "bwuser",
+      "default": {
+        "detected": false,
+        "hits": [],
+        "seconds": 1.6,
+        "requests": 95,
+        "requests_attempted": 107,
+        "rc": 0,
+        "timeout": false,
+        "all_findings": []
+      },
+      "headless": {
+        "detected": false,
+        "hits": [],
+        "seconds": 1.5,
+        "requests": 95,
+        "requests_attempted": 107,
+        "rc": 0,
+        "timeout": false,
+        "all_findings": []
+      }
+    },
+    {
+      "level": "high",
+      "level_id": 2,
+      "face": "reflected",
+      "role": "bee",
+      "default": {
+        "detected": false,
+        "hits": [],
+        "seconds": 1.6,
+        "requests": 60,
+        "requests_attempted": 58,
+        "rc": 0,
+        "timeout": false,
+        "all_findings": []
+      },
+      "headless": {
+        "detected": false,
+        "hits": [],
+        "seconds": 1.6,
+        "requests": 60,
+        "requests_attempted": 58,
         "rc": 0,
         "timeout": false,
         "all_findings": []
@@ -898,7 +1254,9 @@
       "default": {
         "detected": false,
         "hits": [],
-        "seconds": 16.3,
+        "seconds": 30.4,
+        "requests": 663,
+        "requests_attempted": 675,
         "rc": 0,
         "timeout": false,
         "all_findings": []
@@ -906,7 +1264,9 @@
       "headless": {
         "detected": false,
         "hits": [],
-        "seconds": 35.0,
+        "seconds": 72.9,
+        "requests": 663,
+        "requests_attempted": 675,
         "rc": 0,
         "timeout": false,
         "all_findings": [
@@ -917,7 +1277,7 @@
             "confidence": "high",
             "payload": "(TT: tt_no_policy)",
             "context": "trusted_types_eval",
-            "detail": "Page uses dangerous DOM sinks without Trusted Types; if a sink receives user-controlled data, DOM XSS is trivially exploitable (TT is the only reliable DOM-XSS mitigation) | td align=\"center\">666</td>\n            <td>bee</td>\n            <td>2026-11-03 15:02:41</td>\n            <td>javascript:eval(location.hash.slice(1))#alert(&#039;xssv_2cd487b1&#039;)</td>\n\n        </tr",
+            "detail": "Page uses dangerous DOM sinks without Trusted Types; if a sink receives user-controlled data, DOM XSS is trivially exploitable (TT is the only reliable DOM-XSS mitigation) | d align=\"center\">2687</td>\n            <td>bee</td>\n            <td>2026-11-03 21:07:00</td>\n            <td>javascript:eval(location.hash.slice(1))#alert(6026496973)</td>\n\n        </tr>\n\n        <tr ",
             "evidence_class": "browser-unavailable",
             "url": "http://127.0.0.1:8081/xss_stored_1.php",
             "method": "GET"
@@ -933,7 +1293,9 @@
       "default": {
         "detected": false,
         "hits": [],
-        "seconds": 1.3,
+        "seconds": 1.7,
+        "requests": 95,
+        "requests_attempted": 107,
         "rc": 0,
         "timeout": false,
         "all_findings": []
@@ -941,7 +1303,9 @@
       "headless": {
         "detected": false,
         "hits": [],
-        "seconds": 1.4,
+        "seconds": 1.7,
+        "requests": 95,
+        "requests_attempted": 107,
         "rc": 0,
         "timeout": false,
         "all_findings": []

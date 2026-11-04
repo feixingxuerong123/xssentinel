@@ -743,6 +743,18 @@ def _verify_semantic_impl(response_text: str, token: str,
     if _mangled_script_tag(response_text, token):
         return {"confirmed": False, "context": "html_element",
                 "detail": "token inside a %00-mangled tag name (inert)"}
+    # Same class, non-script: a NULL (raw or percent-encoded) in ANY tag
+    # name makes that start-tag an unknown element no browser fires a load
+    # event on -- but parsers disagree on whether the element survives the
+    # parse at all.  Measured divergence (CI run 41699972311): linux
+    # libxml2 materialised ``<svg%00/onload=…>`` as an element with the
+    # handler attribute intact and the on* structural rule below confirmed
+    # it, while the Windows wheel dropped the whole tag, so the same test
+    # was green locally and red on CI.  The verdict must not depend on the
+    # installed parser build, so the check runs on the raw source.
+    if _token_in_mangled_tag_head(response_text, token):
+        return {"confirmed": False, "context": "html_element",
+                "detail": "token inside a %00-mangled tag name (inert)"}
 
     # -- CSP gate: if a strict Content-Security-Policy blocks inline scripts,
     #    reflected <script>/on* handlers won't execute in a real browser.
@@ -859,6 +871,31 @@ def _verify_semantic_impl(response_text: str, token: str,
         "detail": f"token reflected in context '{c}'"
                   + ("" if executable else " (escaped / non-executable)"),
     }
+
+
+def _token_in_mangled_tag_head(response_text: str, token: str) -> bool:
+    """True when the token sits inside a start-tag whose NAME is mangled.
+
+    The token must be inside the tag HEAD (between ``<`` and the matching
+    ``>``) -- the on* structural rule reads handler attributes, which only
+    exist there.  ``%`` or a raw NUL in the name is the null-byte
+    transform's spelling; a browser turns the start-tag into an unknown
+    element (``svg%00``), and neither a load event nor any handler fires in
+    the executable sense this module claims.  Source-level on purpose: see
+    the caller for the parser-divergence measurement.
+    """
+    idx = response_text.find(token)
+    if idx == -1:
+        return False
+    lt = response_text.rfind("<", 0, idx)
+    if lt == -1:
+        return False
+    gt = response_text.find(">", lt)
+    if gt == -1 or gt < idx:
+        return False
+    m = re.match(r"<([^\s/>]*)", response_text[lt:gt + 1])
+    name = m.group(1) if m else ""
+    return ("%" in name) or ("\x00" in name)
 
 
 def _mangled_script_tag(response_text: str, token: str) -> bool:
