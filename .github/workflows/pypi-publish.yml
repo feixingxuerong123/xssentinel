@@ -8,6 +8,9 @@ name: pypi
 # but has never published anything: no v1.4.x tag was pushed from this repo.
 # Installing from source (README "Install") is the supported path until an
 # owner completes the setup below and pushes a tag.
+# MAINTENANCE: once a publish succeeds, update (or remove) the dated
+# "release status" note in BOTH README.md and README.en.md -- it is a
+# present-tense claim that expires the moment this workflow uploads.
 #
 # ONE-TIME owner setup on pypi.org (account -> Publishing -> add a pending
 # publisher), otherwise the publish job fails with a 403 from PyPI:
