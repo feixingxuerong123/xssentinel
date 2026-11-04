@@ -202,19 +202,28 @@ def extract_replay_token(payload: str) -> str | None:
     argument -- extract it from the (possibly transformed) payload
     instead of threading a token through every yield site.  Order
     mirrors mark()'s stamp shapes: plain alert('..'), the paren-free
-    alert`..`, and the concat stamp window['ale'+'rt']('..').  No match
-    means the replay cannot be ATTRIBUTED to this probe -- return None
-    so the caller skips verification rather than risk a false
-    browser-refuted grade on an unattributable dialog.
+    alert`..`, the concat stamp window['ale'+'rt']('..'), and (Phase 356)
+    the UNQUOTED form ``alert(<10-digit numeric_alias>)`` whose dialog text
+    is the alias itself.  No match means the replay cannot be ATTRIBUTED
+    to this probe -- return None so the caller skips verification rather
+    than risk a false browser-refuted grade on an unattributable dialog.
 
     Phase 217: shared by BOTH engines' headless-confirmation paths (the
     async wrapper's ``_probe_token`` delegates here) -- two copies of a
     carrier contract is the Phase 207 drift shape.
+    Phase 357: the async engine started sending the payload's own argument
+    style, so the primary form on a bare ``<script>alert(1)</script>`` is
+    now numeric.  Without the numeric shape here, headless verification was
+    silently skipped and range3's browser-evidence gate lost its only
+    ``fired`` row (CI run 41799682389).  Ten digits only: ``alert(999)`` is
+    an operator's literal, not a marker.
     """
     import re as _re
     m = (_re.search(r"alert\(\s*['\"]([^'\"]{2,})['\"]\s*\)", payload)
          or _re.search(r"alert`\s*([^`]{2,})\s*`", payload)
-         or _re.search(r"rt\]\(\s*['\"]([^'\"]{2,})['\"]\s*\)", payload))
+         or _re.search(r"rt\]\(\s*['\"]([^'\"]{2,})['\"]\s*\)", payload)
+         or _re.search(r"(?:alert|confirm|prompt)\(\s*(\d{10})\s*\)",
+                       payload))
     if m:
         return m.group(1)
     # Fallback: a marker-token run anywhere in the payload (hex-suffixed

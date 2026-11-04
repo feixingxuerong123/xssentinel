@@ -345,3 +345,41 @@ def test_ab_switch_off_keeps_the_legacy_single_marker(monkeypatch) -> None:
     assert seen, "no verification happened"
     assert not any(re.fullmatch(r"\d{10}", t) for t in seen)
     assert not any(re.search(r"alert\(\d{10}\)", v) for v in session.calls)
+
+
+# ---------------------------------------------------------------------------
+# Headless replay token: the numeric form must stay attributable.
+# CI run 41799682389 lost range3's only browser-fired row because the async
+# primary form became alert(<10-digit alias>) and extract_replay_token only
+# knew quoted / xss-prefixed tokens, so _headless_verify_finding returned
+# early on "unattributable replay".
+# ---------------------------------------------------------------------------
+
+def test_numeric_alias_form_yields_its_replay_token() -> None:
+    from xssentinel.core.findings import extract_replay_token
+    marker = "xssentinel_async_q_2813"
+    for payload in ("<script>alert(1)</script>",
+                    "+ADw-script+AD4-alert(1)+ADw-/script+AD4-",
+                    "<img src=x onerror=confirm(1)>"):
+        form, eff, marked = verifier.stamp_forms_or_legacy(
+            payload, marker, 4)[0]
+        assert form == "numeric", (payload, form)
+        assert re.fullmatch(r"\d{10}", eff)
+        assert extract_replay_token(marked) == eff, marked
+
+
+def test_quote_form_still_yields_its_replay_token() -> None:
+    from xssentinel.core.findings import extract_replay_token
+    marker = "xssv_357aabbcc"
+    for form in ("single", "double", "backtick"):
+        marked, eff, _used = verifier.stamp_form(
+            "<svg/onload=alert(1)>", marker, form)
+        assert extract_replay_token(marked) == eff, (form, marked)
+
+
+def test_short_numeric_literal_is_not_a_replay_token() -> None:
+    """An operator's alert(999) is not a Phase 356 numeric alias."""
+    from xssentinel.core.findings import extract_replay_token
+    assert extract_replay_token("<svg/onload=alert(999)>") is None
+    assert extract_replay_token("<script>alert(1234567890)</script>") \
+        == "1234567890"
