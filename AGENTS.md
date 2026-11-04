@@ -196,7 +196,12 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
   `drills`、`benchmark-full` 全 194 例,以及 `tests` 的 ruff;这是方案①
   「每次 run 只跑一次全量门禁」与审计修复的闭环证据。#27 `41817920644`
   的 failure 已定性为修前 runner setuptools 告警,由 `9e62ba2` 修复并在
-  #29 复验绿;#31 `41830062679` 是误触发的重复 dispatch run,已 cancelled。
+  #29 复验绿;  #31 `41830062679` 是误触发的重复 dispatch run,已 cancelled。
+  补记(21:14 复查):#32 `41830070682`(`d5a69e2`,dispatch)与 #33
+  `41832221185`(`9b9ff2f`,push)随后均 **整体 success**;#32 的
+  `nightly-gate` 全量门禁 + evidence-shape sweep、`benchmark-full` 全 194 例、
+  `dependency-audit` 全绿,`tests` 的 `Install (lint only)` 9s,是安装面
+  拆分的闭环证据。
   本行不写「进行中」的 run(会立刻腐烂),引用门禁结论一律以 run 页面为准。
 - 开放项:无。SECURITY.md 的举报渠道已定为 **GitHub 私密安全通告**(仓库 → Security →
   Report a vulnerability,流程与 72 小时时效已写在 SECURITY.md,无需额外邮箱即可生效);
