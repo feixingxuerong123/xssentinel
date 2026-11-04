@@ -59,6 +59,20 @@ layer is replaceable on its own. Highlights:
 
 Use it **only against systems you are authorized to test.**
 
+## Maturity (measured 2026-11-02: **Beta**)
+
+`pyproject.toml` has been `Development Status :: 4 - Beta` since 2026-11-02;
+this is not Production/Stable. What the evidence supports: semantic
+confirmation on the reflected / DOM / stored paths; the self-built 194-case
+matrix at FP0/FN0 on both engines; stored auto-discovery 9/9 on both engines
+on the official target (2026-11-03); and the real-world regression set v2.2
+(22 cases / 5 apps) at **13 TP / 0 FP / 9 TN**, every case backed by an
+official challenge or source plus independent Playwright ground truth.
+What it does not: full privilege-role matrices, and **no head-to-head with
+commercial tools (Burp Pro / Acunetix) on an independent target** — the
+comparisons below are against OSS tools (dalfox / nuclei) only. See
+[README.md](README.md) for the full statement.
+
 > **First time?** Start with [docs/QUICKSTART.en.md](docs/QUICKSTART.en.md) —
 > three commands, four exit codes, and four environment traps that get results
 > misread.
@@ -68,11 +82,17 @@ Use it **only against systems you are authorized to test.**
 - **Push gate**: a 64-case stratified slice on both engines under `--strict-gate`
   (FP0 / FN0 / ERROR0 required); the slice rotates per ISO week, 49 weeks cover
   the full 194-case matrix (numbers pinned by `tests/test_quick_gate_slice.py`).
-- **Full gate**: every `test_*.py` runs file-by-file with its own timeout and one
-  retry (failure evidence survives the run; latest run 258/258 files green with
-  75 skips / 10 files — both numbers reported together). Guards such as the
-  architecture line caps and the broad-except ratchet are mutation-tested
-  (red → restore → green).
+- **Full matrix**: the 194-case strict gate on both engines exits 0 —
+  sync `TP113/FP0/TN81/FN0` (0 SKIP), async `TP107/FP0/TN75/FN0` (12 SKIP);
+  27 control cases give 0 FP on both engines.
+- **Full gate**: every `test_*.py` runs file-by-file (`--jobs 4`) with its own
+  timeout and one retry (failure evidence survives the run). The current
+  reference run is **274/274 files effectively green** — 271 in-gate green
+  plus 3 environment-timeout files green on standalone rerun — with
+  **69 skips across 18 files (5 whole files contributed nothing)**, 1412 s,
+  exit 3; the two counts and the skip count are always reported together.
+  Guards such as the architecture line caps and the broad-except ratchet are
+  mutation-tested (red → restore → green).
 - **Independent target**: the official XSSMaze target + official runner scoring
   three tools on the same cases; artifacts ship with the repo (see below).
 
@@ -117,8 +137,10 @@ PortSwigger cheat-sheet corpus coverage (822 vectors; re-run 2026-11-01 against
 the 2026-09-30 cheat-sheet snapshot, product: benchmark/results/portswigger_corpus_coverage.json):
 the "no user interaction" group is **100%** on events, tags and protocols (gap
 zeroed by the Phase 192 corpus additions); the "requires-interaction" group is
-73.1% on events (76/104, up from 15.4% pre-Phase-192) — reference only, not the
-main metric.
+73.1% on events (76/104) — reference only, not the main metric. The 15.4%
+figure sometimes quoted as a "before" value is the pre-Phase-192 rate of
+**all three groups pooled**, a misleading denominator; it is not this group's
+historical event coverage.
 
 ---
 
@@ -188,7 +210,8 @@ python -m xssentinel -u "https://example.com/search?q=test" --headless
 # Report formats (`-f`: html,json,csv,sarif,junit,markdown,burp,nuclei)
 python -m xssentinel -u "https://example.com/search?q=test" -f sarif -o report.sarif
 
-# Stored XSS: inject at /store, confirm on /view
+# Stored XSS: explicit write/read pair. On the sync engine, viewer discovery
+# is on by default (--no-stored-auto disables it); --stored-inject implies off.
 python -m xssentinel -u "https://example.com/p" --stored-inject https://example.com/store --stored-view https://example.com/view
 
 # Blind XSS (self-hosted listener / public interactsh)
@@ -317,7 +340,9 @@ page carries its own CSP / `X-Frame-Options` / nosniff headers.
   to static heuristics and reflection findings stay semantically confirmed only.
 - The crawler is a lightweight BFS (default depth 2); complex SPAs and auth
   flows are better served with `--headless` or explicit entry URLs.
-- Stored XSS needs a display page (`--stored-inject` + `--stored-view`).
+- Stored XSS can be pointed at an explicit write/read pair (`--stored-inject`
+  + `--stored-view`); auto-discovery is the sync default, but it cannot invent
+  a display page the app never exposes.
 - Blind XSS with `--oob interactsh` needs outbound reachability; offline it
   degrades to "injected but unconfirmed".
 - `--ai-report` is off by default: enabling it sends target URLs, parameters

@@ -1052,7 +1052,17 @@ async scan()        : [['reflected','high','high']]
    results 根目录留 27 个(约 3.3MB,含 corpus_gap/gate_cost 的 6 个输入固件与全部文档引用产物),
    其余 338 个跟踪产物(约 16.5MB)去跟踪并移入 gitignored 的 `_local_archive/`(仅本机留档);
    regression_logs 本就未跟踪。仓库跟踪文件 1129 → 791。
-4. README.en 同步机制:本轮 EN 已修一处与中文脱节的实错;建议建立中英对照检查单,EN 保持
-   "压缩版"定位但数字必须同源。
+4. ~~README.en 同步机制~~ **已处置(2026-11-04 文档一致性收尾)**:落地
+   `tests/test_doc_gate_parity.py` —— 门禁口径按「两边都认」逐条钉中英 README、
+   与 AGENTS.md 运行时证据同源、CHANGELOG 报绿必须带 skip 数、旧口径以现在时
+   回潮即红;变异对照 baseline 绿 4 → EN 回潮 `258/258` 红 2 例 → 中文单向漂移
+   红 2 例 → 删口径表条目红 1 例 → restored 绿 4。同时修掉本轮量到的四处脱节:
+   ① 两版 README 的全量门仍以现在时引 Phase 346 的 `258/258` + 75 skip,改为
+   **274/274 有效绿(271 in-gate + 3 单跑)+ skip 69/18 文件**;② EN 缺 1.4.0 的
+   Beta 成熟度声明、194 例双引擎与真实应用 v2.2 口径;③ EN 把 15.4% 误读成
+   requires-interaction 组的历史事件覆盖率(中文原文是三组混算的误导性分母);
+   ④ 两版都未同步 `--no-stored-auto` 默认行为。EN 保持"压缩版"定位,数字同源
+   由守卫保证。带日期的历史记录(CHANGELOG 旧版本段、dev/、docs/archive/、
+   `_review_20261101/`)按既有规矩不动。
 5. 外部效度:与商业工具在同一独立靶上的对跑仍未发生;Juice Shop 20.2.0 单挑战验证(Phase 209)
    是现成起点,全集对跑是下一步。

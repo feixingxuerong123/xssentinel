@@ -47,6 +47,7 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
 **文档刻度**
 
 - 文档里的数字必须与代码一致:`tests/test_quick_gate_slice.py` 钉住切片/矩阵数字,新增数字声明时同步加钉;历史数字允许留在带日期的记录里,不允许以现在时出现(Phase 190)。
+- 全量分批门的运行时口径(文件数 / 两组数 / skip 数)另由 `tests/test_doc_gate_parity.py` 钉中英 README、CHANGELOG 与 AGENTS.md 同源:引用门禁结果必须带跳过数,旧口径不许以现在时回潮(2026-11-04 文档一致性收尾,处置记录见 `docs/OPTIMIZATION.md` §7 item 4)。带日期的历史记录不受该闸管辖,禁止为过闸去改它们。
 
 **层注册**
 

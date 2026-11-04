@@ -26,6 +26,14 @@
   Range #3 的浏览器证据门误红(run 41799682389);`findings.
   extract_replay_token` 补齐该形态后 run 41809643713 全绿。
 
+### Changed
+- 中英 README 的全量门禁口径同步到 2026-11-04 夜间引用值(274/274 有效绿、
+  skip 69/18 文件),CHANGELOG 1.4.0 条目补 skip 数;新增
+  `tests/test_doc_gate_parity.py` 钉中英同源、与 AGENTS.md 证据同源、旧口径
+  现在时回潮即红(变异对照 baseline 绿 → 三个变异红 → restored 绿),
+  OPTIMIZATION.md §7 item 4 关闭。EN 版补 Beta 成熟度声明、194 例双引擎
+  与真实应用 v2.2 口径,修正 15.4% 的语义误读与 `--no-stored-auto` 默认行为说明。
+
 ## [1.4.0] - 2026-11-04
 
 存储自动发现与 marker-form 轮(Phase 345–356,含 Phase 347/348 的门禁与
@@ -34,8 +42,9 @@ runner 工作):存储注入点自动发现(sync 默认开,官方靶 9/9 双引�
 兜底);认证会话 header canary 修复;真实应用回归集 v2.2(22 例 / 5 app,
 xssentinel 13 TP / 0 FP / 9 TN);成熟度按实测降 Beta。
 验证:194 例自编矩阵双引擎 FP0/FN0(f1=1.0);strict 64 例切片双引擎
-exit 0;27 控制例双引擎 0 FP;全量分批门禁 274 文件全绿(271 in-gate + 3 个
-环境超时文件单跑复绿;2026-11-04 夜间口径,证据链见 AGENTS.md)。
+exit 0;27 控制例双引擎 0 FP;全量分批门禁 274 文件有效绿(271 in-gate + 3 个
+环境超时文件单跑复绿;skip 69 例 / 18 文件、其中 5 个整文件零贡献;
+2026-11-04 夜间口径,证据链见 AGENTS.md)。
 
 ### Added
 

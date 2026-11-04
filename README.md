@@ -163,7 +163,7 @@ medium、收敛后 0/5 进入报告，而 `innerHTML`/`document.write`/`attr('hr
 ## 质量门禁（为什么可以信这份结果）
 
 - **push 门**：64 例分层切片 × 双引擎，`--strict-gate` 要求 FP0 / FN0 / ERROR0；切片按 ISO 周轮转，49 周覆盖全 194 例矩阵（数字由 `tests/test_quick_gate_slice.py` 钉住）。
-- **全量门**：全部 test_*.py 逐文件分批跑（每文件独立超时 + 一次重试，失败证据随 CI 产物留存；最近一次 258/258 文件绿，skip 75 例 / 10 文件——两个数一起报）；架构行数上限、宽泛吞异常棘轮等守卫做过变异对照（红→还原→绿）。
+- **全量门**：全部 test_*.py 逐文件分批跑（`--jobs 4`，每文件独立超时 + 一次重试，失败证据随 CI 产物留存）。最近一次引用口径为 **274/274 文件有效绿**：**271 文件 in-gate 绿 + 3 个环境超时文件单跑复绿**，**skip 69 例 / 18 文件（其中 5 个整文件零贡献）**、1412s、exit 3——两组数与跳过数一起报；架构行数上限、宽泛吞异常棘轮等守卫做过变异对照（红→还原→绿）。
 - **独立靶**：官方 XSSMaze 靶 + 官方 runner 同 scorer 三工具对跑，产物随仓库分发（见下「外部效度」）。
 
 跑法与口径见 [CONTRIBUTING](CONTRIBUTING.md)「测试」一节与 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
@@ -372,7 +372,7 @@ python -m xssentinel -u "https://example.com/search?q=test" --dom-engine static
 python -m xssentinel -u "https://example.com/search?q=test" -f json -o report.json
 python -m xssentinel -u "https://example.com/search?q=test" -f sarif -o report.sarif
 
-# 存储型 XSS（注入 /store，再拉取 /view 确认）
+# 存储型 XSS（显式指定注入 /store、回读 /view；不指定时 sync 默认自动发现注入点）
 python -m xssentinel -u "https://example.com/p" --stored-inject https://example.com/store --stored-view https://example.com/view
 
 # 盲打 XSS 自动确认（自托管监听器，离线/测试用，收到 beacon 即确认）
@@ -421,7 +421,7 @@ exit 3 而不是回退 sync——报告顶层恒带 `engine` 与 `engine_fallbac
 `--oob {self,interactsh}`（盲打自动确认模式）、
 `--oob-timeout`（等待回调秒数，默认 12）、
 `--dom-engine {auto,playwright,static}`（DOM-XSS 引擎：auto=有 playwright 用真浏览器确认、否则静态；playwright=强制真浏览器；static=仅静态启发式，默认 auto）、
-`--stored-inject` / `--stored-view` / `--stored-param`（存储型扫描）、
+`--stored-inject` / `--stored-view` / `--stored-param`（存储型扫描；sync 默认开存储注入点自动发现，`--no-stored-auto` 关闭，显式 `--stored-inject` 时自动让位）、
 `-o/--output`、`-f/--format {html,json,csv,sarif,junit,markdown,burp,nuclei}`（burp=Burp XML、nuclei=每 finding 一个可运行模板目录）、
 `--upload-field`（上传 filename XSS，见上）、
 `--audit-xs-leaks`（XS-Leaks 表面审计：无 COOP/CORP/COEP/帧守卫的页面记 low）、
