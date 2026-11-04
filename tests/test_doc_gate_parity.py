@@ -88,3 +88,23 @@ def test_stale_gate_figures_absent_from_live_docs():
         for stale in _STALE_LIVE_CLAIMS:
             assert stale not in text, (
                 f"{rel} 又用现在时引用旧门禁口径: {stale!r}")
+
+
+def test_changelog_latest_version_matches_package_version():
+    """版本号是同一契约的两处手写:发版时只改一处就会悄悄脱节。
+
+    `pyproject.toml` 用 attr 动态读 `__version__`,所以包元数据不会说谎;
+    会说谎的是 CHANGELOG 的章节标题。禁词表那一族门管「旧口径回潮」,
+    这一族管「当前版本」,两者不互相替代。
+    """
+    import re
+
+    from xssentinel import __version__
+
+    changelog = _read(_CHANGELOG)
+    assert "## [Unreleased]" in changelog, "发版后必须保留空的 Unreleased 段"
+    released = re.findall(r"^## \[(\d+\.\d+\.\d+)\]", changelog, flags=re.M)
+    assert released, "CHANGELOG 找不到已发布版本标题"
+    assert released[0] == __version__, (
+        f"CHANGELOG 最新版本 {released[0]} 与 xssentinel.__version__ "
+        f"{__version__} 不同步:发版时两处要一起改")

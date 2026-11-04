@@ -16,6 +16,8 @@
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-11-04
+
 ### Fixed
 - async 引擎补齐 Phase 356 的引号形态 fan-out(bWAPP `security_level=medium`
   的 `addslashes` 曾让 reflected/header 24 组全漏报),并让每个变体使用自己的
