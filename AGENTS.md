@@ -186,6 +186,18 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
 - **本轮 CI 复验**:`41799682389`(`f80af43`)tests 绿、drills 的 Range #3 红
   (归因见 Phase 357 段);修复 `906ed11` 后 `41809643713` **整体 success**
   (tests / drills / windows-smoke / min-python 全绿,其余按设计 skipped)。
+- **1.4.1 轮 CI 证据(2026-11-04 晚间,只记已定论的 run)**:`41809643713`
+  之后的 push 链 #24 `41813166800`(`156561b`)、#25 `41816092611`(`e4b6f31`)、
+  #26 `41817487077`(`dc5ad1f`)、#28 `41819901219`(`9e62ba2`)、
+  #30 `41830007477`(`d5a69e2`)全部 **success**;手动 dispatch
+  #29 `41820071633`(`9e62ba2`)**整体 success、7 个 job 全绿**
+  —— `nightly-gate` 的全量文件门禁 + evidence-shape sweep、
+  `dependency-audit`(setuptools 升级后 `No known vulnerabilities found`)、
+  `drills`、`benchmark-full` 全 194 例,以及 `tests` 的 ruff;这是方案①
+  「每次 run 只跑一次全量门禁」与审计修复的闭环证据。#27 `41817920644`
+  的 failure 已定性为修前 runner setuptools 告警,由 `9e62ba2` 修复并在
+  #29 复验绿;#31 `41830062679` 是误触发的重复 dispatch run,已 cancelled。
+  本行不写「进行中」的 run(会立刻腐烂),引用门禁结论一律以 run 页面为准。
 - 开放项:无。SECURITY.md 的举报渠道已定为 **GitHub 私密安全通告**(仓库 → Security →
   Report a vulnerability,流程与 72 小时时效已写在 SECURITY.md,无需额外邮箱即可生效);
   原「联系方式待仓库归属者填写」一项于 2026-11-01 关闭。如需增加邮箱等第三方渠道,
