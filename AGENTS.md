@@ -164,7 +164,10 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
   `windows-smoke` 走 windows-latest)—— tests(全量分批 + ruff)、drills(双引擎
   strict 切片周轮转 + range2–6 门禁;range7 走 tests job 的 pytest 契约测试)、
   min-python(3.10)、benchmark-full、nightly-gate、dependency-audit、
-  windows-smoke;push 门 = 双引擎 strict 切片。
+  windows-smoke;push 门 = 双引擎 strict 切片。2026-11-04 起全量分批门每次 run
+  只跑一次:`tests`(push/PR,60min ceiling)或 `nightly-gate`(schedule/dispatch,
+  150min ceiling),事件条件互补由 `tests/test_ci_no_duplicate_gate.py` 钉住
+  (此前 schedule run 会把同一入口跑两遍,CI #18 实测 45m36s + 29m38s)。
 - **本轮 CI 复验**:`41799682389`(`f80af43`)tests 绿、drills 的 Range #3 红
   (归因见 Phase 357 段);修复 `906ed11` 后 `41809643713` **整体 success**
   (tests / drills / windows-smoke / min-python 全绿,其余按设计 skipped)。

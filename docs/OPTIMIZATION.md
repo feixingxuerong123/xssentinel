@@ -1046,26 +1046,32 @@ async scan()        : [['reflected','high','high']]
    审计 0 告警),已翻为阻断并加一次传输重试,详见该文档 Remaining verification。另发现并修复:nightly-gate
    的安装面比 push tests job 少 cryptography/playwright/chromium,同一入口连红三天(11-01/10-31/10-30
    schedule)而 push 全绿——已对齐,待下一次 schedule run 确认变绿。
-2. `nightly-gate` 与 push `tests` job 同入口同 extras,增量有限——**已量
-   (2026-11-04),待归属者决策,未动 ci.yml**。`tests` job 没有 job 级 `if:`,
-   `nightly-gate` 只在 `schedule`/`workflow_dispatch` 跑,两者主步骤**都是
-   `python tests/run_all_batched.py --quiet`**,安装面自 2026-11-01 起完全相同
-   (`-e .[dev,async,ast,api,nuclei]` + cryptography/playwright/chromium)
-   ⇒ **每次 schedule/dispatch run,同一个全量文件门禁跑两遍**。实测 CI #18
-   (`41424021886`,2026-11-02 schedule @793535b):同一 run 内 `tests` 45m36s、
-   `nightly-gate` 29m38s、总墙钟 45m40s(并行),约 30 分钟 CI 分钟为纯重复;
-   `nightly-gate` 唯一增量是 `benchmark/evidence_shape_sweep.py`(179 行,
-   Phase 312 证据形态不变量),另有 150min vs 60min 的 timeout 差。两 job 的失败
-   证据 artifact 同名 `regression-logs`,同 run 同时失败有重名风险。
-   **建议(择一,需拍板)**:① 合并——`tests` 的「Unit + integration tests」步骤
-   加 `if: github.event_name != 'schedule' && github.event_name != 'workflow_dispatch'`,
-   schedule/dispatch 的全量门禁交给 150min ceiling 的 `nightly-gate` 独跑,
-   `tests` 保留 ruff;配套守卫钉「同一事件只有一个 job 跑全量门禁入口」+ 变异对照。
-   ② 错峰——只挪 cron 避开 push 高频段,省并发不省重复。③ 只把 sweep 移进
-   `tests`、删 `nightly-gate` 的重复门禁:不推荐,schedule 的全量门禁会退回
-   60min ceiling,本机顺序档 4554s≈76min 会超时。原「省下的额度跑 nightly
+2. ~~`nightly-gate` 与 push `tests` job 同入口同 extras,增量有限~~
+   **已处置(2026-11-04,归属者拍板,方案①)**。测量(保留为归因):`tests` job
+   没有 job 级 `if:`,`nightly-gate` 只在 `schedule`/`workflow_dispatch` 跑,
+   两者主步骤**都是 `python tests/run_all_batched.py --quiet`**,安装面自
+   2026-11-01 起完全相同(`-e .[dev,async,ast,api,nuclei]` +
+   cryptography/playwright/chromium)⇒ 每次 schedule/dispatch run 全量门禁
+   跑两遍。实测 CI #18(`41424021886`,2026-11-02 schedule @793535b):同一 run
+   内 `tests` 45m36s、`nightly-gate` 29m38s、总墙钟 45m40s(并行),约 30 分钟
+   纯重复;`nightly-gate` 唯一增量是 `benchmark/evidence_shape_sweep.py`
+   (179 行),另 150min vs 60min ceiling 差;两 job 失败证据 artifact 同名
+   `regression-logs`。
+   **落地(方案①)**:`tests` 的「Unit + integration tests」步骤加
+   `if: github.event_name != 'schedule' && github.event_name != 'workflow_dispatch'`,
+   schedule/dispatch 由 150min ceiling 的 `nightly-gate` 独跑,`tests` 保留 ruff;
+   `tests` 的 failure-evidence 步骤同步加同事件排除,消掉同名 artifact 竞争。
+   ci.yml 头部/job 注释与 `docs/ARCHITECTURE.md` 门禁表同步。守卫
+   `tests/test_ci_no_duplicate_gate.py`:钉门禁入口 job 集合恰为两个、两个 if
+   精确且对四种 trigger 互补(XOR 恒 1)、trigger 集合不变、求值器真值表自检、
+   evidence 步骤同事件范围;变异对照 baseline 绿 6 → 七个变异(删 if / 漏
+   dispatch / nightly 漏 dispatch / 第三个入口 / evidence 未隔离 / 触发集合
+   缩小 / 求值器写反)各红 → restored 绿 6。
+   **边界**:`tests` job 在 schedule/dispatch 仍执行完整依赖安装(为 ruff 那几秒),
+   属方案①未覆盖的残留开销;②(错峰)与③(只移 sweep)未采纳,③会让 schedule
+   退回 60min ceiling 而本机顺序档 4554s≈76min 会超时。原「省下额度跑 nightly
    全矩阵」已过时:`benchmark-full` 自 Phase 348 起就是 schedule 触发(同 run
-   实测 31m35s,sync+async 全 194 例),额度用途需重定。
+   31m35s,sync+async 全 194 例)。
 3. ~~产物入库体积~~ **已处置(2026-11-01)**:落地"只保留被文档引用的证据与被脚本读取的输入"口径——
    results 根目录留 27 个(约 3.3MB,含 corpus_gap/gate_cost 的 6 个输入固件与全部文档引用产物),
    其余 338 个跟踪产物(约 16.5MB)去跟踪并移入 gitignored 的 `_local_archive/`(仅本机留档);

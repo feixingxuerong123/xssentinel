@@ -23,6 +23,13 @@ name: CI
 #    both engines -- installed from the same extra set as requirements.txt, so
 #    a wedge or a per-file regression cannot hide behind the 64-case quick
 #    slice, and an esprima/flask-gated test cannot silently self-skip.
+#    That full gate runs exactly ONCE per run: `tests` owns it on
+#    push / pull_request (60-min ceiling), `nightly-gate` owns it on
+#    schedule / workflow_dispatch (150-min ceiling).  Before 2026-11-04 both
+#    jobs invoked the identical `run_all_batched.py --quiet` on the same
+#    scheduled run -- measured in CI #18 (41424021886): tests 45m36s plus
+#    nightly-gate 29m38s inside one 45m40s wall-clock run.  The complementary
+#    conditions are pinned by tests/test_ci_no_duplicate_gate.py.
 # Async/asyncio.run tests self-skip via tests/conftest.py when the runner's
 # loopback socketpair is throttled.
 
@@ -70,6 +77,12 @@ jobs:
         run: python -m ruff check
 
       - name: Unit + integration tests (pipeline slice included)
+        # 2026-11-04: on schedule / workflow_dispatch the full file-by-file
+        # gate belongs to `nightly-gate` (150-min ceiling).  Running it in
+        # both jobs used to execute the identical `run_all_batched.py --quiet`
+        # twice in one run (CI #18: 45m36s + 29m38s).  ruff above stays on
+        # every trigger; this 60-min ceiling now only covers push / PR.
+        if: github.event_name != 'schedule' && github.event_name != 'workflow_dispatch'
         # File-by-file batched runner (per-file subprocess, 540s budget +
         # one retry; exit code = files still red).  A single-process
         # `pytest tests/` wedges the whole suite once one async/DOM test
@@ -86,7 +99,11 @@ jobs:
       # (2026-10-29: the first batched run failed on one file and the log
       # was gone -- the failure had to be reproduced locally from scratch.)
       - name: Upload failure evidence
-        if: failure()
+        # Same event scope as the gate step above: on schedule/dispatch the
+        # failure evidence belongs to nightly-gate, which uploads an artifact
+        # with the SAME name.  Scoping this avoids two jobs racing for
+        # `regression-logs` in one run.
+        if: failure() && github.event_name != 'schedule' && github.event_name != 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
           name: regression-logs
@@ -274,6 +291,10 @@ jobs:
     # (tests/run_all_batched.py), so CI sees per-file timeouts, one retry,
     # and evidence logs that survive the run -- not one wedged pytest
     # process killed by the job ceiling.
+    # Since 2026-11-04 this job is the SOLE owner of the full gate on
+    # schedule / workflow_dispatch; `tests` steps aside there (see its if).
+    # The 150-min ceiling (vs 60 in `tests`) is why it owns the slow run:
+    # the local sequential gate has measured 4554s (~76 min).
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 150
