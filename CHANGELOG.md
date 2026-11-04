@@ -46,6 +46,10 @@
   新增 `tests/test_ci_no_duplicate_gate.py` 钉「同一事件只有一个 job 跑全量
   门禁」(七组变异对照 baseline/restored 绿),同步 ci.yml 注释与
   `docs/ARCHITECTURE.md` 门禁表。
+- 收掉方案①的残留开销:`tests` job 的 Install 拆成互斥两步,push/PR 装全套依赖,
+  schedule/dispatch 只装 `.[dev]`(ruff 仍来自同一 dev extra),Lint 步骤恒定执行。
+  CI #29 实测该 job 原为 56s、其中 Install 50s 只为跑 ruff。守卫增 4 例钉安装面,
+  八组变异对照 baseline/restored 绿。
 
 ## [1.4.0] - 2026-11-04
 

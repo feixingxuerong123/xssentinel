@@ -168,6 +168,8 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
   只跑一次:`tests`(push/PR,60min ceiling)或 `nightly-gate`(schedule/dispatch,
   150min ceiling),事件条件互补由 `tests/test_ci_no_duplicate_gate.py` 钉住
   (此前 schedule run 会把同一入口跑两遍,CI #18 实测 45m36s + 29m38s)。
+  `tests` 的安装面按同一组事件分流:push/PR 装全套,schedule/dispatch 只装
+  `.[dev]` 跑 ruff(CI #29 实测原为 56s job 里 50s 安装),由同一守卫钉住。
 - **本轮 CI 复验**:`41799682389`(`f80af43`)tests 绿、drills 的 Range #3 红
   (归因见 Phase 357 段);修复 `906ed11` 后 `41809643713` **整体 success**
   (tests / drills / windows-smoke / min-python 全绿,其余按设计 skipped)。

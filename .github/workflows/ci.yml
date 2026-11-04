@@ -56,7 +56,8 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install
+      - name: Install (full suite)
+        if: github.event_name != 'schedule' && github.event_name != 'workflow_dispatch'
         # The test suite exercises every engine channel: aiohttp (async),
         # cryptography (MITM), esprima (sandbox JS gate), playwright
         # (browser-confirmed DOM), flask/werkzeug (API gate) and pyyaml
@@ -69,6 +70,18 @@ jobs:
           pip install -e ".[dev,async,ast,api,nuclei]"
           pip install cryptography playwright
           python -m playwright install chromium --with-deps
+
+      - name: Install (lint only)
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        # 2026-11-04: on these two events the full gate belongs to
+        # `nightly-gate`, so this job runs ONLY the ruff step.  Measured in
+        # CI #29 (41820071633): Install took 50s of a 56s job just to lint.
+        # Keep ruff from the SAME `dev` extra as the full install (no second
+        # copy of the version constraint) but skip chromium and the engine
+        # extras that nothing in this job will import.
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
 
       # Lint gate: E/F/W baseline is ZERO.  Fail fast before any test runs
       # so regressions (new unused imports, undefined names, dead code)

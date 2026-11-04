@@ -128,3 +128,63 @@ def test_evaluator_truth_table_is_not_inverted():
             f"evaluator truth table drifted for {event}")
     assert _eval("github.event_name == 'push'", "push")
     assert not _eval("github.event_name == 'push'", "schedule")
+
+
+# ---------------------------------------------------------------------------
+# Install surface: on schedule/dispatch this job runs ONLY ruff.  CI #29
+# (41820071633) measured Install at 50s of a 56s job -- the engine extras
+# and chromium were downloaded for a two-second lint.  Keep the two install
+# steps complementary and ruff sourced from the SAME `dev` extra, so the
+# lint version never becomes a second hand-written contract.
+# ---------------------------------------------------------------------------
+
+def _tests_steps():
+    return _workflow()["jobs"]["tests"]["steps"]
+
+
+def _install_steps():
+    return [s for s in _tests_steps()
+            if str(s.get("name", "")).startswith("Install")]
+
+
+def _commands(step):
+    return [line.strip() for line in step["run"].splitlines()
+            if line.strip() and not line.lstrip().startswith("#")]
+
+
+def test_install_steps_are_exactly_two_and_complementary():
+    installs = _install_steps()
+    assert len(installs) == 2, "tests job needs one full + one lint-only install"
+    by_name = {s["name"]: s for s in installs}
+    assert set(by_name) == {"Install (full suite)", "Install (lint only)"}
+    assert by_name["Install (full suite)"].get("if", "").strip() == _TESTS_IF
+    assert by_name["Install (lint only)"].get("if", "").strip() == _NIGHTLY_IF
+    for event in sorted(_TRIGGERS):
+        assert _eval(_TESTS_IF, event) != _eval(_NIGHTLY_IF, event), (
+            f"{event}: installs would both run or both skip")
+
+
+def test_full_install_keeps_the_whole_surface():
+    full = next(s for s in _install_steps() if s["name"] == "Install (full suite)")
+    for needle in ('pip install -e ".[dev,async,ast,api,nuclei]"',
+                   "pip install cryptography playwright",
+                   "python -m playwright install chromium --with-deps"):
+        assert needle in full["run"], f"full install lost {needle!r}"
+
+
+def test_lint_only_install_is_minimal_and_shares_the_dev_extra():
+    lint = next(s for s in _install_steps() if s["name"] == "Install (lint only)")
+    cmds = _commands(lint)
+    assert 'pip install -e ".[dev]"' in cmds, (
+        "ruff must come from the same dev extra as the full install")
+    assert len(cmds) == 2, "lint-only install = upgrade pip + install .[dev], nothing else"
+    for heavy in ("playwright", "cryptography", "async,ast,api,nuclei", "chromium"):
+        assert not any(heavy in c for c in cmds), (
+            f"lint-only install pulled in the unused {heavy!r} surface")
+
+
+def test_lint_step_stays_unconditional():
+    lints = [s for s in _tests_steps()
+             if str(s.get("name", "")).startswith("Lint (ruff")]
+    assert len(lints) == 1, "ruff step must exist exactly once"
+    assert "if" not in lints[0], "ruff must run on EVERY trigger"

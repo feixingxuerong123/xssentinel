@@ -1067,11 +1067,19 @@ async scan()        : [['reflected','high','high']]
    evidence 步骤同事件范围;变异对照 baseline 绿 6 → 七个变异(删 if / 漏
    dispatch / nightly 漏 dispatch / 第三个入口 / evidence 未隔离 / 触发集合
    缩小 / 求值器写反)各红 → restored 绿 6。
-   **边界**:`tests` job 在 schedule/dispatch 仍执行完整依赖安装(为 ruff 那几秒),
-   属方案①未覆盖的残留开销;②(错峰)与③(只移 sweep)未采纳,③会让 schedule
-   退回 60min ceiling 而本机顺序档 4554s≈76min 会超时。原「省下额度跑 nightly
-   全矩阵」已过时:`benchmark-full` 自 Phase 348 起就是 schedule 触发(同 run
-   31m35s,sync+async 全 194 例)。
+   **残留开销已处置(2026-11-04 收尾)**:CI #29(`41820071633`)实测 dispatch 下
+   `tests` job 共 56s,其中 Install 占 50s —— 全套 extras + chromium 只为跑两秒
+   ruff。现将 Install 拆为互斥两步:push/PR 装
+   `.[dev,async,ast,api,nuclei]` + cryptography/playwright/chromium,
+   schedule/dispatch 只装 `.[dev]`(ruff 仍来自同一个 dev extra,不手写第二份
+   版本约束),Lint 步骤保持无条件。`test_ci_no_duplicate_gate.py` 增 4 例钉安装面
+   (两步互补 / full 全套 / lint-only 最小且同源 / Lint 无条件),变异对照
+   baseline 绿 10 → 八个变异(删 if / 装全套 / 装 chromium / 改步骤名 / full 丢
+   chromium / Lint 加条件 / 漏 dispatch / full 删 if)各红 → restored 绿 10。
+   ②(错峰)与③(只移 sweep)仍未采纳,③会让 schedule 退回 60min ceiling 而
+   本机顺序档 4554s≈76min 会超时。原「省下额度跑 nightly 全矩阵」已过时:
+   `benchmark-full` 自 Phase 348 起就是 schedule 触发(同 run 31m35s,
+   sync+async 全 194 例)。
 3. ~~产物入库体积~~ **已处置(2026-11-01)**:落地"只保留被文档引用的证据与被脚本读取的输入"口径——
    results 根目录留 27 个(约 3.3MB,含 corpus_gap/gate_cost 的 6 个输入固件与全部文档引用产物),
    其余 338 个跟踪产物(约 16.5MB)去跟踪并移入 gitignored 的 `_local_archive/`(仅本机留档);
