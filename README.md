@@ -468,6 +468,13 @@ httpx -l targets.txt | xssentinel --batch-stdin -o - -f json | jq -c '.findings[
   诚实错误而不再 traceback 或误报 exit 3;`--ai-timeout` 现在对 `--ai-check`
   生效;`--self-test` 自动避开被占用的 8899。审计覆盖**入口可达性**,不等于
   所有 flag 组合的语义正确性(那由各功能专属测试与 194 例基准负责)。
+- **`-o -` 全入口收口(Phase 362 后续,2026-11-06)**:扫描、`--diff`、
+  `--verify-fix` 三个报告入口共用同一 stdout 帧;`-o -` 不再把 `-` 当文件名,
+  CWD 不会出现 `-` / `-.json` / `-.csv`(根目录 11-05 的历史残留已删除,
+  回归测试在临时 CWD 断言三者为空)。
+- **XSSMaze 残余 FN(Phase 361–362)**:69 条 FN 逐条归因后修掉可修项
+  (path 整段替换、UTF-7 charset 门、括号死页裸属性名语料);修后 194 例
+  双引擎判定与改前逐位一致,27/27 控制例 FP=0,详见 CHANGELOG。
 
 **批量输入（Phase 87 P0/P1）：**
 

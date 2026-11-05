@@ -59,6 +59,8 @@ layer is replaceable on its own. Highlights:
 - **CLI surface audit (Phase 360 follow-up)**: 29 surface cases and 133 parser flags were each driven through a real CLI subprocess with zero crashes and zero timeouts; all eight report formats produced artefacts. Malformed `--raw-request` files, corrupt `--resume` checkpoints and unusable `--poc-dir` paths now return honest errors instead of tracebacks or a false "scan incomplete" (exit 3); `--ai-timeout` reaches `--ai-check`, and `--self-test` avoids an occupied hard-coded port. This audits **entry-point reachability**, not the semantics of every flag combination (covered by the per-feature suites and the 194-case matrix).
   Every confirmed finding carries a reproducible PoC (curl, URL, self-contained
   HTML page).
+- **`-o -` closed across every report entry point (post-Phase 362, 2026-11-06)**: scan, `--diff` and `--verify-fix` share one stdout frame writer; `-` is never treated as a filename, so the CWD no longer receives `-` / `-.json` / `-.csv` (stale 11-05 artefacts were removed; a regression test asserts all three are absent in a scratch CWD).
+- **XSSMaze residual FNs (Phase 361–362)**: the 69 FNs were attributed case by case and the actionable ones fixed (whole-segment path replacement, the UTF-7 charset gate, bare attribute-name corpus for bracket-dead pages). The 194-case dual-engine verdicts stayed byte-identical to the baseline and all 27/27 controls remained FP-free — see the changelog.
 
 Use it **only against systems you are authorized to test.**
 
