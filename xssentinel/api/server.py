@@ -842,10 +842,18 @@ def _handle_diff(ctx, m, body, query) -> Response:
 # state that can go stale.  Auth reuses the API server's ``--api-key``; the
 # shared same-origin gate (Phase 70/196) already polices browser callers.
 def _handle_mcp(ctx, m, body, query) -> Response:
-    """One JSON-RPC message (or batch) -> one JSON-RPC response."""
+    """One JSON-RPC message (or batch) -> one JSON-RPC response.
+
+    Phase 358: the same dispatch also serves modern (2026-07-28) frames.
+    Modern frames get the transport-level status codes that revision
+    mandates (400 for version/header failures, 404 for unknown methods);
+    legacy frames keep the 200/202 behaviour they have always had, so a
+    2025-era agent attached to an old URL cannot notice the upgrade.
+    """
     if not ctx.api_key_valid:
         return Response.error(401, "unauthorized", "missing or invalid API key")
-    from .mcp_server import dispatch_message
+    from .mcp_server import (dispatch_message, request_is_modern,
+                             validate_http_headers)
 
     # The shared dispatch layer answers malformed JSON with HTTP 400 for
     # the REST routes; MCP says a parse error must be a JSON-RPC error
@@ -867,6 +875,10 @@ def _handle_mcp(ctx, m, body, query) -> Response:
                                         "message": ("invalid request: "
                                                     "expected object")}})
             continue
+        mismatch = validate_http_headers(msg, ctx.headers)
+        if mismatch is not None:
+            responses.append(mismatch)
+            continue
         resp = dispatch_message(msg)
         if resp is not None:                  # notifications never answer
             responses.append(resp)
@@ -874,6 +886,16 @@ def _handle_mcp(ctx, m, body, query) -> Response:
         # Notifications only: JSON-RPC forbids a response body; the
         # Streamable HTTP transport answers 202 Accepted.
         return Response(202, None)
+    if not batch and len(responses) == 1:
+        err = responses[0].get("error")
+        # -32022 / -32020 are modern-only codes: a frame declaring an
+        # UNKNOWN version is not classified "modern" by the era probe, but
+        # the UnsupportedProtocolVersionError itself is the modern signal a
+        # client uses to stay on this era, so it must still carry 400.
+        if err and err.get("code") in (-32022, -32020):
+            return Response.json(400, responses[0])
+        if err and err.get("code") == -32601 and request_is_modern(msgs[0]):
+            return Response.json(404, responses[0])
     return Response.json(200, responses if batch else responses[0])
 
 

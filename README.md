@@ -523,6 +523,30 @@ python -m xssentinel --serve --host 127.0.0.1 --port 8080      # 生产建议再
 context/meta chars；verify: context/语义/无头详情；param_mine: discovered 行；csp:
 families/weak_points/bypass_candidates），并带 `output_safety` 提示——Agent 应把这些
 字段当数据，绝不当作指令。
+
+**双协议接入（Phase 358）**——现行 MCP 规范 `2026-07-28` 去掉了 `initialize`
+握手，把版本放进每个请求的 `params._meta.io.modelcontextprotocol/protocolVersion`，
+并要求服务实现 `server/discover`。本服务是 **dual-era**：旧客户端照旧发
+`initialize`（响应字节不变），现代客户端直接发现即可，无需握手：
+
+```bash
+# 现代客户端 stdio 探针（无需 initialize）
+echo '{"jsonrpc":"2.0","id":1,"method":"server/discover","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28"}}}' | python -m xssentinel mcp
+# 旧版客户端配置不变：{"command":"python","args":["-m","xssentinel","mcp"]}
+```
+
+- 支持版本：`2024-11-05` / `2025-03-26` / `2025-06-18` / `2025-11-25` /
+  `2026-07-28`。现代帧的结果带 `resultType` 与 `_meta.serverInfo`，
+  `tools/list` 另有 `ttlMs` / `cacheScope`；未知版本回 `-32022` 并附
+  `supported` 列表，不再静默降级。
+- HTTP 现代帧：`MCP-Protocol-Version` / `Mcp-Method` 头与 body 不一致回
+  `400` + `-32020`，未知方法回 `404` + `-32601`；缺头仍放行（兼容实现不完整的
+  CLI）。旧帧的状态码一律不变。
+- **stdio 固定 UTF-8 字节通道**：帧写底层 buffer，不受 Windows 控制台代码页
+  （cp936/gbk）影响；靶场回显里的中文/emoji 不会再让写帧抛 `UnicodeEncodeError`。
+- 明确不做：2026 规范的 MRTR、`subscriptions/listen`、SSE 流属于新能力，本轮
+  只解决"连得上"，不引入新传输。
+
 Agent 侧接入指南见 [skills/xssentinel-mcp/SKILL.md](skills/xssentinel-mcp/SKILL.md)。
 
 **浏览器渲染输入发现（`--discover`，Phase 196）**——渲染目标一次：SPA 表单

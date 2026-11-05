@@ -143,6 +143,8 @@ xssentinel --diff before.json after.json   # 修复前后对比
 xssentinel --verify-fix URL          # 复验某个修复
 xssentinel --serve                   # REST API 微服务模式
 xssentinel --mcp                     # MCP server,接进 AI 工作流
+# 客户端配置:{"command":"python","args":["-m","xssentinel","mcp"]}
+# 现代 MCP(2026-07-28)无需 initialize,直接发 server/discover;旧版握手照旧
 ```
 
 Whether to trust a finding comes down to two fields:

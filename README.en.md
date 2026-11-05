@@ -277,6 +277,19 @@ Protocol behavior: single or batched JSON-RPC arrays; notification-only batches
 GET/DELETE `/mcp` → 405 (no SSE upgrade, no session to terminate). Same auth
 and same-origin gate as the REST API.
 
+**Dual-era protocol support (Phase 358)** — the current MCP revision
+`2026-07-28` removed the `initialize` handshake and requires
+`server/discover`. This server answers both eras: legacy clients keep their
+byte-for-byte `initialize` responses; modern clients declare
+`params._meta.io.modelcontextprotocol/protocolVersion` and get `resultType`,
+`_meta.serverInfo` and cache hints, with `-32022` plus a `supported` list for
+unknown versions. On Streamable HTTP, a mismatched `MCP-Protocol-Version` or
+`Mcp-Method` header returns 400 `-32020`, an unknown modern method returns
+404 `-32601`; missing headers are tolerated for CLIs that omit them. stdio is
+a UTF-8 byte channel, so a Windows cp936/gbk console can no longer break a
+frame containing non-ASCII target data. MRTR, `subscriptions/listen` and SSE
+streams are intentionally out of scope.
+
 **Contracts**: `tools/call` arguments are validated against each tool's
 inputSchema — unknown keys are rejected with the accepted-key list (never
 silently dropped: a misspelled `cookie` used to run an unauthenticated scan

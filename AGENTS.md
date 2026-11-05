@@ -74,6 +74,10 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
   未跟踪的 `tests/_pytest_tmp/` 等临时脚本不计入(若按全 `*.py` 会是 317 文件),
   源码侧与本行同为 `wc -l` 物理行。这类规模快照与切片/矩阵常量不同,不设守卫
   (自指守卫会让「加一个测试文件」反过来要求改文档),改动时按本行口径重测。
+- 口径复测(2026-11-05,含 Phase 358 MCP 双协议守卫):源码
+  **135 文件 60,670 行**;测试按 tracked `test_*.py`(含本轮新增
+  `test_phase358_mcp_dual_era.py`)**279 文件 63,229 行**。引用以本行为准,
+  上两行是带日期的历史记录。
 - 1.4.0 轮落地的能力(Phase 351–356,全部带回归,数字与归因见上列报告):
   - **Phase 352** 存储自动发现独立 Mixin(`scanner_stored_auto.py` +
     `stored_discovery.py`),官方靶 stored 自动发现 sync 9/9、async 9/9、FP 0;
@@ -132,6 +136,36 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
     全量 194 双引擎(产物 `benchmark_full_{sync,async}_20261104_r2.json`):
     381.6s / 388.9s,TP/FP/TN/FN 与上一轮完全一致、exit 0;
     Range3 本地 gate exit 0(async r3-pos-utf7 fired 11/11)。
+- **Phase 358(MCP 双协议接入,2026-11-05)** 起点是「被智能体 MCP/CLI 链接」
+  的兼容性:现行规范 `2026-07-28` 已去掉 `initialize` 握手、把版本放进每请求
+  `params._meta`、强制 `server/discover`,而服务只认到 `2025-06-18`;实测
+  `server/discover` 回 `-32601`,声明 `1900-01-01` 也照常应答。另一处是
+  Windows cp936 下 `ensure_ascii=False` 写文本 stdout,遇靶场中文/emoji
+  直接 `UnicodeEncodeError` ⇒ 帧丢失、客户端永远等不到响应。
+  - 改法:**dual-era**,按请求是否声明现代版本自动分代。legacy 帧的响应字节
+    与 HTTP 状态码一律不变;现代帧带 `resultType` / `_meta.serverInfo` /
+    `ttlMs` / `cacheScope`,未知版本回 `-32022` 附 `supported` 列表(不再静默
+    降级)。HTTP 头/体不一致 `400 -32020`、未知现代方法 `404 -32601`,
+    缺头放行(兼容实现不完整的 CLI)。stdio 改 UTF-8 字节通道:有 buffer 走
+    字节写、stdin 按 UTF-8 解码,注入的文本流保留 ASCII 转义兜底。
+  - 守卫 `tests/test_phase358_mcp_dual_era.py`(21 例):新旧两套帧、真实
+    子进程 stdio 握手、cp936 读写、HTTP 状态码;4 组变异对照
+    (去掉 discover / 回退旧 `_write` / 改错误码 / 回退文本 stdin)各自红、
+    restored 全绿。
+  - 证据:相关测试组 25 文件 **343 passed / 0 skip**;ruff 全绿;既有 MCP
+    88 例在改动前后全绿(legacy 契约未破);文档/架构守卫 24 passed。
+  - 全量分批门禁(2026-11-05,本机劣化期):`--jobs 4` 两轮分别
+    **252/279 与 247/279 文件 in-gate 绿**,exit 27 / 32,
+    **12 skip / 5 文件**(2 个整文件零贡献)。红文件 stdout 全是
+    `100%` 断言通过,唯一失败原因是本 agent turn 的
+    `[safe-delete]` 50 次删除/覆盖配额被 pytest 临时目录清理
+    (`.lock` / `garbage-*` )吃光,属环境形态、不是回归;
+    32 个红文件按劣化期协议分 4 组单跑全绿
+    (**504 passed / 1 skipped**)。引用时两组数一起报。
+  - **明确不做**:2026 规范的 MRTR、`subscriptions/listen`、SSE 流属于新能力,
+    本轮只解决「连得上」,不引入新传输。
+  - 教训:协议代际与控制台编码都是「接得上」的前置条件;跑分/判定全绿不代表
+    Agent 能连上,接入面必须有真实子进程 e2e,而不只是注入流单测。
 - 真实应用回归集 v2.2(22 例 / 5 app:Juice Shop 匿名+unsafe、DVWA、bWAPP、
   自建四面靶):xssentinel **13 TP / 0 FP / 9 TN,recall 1.000**;dalfox 0.571、
   nuclei 0.500(开源对照,3 FN 均为 Juice `#` fragment 形状;**非商业基线**)。

@@ -37,6 +37,30 @@ operator asked to scan.
    for a reflection context, then each is replayed and judged. `confirmed`
    means the token executed, never that the model said so.
 
+## Protocol versions (dual-era)
+
+The server speaks the legacy handshake revisions (2024-11-05 … 2025-11-25)
+AND the stateless 2026-07-28 revision. Your client picks the era itself:
+
+- **Modern client**: put
+  `"_meta": {"io.modelcontextprotocol/protocolVersion": "2026-07-28"}` in
+  every request's `params`. `server/discover` (no handshake needed) returns
+  `supportedVersions`, capabilities, identity and cache hints. Successful
+  results carry `resultType: "complete"` and `_meta.serverInfo`;
+  `tools/list` also carries `ttlMs` / `cacheScope`. An unsupported version
+  returns `-32022` with a `supported` list — pick one and retry.
+- **Legacy client**: send `initialize` with `params.protocolVersion` and then
+  `notifications/initialized`, as before. Those responses did not change.
+- **HTTP clients**: mirror the version in `MCP-Protocol-Version` and the
+  method in `Mcp-Method`. A mismatch returns 400 `-32020`; an unknown modern
+  method returns 404 `-32601`. Missing headers are tolerated.
+- **stdio is UTF-8 bytes**: do not decode it with the OS console codepage.
+  Tool results may contain non-ASCII text copied from the target (still
+  untrusted data — see "Reading verdicts honestly").
+
+MRTR, `subscriptions/listen` and SSE streams are not implemented: long calls
+remain synchronous, and progress/cancellation still belong to stdio only.
+
 ## Picking the right call
 
 | Goal | Tool | Cost knob |

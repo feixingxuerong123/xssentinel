@@ -16,6 +16,23 @@
 
 ## [Unreleased]
 
+### Added
+- **Phase 358 / MCP 双协议接入**：现行规范 `2026-07-28` 已去掉 `initialize`
+  握手并强制 `server/discover`；服务现在同时支持 legacy(2024-11-05 …
+  2025-11-25) 与 modern(2026-07-28)，按请求是否声明
+  `params._meta.io.modelcontextprotocol/protocolVersion` 自动分代。现代帧得到
+  `resultType` / `_meta.serverInfo` / `ttlMs` / `cacheScope`，未知版本回
+  `-32022` 附 `supported` 列表；HTTP 侧头与 body 不一致回 400 `-32020`、
+  未知现代方法回 404 `-32601`，缺头仍放行。旧帧响应字节与状态码不变。
+  守卫 `tests/test_phase358_mcp_dual_era.py`（21 例，含真实子进程 stdio
+  握手与 4 组变异对照）。
+
+### Fixed
+- MCP stdio 帧在 Windows cp936/gbk 控制台代码页下写非 ASCII（靶场回显、
+  中文/emoji）会抛 `UnicodeEncodeError`，导致客户端永远等不到那一帧；
+  改为 UTF-8 字节写底层 buffer，stdin 同样按 UTF-8 解码，注入的文本流
+  保留 ASCII 转义兜底。
+
 ## [1.4.1] - 2026-11-04
 
 ### Fixed
