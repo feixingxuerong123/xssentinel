@@ -13,6 +13,8 @@ import time
 from datetime import datetime
 from urllib.parse import urlparse
 
+from .cli_output import (clean_batch_lines, decode_input_bytes, human,
+                         write_report_frame)
 from .core.requester import Requester  # noqa: F401  (shared with cli_commands)
 from .core.budget import BudgetExhausted, CircuitOpen
 from .core.scanner import Scanner
@@ -22,6 +24,22 @@ from .core.session import SessionManager, login_with_csrf
 from .core.logger import get_logger
 
 _log = get_logger("cli")
+
+
+def _decode_batch_bytes(data: bytes) -> tuple[str, str | None]:
+    """Phase 360: delegate to the shared decoder (``cli_output``).
+
+    Kept under its old name for the tests and callers that reach it through
+    this module.  Phase 359 introduced the UTF-8-sig / UTF-16 / GB18030
+    ladder here; Phase 360 lifted it so ``--config`` and the other text
+    inputs cannot drift into a second, stricter implementation.
+    """
+    return decode_input_bytes(data)
+
+
+def _clean_batch_lines(text: str) -> list[str]:
+    """Strip BOM/CRLF/blank lines and ``#`` comments from a decoded stream."""
+    return clean_batch_lines(text)
 
 
 def load_target_urls(batch_file=None, batch_stdin=False, url=None,
@@ -45,9 +63,11 @@ def load_target_urls(batch_file=None, batch_stdin=False, url=None,
     if batch_file:
         if not os.path.isfile(batch_file):
             return [], f"Batch file not found: {batch_file}"
-        with open(batch_file, "r", encoding="utf-8") as f:
-            urls = [line.strip() for line in f
-                    if line.strip() and not line.startswith("#")]
+        with open(batch_file, "rb") as f:
+            text, err = _decode_batch_bytes(f.read())
+        if err:
+            return [], f"Batch file {batch_file}: {err}"
+        urls = _clean_batch_lines(text)
     elif batch_stdin:
         src = stdin if stdin is not None else _sys.stdin
         try:
@@ -58,8 +78,17 @@ def load_target_urls(batch_file=None, batch_stdin=False, url=None,
             return [], ("--batch-stdin needs piped input (stdin is a TTY). "
                         "Example: type urls.txt | xssentinel --batch-stdin "
                         "-o out/")
-        urls = [line.strip() for line in src
-                if line.strip() and not line.startswith("#")]
+        # Real stdin has a binary buffer; injected text streams (tests)
+        # do not.  Decoding bytes here keeps a GBK/UTF-16 pipe working on
+        # Windows, where the console codepage would otherwise mangle it.
+        buf = getattr(src, "buffer", None)
+        if buf is not None:
+            text, err = _decode_batch_bytes(buf.read())
+            if err:
+                return [], f"--batch-stdin: {err}"
+        else:
+            text = src.read()
+        urls = _clean_batch_lines(text)
         if not urls:
             return [], "No URLs read from stdin"
     elif url:
@@ -139,7 +168,7 @@ def _do_login(requester, args) -> "SessionManager | None":
             if getattr(args, "login_json", False):
                 # Phase 278: JSON login (token in the body, not a cookie).
                 from .core.session import login_json as _login_json
-                print(f"[*] JSON login at {args.login_url} ...")
+                print(f"[*] JSON login at {args.login_url} ...", file=human())
                 _hdrs, _store, _tok = _login_json(
                     requester, args.login_url, args.login_user,
                     args.login_pass or "",
@@ -158,11 +187,11 @@ def _do_login(requester, args) -> "SessionManager | None":
                     except Exception:
                         pass
                 print("[+] JSON login token captured" if ok
-                      else "[!] JSON login failed -- no token in response")
+                      else "[!] JSON login failed -- no token in response", file=human())
             else:
                 # Form login. Use the richer login_form when markers are given
                 # (otherwise fall back to the legacy csrf helper).
-                print(f"[*] Logging in at {args.login_url} ...")
+                print(f"[*] Logging in at {args.login_url} ...", file=human())
                 creds = {args.login_field_user: args.login_user,
                          args.login_field_pass: args.login_pass or ""}
                 marker = getattr(args, "login_success_marker", None)
@@ -185,7 +214,7 @@ def _do_login(requester, args) -> "SessionManager | None":
                         mgr._login_data = creds
                         mgr._login_method = "POST"
                 print("[+] Login succeeded (session cookie captured)" if ok
-                      else "[!] Login failed -- continuing without auth")
+                      else "[!] Login failed -- continuing without auth", file=human())
 
         elif getattr(args, "login_basic", None):
             if ":" not in args.login_basic:
@@ -194,7 +223,7 @@ def _do_login(requester, args) -> "SessionManager | None":
                 u, _, p = args.login_basic.partition(":")
                 ok = mgr.login_basic(u, p)
                 print("[+] Basic auth configured" if ok
-                      else "[!] Basic auth setup failed")
+                      else "[!] Basic auth setup failed", file=human())
 
         elif getattr(args, "login_header", None):
             if ":" not in args.login_header:
@@ -203,7 +232,7 @@ def _do_login(requester, args) -> "SessionManager | None":
                 name, _, value = args.login_header.partition(":")
                 ok = mgr.login_header(name.strip(), value.strip())
                 print(f"[+] Auth header {name.strip()} configured" if ok
-                      else "[!] Auth header setup failed")
+                      else "[!] Auth header setup failed", file=human())
 
         elif getattr(args, "login_oauth_token", None):
             ok = mgr.login_oauth_token(
@@ -216,9 +245,9 @@ def _do_login(requester, args) -> "SessionManager | None":
             )
             refresh_ready = bool(mgr._oauth_refresh)
             print("[+] OAuth token accepted" if ok else
-                  "[!] OAuth token rejected")
+                  "[!] OAuth token rejected", file=human())
             if ok and refresh_ready:
-                print("[+]   refresh flow armed (auto-renew before expiry)")
+                print("[+]   refresh flow armed (auto-renew before expiry)", file=human())
 
         elif getattr(args, "login_token", None):
             ok = mgr.login_token(
@@ -229,7 +258,7 @@ def _do_login(requester, args) -> "SessionManager | None":
                 verify_url=getattr(args, "login_verify_url", None),
                 success_marker=getattr(args, "login_verify_marker", None),
             )
-            print("[+] Token accepted" if ok else "[!] Token rejected")
+            print("[+] Token accepted" if ok else "[!] Token rejected", file=human())
     except Exception as e:                       # never abort the scan
         _log.warning("Authentication setup failed: %s", e)
         return None
@@ -458,7 +487,7 @@ def _run_scan(args, url: str, requester, oob, progress, checkpoint,
                     _param_wl = list(dict.fromkeys(
                         list(_param_wl or []) + _names))
                     print(f"[*] Discover: {len(_names)} live input field "
-                          f"name(s) merged into the mining wordlist")
+                          f"name(s) merged into the mining wordlist", file=human())
                 _discovered_urls = _res.get("resource_urls") or []
                 # Phase 210: hash routes the rendered page links to.  Only the
                 # ones carrying a fragment query can be probed, so they go
@@ -471,11 +500,11 @@ def _run_scan(args, url: str, requester, oob, progress, checkpoint,
                                                            _discovered_urls)
                     print(f"[*] Discover: {len(_routes)} hash route(s) the "
                           f"rendered page links to; those with a fragment "
-                          f"parameter are scanned first")
+                          f"parameter are scanned first", file=human())
                 if _discovered_urls:
                     print(f"[*] Discover: {len(_discovered_urls)} same-origin "
                           f"endpoint(s) the page itself fetched -- they will "
-                          f"be scanned after the main target")
+                          f"be scanned after the main target", file=human())
                 # Phase 247: reap the base page AND the routes it links.
                 # Phase 242 measured multi-route reaping as low-value on
                 # Juice Shop (only one extra face) -- but that asked "how
@@ -503,10 +532,10 @@ def _run_scan(args, url: str, requester, oob, progress, checkpoint,
                 if _spa_write_faces:
                     print(f"[*] Discover: {len(_spa_write_faces)} SPA write "
                           f"face(s) OBSERVED by driving the page's own UI "
-                          f"(the stored round-trip will run over them)")
+                          f"(the stored round-trip will run over them)", file=human())
             else:
                 print("[!] Discover: playwright/chromium not available -- "
-                      "continuing with the static wordlist")
+                      "continuing with the static wordlist", file=human())
         except Exception as e:
             _log.warning("Discover pass failed (continuing): %s", e,
                          exc_info=args.verbose)
@@ -554,7 +583,7 @@ def _run_scan(args, url: str, requester, oob, progress, checkpoint,
     if getattr(args, "fuzz", False):
         try:
             from .core import fuzzer as fuzzer_mod
-            print(f"\n[*] Fuzzer mode: triaging params for {base_url}")
+            print(f"\n[*] Fuzzer mode: triaging params for {base_url}", file=human())
             # Phase 43: operator wordlist (--param-wordlist) is PREPENDED
             # to the built-in candidates; triage is one cheap request per
             # candidate, so the full expanded list (300+) is affordable.
@@ -569,13 +598,13 @@ def _run_scan(args, url: str, requester, oob, progress, checkpoint,
                 max_params=100, verbose=args.verbose)
             injectable = [r for r in fuzz_results if r.get("injectable")]
             print(f"[+] Fuzzer: {len(injectable)}/{len(fuzz_results)} "
-                  f"params scored injectable (>= 30 points)")
+                  f"params scored injectable (>= 30 points)", file=human())
             for r in fuzz_results[:5]:
                 score = r.get("score", 0)
                 name = r.get("name", "?")
                 ctx_name = r.get("context", "?")
                 print(f"    - {name}: score={score} ctx={ctx_name} "
-                      f"injectable={r.get('injectable', False)}")
+                      f"injectable={r.get('injectable', False)}", file=human())
             # Attach fuzzer findings as low-severity info entries so they
             # appear in the report.
             for r in injectable:
@@ -619,7 +648,7 @@ def _run_scan(args, url: str, requester, oob, progress, checkpoint,
                             params.setdefault(name, "xss")
                 print(f"[*] Fuzzer triage: {len(kept)} param(s) selected "
                       f"for deep payload testing (top-{fuzz_top_n} + "
-                      f"user-supplied)")
+                      f"user-supplied)", file=human())
         except Exception as e:
             _log.warning("Fuzzer pre-flight error: %s", e, exc_info=args.verbose)
 
@@ -643,14 +672,14 @@ def _run_scan(args, url: str, requester, oob, progress, checkpoint,
                 _discovered_urls = _discover_scan_order(
                     _mined, _discovered_urls)
                 print(f"[*] Discover: {len(_mined)} bundle-declared route(s) "
-                      f"with parameters added to the scan set")
+                      f"with parameters added to the scan set", file=human())
         except Exception as e:
             _log.warning("discover route mining failed (continuing): %s", e,
                          exc_info=args.verbose)
 
     for _du in _discovered_urls[:10]:
         if args.verbose:
-            print(f"[*] Discover: scanning {args.method} {_du}")
+            print(f"[*] Discover: scanning {args.method} {_du}", file=human())
         try:
             scanner.scan_target(_du, method="GET", params={},
                                 data=None, oob_collect=False)
@@ -677,7 +706,7 @@ def _run_scan(args, url: str, requester, oob, progress, checkpoint,
             ran = scanner.scan_spa_write_faces(
                 _spa_write_faces, base_url, view_urls=_spa_routes[:8])
             print(f"[*] SPA write faces: ran the stored round-trip over "
-                  f"{len(ran)}/{len(_spa_write_faces)} observed face(s)")
+                  f"{len(ran)}/{len(_spa_write_faces)} observed face(s)", file=human())
         except Exception as e:
             _log.warning("SPA write-face round-trip failed (continuing): %s",
                          e, exc_info=args.verbose)
@@ -1368,25 +1397,25 @@ def ai_opts_from_args(args) -> dict:
     if os.environ.get("XSSentinel_NO_AI_EGRESS", "").strip().lower() in (
             "1", "true", "yes", "on"):
         print("[!] --ai-report ignored: XSSentinel_NO_AI_EGRESS is set -- "
-              "no target or finding data will be sent to any LLM provider.")
+              "no target or finding data will be sent to any LLM provider.", file=human())
         return {}
     from .core.llm_pool import LLMPool
     pool = None
     try:
         pool = LLMPool.from_file(getattr(args, "ai_config", None))
         print(f"[*] AI report on: {len(pool.candidates)} candidate(s) from "
-              f"{pool.source}")
+              f"{pool.source}", file=human())
         # Say WHERE the data goes, not just that it does: the target URL,
         # parameters and payloads leave this machine for these hosts.
         hosts = sorted({urlparse(c.endpoint).netloc or c.endpoint
                         for c in pool.candidates})
         if hosts:
             print(f"[*] AI report egress: target URLs, parameters and "
-                  f"payloads will be sent to: {', '.join(hosts)}")
+                  f"payloads will be sent to: {', '.join(hosts)}", file=human())
     except Exception as e:
         print(f"[!] --ai-report: cannot load the LLM pool "
               f"({type(e).__name__}: {e}); the AI section will come from the "
-              f"built-in advice corpus.")
+              f"built-in advice corpus.", file=human())
     models = None
     raw = getattr(args, "ai_model", None)
     if raw:
@@ -1457,8 +1486,24 @@ def _attach_ai_report(scanner, target_url, meta):
         meta["ai_report"] = ai_meta
 
 
+def _write_stdout_report(out: str, fmt: str) -> None:
+    """Emit a report on stdout as UTF-8 BYTES (Phase 359, ``-o -``).
+
+    Phase 360: the frame writer moved to :func:`cli_output.write_report_frame`
+    so it can also serve the report channel in embedded/injected-stream
+    contexts.  Two measured gaps are closed there: a text-only stdout on a
+    cp936 console used to raise ``UnicodeEncodeError`` on non-ASCII reports,
+    and a closed downstream pipe used to surface as a per-target scan
+    failure (all remaining targets "failed", exit 3) plus a flush traceback.
+    ``OutputPipeClosed`` propagates to ``main()``, which ends the run
+    cleanly instead of blaming the scan.
+    """
+    write_report_frame(out, fmt)
+
+
 def _write_report(scanner, target_url, output_path, fmt, meta=None):
-    """Write scan report to file."""
+    """Write scan report to a file, or to stdout when ``output_path == '-'``."""
+    stdout_mode = output_path == "-"
     meta = meta or {}
     meta.setdefault("generated", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
     meta.setdefault("requests", scanner.requests_made)
@@ -1497,28 +1542,31 @@ def _write_report(scanner, target_url, output_path, fmt, meta=None):
 
     if fmt == "json":
         out = reportmod.build_json(scanner.findings, target_url, meta)
-        if not output_path.endswith(".json"):
+        if not stdout_mode and not output_path.endswith(".json"):
             output_path += ".json"
     elif fmt == "csv":
         out = reportmod.build_csv(scanner.findings, target_url, meta)
-        if not output_path.endswith(".csv"):
+        if not stdout_mode and not output_path.endswith(".csv"):
             output_path += ".csv"
     elif fmt == "sarif":
         out = reportmod.build_sarif(scanner.findings, target_url, meta)
-        if not output_path.endswith(".sarif"):
+        if not stdout_mode and not output_path.endswith(".sarif"):
             output_path += ".sarif"
     elif fmt == "junit":
         out = reportmod.build_junit(scanner.findings, target_url, meta)
-        if not output_path.endswith(".xml"):
+        if not stdout_mode and not output_path.endswith(".xml"):
             output_path += ".xml"
     elif fmt == "burp":
         # Phase 49: Burp Suite "export issue data" XML (Dradis/importers).
         out = reportmod.build_burp_xml(scanner.findings, target_url, meta)
-        if not output_path.endswith(".xml"):
+        if not stdout_mode and not output_path.endswith(".xml"):
             output_path += ".xml"
     elif fmt == "nuclei":
         # Phase 49: one runnable nuclei template per finding -- a directory
         # artifact, so `nuclei -t <dir>` consumes it directly.
+        if stdout_mode:
+            raise ValueError("-o - is not supported with -f nuclei "
+                             "(that format writes a directory of templates)")
         base = output_path
         for ext in (".yaml", ".yml", ".nuclei"):
             if base.lower().endswith(ext):
@@ -1529,15 +1577,25 @@ def _write_report(scanner, target_url, output_path, fmt, meta=None):
         return base  # directory, not a single file
     elif fmt == "markdown":
         out = reportmod.build_markdown(scanner.findings, target_url, meta)
-        if not output_path.endswith(".md"):
+        if not stdout_mode and not output_path.endswith(".md"):
             output_path += ".md"
     else:
         out = reportmod.build_html(scanner.findings, target_url, meta)
-        if not output_path.endswith(".html"):
+        if not stdout_mode and not output_path.endswith(".html"):
             output_path += ".html"
 
     # Phase 326: report artifacts carry target URLs, parameters and live
     # payloads -- write them owner-only on POSIX (dalfox v3.2.4 parity).
+    if stdout_mode:
+        _write_stdout_report(out, fmt)
+        return "-"
     from .core.fsutil import secure_write_text
+    # Phase 359: `-o reports/scan.json` used to fail when `reports/` did
+    # not exist yet (FileNotFoundError -> exit 3 "incomplete", which lies
+    # about a scan that actually completed).  Create the parent once here,
+    # for both single-target and batch paths.
+    parent = os.path.dirname(os.path.abspath(output_path))
+    if parent:
+        os.makedirs(parent, exist_ok=True)
     secure_write_text(output_path, out)
     return output_path

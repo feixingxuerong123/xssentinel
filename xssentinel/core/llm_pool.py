@@ -730,19 +730,25 @@ class LLMPool:
         return out
 
     def probe(self, prompt: str = "Reply with the single word: ok",
-              models: list[str] | None = None) -> list[dict]:
+              models: list[str] | None = None,
+              timeout: float | None = None) -> list[dict]:
         """Live-call every candidate once (ignores cooldowns) for health checks.
 
         Deliberately bypasses the cooldown state: this is the "which of my keys
         still work?" tool, not the failover path.  Costs one tiny call per
         candidate, so it is never called implicitly.
+
+        Phase 360 follow-up: ``timeout`` is now forwarded from the CLI's
+        ``--ai-timeout``; it used to be accepted by ``_try_one`` but hard-coded
+        to None here, so ``--ai-check`` could run for minutes on an offline
+        host with no way for the caller to bound it.
         """
         out = []
         pool = [c for c in self._candidates if self._matches(c, models)]
         for c in pool:
             att = self._try_one(c, [{"role": "user", "content": prompt}],
-                                max_tokens=16, temperature=0.0, timeout=None,
-                                forced=False)
+                                max_tokens=16, temperature=0.0,
+                                timeout=timeout, forced=False)
             row = att.to_dict()
             row["endpoint"] = c.endpoint
             if att.ok:

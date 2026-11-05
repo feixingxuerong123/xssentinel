@@ -35,6 +35,8 @@ import os
 import threading
 from datetime import datetime
 
+from ..cli_output import read_text_file
+
 
 class Checkpoint:
     """Track scan progress for save/resume."""
@@ -52,13 +54,24 @@ class Checkpoint:
 
     @classmethod
     def load(cls, path: str) -> "Checkpoint | None":
-        """Load a checkpoint file.  Returns None if file doesn't exist or is
-        corrupt."""
+        """Load a checkpoint file.  Returns None if missing or corrupt.
+
+        Phase 360 follow-up: the docstring always promised "None on corrupt",
+        but a *valid JSON document that is not an object* (``1``, ``[]``,
+        ``"x"``) reached ``data.get(...)`` and raised an uncaught
+        AttributeError -- measured as ``--resume broken.ckpt.json`` -> rc=1
+        plus a traceback.  Also shares the CLI input decoder so a BOM /
+        GB18030 checkpoint loads like every other operator file.
+        """
         if not path or not os.path.isfile(path):
             return None
+        text, err = read_text_file(path)
+        if err:
+            return None
         try:
-            with open(path, "r", encoding="utf-8") as f:
-                data = json.load(f)
+            data = json.loads(text.lstrip("\ufeff"))
+            if not isinstance(data, dict):
+                return None
             ckpt = cls(path, data.get("target", ""))
             ckpt._scanned = set(data.get("scanned_urls", []))
             ckpt._findings = list(data.get("findings", []))
@@ -67,7 +80,7 @@ class Checkpoint:
             ckpt.started = data.get("started", ckpt.started)
             ckpt.updated = data.get("updated", ckpt.updated)
             return ckpt
-        except (json.JSONDecodeError, OSError):
+        except (OSError, ValueError, TypeError, AttributeError):
             return None
 
     def mark_scanned(self, url: str) -> None:

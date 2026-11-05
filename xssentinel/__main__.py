@@ -24,10 +24,14 @@ from urllib.parse import urlparse
 # Allow running as a module or script.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from xssentinel import __version__
+from xssentinel.cli_output import (OutputPipeClosed, human,
+                                   read_text_file, reset_human_stream,
+                                   set_human_stream)
 from xssentinel.core.requester import (DEFAULT_MAX_RESPONSE_BYTES,
                                        Requester, env_proxy_for)
 from xssentinel.core.oob import make_listener, oob_callback_warning
-from xssentinel.core.config import Config, save_config
+from xssentinel.core.config import Config, ConfigError, save_config
 from xssentinel.core.checkpoint import Checkpoint
 from xssentinel.core.logger import configure_logging, get_logger
 from xssentinel.core.fsutil import ensure_writable_temp
@@ -227,6 +231,12 @@ def build_parser(mode: str = "scan"):
         description=description,
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=epilog)
+    # Phase 360: version discovery is table stakes for wrappers/CI/package
+    # managers.  Reading __version__ keeps it single-sourced with the
+    # CHANGELOG gate (test_doc_gate_parity).
+    ap.add_argument("-V", "--version", action="version",
+                    version=f"xssentinel {__version__}",
+                    help="show program's version number and exit")
     # Target
     g_tgt = ap.add_argument_group("Target")
     g_tgt.add_argument("-u", "--url", help="Target URL")
@@ -888,7 +898,14 @@ def build_parser(mode: str = "scan"):
              "subdirectory per scanned host so multi-target runs do not "
              "overwrite each other). The PoCs are live attack strings: "
              "only use on systems you are authorized to test.")
-    g_out.add_argument("-v", "--verbose", action="store_true")
+    # Phase 360: before --version existed, `--ver` was --verbose's only
+    # abbreviation.  Adding --version makes that shared prefix ambiguous,
+    # a silent compatibility regression for scripts using the short form.
+    # Make it a third EXACT option string on the SAME action: argparse
+    # resolves exact matches without abbreviation ambiguity, and a separate
+    # hidden action sharing this dest would shadow the real one in
+    # test_cli_subcommands' dest->action visibility map.
+    g_out.add_argument("-v", "--verbose", "--ver", action="store_true")
     g_out.add_argument("--log-level", default=None,
                        choices=["debug", "info", "warning", "error"],
                        help="Logging verbosity (default: warning; "
@@ -1018,39 +1035,42 @@ def _run_ai_check(args) -> int:
     """
     pool, err = _load_ai_pool(args)
     if pool is None:
-        print(f"[!] Cannot load LLM pool: {err}")
+        print(f"[!] Cannot load LLM pool: {err}", file=human())
         print("[*] Put a pool at xssentinel/data/llm_providers.json, or pass "
-              "--ai-config, or set XSSENTINEL_LLM_CONFIG.")
+              "--ai-config, or set XSSENTINEL_LLM_CONFIG.", file=human())
         return 1
 
     models = _ai_model_filter(args)
     pool_cands = [c for c in pool.candidates if pool._matches(c, models)]
-    print(f"[*] Pool   : {pool.source}")
-    print(f"[*] State  : {pool.state_path}")
-    print(f"[*] Probes : {len(pool_cands)} candidate(s), 1 minimal call each")
+    print(f"[*] Pool   : {pool.source}", file=human())
+    print(f"[*] State  : {pool.state_path}", file=human())
+    print(f"[*] Probes : {len(pool_cands)} candidate(s), 1 minimal call each", file=human())
     if models:
-        print(f"[*] Filter : models={models}")
-    print()
+        print(f"[*] Filter : models={models}", file=human())
+    print(file=human())
 
-    rows = pool.probe(models=models)
-    print(f"{'result':<12} {'provider':<12} {'model':<30} {'key':<18} {'s':>6}")
-    print("-" * 84)
+    # --ai-timeout used to be declared but never reached --ai-check: the
+    # command probed every provider with the pool's (unbounded) default.
+    rows = pool.probe(models=models,
+                      timeout=getattr(args, "ai_timeout", None))
+    print(f"{'result':<12} {'provider':<12} {'model':<30} {'key':<18} {'s':>6}", file=human())
+    print("-" * 84, file=human())
     for r in rows:
         tag = "OK" if r["ok"] else (r["kind"] or "fail")
         if not r["ok"] and r.get("status"):
             tag = f"{tag}/{r['status']}"
         print(f"{tag:<12} {r['provider']:<12} {r['model'][:30]:<30} "
-              f"{r['key']:<18} {r['elapsed']:>5.1f}")
+              f"{r['key']:<18} {r['elapsed']:>5.1f}", file=human())
         if not r["ok"] and r.get("detail"):
-            print(f"{'':<12} └─ {str(r['detail'])[:150]}")
+            print(f"{'':<12} └─ {str(r['detail'])[:150]}", file=human())
         elif r["ok"] and r.get("reply"):
-            print(f"{'':<12} └─ {r['reply'][:80]}")
+            print(f"{'':<12} └─ {r['reply'][:80]}", file=human())
     ok = sum(1 for r in rows if r["ok"])
-    print()
-    print(f"[+] {ok}/{len(rows)} candidate(s) answered.")
+    print(file=human())
+    print(f"[+] {ok}/{len(rows)} candidate(s) answered.", file=human())
     if ok == 0:
         print("[!] No provider is usable right now -- --ai-report would fall "
-              "back to the deterministic template.")
+              "back to the deterministic template.", file=human())
     return 0 if ok else 2
 
 
@@ -1058,13 +1078,13 @@ def _run_ai_reset(args) -> int:
     """``--ai-reset``: drop every stored cooldown for the pool."""
     pool, err = _load_ai_pool(args)
     if pool is None:
-        print(f"[!] Cannot load LLM pool: {err}")
+        print(f"[!] Cannot load LLM pool: {err}", file=human())
         return 1
     before = [c.describe() for c in pool.cooling()]
     pool.reset_state()
-    print(f"[+] Cooldown state cleared: {pool.state_path}")
+    print(f"[+] Cooldown state cleared: {pool.state_path}", file=human())
     if before:
-        print(f"[*] Was cooling: {', '.join(before)}")
+        print(f"[*] Was cooling: {', '.join(before)}", file=human())
     return 0
 
 
@@ -1130,7 +1150,7 @@ def _build_spec_targets(args, urls):
                 _log.error("Every sitemap URL was out of scope; nothing to"
                            " scan. Re-run with --allow-host.")
                 return {"spec_targets": spec_targets, "src_label": src_label, "urls": urls, "err": 2}
-        print(f"[*] Sitemap {args.sitemap}: {len(urls)} URL(s) imported")
+        print(f"[*] Sitemap {args.sitemap}: {len(urls)} URL(s) imported", file=human())
     elif getattr(args, "wayback", None):
         from .core.wayback_import import wayback_to_urls, normalize_target
         try:
@@ -1160,7 +1180,7 @@ def _build_spec_targets(args, urls):
                 _log.error("Every wayback URL was out of scope; nothing to"
                            " scan. Re-run with --allow-host.")
                 return {"spec_targets": spec_targets, "src_label": src_label, "urls": urls, "err": 2}
-        print(f"[*] Wayback {args.wayback}: {len(urls)} URL(s) imported")
+        print(f"[*] Wayback {args.wayback}: {len(urls)} URL(s) imported", file=human())
     elif getattr(args, "gql", None):
         from .core.gql_import import gql_param_candidates,             gql_mutation_targets
         try:
@@ -1195,7 +1215,7 @@ def _build_spec_targets(args, urls):
         urls = [t["url"] for t in spec_targets]
         print(f"[*] GraphQL {args.gql}: {len(gql_names)} parameter name(s) "
               f"into the mining wordlist + {len(mutation_specs)} mutation "
-              f"target(s) (JSON-carrier probing)")
+              f"target(s) (JSON-carrier probing)", file=human())
 
     return {"spec_targets": spec_targets, "src_label": src_label,
             "urls": urls, "err": None}
@@ -1213,14 +1233,39 @@ def main(argv=None):
     ``--mcp`` uninstalls it before serving: stdout there is a JSON-RPC
     protocol channel whose payload bytes must stay exact (the MCP server
     already forbids any print to stdout).
+
+    Phase 360: a closed downstream pipe is a normal end of output, not a
+    crash.  Before, ``-o - | head -1`` made every remaining batch target
+    look like a failed scan (exit 3) and left an ``Exception ignored on
+    flushing sys.stdout`` traceback at interpreter shutdown.
     """
     from .core.term_safe import (install_cli_print_guard,
                                   uninstall_cli_print_guard)
     install_cli_print_guard()
     try:
         return _main_impl(argv)
+    except OutputPipeClosed:
+        print("[!] stdout consumer closed (broken pipe); stopping output.",
+              file=sys.stderr)
+        _silence_stdout()
+        return 0
     finally:
+        reset_human_stream()
         uninstall_cli_print_guard()
+
+
+def _silence_stdout() -> None:
+    """Keep the interpreter's final flush from re-raising on a dead pipe."""
+    try:
+        sys.stdout.flush()
+    except (OSError, ValueError):
+        pass
+    try:
+        devnull = os.open(os.devnull, os.O_WRONLY)
+        os.dup2(devnull, sys.stdout.fileno())
+        os.close(devnull)
+    except (OSError, ValueError, AttributeError):
+        pass
 
 
 def _split_subcommand(argv):
@@ -1286,12 +1331,53 @@ def _print_failure_reasons(reasons: dict, limit: int = 3) -> None:
             print(f"    - {label}: {v['example']}", file=sys.stderr)
 
 
+def _bind_human_stream(args) -> bool:
+    """Bind ``human()`` for this invocation; return whether stdout is a channel.
+
+    Phase 360: called once after ``parse_args`` and AGAIN after the config
+    merge, because ``--config`` may itself set ``"output": "-"``.  Without
+    the second call a config-driven stdout report worked but every human
+    line still polluted it -- the same decision was being made from two
+    half-correct places.
+    """
+    stdout_output = getattr(args, "output", None) == "-"
+    set_human_stream(sys.stderr if stdout_output else sys.stdout)
+    return stdout_output
+
+
+def _explicit_cli_values(mode: str, argv: list) -> dict:
+    """Return ONLY the options the operator typed, not argparse defaults.
+
+    Phase 360: ``vars(ap.parse_args(argv))`` carries every default
+    (``format='html'``, ``timeout=15``, ``method='GET'``, ``output='report.html'``...).
+    Passing that to ``Config.merge_args`` made ``--config`` silently lose
+    every key whose CLI has a non-empty default -- measured:
+    ``{"format": "json", "timeout": 42, "output": "-"}`` produced an HTML
+    report into ``report.html`` with ``timeout=15``.  A second parser whose
+    defaults are all ``None`` distinguishes "typed ``--timeout 15``" from
+    "did not type it" without a hand-maintained list of defaults (that list
+    is exactly the kind of duplicated contract this project keeps catching).
+    """
+    shadow = build_parser(mode)
+    for action in shadow._actions:
+        action.default = None
+    return {k: v for k, v in vars(shadow.parse_args(argv)).items()
+            if v is not None}
+
+
 def _main_impl(argv=None):
     if argv is None:
         argv = sys.argv[1:]
     mode, argv = _split_subcommand(list(argv))
     ap = build_parser(mode)
     args = ap.parse_args(argv)
+
+    # Phase 359: ``-o -`` makes stdout a MACHINE channel (one report frame
+    # per target).  Phase 360: the stream lives in cli_output.human(), so
+    # cli_runner / cli_commands prints obey the same contract -- measured
+    # stdout pollution on login / ai-report / fuzz / discover / spec import.
+    # Scoped to the call, not a sys.stdout patch: main() resets it in finally.
+    stdout_output = _bind_human_stream(args)
 
     # Configure logging based on --log-level or --verbose.
     level = args.log_level
@@ -1354,10 +1440,20 @@ def _main_impl(argv=None):
     # Phase 83: --raw-request -- parse the raw file into args and fall
     # through to the normal scan pipeline (auth/OOB/checkpoint included).
     if getattr(args, "raw_request", None):
-        from .core.http_raw import parse_raw_request
-        with open(args.raw_request, "r", encoding="utf-8",
-                  errors="replace") as fh:
-            parsed = parse_raw_request(fh.read())
+        # Phase 360 follow-up: a malformed raw request used to escape as an
+        # uncaught RawRequestError (rc=1 + traceback).  Treat this input
+        # surface like --config / --batch: shared decoder + honest rc=2.
+        from .core.http_raw import RawRequestError, parse_raw_request
+        raw_text, raw_err = read_text_file(args.raw_request)
+        if raw_err:
+            print(f"[!] {raw_err}", file=sys.stderr)
+            return 2
+        try:
+            parsed = parse_raw_request(raw_text)
+        except RawRequestError as e:
+            print(f"[!] Invalid raw HTTP request in {args.raw_request}: {e}",
+                  file=sys.stderr)
+            return 2
         args.url = parsed["url"]
         args.method = parsed["method"]
         if parsed["cookies"] and not args.cookie:
@@ -1373,7 +1469,7 @@ def _main_impl(argv=None):
                 continue
             args.header.append(f"{hname}: {hval}")
         print(f"[*] raw request loaded: {args.method} {args.url} "
-              f"({len(parsed['headers'])} headers)")
+              f"({len(parsed['headers'])} headers)", file=human())
 
     # --verify-fix: replay findings from a previous JSON report.
     if args.verify_fix:
@@ -1395,9 +1491,15 @@ def _main_impl(argv=None):
         else:
             args.output = "report.html"
 
-    # Load config file and merge with CLI args.
-    cfg = Config.load(args.config) if args.config else Config()
-    cli_dict = {k: v for k, v in vars(args).items()}
+    # Load config file and merge with CLI args.  Phase 360: a bad config is
+    # an honest usage error (rc=2), never an empty Config that silently
+    # discards the operator's target and then blames them for "no target".
+    try:
+        cfg = Config.load(args.config) if args.config else Config()
+    except ConfigError as e:
+        print(f"[!] {e}", file=sys.stderr)
+        return 2
+    cli_dict = _explicit_cli_values(mode, argv)
     merged = cfg.merge_args(cli_dict)
 
     # Apply merged config to args (CLI already took precedence in merge_args).
@@ -1405,6 +1507,11 @@ def _main_impl(argv=None):
         if k not in ("login", "batch_file", "custom_payloads", "verify_ssl"):
             setattr(args, k, v)
     args.verify_ssl = not args.no_verify_ssl
+
+    # The config may have chosen the stdout channel itself (``"output": "-"``).
+    # Re-bind the human stream AFTER the merge so both paths honour the same
+    # contract; the format gate below then covers config-driven values too.
+    stdout_output = _bind_human_stream(args)
 
     # --save-config: dump current options and exit.
     if args.save_config:
@@ -1425,7 +1532,7 @@ def _main_impl(argv=None):
                   file=sys.stderr)
 
         if save_config(args.save_config, cfg_data):
-            print(f"[+] Config saved to {args.save_config}")
+            print(f"[+] Config saved to {args.save_config}", file=human())
             return 0
         _log.error("Failed to save config to %s", args.save_config)
         return 1
@@ -1467,13 +1574,17 @@ def _main_impl(argv=None):
 
     if spec_targets:
         urls = [t["url"] for t in spec_targets]
-        print(f"[*] {src_label}: {len(spec_targets)} endpoint(s) imported")
+        print(f"[*] {src_label}: {len(spec_targets)} endpoint(s) imported",
+              file=human())
 
     if not urls:
-        ap.print_help()
-        print("\n[!] No target specified. Use -u URL, --batch FILE, "
+        # Phase 359: a usage error is not a report.  Printing the full 40 KB
+        # --help on stdout polluted pipelines that expected machine-readable
+        # output (and put the actual error on a different stream).  Keep
+        # stdout empty, say the short version on stderr, same exit code.
+        print("[!] No target specified. Use -u URL, --batch FILE, "
               "--batch-stdin, --har FILE, --openapi FILE, --sitemap, "
-              "--wayback or --gql.",
+              "--wayback or --gql. See --help for all options.",
               file=sys.stderr)
         return 2
 
@@ -1533,7 +1644,7 @@ def _main_impl(argv=None):
             hosts = scoping.distinct_hosts(spec_targets)
             print(f"[*] Import defines scope: {len(hosts)} host(s) will be"
                   " probed: " + ", ".join(hosts[:12])
-                  + (" ..." if len(hosts) > 12 else ""))
+                  + (" ..." if len(hosts) > 12 else ""), file=human())
 
     # Build shared HTTP requester.
     headers = {}
@@ -1577,7 +1688,7 @@ def _main_impl(argv=None):
         _proxy_pool = load_proxies(getattr(args, "proxy_list", None)) or None
         if _proxy_pool:
             print(f"[*] Proxy rotation: {len(_proxy_pool)} proxy/proxies "
-                  f"in pool")
+                  f"in pool", file=human())
     except Exception as e:
         _log.debug("proxy pool setup skipped: %s", e)
         _proxy_pool = None
@@ -1668,12 +1779,25 @@ def _main_impl(argv=None):
     # Checkpoint (resume or new).
     checkpoint = None
     if args.resume:
-        checkpoint = Checkpoint.load(args.resume)
-        if checkpoint:
-            print(f"[*] Resumed from {args.resume} "
-                  f"({checkpoint.scanned_count} URL(s) already scanned)")
+        # Phase 360 follow-up: "no file yet" is a legitimate fresh start,
+        # but "a file exists and cannot be read" used to be reported with
+        # the same sentence -- silently discarding the operator's resume
+        # progress (or, for a non-object JSON, crashing with AttributeError).
+        if os.path.isfile(args.resume):
+            checkpoint = Checkpoint.load(args.resume)
+            if checkpoint:
+                print(f"[*] Resumed from {args.resume} "
+                      f"({checkpoint.scanned_count} URL(s) already scanned)",
+                      file=human())
+            else:
+                print(f"[!] {args.resume} is not a valid XSSentinel "
+                      "checkpoint (unreadable or wrong schema). Refusing to "
+                      "silently discard resume state; fix or remove the file.",
+                      file=sys.stderr)
+                return 2
         else:
-            print(f"[*] No checkpoint at {args.resume}, starting fresh")
+            print(f"[*] No checkpoint at {args.resume}, starting fresh",
+                  file=human())
             checkpoint = Checkpoint(args.resume, urls[0] if urls else "")
     elif args.checkpoint:
         checkpoint = Checkpoint(args.checkpoint, urls[0] if urls else "")
@@ -1683,8 +1807,25 @@ def _main_impl(argv=None):
     # files under -o DIR, or next to -o FILE when a directory is not
     # given).
     is_batch = bool(args.batch or args.batch_stdin or spec_targets)
+    # Phase 360: one gate for BOTH shapes of "stdout cannot carry this
+    # format".  Before, a single-target ``-o - -f nuclei`` fell through to
+    # the report writer, raised ValueError, was caught as "report write
+    # failed" and exited 3 ("scan incomplete") -- a usage error lying about
+    # a scan that had actually succeeded.  The batch shape already returned
+    # 2; now both do, BEFORE any scan work.
+    if stdout_output and args.format == "nuclei":
+        print("[!] -o - cannot write -f nuclei (it is a template DIRECTORY, "
+              "not a single report). Use a file path or -f json.",
+              file=sys.stderr)
+        return 2
+    if stdout_output and is_batch and args.format != "json":
+        # One machine-readable frame per target.  Concatenated HTML/CSV
+        # would be unparseable, so refuse it instead of emitting garbage.
+        print("[!] -o - with a batch requires -f json (one JSON report "
+              "per line).", file=sys.stderr)
+        return 2
     out_dir = None
-    if is_batch:
+    if is_batch and not stdout_output:
         # Phase 88: -o may point at an existing directory (per-target
         # files inside), a fresh directory to create, or a file path whose
         # parent directory holds the per-target files.  Previously a
@@ -1776,13 +1917,13 @@ def _main_impl(argv=None):
             # (Phase 25-3); teaching it bounded target concurrency is its
             # own change.  Until then the flag must not pretend to apply.
             print("[!] --batch-workers: async batch concurrency is not "
-                  "supported yet; scanning targets sequentially.")
+                  "supported yet; scanning targets sequentially.", file=human())
         else:
             import threading as _threading
             _batch_lock = _threading.Lock()
             print(f"[*] --batch-workers {_batch_workers}: targets run "
                   "concurrently; the rate limit and request budget stay "
-                  "global (shared).")
+                  "global (shared).", file=human())
 
     def _scan_one_target(i, url):
         """Phase 349: one batch target.
@@ -1797,11 +1938,11 @@ def _main_impl(argv=None):
         st = {"url": url, "status": "ok", "findings": 0, "attempted": 0,
               "failed_requests": 0, "failure_reasons": [], "egress": False}
         if checkpoint and checkpoint.is_scanned(url) and url not in async_results:
-            print(f"[*] Skipping already-scanned: {url}")
+            print(f"[*] Skipping already-scanned: {url}", file=human())
             st["status"] = "skipped"
             return st
         if len(urls) > 1:
-            print(f"\n[{i+1}/{len(urls)}] {url}")
+            print(f"\n[{i+1}/{len(urls)}] {url}", file=human())
 
         # Phase 88 (P1): HAR entries carry their own method/body/cookies/
         # headers.  Apply them as per-target overrides on a shallow copy so
@@ -1942,27 +2083,50 @@ def _main_impl(argv=None):
                     args, "_engine_fallback_reason", None)}
         try:
             out_path = _write_report(scanner, url, out_path, args.format, meta)
-            # Phase 139: optional PoC artifacts (opt-in; see --poc-dir).
-            if getattr(args, "poc_dir", None):
-                meta.setdefault("generated",
-                                out_path and os.path.getmtime(out_path))
-                written = reportmod.write_poc_dir(
-                    scanner.findings, url, meta,
-                    _poc_dir_for(args.poc_dir, url))
-                _log.warning("PoC artifacts: %d file(s) -> %s",
-                             len(written), args.poc_dir)
+        except OutputPipeClosed:
+            # The reader left; do NOT mark this target (or the other 39 in
+            # the batch) as "scan failed" -> exit 3.  main() ends the run.
+            raise
         except Exception as e:
             _log.error("Report write failed: %s", e, exc_info=args.verbose)
             st["status"] = "failed"
             return st
 
+        # Phase 360 follow-up: PoC artifacts are OPTIONAL side products.
+        # They used to share the report writer's try/except, so a bad
+        # --poc-dir (a file instead of a directory, or an unwritable path)
+        # was reported as "Report write failed" and turned a completed scan
+        # into exit 3.  Same family as the Phase 359 parent-directory bug:
+        # an output-path problem must not lie about the scan verdict.
+        if getattr(args, "poc_dir", None):
+            try:
+                # `-` is not a file: getmtime("-") would raise.
+                import time as _time
+                _generated = (_time.time() if out_path == "-"
+                              else (out_path and os.path.getmtime(out_path)))
+                meta.setdefault("generated", _generated)
+                written = reportmod.write_poc_dir(
+                    scanner.findings, url, meta,
+                    _poc_dir_for(args.poc_dir, url))
+                _log.warning("PoC artifacts: %d file(s) -> %s",
+                             len(written), args.poc_dir)
+            except (OSError, ValueError, TypeError) as e:
+                print(f"[!] --poc-dir artifacts skipped: {e}",
+                      file=sys.stderr)
+
         hi = sum(1 for f in scanner.findings
                  if (f.data if hasattr(f, "data") else f).get("severity") == "high")
         if len(urls) == 1:
+            # Phase 359: `-o -` makes stdout the report channel; the human
+            # summary moves to stderr so `| jq` sees nothing but the frame.
+            # Phase 360: use human() like every other CLI print -- a local
+            # ``summary_stream`` recomputed the same decision by hand was
+            # exactly the seam that let cli_runner drift for one release.
             print(f"[+] Done. {len(scanner.findings)} finding(s) "
-                  f"({hi} high). Report: {out_path}")
+                  f"({hi} high). Report: {out_path}", file=human())
             if scanner.waf_name:
-                print(f"[*] WAF detected: {scanner.waf_name}")
+                print(f"[*] WAF detected: {scanner.waf_name}",
+                      file=human())
         return st
 
     def _merge_target(st):
@@ -2002,6 +2166,10 @@ def _main_impl(argv=None):
                 _u = _futs[_f]
                 try:
                     results[_u] = _f.result()
+                except OutputPipeClosed:
+                    # Phase 360: the reader left.  Not a target failure;
+                    # main() ends the whole run cleanly.
+                    raise
                 except Exception as e:
                     # A bug escaping _scan_one_target must fail that target,
                     # not unwind the batch -- the same isolation contract the
@@ -2027,9 +2195,9 @@ def _main_impl(argv=None):
         # are reported -- "0 findings" must never silently mean "we stopped at
         # someone else's host and never looked".
         print(f"\n[!] Authorization boundary: {len(requester.egress.boundary_stops)} "
-              "cross-origin redirect(s) NOT followed:")
+              "cross-origin redirect(s) NOT followed:", file=human())
         for _stopped in requester.egress.boundary_stops:
-            print(f"    - {_stopped}")
+            print(f"    - {_stopped}", file=human())
 
     if len(urls) > 1:
         # Phase 25-2: include the failure count in the batch summary so the
@@ -2037,23 +2205,23 @@ def _main_impl(argv=None):
         ok = len(urls) - len(failed_targets)
         print(f"\n[+] Batch complete: {len(urls)} target(s) "
               f"({ok} ok, {len(failed_targets)} failed), "
-              f"{total_findings} total finding(s).")
+              f"{total_findings} total finding(s).", file=human())
         if failed_targets:
-            print("[!] Failed targets:")
+            print("[!] Failed targets:", file=human())
             for u in failed_targets:
-                print(f"    - {u}")
+                print(f"    - {u}", file=human())
 
     # Final checkpoint save.
     if checkpoint:
         checkpoint.save()
         if args.checkpoint or args.resume:
-            print(f"[*] Checkpoint saved: {checkpoint.path}")
+            print(f"[*] Checkpoint saved: {checkpoint.path}", file=human())
 
     # CI exit-code gate: if --exit-code is set and total findings >= threshold,
     # exit with non-zero so CI pipelines can fail the build.
     if args.exit_code > 0 and total_findings >= args.exit_code:
         print(f"\n[!] CI gate: {total_findings} findings >= threshold "
-              f"{args.exit_code} -- exiting with code 1.")
+              f"{args.exit_code} -- exiting with code 1.", file=human())
         return 1
 
     # Exit 3: this run cannot support a negative conclusion.  Kept separate from
@@ -2073,7 +2241,7 @@ def _main_impl(argv=None):
         # while nothing examined the target.
         print("[*] Completeness check offline: this run's scanner reported no "
               "egress counters, so an empty result was not tested for "
-              "'nothing reached the target'.")
+              "'nothing reached the target'.", file=human())
     if total_findings == 0 and egress_reported and (
             attempted_total == 0 or failed_total >= attempted_total):
         print(f"\n[!] Scan incomplete: {failed_total} of {attempted_total} "

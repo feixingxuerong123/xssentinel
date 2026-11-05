@@ -9,13 +9,47 @@ from __future__ import annotations
 import json
 import http.client
 import os
+import socket
 import subprocess
 import sys
 
+from .cli_output import human, write_report_frame
 from .core.requester import Requester
 from .core.logger import get_logger
 
 _log = get_logger("cli")
+
+#: Phase 360 follow-up: ONE port contract shared by cli_commands,
+#: tests/vuln_server.py and tests/run_self_test.py.  8899 used to be
+#: hard-coded in all three, so a host already serving anything on that port
+#: made ``--self-test`` unusable (measured on this machine: an unrelated
+#: ``python -m http.server 8899`` -> "Vuln server did not start within 10
+#: seconds", rc=1).  The children receive the chosen value through this
+#: variable; running either script standalone still defaults to 8899.
+SELFTEST_PORT_ENV = "XSSENTINEL_SELFTEST_PORT"
+SELFTEST_DEFAULT_PORT = 8899
+
+
+def _selftest_port() -> int:
+    """Pin via env var, else prefer 8899 and fall back to a free loopback port."""
+    raw = os.environ.get(SELFTEST_PORT_ENV)
+    if raw:
+        try:
+            return int(raw)
+        except ValueError as e:
+            raise ValueError(
+                f"{SELFTEST_PORT_ENV} must be an integer, got {raw!r}") from e
+    for preferred in (SELFTEST_DEFAULT_PORT, 0):
+        sock = socket.socket()
+        try:
+            sock.bind(("127.0.0.1", preferred))
+            return sock.getsockname()[1]
+        except OSError:
+            continue
+        finally:
+            sock.close()
+    raise OSError("no loopback port available for --self-test")
+
 
 def _run_sandbox(args) -> int:
     """Phase 169: offline HTML sandbox -- try a payload before you send it.
@@ -32,9 +66,9 @@ def _run_sandbox(args) -> int:
     from .core import sandbox
 
     if getattr(args, "sandbox_hosts", False):
-        print("reflection contexts available to --sandbox-host:")
+        print("reflection contexts available to --sandbox-host:", file=human())
         for name, tpl in sorted(sandbox.HOSTS.items()):
-            print(f"  {name:14s} {tpl}")
+            print(f"  {name:14s} {tpl}", file=human())
         return 0
 
     payload = getattr(args, "sandbox", None)
@@ -62,7 +96,7 @@ def _run_sandbox(args) -> int:
                   "to search for)", file=sys.stderr)
             return 1
         print(f"judging {len(html)} bytes of {response} for token "
-              f"{token[:32]!r}\n")
+              f"{token[:32]!r}\n", file=human())
         for sink in sinks:
             v = sandbox.judge(html, token, sink=sink)
             _print_verdict(f"sink={sink}", v)
@@ -82,12 +116,12 @@ def _run_sandbox(args) -> int:
     # attributable to this payload.  A payload with no call syntax gets its own
     # text, which is what a real reflection would carry.
     token = getattr(args, "sandbox_token", "") or _default_token(payload)
-    print(f"payload: {payload}")
-    print(f"token  : {token!r}\n")
+    print(f"payload: {payload}", file=human())
+    print(f"token  : {token!r}\n", file=human())
     header = "  {:<16s}".format("context") + "".join(
         f"{s[:11]:>12s}" for s in sinks)
-    print(header)
-    print("  " + "-" * (len(header) - 2))
+    print(header, file=human())
+    print("  " + "-" * (len(header) - 2), file=human())
     interesting = []
     for h in hosts:
         row = f"  {h:<16s}"
@@ -101,18 +135,18 @@ def _run_sandbox(args) -> int:
             row += f"{_CELL.get(v.state + ('A' if v.activation else ''), '?'):>12s}"
             if v.state == "live" or v.state == "unknown":
                 interesting.append((h, sink, v))
-        print(row)
-    print("\n  " + "  ".join(f"{k}={v}" for k, v in sorted(_CELL.items())))
+        print(row, file=human())
+    print("\n  " + "  ".join(f"{k}={v}" for k, v in sorted(_CELL.items())), file=human())
     if interesting:
-        print("\nwhy:")
+        print("\nwhy:", file=human())
         for h, sink, v in interesting:
             gate = " (needs user activation)" if v.activation else ""
-            print(f"  {h}/{sink}{gate}\n      {v.reason}")
+            print(f"  {h}/{sink}{gate}\n      {v.reason}", file=human())
             if v.evidence:
-                print(f"      {v.evidence[:200]}")
+                print(f"      {v.evidence[:200]}", file=human())
     else:
         print("\nno context executed this payload. Either it does not escape the "
-              "containers above, or the token never reaches an attribute value.")
+              "containers above, or the token never reaches an attribute value.", file=human())
     return 0
 
 
@@ -128,9 +162,9 @@ def _default_token(payload: str) -> str:
 
 def _print_verdict(label: str, v) -> None:
     gate = "  requires user activation" if v.activation else ""
-    print(f"  {label:<24s} {v.state.upper():9s} {v.reason}{gate}")
+    print(f"  {label:<24s} {v.state.upper():9s} {v.reason}{gate}", file=human())
     if v.evidence:
-        print(f"  {'':<24s} evidence: {v.evidence[:220]}")
+        print(f"  {'':<24s} evidence: {v.evidence[:220]}", file=human())
 
 
 _CELL = {"live": "LIVE", "liveA": "LIVE*", "inert": "inert", "unknown": "?"}
@@ -185,19 +219,19 @@ def _run_marker_fuzz(args) -> int:
         rate_limit=getattr(args, "rate_limit", 0))
 
     print(f"[*] marker-fuzz {args.url} with {len(chosen)} payloads "
-          f"(marker={marker!r}, method={method})")
+          f"(marker={marker!r}, method={method})", file=human())
     results = fuzz_marker(requester, args.url, method, body, marker,
                           chosen, headers=None,
                           params=getattr(args, "params", None) or None)
     s = fuzz_summary(results)
     print(f"[+] {s['total']} payloads sent: "
           f"{s['confirmed']} confirmed, {s['reflected_only']} "
-          f"reflected-only")
+          f"reflected-only", file=human())
     for r in results:
         if r["confirmed"]:
-            print(f"    [CONFIRMED] {r['payload']}")
+            print(f"    [CONFIRMED] {r['payload']}", file=human())
         elif r["reflected"]:
-            print(f"    [reflected] {r['payload']}")
+            print(f"    [reflected] {r['payload']}", file=human())
     return 0
 
 
@@ -225,16 +259,23 @@ def _run_self_test():
         _log.error("run_self_test.py not found at %s", test_path)
         return 1
 
-    print("[*] Starting local vuln test server on port 8899 ...", flush=True)
+    try:
+        port = _selftest_port()
+    except (ValueError, OSError) as e:
+        _log.error("cannot pick a self-test port: %s", e)
+        return 2
+    child_env = {**os.environ, SELFTEST_PORT_ENV: str(port)}
+    print(f"[*] Starting local vuln test server on port {port} ...",
+          flush=True, file=human())
     server_proc = subprocess.Popen(
-        [sys.executable, server_path],
+        [sys.executable, server_path], env=child_env,
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     # Wait for the server to be ready (max 10 seconds).
     ready = False
     for _ in range(20):
         try:
-            conn = http.client.HTTPConnection("127.0.0.1", 8899, timeout=1)
+            conn = http.client.HTTPConnection("127.0.0.1", port, timeout=1)
             conn.request("GET", "/safe?q=ping")
             resp = conn.getresponse()
             resp.read()
@@ -247,7 +288,8 @@ def _run_self_test():
 
     if not ready:
         server_proc.terminate()
-        _log.error("Vuln server did not start within 10 seconds")
+        _log.error("Vuln server did not start on port %d within 10 seconds",
+                   port)
         return 1
 
     # flush=True on both progress lines: this command can run for minutes, and
@@ -255,7 +297,7 @@ def _run_self_test():
     # `--self-test | tee` showed nothing at all for two minutes, so an
     # operator (or a CI log) cannot tell "starting" from "wedged" -- the exact
     # distinction the timeout below exists to make.
-    print("[+] Vuln server ready. Running self-test suite ...\n", flush=True)
+    print("[+] Vuln server ready. Running self-test suite ...\n", flush=True, file=human())
     # Phase 73: bound the self-test run.  On a degraded-loopback host the
     # full suite can hang forever (intermittently killed connections make
     # layer probes block); without a timeout, --self-test never returns and
@@ -263,7 +305,7 @@ def _run_self_test():
     timeout = int(os.environ.get("XSSentinel_SELFTEST_TIMEOUT", "900"))
     try:
         result = subprocess.run(
-            [sys.executable, test_path],
+            [sys.executable, test_path], env=child_env,
             capture_output=False, timeout=timeout)
         return result.returncode
     except subprocess.TimeoutExpired:
@@ -307,6 +349,23 @@ def _run_serve(args):
     )
 
 
+def _emit_report(out: str, fmt: str, out_path: str) -> str:
+    """Write a built report to ``out_path``; ``-`` means the stdout channel.
+
+    Phase 359 contract applied to the two subcommands that build their own
+    artifacts: ``-o -`` used to fall through the extension-append logic and
+    create a file literally named ``-.json`` / ``-.html`` in the CWD.  The
+    report bytes now go through the same UTF-8 frame writer as a scan report.
+    """
+    if out_path == "-":
+        write_report_frame(out, fmt)
+        return "-"
+    # Phase 326: owner-only artifacts on POSIX (payloads/URLs inside).
+    from .core.fsutil import secure_write_text
+    secure_write_text(out_path, out)
+    return out_path
+
+
 def _run_verify_fix(args):
     """Replay findings from a historical JSON report and emit a verify report.
 
@@ -341,8 +400,8 @@ def _run_verify_fix(args):
     except Exception:
         pass
 
-    print(f"[*] Loaded {len(findings)} finding(s) from {src}")
-    print("[*] Re-verifying each finding (replays original payload) ...")
+    print(f"[*] Loaded {len(findings)} finding(s) from {src}", file=human())
+    print("[*] Re-verifying each finding (replays original payload) ...", file=human())
 
     # Build a requester with the user's HTTP options.
     headers = {}
@@ -372,11 +431,11 @@ def _run_verify_fix(args):
     s = vf.summarize(results)
     c = s["counts"]
 
-    print("\n[+] Verification complete:")
-    print(f"    Fixed:            {c['fixed']}")
-    print(f"    Still vulnerable: {c['still_vuln']}")
-    print(f"    Error:            {c['error']}")
-    print(f"    Skipped:          {c['skipped']}")
+    print("\n[+] Verification complete:", file=human())
+    print(f"    Fixed:            {c['fixed']}", file=human())
+    print(f"    Still vulnerable: {c['still_vuln']}", file=human())
+    print(f"    Error:            {c['error']}", file=human())
+    print(f"    Skipped:          {c['skipped']}", file=human())
 
     # Write the output report.
     out_path = args.output or "verify_fix.html"
@@ -393,24 +452,23 @@ def _run_verify_fix(args):
         {"source_report": src, "generated": s["generated"]},
         ai_opts_from_args(args), task="verify")
 
+    stdout_mode = out_path == "-"
     if fmt == "json":
         out = vf.build_json(results, src, target, ai_report=ai_meta)
-        if not out_path.endswith(".json"):
+        if not stdout_mode and not out_path.endswith(".json"):
             out_path += ".json"
     else:
         out = vf.build_html(results, src, target, ai_report=ai_meta)
-        if not out_path.endswith(".html"):
+        if not stdout_mode and not out_path.endswith(".html"):
             out_path += ".html"
 
-    # Phase 326: owner-only artifacts on POSIX (payloads/URLs inside).
-    from .core.fsutil import secure_write_text
-    secure_write_text(out_path, out)
-    print(f"\n[+] Verify-fix report written to: {out_path}")
+    out_path = _emit_report(out, fmt, out_path)
+    print(f"\n[+] Verify-fix report written to: {out_path}", file=human())
 
     # Exit non-zero if any finding is still vulnerable (CI gate).
     if c["still_vuln"] > 0:
         print(f"\n[!] {c['still_vuln']} finding(s) still exploitable -- "
-              f"exiting with code 1.")
+              f"exiting with code 1.", file=human())
         return 1
     return 0
 
@@ -437,18 +495,18 @@ def _run_diff(args):
         _log.error("Failed to load reports: %s", e)
         return 2
 
-    print(f"[*] Baseline: {len(baseline)} finding(s) from {baseline_path}")
-    print(f"[*] Current:  {len(current)} finding(s) from {current_path}")
+    print(f"[*] Baseline: {len(baseline)} finding(s) from {baseline_path}", file=human())
+    print(f"[*] Current:  {len(current)} finding(s) from {current_path}", file=human())
 
     diff = dr.diff_findings(baseline, current)
     s = diff["summary"]
 
-    print("\n[+] Diff summary:")
-    print(f"    New:        {s['new']}")
-    print(f"    Fixed:      {s['fixed']}")
-    print(f"    Regressed:  {s['regressed']}")
-    print(f"    Improved:   {s['improved']}")
-    print(f"    Unchanged:  {s['unchanged']}")
+    print("\n[+] Diff summary:", file=human())
+    print(f"    New:        {s['new']}", file=human())
+    print(f"    Fixed:      {s['fixed']}", file=human())
+    print(f"    Regressed:  {s['regressed']}", file=human())
+    print(f"    Improved:   {s['improved']}", file=human())
+    print(f"    Unchanged:  {s['unchanged']}", file=human())
 
     # Derive target label from the current report's target field.
     target = ""
@@ -461,31 +519,30 @@ def _run_diff(args):
         pass
 
     out_path = args.output or "diff_report.html"
+    stdout_mode = out_path == "-"
     fmt = args.format if args.format in ("html", "json") else "html"
     if fmt == "json":
         out = dr.diff_report_json(baseline, current, target=target,
                                   baseline_label=baseline_path,
                                   current_label=current_path)
-        if not out_path.endswith(".json"):
+        if not stdout_mode and not out_path.endswith(".json"):
             out_path += ".json"
     else:
         out = dr.diff_report_html(baseline, current, target=target,
                                   baseline_label=baseline_path,
                                   current_label=current_path)
-        if not out_path.endswith(".html"):
+        if not stdout_mode and not out_path.endswith(".html"):
             out_path += ".html"
 
-    # Phase 326: owner-only artifacts on POSIX (payloads/URLs inside).
-    from .core.fsutil import secure_write_text
-    secure_write_text(out_path, out)
-    print(f"\n[+] Diff report written to: {out_path}")
+    out_path = _emit_report(out, fmt, out_path)
+    print(f"\n[+] Diff report written to: {out_path}", file=human())
 
     # CI gate: fail if new or regressed findings.
     if s["new"] > 0 or s["regressed"] > 0:
         print(f"\n[!] CI verdict: FAIL -- {s['new']} new, "
-              f"{s['regressed']} regressed finding(s).")
+              f"{s['regressed']} regressed finding(s).", file=human())
         return 1
-    print("\n[+] CI verdict: PASS -- no new or regressed findings.")
+    print("\n[+] CI verdict: PASS -- no new or regressed findings.", file=human())
     return 0
 
 
@@ -576,19 +633,19 @@ def _run_passive_proxy(args):
 
     host, port = proxy.server_address
     print(f"\n[+] Passive proxy listening on {host}:{port}  "
-          f"(scope={args.scope or '*'})")
+          f"(scope={args.scope or '*'})", file=human())
     if proxy.mitm is not None:
         # Phase 50: interception is on -- tell the operator how to trust it.
         cert_only = proxy.mitm.cert_only_path
         print("[+] HTTPS interception ENABLED: install the CA certificate "
-              "into the browser/OS trust store")
-        print(f"    {cert_only}")
-        print("[+] (Out-of-scope hosts stay blind tunneled.)")
+              "into the browser/OS trust store", file=human())
+        print(f"    {cert_only}", file=human())
+        print("[+] (Out-of-scope hosts stay blind tunneled.)", file=human())
     else:
         print("[+] HTTPS: blind CONNECT tunnel (no interception). Add "
-              "--mitm-ca <ca>.pem to capture HTTPS traffic.")
+              "--mitm-ca <ca>.pem to capture HTTPS traffic.", file=human())
     print("[+] Point your browser/system proxy here, then browse. "
-          "Ctrl+C to stop and write the report.\n")
+          "Ctrl+C to stop and write the report.\n", file=human())
     try:
         while True:
             time.sleep(1)
@@ -604,11 +661,11 @@ def _run_passive_proxy(args):
           f"({proxy.stats['requests']} requests, "
           f"{proxy.stats['skipped_dup']} dup-skipped, "
           f"{proxy.stats['tunnels']} HTTPS tunnels"
-          + (f", {mitm_n} intercepted" if mitm_n else "") + ")")
-    print(f"[+] Scans run: {proxy.stats['scans']}  Findings: {n}")
+          + (f", {mitm_n} intercepted" if mitm_n else "") + ")", file=human())
+    print(f"[+] Scans run: {proxy.stats['scans']}  Findings: {n}", file=human())
 
     if n == 0:
-        print("[*] No findings captured. Nothing to report.")
+        print("[*] No findings captured. Nothing to report.", file=human())
         return 0
 
     out_path = args.output
@@ -627,7 +684,7 @@ def _run_passive_proxy(args):
         _write_report(scanner, "passive://proxy", out_path, fmt,
                       meta={"passive": True, "stats": proxy.stats,
                             "ai": ai_opts_from_args(args)})
-        print(f"[+] Report written to: {out_path}")
+        print(f"[+] Report written to: {out_path}", file=human())
     except Exception as e:
         _log.error("report write failed: %s", e)
         return 1

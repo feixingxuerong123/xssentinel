@@ -49,6 +49,22 @@ import json
 import os
 from typing import Any
 
+from ..cli_output import clean_batch_lines, read_text_file
+from .logger import get_logger
+
+_log = get_logger("config")
+
+
+class ConfigError(ValueError):
+    """A config file could not be read or understood (Phase 360).
+
+    Before Phase 360 ``Config.load`` returned an EMPTY config on any parse
+    error.  Measured: a UTF-8 BOM made ``json.load`` fail, the empty config
+    silently discarded the operator's target, and the CLI then said "No
+    target specified" -- blaming the user for a file it never read.  A GBK
+    file was worse: ``UnicodeDecodeError`` escaped as a traceback (rc=1).
+    """
+
 
 class Config:
     """Load and merge scan configuration from a JSON file."""
@@ -58,17 +74,24 @@ class Config:
 
     @classmethod
     def load(cls, path: str) -> "Config":
-        """Load config from a JSON file.  Returns empty Config on error."""
+        """Load a JSON config; raise :class:`ConfigError` on any failure.
+
+        Phase 360: one decoder for every operator text file (UTF-8-sig /
+        UTF-16 BOM / GB18030), and no silent empty-config fallback.  The
+        caller turns ``ConfigError`` into an honest usage error (rc=2).
+        """
         if not path or not os.path.isfile(path):
-            return cls()
+            raise ConfigError(f"config file not found: {path}")
+        text, err = read_text_file(path)
+        if err:
+            raise ConfigError(err)
         try:
-            with open(path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            if not isinstance(data, dict):
-                return cls()
-            return cls(data)
-        except (json.JSONDecodeError, OSError):
-            return cls()
+            data = json.loads(text.lstrip("\ufeff"))
+        except json.JSONDecodeError as e:
+            raise ConfigError(f"{path}: invalid JSON: {e}") from e
+        if not isinstance(data, dict):
+            raise ConfigError(f"{path}: top level must be a JSON object")
+        return cls(data)
 
     def get(self, key: str, default: Any = None) -> Any:
         return self.data.get(key, default)
@@ -105,31 +128,26 @@ class Config:
 
     @property
     def batch_urls(self) -> list[str]:
-        """Load URLs from batch_file if configured."""
-        path = self.data.get("batch_file")
-        if not path or not os.path.isfile(path):
-            return []
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                urls = [line.strip() for line in f if line.strip()
-                        and not line.startswith("#")]
-            return urls
-        except OSError:
-            return []
+        """Load URLs from batch_file (shared decoder, BOM/GB18030 safe)."""
+        return self._read_lines("batch_file")
 
     @property
     def custom_payloads(self) -> list[str]:
-        """Load custom payloads from file if configured."""
-        path = self.data.get("custom_payloads")
+        """Load custom payloads from file (shared decoder, BOM/GB18030 safe)."""
+        return self._read_lines("custom_payloads")
+
+    def _read_lines(self, key: str) -> list[str]:
+        path = self.data.get(key)
         if not path or not os.path.isfile(path):
             return []
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                payloads = [line.strip() for line in f if line.strip()
-                            and not line.startswith("#")]
-            return payloads
-        except OSError:
+        text, err = read_text_file(path)
+        if err:
+            # A configured file that cannot be read must not look like "the
+            # operator configured nothing": say so on stderr (human stream)
+            # instead of silently dropping URLs/payloads.
+            _log.warning("%s", err)
             return []
+        return clean_batch_lines(text)
 
     def to_dict(self) -> dict:
         return dict(self.data)

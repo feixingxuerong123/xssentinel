@@ -26,7 +26,11 @@ from xssentinel.core.scanner import Scanner
 from xssentinel.core.oob import SelfHostedListener
 from xssentinel.core import dom_engine as dom_engine_mod
 
-BASE = "http://127.0.0.1:8899"
+# Phase 360 follow-up: one port contract, supplied by --self-test through
+# the environment.  Standalone runs (server started by hand on 8899) are
+# unchanged.
+_SELFTEST_PORT = int(os.environ.get("XSSENTINEL_SELFTEST_PORT", "8899"))
+BASE = f"http://127.0.0.1:{_SELFTEST_PORT}"
 ENDPOINTS = [
     ("/echo",   "GET", {"q": "test"}, {}),    # L1 html_element
     ("/attr",   "GET", {"q": "test"}, {}),    # L1 html_attribute_dq

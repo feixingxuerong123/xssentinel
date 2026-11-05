@@ -1,6 +1,7 @@
 """Local vulnerable test server for validating XSSentinel (self-test only)."""
 from __future__ import annotations
 import html
+import os
 import threading
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -1725,7 +1726,9 @@ class H(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    port = 8899
+    # Phase 360 follow-up: ``--self-test`` picks a free loopback port and
+    # passes it here; running this script standalone still defaults to 8899.
+    port = int(os.environ.get("XSSENTINEL_SELFTEST_PORT", "8899"))
     print(f"vuln test server on http://127.0.0.1:{port}")
     # Phase 200: ThreadingHTTPServer, per the PROJECT.md rule that already
     # governs benchmark/server.py ("single-thread HTTPServer + keep-alive =
