@@ -1180,6 +1180,24 @@ class Scanner(StoredBlindMixin, StoredAutoMixin, AdvancedLayerMixin, CrawlMixin)
         if profile is not None and not profile["full_reflection"]:
             bases = rp_mod.prioritize_payloads(profile, bases)
             transform_priority = rp_mod.prioritize_transforms(profile)
+            # Phase 362: bracket-dead reflection -> bare attribute-NAME
+            # handler shapes are the only executable non-bracket vector
+            # for an element reflection (measured on XSSMaze
+            # eventhandler/level3-5).  Prepended BEFORE the generative
+            # block: the generative channel answers a bracket-dead profile
+            # with javascript:-URI shapes that presume a URL-position
+            # reflection this window cannot offer, while the bare shapes
+            # are inert as reflected text -- at most two unconfirmed slots
+            # on ordinary bracket-dead pages.  The measured lab arrangement
+            # keeps the corpus polyglot entries inside the default budget
+            # window (eventhandler/level5 confirms through one), which the
+            # bare-first variant traded away.
+            if rp_mod.bracket_dead(profile):
+                _known = {b.get("payload") for b in bases}
+                _bare = [p for p in rp_mod.bare_attrname_payloads(context)
+                         if p.get("payload") not in _known]
+                if _bare:
+                    bases = _bare + bases
             # Phase 32: generative payloads built from SURVIVING chars
             # only -- they can slip past the filter that blocks the
             # corpus entries, so they lead the queue (dedup'd).
@@ -1412,6 +1430,14 @@ class Scanner(StoredBlindMixin, StoredAutoMixin, AdvancedLayerMixin, CrawlMixin)
         tried.add(key)
         if is_body and self.json_body is not None:
             return False
+        # Phase 362: the bracket-dead injected attr-name shapes cannot
+        # confirm in an HPP re-fire -- both orderings render or filter the
+        # value as text, neither turns it into a live attribute.  Skip
+        # them so the two-payload cap spends on shapes that can.
+        bases = [b for b in bases
+                 if not (isinstance(b, dict)
+                         and rp_mod.ATTR_NAME_INJECTION_TAG
+                         in (b.get("tags") or []))]
         self.coverage.touch_layer(
             url, "L2_hpp", method,
             detail=f"param='{param}' duplicated, both orderings probed: "

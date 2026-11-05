@@ -15133,6 +15133,36 @@
       "note": "Phase 285: measured bypass of a homegrown RegEx sanitizer (OWASP Juice Shop legacy profile page, CSP Bypass challenge). The doubled < plus the | inside the tag name keep the sanitizer pattern from matching, so the script survives while a plain <script> block on the same page is stripped. Measured with a real browser: a dialog carried the probe token."
     },
     {
+      "id": "html-attrname-001",
+      "context": "html_element",
+      "tags": [
+        "attr_name_injection"
+      ],
+      "confidence": "medium",
+      "payload": "ondblclick=alert(1)",
+      "note": "Phase 362: bare attribute-NAME handler -- pages that reflect the param into a tag as an attribute name and strip angle brackets (measured on XSSMaze eventhandler/level3: '<' '>' and '+' are stripped while / \" ' survive, and the answer shape is an UNLISTED handler name -- seven common ones are stripped, ondblclick is not). Inert as reflected text, so it never confirms on ordinary element-body reflections; reflection_profile promotes it to the front when the profile shows angle brackets stripped."
+    },
+    {
+      "id": "html-attrname-002",
+      "context": "html_element",
+      "tags": [
+        "attr_name_injection"
+      ],
+      "confidence": "medium",
+      "payload": "onauxclick=alert(1)",
+      "note": "Phase 362: second unlisted bare attribute-NAME handler (onauxclick), same shape and rationale as html-attrname-001 -- variety against per-name handler strip lists."
+    },
+    {
+      "id": "html-attrname-003",
+      "context": "html_element",
+      "tags": [
+        "attr_name_injection"
+      ],
+      "confidence": "medium",
+      "payload": "marquee onstart=alert(1)",
+      "note": "Phase 362: bracket-stripped tag content -- pages that strip only the angle brackets leave 'marquee' as an attribute name and onstart=alert(token) as a LIVE attribute (measured on XSSMaze eventhandler/level5, whose strip list also removes the bare handler names html-attrname-001/002 need). Inert as reflected text on ordinary pages."
+    },
+    {
       "id": "ps-ia-206",
       "context": "interaction_events",
       "tags": [

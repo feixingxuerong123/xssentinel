@@ -178,6 +178,57 @@ def triage_line(profile: dict | None) -> str | None:
     return " | ".join(parts) if parts else None
 
 
+#: Bare attribute-NAME handler shape: no angle brackets, the payload IS
+#: the ``on<name>=`` assignment.  When the profile shows angle brackets
+#: stripped, these are the only executable non-bracket vector for an
+#: element-body reflection (measured Phase 362, XSSMaze eventhandler
+#: family: the page reflects the param as an attribute name, strips
+#: ``<`` ``>`` and ``+``, and the answer shape is an unlisted handler).
+#: Corpus entries carrying this tag are INERT as reflected text, so on
+#: ordinary pages they cost at most two unconfirmed slots.
+ATTR_NAME_INJECTION_TAG = "attr_name_injection"
+
+
+def bracket_dead(profile: dict | None) -> bool:
+    """True when the profile shows angle brackets STRIPPED.
+
+    A bracket-dead reflection cannot execute any tag-shaped payload; the
+    engines use this to surface the bare attribute-NAME handler shapes
+    (``bare_attrname_payloads``) ahead of the generative queue.
+
+    Two Phase 362 guards keep this to the measured shape (XSSMaze
+    eventhandler family: the page DELETES ``<`` while echoing the probe):
+
+    * the sandwich probe must have come BACK (``reflected``) --
+      ``profile_reflection`` reports ``chars_kept: []`` for a probe the
+      target never echoed (the Phase 315 HPP fixture's filter-checked
+      slot), which is "unknown filtering", not bracket-dead;
+    * ``<`` must sit in ``chars_stripped``, not merely be absent from
+      ``chars_kept`` -- a page that HTML-ENCODES the probe (``&lt;``) has
+      a working encoder, and burning the escaped page's minimal probe
+      budget on shapes that cannot confirm is exactly what the Phase 27-1
+      early-stop exists to prevent (measured on the Phase 311
+      escaped-echo fixture).
+    """
+    if not profile or profile.get("full_reflection"):
+        return False
+    if not profile.get("reflected"):
+        return False
+    return "<" in set(profile.get("chars_stripped", []))
+
+
+def bare_attrname_payloads(context: str) -> list[dict]:
+    """Corpus payloads tagged :data:`ATTR_NAME_INJECTION_TAG` for a context.
+
+    Returns the corpus dicts (payload/id/tags/...) so each engine can
+    adapt them to its own queue shape; empty when the corpus carries none.
+    """
+    from . import payloads as _payloads_mod
+    return [p for p in _payloads_mod.by_context(context)
+            if ATTR_NAME_INJECTION_TAG in (p.get("tags") or [])
+            and p.get("payload")]
+
+
 def prioritize_payloads(profile: dict, candidates: list) -> list:
     """Stable reorder: payloads using missing characters go to the back.
 

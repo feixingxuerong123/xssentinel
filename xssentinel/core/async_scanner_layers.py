@@ -1525,6 +1525,15 @@ class AsyncDetectionLayersMixin:
         if (url, param) in _htried:
             return
         _htried.add((url, param))
+        # Phase 362: the bracket-dead injected attr-name shapes cannot
+        # confirm in an HPP re-fire -- both orderings render or filter the
+        # value as text, neither turns it into a live attribute (sync
+        # _try_hpp parity).  Skip them so the two-payload cap spends on
+        # shapes that can.
+        _bare_hpp = {p["payload"] for p in rp_mod.bare_attrname_payloads(
+            context)}
+        if _bare_hpp:
+            cands = [c for c in cands if c not in _bare_hpp]
         for _cand in cands[:2]:
             for _payload_first in (False, True):
                 _htok = "xssv_" + secrets.token_hex(4)
@@ -1706,6 +1715,25 @@ class AsyncDetectionLayersMixin:
                                                     prof, cands)
                 except Exception:
                     pass
+                # Phase 362: bracket-dead reflection -> bare attribute-NAME
+                # handler shapes join the queue (sync parity, same rule as
+                # Scanner._prioritize_bases): the generative channel answers
+                # a bracket-dead profile with javascript:-URI shapes, which
+                # presume a URL-position reflection this window cannot
+                # offer.  Prepended BEFORE the generative block -- the
+                # measured lab arrangement keeps corpus polyglot entries
+                # inside the default budget window.
+                if rp_mod.bracket_dead(prof):
+                    _bare = await asyncio.to_thread(
+                        rp_mod.bare_attrname_payloads, context)
+                    _known = set(cands)
+                    _bare_strs = [p["payload"] for p in _bare
+                                  if p.get("payload")
+                                  and p["payload"] not in _known]
+                    if _bare_strs:
+                        cands = _bare_strs + cands
+                        for _bs in _bare_strs:
+                            families[_bs] = context
                 try:
                     gen_pls = await asyncio.to_thread(gen_mod.generate, prof,
                                                       context)

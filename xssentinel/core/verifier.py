@@ -613,6 +613,36 @@ _SANDBOX_EXEMPT_CONTEXTS = frozenset({
     "mutation_xss", "template_angular", "css_context",
 })
 
+#: UTF-7 payload sequences as produced by ``transform.t_utf7`` (+ADw-,
+#: +ACc-, ...).  A handler value carrying these only executes when the
+#: BROWSER decodes the document as UTF-7 -- which it only does when the
+#: document declares that charset.  Measured Phase 362 (XSSMaze
+#: eventhandler/level3): a page with no charset basis reflects
+#: ``onstart=alert+ACg-'tok'+ACk-`` as a structurally real attribute and
+#: the old rule confirmed it high, while the scanner's own PoC replay
+#: refused the same finding ("not_reproduced") -- an oracle split.
+_UTF7_SEQ_RE = re.compile(r"\+[A-Za-z0-9]{2,}-")
+_UTF7_META_RE = re.compile(
+    r"<meta[^>]+charset\s*=\s*[\"']?\s*utf-?7\b", re.IGNORECASE)
+
+
+def _has_utf7_charset_basis(response_headers, html: str | None) -> bool:
+    """True when the document itself asks the browser to decode UTF-7."""
+    for k, v in dict(response_headers or {}).items():
+        if str(k).lower() == "content-type" and "utf-7" in str(v).lower():
+            return True
+    if html and _UTF7_META_RE.search(html):
+        return True
+    return False
+
+
+def _utf7_shaped_without_basis(val: str, response_headers,
+                               html: str | None) -> bool:
+    """Handler value rides UTF-7 sequences but no UTF-7 charset declared."""
+    if not _UTF7_SEQ_RE.search(val or ""):
+        return False
+    return not _has_utf7_charset_basis(response_headers, html)
+
 
 def verify_semantic(response_text: str, token: str,
                     response_headers: dict | None = None) -> dict:
@@ -970,6 +1000,11 @@ def _structural_confirm(soup, token: str, csp_blocks: bool,
                     return {"confirmed": False, "context": "event_handler",
                             "detail": f"token in {attr} but CSP blocks inline "
                                       "handler execution"}
+                if _utf7_shaped_without_basis(val, response_headers, html):
+                    return {"confirmed": False, "context": "event_handler",
+                            "detail": f"token in {attr} rides UTF-7 sequences "
+                                      "but the document declares no UTF-7 "
+                                      "charset, so a browser never decodes it"}
                 return {"confirmed": True, "context": "event_handler",
                         "detail": f"token reflected in {attr} handler"}
             # Phase 168: element-aware URL sinks.  Phase 167 measured, per
@@ -1025,6 +1060,11 @@ def _structural_confirm(soup, token: str, csp_blocks: bool,
                     return {"confirmed": False, "context": "event_handler",
                             "detail": f"token in {attr} but CSP blocks inline "
                                       "handler execution"}
+                if _utf7_shaped_without_basis(val, response_headers, html):
+                    return {"confirmed": False, "context": "event_handler",
+                            "detail": f"token in {attr} rides UTF-7 sequences "
+                                      "but the document declares no UTF-7 "
+                                      "charset, so a browser never decodes it"}
                 return {"confirmed": True, "context": "event_handler",
                         "detail": f"token reflected in {attr} handler (svg/math)"}
 

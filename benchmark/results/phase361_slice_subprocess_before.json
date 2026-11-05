@@ -1,0 +1,163 @@
+{
+  "generated": "2026-11-06 02:16:03",
+  "base_url": "http://127.0.0.1:18896",
+  "tools": [
+    "XSSentinel"
+  ],
+  "tool_versions": {
+    "XSSentinel": "builtin"
+  },
+  "engine_fingerprint_start": "db632f88e96d62bb",
+  "engine_fingerprint_end": "db632f88e96d62bb",
+  "engine_stable": true,
+  "slice": {
+    "requested_sample": 0,
+    "all": false,
+    "ids": [
+      "pos-elem-01",
+      "pos-attr-01",
+      "pos-attr-05",
+      "pos-script-01",
+      "pos-script-03",
+      "pos-comment-01",
+      "pos-url-01",
+      "pos-dom-01",
+      "pos-svg-01",
+      "pos-polyglot-01",
+      "neg-rcdata-01",
+      "neg-filter-01",
+      "neg-escape-01",
+      "neg-comment-01",
+      "neg-attr-01",
+      "neg-csp-01",
+      "neg-jsonp-01",
+      "neg-rcdata-05"
+    ]
+  },
+  "cases": 18,
+  "per_tool": {
+    "XSSentinel": {
+      "tp": 12,
+      "fp": 0,
+      "tn": 6,
+      "fn": 0,
+      "errors": 0,
+      "completed": 18,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "total_time_s": 54.1
+    }
+  },
+  "matrix": {
+    "pos-elem-01": {
+      "ground_truth": "vulnerable",
+      "mode": "raw_element",
+      "context": "html_element",
+      "XSSentinel": true
+    },
+    "pos-attr-01": {
+      "ground_truth": "vulnerable",
+      "mode": "raw_attr_dq",
+      "context": "html_attribute_dq",
+      "XSSentinel": true
+    },
+    "pos-attr-05": {
+      "ground_truth": "vulnerable",
+      "mode": "raw_attr_dq_src",
+      "context": "html_attribute_dq",
+      "XSSentinel": true
+    },
+    "pos-script-01": {
+      "ground_truth": "vulnerable",
+      "mode": "raw_script_string_dq",
+      "context": "script_string_dq",
+      "XSSentinel": true
+    },
+    "pos-script-03": {
+      "ground_truth": "vulnerable",
+      "mode": "raw_script_block",
+      "context": "script_block",
+      "XSSentinel": true
+    },
+    "pos-comment-01": {
+      "ground_truth": "vulnerable",
+      "mode": "raw_comment",
+      "context": "html_comment",
+      "XSSentinel": true
+    },
+    "pos-url-01": {
+      "ground_truth": "vulnerable",
+      "mode": "raw_href_js",
+      "context": "url_javascript",
+      "XSSentinel": true
+    },
+    "pos-dom-01": {
+      "ground_truth": "vulnerable",
+      "mode": "dom_hash_innerhtml",
+      "context": "dom_xss",
+      "XSSentinel": true
+    },
+    "pos-svg-01": {
+      "ground_truth": "vulnerable",
+      "mode": "raw_svg",
+      "context": "svg_context",
+      "XSSentinel": true
+    },
+    "pos-polyglot-01": {
+      "ground_truth": "vulnerable",
+      "mode": "raw_element",
+      "context": "html_element",
+      "XSSentinel": true
+    },
+    "neg-rcdata-01": {
+      "ground_truth": "vulnerable",
+      "mode": "rcdata_textarea",
+      "context": "html_element",
+      "XSSentinel": true
+    },
+    "neg-filter-01": {
+      "ground_truth": "vulnerable",
+      "mode": "filter_script_tag",
+      "context": "html_element",
+      "XSSentinel": true
+    },
+    "neg-escape-01": {
+      "ground_truth": "safe",
+      "mode": "escape_element",
+      "context": "html_element",
+      "XSSentinel": false
+    },
+    "neg-comment-01": {
+      "ground_truth": "safe",
+      "mode": "comment_stripped",
+      "context": "html_comment",
+      "XSSentinel": false
+    },
+    "neg-attr-01": {
+      "ground_truth": "safe",
+      "mode": "attr_quotes_stripped",
+      "context": "html_attribute_dq",
+      "XSSentinel": false
+    },
+    "neg-csp-01": {
+      "ground_truth": "safe",
+      "mode": "csp_strict_element",
+      "context": "html_element",
+      "XSSentinel": false
+    },
+    "neg-jsonp-01": {
+      "ground_truth": "safe",
+      "mode": "jsonp_whitelist",
+      "context": "script_block",
+      "XSSentinel": false
+    },
+    "neg-rcdata-05": {
+      "ground_truth": "safe",
+      "mode": "escape_rcdata_textarea",
+      "context": "html_element",
+      "XSSentinel": false
+    }
+  },
+  "disagreements": []
+}

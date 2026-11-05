@@ -194,10 +194,20 @@ def build_test_url(
     """Build a URL with ``payload`` substituted into ``path_segment``.
 
     ``base_url`` is the URL template that already contains the segment
-    literal somewhere in its path.  The first occurrence of
-    ``path_segment`` in the path is replaced by URL-encoded ``payload``.
-    If the segment is not present, the encoded payload is appended to
-    the path.
+    literal as a WHOLE path segment.  That segment is replaced by the
+    URL-encoded ``payload``.  If no whole segment matches, the encoded
+    payload is appended to the path.
+
+    Phase 362: the replacement matches WHOLE segments (split on ``/``),
+    preferring the last match -- callers pass the terminal segment they
+    extracted from the same URL.  The previous first-occurrence
+    SUBSTRING replace injected the payload into an earlier segment whose
+    name merely CONTAINED the value: measured on XSSMaze
+    ``/path/level1/a``, where the first ``a`` sits inside the literal
+    directory name ``path``, so the probe rebuilt
+    ``/p<payload>th/level1/a``, never touched the terminal segment, and
+    the layer went silently blind on every short segment value (dalfox
+    and nuclei confirm 4/4 of those endpoints under the same contract).
 
     The payload is encoded with ``safe=""`` so ``<``, ``>``, ``"``,
     spaces, etc. are percent-encoded -- this is what a browser would
@@ -209,8 +219,15 @@ def build_test_url(
     parts = urlsplit(base_url)
     path = parts.path or "/"
     encoded = quote(payload or "", safe="")
-    if path_segment and path_segment in path:
-        path = path.replace(path_segment, encoded, 1)
+    segs = path.split("/")
+    whole = ([i for i, s in enumerate(segs) if s == path_segment]
+             if path_segment else [])
+    if whole:
+        # Prefer the LAST whole-segment match: the caller passes the
+        # terminal segment, and that is the position whose reflection the
+        # layer actually measured (Phase 353 bare-marker probe).
+        segs[whole[-1]] = encoded
+        path = "/".join(segs)
     else:
         # Append the encoded payload as a new trailing segment.
         if not path.endswith("/"):

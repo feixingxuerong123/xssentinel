@@ -39,7 +39,15 @@ _EXPECTED_FAMILY_SIZE = 48
 # shifts sync's sibling stride slices (len feeds the step); the PRIMARY
 # slice is corpus-head based since Phase 331, so it no longer moves.
 # Phase 285 re-measured the gate in the pre-331 state.
-_EXPECTED_HTML_ELEMENT_SIZE = 209
+# 212, not 209: `html-attrname-001..003` (Phase 362 -- bare attribute-NAME
+# handler shapes, measured live on the XSSMaze eventhandler family; the
+# queue injection only surfaces them when the reflection profile shows
+# angle brackets STRIPPED from a reflected probe).  Tail-appended at the
+# end of the html_element family; the 194-case matrix was re-measured
+# after the change and stayed exactly on its pre-change verdicts
+# (sync TP113/FP0/TN81/FN0, async TP107/FP0/TN75/FN0, both F1=1.000 --
+# benchmark/results/phase362_matrix_{sync,async}.json).
+_EXPECTED_HTML_ELEMENT_SIZE = 212
 
 
 def test_family_loads_and_is_registered():
