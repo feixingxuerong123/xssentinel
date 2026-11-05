@@ -27,7 +27,9 @@ python -m xssentinel --self-test
 ```
 
 **它是慢的**(分钟级,默认上限 900s,可用 `XSSentinel_SELFTEST_TIMEOUT` 调),
-不是冒烟测试。只想确认装好了,`python -m xssentinel --help` 能出帮助就够了。
+不是冒烟测试。只想确认装好了,`python -m xssentinel --version`(输出单行版本号,
+便于脚本判断装的是哪一版)或 `--help` 就够了。`--self-test` 会自己挑空闲端口
+(默认优先 8899,被占用时自动改);需要固定端口就设 `XSSENTINEL_SELFTEST_PORT`。
 
 ---
 
@@ -49,6 +51,14 @@ xssentinel -u "https://target.example/search?q=1" \
 ```
 
 `-f` 支持 `html / json / csv / sarif / junit / markdown / burp / nuclei`。
+管道里要机器可读结果时用 `-o -`（摘要走 stderr，stdout 只有报告）:
+
+```bash
+httpx -l targets.txt | xssentinel --batch-stdin -o - -f json | jq -c '.findings[]'
+```
+
+批量 URL 列表接受 UTF-8/UTF-16 BOM、GBK 与 CRLF；退出码 `0/1/2/3` 分别为
+成功 / 崩溃 / 用法错误 / 扫描不完整。
 不确定预算时用档位而不是手调参数:
 
 ```bash

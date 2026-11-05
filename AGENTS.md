@@ -53,15 +53,16 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
 
 - 新增检测层必须**同时**注册 `coverage.LAYERS` 与 `layer_coverage` 矩阵(Phase 187/192 两次被门禁抓到的同一课)。
 
-## 当前状态(2026-11-04)
+## 当前状态(2026-11-06)
 
-- **1.4.1(2026-11-04,patch)**:承接 [Unreleased] 的 4 条 Fixed + 3 条 Changed
-  (Phase 357 后续修复与本轮 CI/文档治理),无新增能力、无破坏性变更,按
-  CHANGELOG「版本策略」(只修缺陷走 patch)定级。版本同源由
+- **1.4.2(2026-11-06,patch)**:承接 Phase 358–362(MCP 双协议、CLI 管道
+  与功能面收口、XSSMaze 残余 FN 归因与三修),无破坏性变更(唯一行为变化是
+  `--config` 带默认值的键现在生效,CHANGELOG Changed 已明示),按「只修缺陷/
+  补齐既有能力走 patch」定级。版本同源仍由
   `test_doc_gate_parity.py::test_changelog_latest_version_matches_package_version`
   钉住(`__version__` == CHANGELOG 最新章节号)。`pyproject.toml` 用 attr 动态读
   `__version__`,无需单独改。
-- 版本 1.4.1;最新 Phase 357。源码 135 文件 60,440 行 / 测试 275 文件 62,544 行
+- 版本 1.4.2;最新 Phase 362。源码 135 文件 60,440 行 / 测试 275 文件 62,544 行
   (2026-11-04 复测)。Phase 350(`757e58f`)已提交;351–356 已随 1.4.0
   (`bad66b2`)发布,过程记录在 `benchmark/results/round2..round5_*_20261103.md`
   与 `zap_unavailable_20261103.md`;Phase 357 为 2026-11-04 的收口轮
@@ -74,10 +75,18 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
   未跟踪的 `tests/_pytest_tmp/` 等临时脚本不计入(若按全 `*.py` 会是 317 文件),
   源码侧与本行同为 `wc -l` 物理行。这类规模快照与切片/矩阵常量不同,不设守卫
   (自指守卫会让「加一个测试文件」反过来要求改文档),改动时按本行口径重测。
-- 口径复测(2026-11-05,含 Phase 358 MCP 双协议守卫):源码
-  **135 文件 60,670 行**;测试按 tracked `test_*.py`(含本轮新增
-  `test_phase358_mcp_dual_era.py`)**279 文件 63,229 行**。引用以本行为准,
-  上两行是带日期的历史记录。
+- 口径复测(2026-11-05 晚间,含 Phase 358 MCP 与 Phase 359 CLI 两个守卫):
+  源码 **135 文件 60,797 行**;测试按 tracked `test_*.py`(含本轮新增
+  `test_phase358_mcp_dual_era.py`、`test_phase359_cli_compat.py`)
+  **280 文件 63,447 行**。带日期的历史记录,保留不改。
+- 口径复测(2026-11-05 深夜,含 Phase 360 的 `cli_output.py` 与
+  `test_phase360_cli_compat.py`):源码 **136 文件 61,042 行**;测试按同口径
+  (tracked + 本轮待提交的 `test_phase359_cli_compat.py`、
+  `test_phase360_cli_compat.py`)**281 文件 63,869 行**。带日期的历史记录,
+  保留不改;口径仍是 `wc -l` 物理行、排除 `__pycache__` / `tests/_pytest_tmp/`。
+- 口径复测(2026-11-06,含功能面审计的 `test_phase360_cli_surface.py` 与
+  `core/llm_pool.py`、`core/checkpoint.py` 的修法):源码 **136 文件 61,138 行**;
+  测试按同口径 **282 文件 64,173 行**。**引用以本行为准**。
 - 1.4.0 轮落地的能力(Phase 351–356,全部带回归,数字与归因见上列报告):
   - **Phase 352** 存储自动发现独立 Mixin(`scanner_stored_auto.py` +
     `stored_discovery.py`),官方靶 stored 自动发现 sync 9/9、async 9/9、FP 0;
@@ -166,6 +175,189 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
     本轮只解决「连得上」,不引入新传输。
   - 教训:协议代际与控制台编码都是「接得上」的前置条件;跑分/判定全绿不代表
     Agent 能连上,接入面必须有真实子进程 e2e,而不只是注入流单测。
+- **Phase 359(CLI 管道兼容,2026-11-05)** 以真实 CLI 子进程对照测出的五个硬缺口:
+  ① `--batch` / `--batch-stdin` 带 UTF-8 BOM 时首行 `\ufeff# c` 被当 URL
+  (`Invalid URL` rc=2);② GBK 列表抛未捕获 `UnicodeDecodeError`(rc=1 +
+  traceback);③ `-o -` 被当文件名写出 `-.json`,stdout 只有人类摘要;
+  ④ `-o reports/scan.json` 父目录不存在时写失败并误报 exit 3;
+  ⑤ 无目标时把 40KB `--help` 打到 stdout、错误却在 stderr。
+  - 修法:输入侧按 UTF-8-sig → UTF-16(BOM) → GB18030 解码、CRLF/BOM/注释统一
+    清洗,无法解码给诚实错误;输出侧 `-o -` 为 UTF-8 字节 stdout 通道(单目标
+    一行 JSON,批处理 JSONL 且限 `-f json`),人类摘要/进度/错误全部改走
+    `_human` 流,自动创建父目录;用法错误只回 stderr 短提示。退出码
+    `0/1/2/3` 语义不变,由测试钉住。
+  - 守卫 `tests/test_phase359_cli_compat.py`(13 例):真实 CLI 子进程 +
+    loopback 靶场、注入流的解码单测、**AST 断言 `_main_impl` 内所有 print
+    都显式指定流**(防未来新增 print 污染 stdout);5 组变异对照各自红、
+    restored 全绿。
+  - 证据:CLI/报告相关 13 文件 **158 passed / 0 skip**;文档/架构/MCP 守卫
+    6 文件 **65 passed**;ruff 全绿;既有 MCP/CLI 契约未破。
+  - 教训:「管道公民」和「终端程序」是两套输出契约;只修输出通道不够,
+    必须把人类文本统一到 stderr,并用源码级断言锁住新增打印点。
+- **Phase 360(CLI 兼容性收口,2026-11-05 深夜)** 起点是一轮**真实子进程
+  探针矩阵**(`dev/cli_compat_probe.py`,修前/修后 JSON 留证),不凭代码观感
+  列清单。量出的六组硬缺口:
+  ① `--version` / `-V` 不存在(rc=2 + 5.6KB usage 到 stderr);
+  ② **Phase 359 的 AST 门只钉 `_main_impl`**,`__main__` / `cli_runner` /
+  `cli_commands` 另有 **97 处裸 print**,实测 `-o -` 下 `--login-token` /
+  `--login-basic` / `--ai-report` / `--fuzz` / `--discover` / `--har` 导入
+  都把人类行写进报告流;
+  ③ `--config` 带 UTF-8 BOM 被静默吞成**空配置**(报「No target specified」
+  把文件问题栽给使用者),GBK 配置 rc=1 + traceback;另外凡带非空 argparse
+  默认值的键(`format` / `timeout` / `output` / `method`)写了也不生效;
+  ④ `-o - -f nuclei` 单目标扫完才在报告写入处抛 ValueError,被当成
+  「Report write failed」→ exit 3,而批处理同错是 exit 2;
+  ⑤ `-o - | head` 把剩余每个目标标 failed、exit 3,退出时还留
+  `Exception ignored on flushing sys.stdout`(实测 rc=120);
+  ⑥ stdout 无 `.buffer`(注入的文本流 / cp936)时非 ASCII 报告丢帧。
+  - 改法:新增 `xssentinel/cli_output.py` 收拢两份契约——`human()` 流
+    (默认 stdout,`-o -` 时 stderr,`main()` 的 finally 复位,不是全局
+    `sys.stdout` patch)与 `decode_input_bytes`(UTF-8-sig / UTF-16 BOM /
+    GB18030)。97 处 print 全部显式 `file=human()`;坏配置改抛 `ConfigError`
+    → rc=2 明确原因;`_explicit_cli_values()` 用「默认值置 None 的第二遍
+    parser」区分显式输入与 argparse 默认值(避免手写默认值清单);
+    `--config` 自带 `output: "-"` 时在 merge 之后重新绑定流;`-o -` 的
+    nuclei / 批量非 JSON 统一为扫描前 rc=2;`OutputPipeClosed` 从 per-target
+    与并行批量的 `except Exception` 里单独冒到 `main()`,rc=0 + 一行说明。
+    `--version` 用 `__version__` 同源;`--ver` 作为 `--verbose` 的**同一个
+    action 的精确别名**保留(单独注册隐藏 action 会与 `verbose` 共享 dest,
+    被 `test_cli_subcommands` 的 dest→action 映射当场抓到)。
+  - 守卫 `tests/test_phase360_cli_compat.py`(**34 例 / 0 skip**):真实 CLI
+    子进程 + loopback 靶场覆盖 5 类污染、HAR 导入、config 三种编码与四种
+    坏形状、配置优先级、config 驱动的 stdout 通道、nuclei 门、BrokenPipe、
+    cp936 文本流兜底;源码级 AST 门覆盖**三个 CLI 模块的所有 print**(不再
+    只钉一个函数)且禁止硬编码 `file=sys.stdout`。取证脚本
+    `dev/phase360_rewrite_prints.py`(AST + 字节偏移改写,CRLF 与非 ASCII
+    列偏移两个坑)、`dev/phase360_mutation_check.py`。
+  - 变异对照**首次运行 6/6 通过**(版本 / 裸 print / 静默吞配置 / nuclei 门 /
+    管道吞异常 / 默认值覆盖,baseline 绿 → 改回旧行为红 → restored 绿)。
+    **最终代码上两次重跑,后 4 组未完成**:前 2 组(版本 / 裸 print)每次都
+    baseline 绿 → mutated 红 → restored 绿,第 3 组 baseline 两次都被本 turn
+    的 `[safe-delete]` 50 次删除/覆盖配额(count 51 > threshold 50,pytest
+    临时目录 `garbage-*` 清理吃光,与 Phase 358 记录的环境形态相同)中止。
+    ABORT 发生在写 mutated **之前**,源码已核实干净(无 `MUTATED` / `-Vx` 等
+    残留),不是回归;配额按 turn 计,下轮环境干净时补跑后 4 组。首轮 6/6 与
+    最终代码的唯一差异是 `--ver` 注册方式(同一 action 的精确别名),与 6 个
+    变异锚点均无关,但不拿首轮结论冒充最终代码的全量结论。
+  - 证据:CLI / MCP / 报告 / 文档 / 架构 13 文件 **115 passed / 1 skipped**
+    (唯一的 skip 是 `test_no_undefined_names.py` 因 pyflakes 未安装的**整文件
+    零贡献**,按规矩不当绿算);Phase 360 守卫单跑 34 passed / 0 skip;
+    文档 / 架构 / 刻度守卫 5 文件 34 passed / 0 skip;ruff 全仓全绿;
+    Phase 358 / 359 既有契约未破。按「引用带跳过数」的口径,两组数一起报。
+  - **本轮未跑全量分批门禁**(`--jobs 4`):同一 turn 的 safe-delete 配额被
+    变异对照与回归组的 pytest 临时目录清理占用(下条),全量跑只会产出
+    Phase 358 记录过的环境形态红,而不是判定。按「绿和跑过是两个词」不以
+    「跑过」充当「绿」,也不拿旧 run 的数字顶上;下轮环境干净时补跑。
+  - **明确不做**:shell completion、`version` 子命令、位置参数形式的目标
+    URL、`--config` 的 YAML、禁用 argparse 缩写(会破坏既有脚本)。
+  - 教训:与 Phase 357「同一契约被手写两遍」同族,这次是**守卫覆盖面没跟着
+    能力面走**——修了 `_main_impl` 的流,却让另外两个模块继续自由打印;
+    有效做法是「共享函数 + 全模块源码级门 + 真实子进程行为门」三者同时在场。
+    另一课:探针里把 `--version` 改名不算变异(argparse 缩写仍能命中),
+    变异必须真正改变行为,否则守卫绿是对的。
+- **Phase 360 后续:CLI 功能面审计(2026-11-06)** 追问「CLI 是否都能正常
+  调用里面的所有功能」,答案不能凭代码观感给。写了
+  `dev/cli_surface_probe.py`:29 个功能面用例(4 个子命令 help、9 个程序
+  模式、6 个输入面、8 种报告格式、长驻服务启动检查)+ 从 `build_parser`
+  自动枚举的 **133 个 flag**(161 actions / 174 option strings 中排除 31 个
+  需外部条件或已单测的,每个都带合理占位值真实跑一次),判定口径是
+  「有没有未捕获异常 / traceback」,而不是「feature 是否语义正确」——后者
+  由 194 例基准与各功能专属测试负责。
+  - 修前实测:**2 处崩溃**(`--raw-request` 坏文件抛 RawRequestError、
+    `--resume` 非对象 JSON 抛 AttributeError),1 处功能不可达
+    (`--self-test` 的 8899 被本机一个无关的 `python -m http.server` 长期
+    占用,三处硬编码同一端口),2 处契约漏接(`--poc-dir` 写失败被算成
+    exit 3、`--ai-timeout` 声明了却没传给 `--ai-check`)。另有若干
+    **探针 fixture 自身**的形状(fuzz-body 需 `@` 前缀、verify-fix 需非空
+    findings、sitemap 需 `--allow-host`、ai-check 需网络超时上限),逐个
+    归因后修正探针,不拿它们冒充产品缺陷。
+  - 修后同探针复测:**29 功能面 0 崩溃**(24 rc=0、3 个长驻模式 running、
+    1 个 verify-fix 的 CI 门 rc=1、1 个 self-test 人为 8s 超时但
+    `ready=True`)、**133 flag 0 崩溃 / 0 超时**(129 rc=0,其余是占位值
+    导致的诚实用法错误或 CI 门 rc=1)、**8 种报告格式全部产出非空文件**。
+  - 守卫 `tests/test_phase360_cli_surface.py`(**26 例 / 0 skip**):
+    真实子进程 + 三个文件共享端口的 AST 门 + `--ai-timeout` 转发的
+    源码级断言 + fake probe 行为单测。变异对照
+    `dev/phase360_surface_mutation.py` **5/5 通过**,且这轮改为**纯子进程
+    驱动、不经过 pytest**,避开上一轮把 safe-delete 配额吃光的临时目录清理。
+  - 证据:CLI / MCP / PoC / LLM / Checkpoint / 文档 / 架构 21 文件
+    **247 passed / 0 skipped / 0 failed**(337s);ruff 全仓全绿。
+    **仍未跑全量分批门禁**,理由同上一条(本轮同样用 pytest 临时目录,
+    配额按 turn 计),下轮补跑。
+  - 边界(如实说):审计覆盖的是**入口可达性**,不是 2^161 种参数组合的
+    语义正确性;`--wayback` / `--gql` / `--headless` / `--webhook` / OOB
+    监听等需外部服务或浏览器的 flag 未逐个实测,由各自专属测试覆盖;
+    `--serve` / `--passive` / `--mcp` 只验证「能启动并留在前台」。
+  - 2026-11-06 收口:`--diff` / `--verify-fix` 自己拼报告时同样把 `-` 当
+    文件名(`-.json` / `-.html`),现与扫描入口共用
+    `cli_output.write_report_frame`;回归测试在临时 CWD 断言不出现
+    `-` / `-.json` / `-.csv`(扫描与 diff 两个入口)。根目录历史残留
+    `-.json`(14,748B)/`-.csv`(518B,2026-11-05 23:11)已删除。
+- **Phase 361–362(XSSMaze 残余 FN 归因 + 三修,2026-11-06)** 回答「检测
+  功能还能不能提升」这个问题时,先做了 Phase 361 归因:不重跑全靶,用
+  `dev/_xssmaze/fn_delta_p310_p341.py` 从两轮原始 TSV 重推差集(方法自校验:
+  p341 重推 = 69 整,与官方 scorecard 一致;「最新目录不是我的目录」在这一步
+  直接兑现为「最新归因报告归因的是旧一轮」——10-25 的
+  `FN_ATTRIBUTION_20261025.md` 归因的是 p310 的 81 FN,Phase 315–322 修复波
+  关闭 16 个后,当前 69 的残余归因没人做过)。归因结论(全部有实测证据,
+  报告 `dev/_xssmaze/FN_ATTRIBUTION_20261106.md`):69 = 4 预算挤占 + 4 path
+  产品缺口 + 31 合同结构性(body 25 + header 6,dalfox 与 nuclei 在同一
+  URL-only 合同下同样全 0,不归检测逻辑)+ 28 真实 query 缺口 + 2 超时形态。
+  三个「新 FN」逐一验明:2 个是 p341 轮 wrapper 100s 超时的环境形态(当前树
+  1.3s 复验 TP),1 个(eventhandler/level3)是真回归。
+  - Phase 362 三修(全部靶场活体验证,默认预算):
+    ① `build_test_url` 首次**子串**替换改**整段**替换(核心 `path_xss.py`)——
+    官方靶 `/path/level1/a` 的第一个 `a` 在目录名 `path` 里,探测从未碰过终端
+    段(`docstring` 把 bug 写成了契约);dalfox 3/4、nuclei 4/4 同合同可检出,
+    修后 4/4 `path_xss` medium;
+    ② verifier event-handler 确认位点加 **UTF-7 charset 门**——mp40 轮的
+    「确认 high」实为 oracle 伪影(页面无 UTF-7 charset 声明,浏览器不会解码,
+    扫描器自己的 `poc_verify` 都拒了同一 finding,`not_reproduced`);
+    range3 真 UTF-7 页声明 `charset=UTF-7`(server.py:192),诚实案例不受影响;
+    ③ bracket-dead 队列注入——画像显示 `<` 被剥时,语料新增的三条
+    `attr_name_injection` 裸形状(`ondblclick` / `onauxclick` /
+    `marquee onstart`)进默认预算窗口(sync `_prioritize_bases` 与 async
+    同型点接线,Phase 357 双引擎教训)。eventhandler/3、4 以
+    `ondblclick=alert('xssv_...')` 诚实确认 high,level5 以
+    `marquee onstart=alert(...)` 确认(level5 连裸 handler 名也剥,括号被剥
+    后 `onstart=...` 才是真属性),realworld-encoding/8 确认 high。
+    净变化:**+8 诚实 TP**(p341 基线上全 FN),27/27 控制例 FP=0。
+  - 自纠正四笔(都钉在测试与报告里):① 队列顺序——「裸形状最先」的直觉
+    排列把 level5 的语料 polyglot 条目挤出 14 窗口(其早前 medium 是不可
+    复现的队列巧合,40 预算主循环 0 确认),落定为 lab 实测 8/8 的排列
+    (注入在 generative prepend 之前);② 守卫空转——`if False and` 变异
+    从源码子串钉子上滑了过去(Phase 201 续四形状),sync 接线改**行为测试**
+    (monkeypatch 画像探针驱动真 `_prioritize_bases`)+ 精确语句钉子,
+    三个锚点全部 baseline 绿 → mutated 红 → restored 绿;③ **bracket_dead
+    两道前置**——首轮全量门禁抓到 5 个真回归后归因:`profile_reflection`
+    对「探针未被回显」返回 `chars_kept: []`,第一版据此把「过滤未知」误判
+    为 bracket-dead,裸形状占满 Phase 315 async HPP 的 `cands[:2]` 重发位、
+    hpp finding 消失;escaped 页的 `<` 走**编码**(Phase 311 夹具),同样不在
+    kept,3 条裸形状吃光其 3 槽预算。落定:探针必须回显(`reflected`)且
+    `<` 必须在 `chars_stripped`(编码≠被剥);④ HPP 层 outright 跳过
+    `attr_name_injection` 形状(双引擎)——两种 HPP 排序位置都无法把
+    裸形状变成活属性,重发位只该花在能确认的形状上。
+  - 守卫 `tests/test_phase362_xssmaze_fixes.py`(22 例):build_test_url
+    精确等值锚(排除 append 分支侥幸)、UTF-7 门三态(header/meta/无依据)+
+    helper 直测 + 双位点源码钉、bracket_dead 三态单测(被剥/未回显/被编码)、
+    语料形状、双引擎接线。`test_portswigger_events_corpus` 常量按其自带
+    协议抬 209→212(附日期与矩阵复测依据);语料 3 条移至 html_element
+    家族尾部(stride 位移最小化)。ruff 全绿;架构行数门绿。
+  - **第一轮全量门禁的战果**:exit 0 但 per-file 日志带 5 个红
+    (ratchet×2、portswigger 契约、Phase 315 async HPP、Phase 311
+    escaped-echo)——单文件复跑定性全部为真回归(非环境形态),即上面
+    ③④ 的来源;修后同组 75 例全绿。教训:exit 0 不等于可以只引总数,
+    失败/重试日志才是证据来源。
+  - **终树门禁(2026-11-06,本节引用口径)**:全量分批门禁 `--jobs 4`
+    **283/283 文件绿(956s,失败 0)**,skip **37 例 / 13 文件**(2 个
+    整文件零贡献),2 个文件首跑超时重试后复绿(test_phase209_
+    accept_encoding / spa_route_delivery);194 矩阵双引擎(14/12/90
+    标定口径)sync **TP113/FP0/TN81/FN0/ERR0**(524s)、async
+    **TP107/FP0/TN75/FN0/ERR0**(537s;12 SKIP 为 manifest 声明
+    sync-only 的 `neg-stored-02` 口径),双双与改前基线逐位一致,F1 均
+    1.000,产物 `benchmark/results/phase362_matrix_{sync,async}_r2.json`
+    (r1 为修 5 回归前的树,数字同,留档)。测试规模口径随之 +1 文件
+    (283 含本轮 `tests/test_phase362_xssmaze_fixes.py`)。
 - 真实应用回归集 v2.2(22 例 / 5 app:Juice Shop 匿名+unsafe、DVWA、bWAPP、
   自建四面靶):xssentinel **13 TP / 0 FP / 9 TN,recall 1.000**;dalfox 0.571、
   nuclei 0.500(开源对照,3 FN 均为 Juice `#` fragment 形状;**非商业基线**)。
@@ -240,9 +432,16 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
 - 开放项:无。SECURITY.md 的举报渠道已定为 **GitHub 私密安全通告**(仓库 → Security →
   Report a vulnerability,流程与 72 小时时效已写在 SECURITY.md,无需额外邮箱即可生效);
   原「联系方式待仓库归属者填写」一项于 2026-11-01 关闭。如需增加邮箱等第三方渠道,
-  由仓库归属者自行补充,不阻塞发布。产品级 backlog 无未决项
+  由仓库归属者自行补充,不阻塞发布。既有 backlog 无未决项
   (OPTIMIZATION.md §3.6 item 6 被动代理 drain 时间上限已于 2026-10-31 关闭;
   其余均为"有意不做/需外部条件"清单)。
+- **新增开放项(2026-11-06,仅评估、未实现)**:OPTIMIZATION.md §8「Agent
+  接入面 backlog」,11 项按 P0/P1/P2 排序,来自 `dev/agent_surface_probe.py`
+  的真实 MCP 帧测量(产物 `dev/_agent_surface_probe.json`)。P0 三件:授权范围
+  缺服务端强制、错误结果只有纯文本无结构化、200 finding 静默截断;
+  P1 四件:默认 `max_seconds=300` 与 Agent 平台超时错位且无异步入口、7 个工具
+  全无 `title`/`annotations`、进度通知无 `total`、重试不幂等。**其中授权范围
+  的默认策略(默认拒绝 vs 默认放行)需仓库归属者拍板,拍板前不动。**
 - 环境事件(2026-11-04 凌晨):① 邻项目 `D:\qoder\vuln-agent` 同时段并发
   跑自己的测试批(污染一轮门禁,该轮不引用);② 负载抖动贯穿夜间——同一
   文件单跑 2.2s~176s、门禁内可 1080s×2 超时,skip 数 59→69→134 随 conftest

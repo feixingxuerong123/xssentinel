@@ -16,6 +16,8 @@
 
 ## [Unreleased]
 
+## [1.4.2] - 2026-11-06
+
 ### Added
 - **Phase 358 / MCP 双协议接入**：现行规范 `2026-07-28` 已去掉 `initialize`
   握手并强制 `server/discover`；服务现在同时支持 legacy(2024-11-05 …
@@ -26,12 +28,113 @@
   未知现代方法回 404 `-32601`，缺头仍放行。旧帧响应字节与状态码不变。
   守卫 `tests/test_phase358_mcp_dual_era.py`（21 例，含真实子进程 stdio
   握手与 4 组变异对照）。
+- **Phase 359 / CLI 管道兼容**：`-o -` 把报告写进 stdout（UTF-8 字节；单目标
+  一行 JSON、批处理 JSONL 且限 `-f json`），人类摘要/进度/错误全部改走 stderr；
+  `-o PATH` 自动创建缺失父目录；`--batch` / `--batch-stdin` 接受 UTF-8
+  （带/不带 BOM）、UTF-16（BOM）、GB18030/GBK 与 CRLF，无法解码时给明确错误。
+  无目标时不再把 40KB `--help` 打到 stdout。退出码 0/1/2/3 语义由
+  `tests/test_phase359_cli_compat.py`（13 例，真实 CLI 子进程 + 5 组变异对照）
+  钉住。
+- **Phase 360 / CLI 兼容性收口**：`--version` 与 `-V` 输出单行版本（读
+  `__version__`，与包元数据同源）；`--ver` 作为 `--verbose` 的精确别名保留，
+  新增 `--version` 不会让历史缩写变成「ambiguous option」。新增
+  `xssentinel/cli_output.py` 统一「人类文本流」与「输入解码」两份契约。
+  守卫 `tests/test_phase360_cli_compat.py`（34 例，真实 CLI 子进程 + 三个
+  CLI 模块的源码级 AST 门 + 6 组变异对照，全部 baseline 绿 / 改回旧行为红 /
+  restored 绿），取证脚本 `dev/cli_compat_probe.py` 与
+  `dev/phase360_mutation_check.py`。
+- **Phase 362 / 括号被剥页面的裸属性名语料**：画像显示 `<` 被剥时，
+  `attr_name_injection` 家族新增 `ondblclick` / `onauxclick` /
+  `marquee onstart` 三条裸形状并进入默认预算窗口（sync / async 双引擎接线）；
+  XSSMaze eventhandler/3、4、level5 与 realworld-encoding/8 由 FN 变为
+  诚实 TP（净 +8）。守卫 `tests/test_phase362_xssmaze_fixes.py`（22 例）。
 
 ### Fixed
+- **XSSMaze 真实 query FN（Phase 361–362）**：Phase 361 从两轮原始 TSV
+  重推 69 条 FN 的归因（4 预算挤占 + 4 path 产品缺口 + 31 合同结构性 +
+  28 真实 query 缺口 + 2 超时伪影，方法自校验与官方 scorecard 一致）；
+  Phase 362 修掉其中的可修项：`build_test_url` 的**子串**替换改为**整段**
+  替换（官方靶 `/path/level1/a` 的终端段从未被探测，修后 4/4 检出）；
+  event-handler 确认位点加 **UTF-7 charset 门**（无 `charset=UTF-7` 声明的
+  页面不再把 UTF-7 解码当作浏览器事实）；bracket-dead 队列按实测排列注入。
+  修后 194 例双引擎判定与改前逐位一致（`phase362_matrix_{sync,async}_r2.json`），
+  27/27 控制例 FP=0。
+- **`-o -` 在 `--diff` / `--verify-fix` 仍会写出名为 `-` 的文件**：这两个
+  子命令自己拼报告，扩展名追加逻辑在 stdout 分支之前执行，`-` 被变成
+  `-.json` / `-.html`。现统一走 `cli_output.write_report_frame`，并在
+  CWD 留下 `-` 文件的形状由回归测试钉住（扫描 / diff 两个入口）。
+
+### Changed
+- **`-o -` 的报告流仍被人类文本污染**：Phase 359 的源码级守卫只覆盖
+  `_main_impl`，`__main__` / `cli_runner` / `cli_commands` 另有 97 处裸
+  `print`；实测 `--login-token` / `--login-basic` / `--ai-report` /
+  `--fuzz` / `--discover` 与 `--har` 导入都会把人类行写进报告流。现全部
+  显式走 `human()`，`--config` 里写 `"output": "-"` 也重新绑定该流；无
+  `-o -` 时输出字节不变。
+- **`--config` 的输入与优先级**：UTF-8 BOM 曾让 `json.load` 失败并被静默吞成
+  **空配置**（报错成「No target specified」，把文件问题栽给使用者）；GBK 配置
+  抛未捕获 `UnicodeDecodeError`（rc=1 + traceback）。现与 `--batch` 共用
+  UTF-8-sig / UTF-16(BOM) / GB18030 解码器，坏文件一律 rc=2 + 明确原因；
+  配置引用的 `batch_file` / `custom_payloads` 同样不再静默丢弃。
+- **`--config` 的键被 argparse 默认值覆盖**：`format` / `timeout` / `output` /
+  `method` 等凡带非空默认值的键写了也不生效（实测 `{"format":"json",
+  "timeout":42}` 产出 HTML 报告、timeout 15）。现只把使用者**显式输入**的
+  flag 交给合并逻辑，CLI 显式值仍优先于配置。
+- **`-o - -f nuclei`（单目标）误报扫描失败**：格式错误直到报告写入才抛出，被
+  当成「Report write failed」→ exit 3，而批处理同错是 exit 2。现两种形状统一
+  在扫描开始前 rc=2，stdout 为空。
+- **下游提前关闭管道被算成扫描失败**：`-o - | head` 曾把剩余每个目标标为
+  failed、exit 3，并在解释器退出时留 `Exception ignored on flushing
+  sys.stdout`（实测 rc=120）。现视为正常结束：rc=0、stderr 一行说明、无
+  traceback、不谎报「扫描不完整」。
+- **stdout 字节通道缺失时的编码兜底**：注入的纯文本流（IDE / 测试替身）在
+  cp936 下遇非 ASCII 报告会 `UnicodeEncodeError` 丢帧；现文本回退统一用 ASCII
+  转义，JSON 解析后仍还原原文。
 - MCP stdio 帧在 Windows cp936/gbk 控制台代码页下写非 ASCII（靶场回显、
   中文/emoji）会抛 `UnicodeEncodeError`，导致客户端永远等不到那一帧；
   改为 UTF-8 字节写底层 buffer，stdin 同样按 UTF-8 解码，注入的文本流
   保留 ASCII 转义兜底。
+- CLI 批处理列表带 UTF-8 BOM 时首行被当作 URL（`Invalid URL` rc=2），GBK 列表
+  直接抛 `UnicodeDecodeError`（rc=1 + traceback）；`-o -` 被当文件名生成
+  `-.json`；`-o reports/scan.json` 在父目录不存在时写失败并误报 exit 3。
+  四项均已修，见上面 Phase 359 条目。
+- **Phase 360 后续 / CLI 功能面审计**：用真实子进程把 29 个功能面用例与
+  133 个 flag 各调一遍（`dev/cli_surface_probe.json` 留证），修掉 5 处
+  「能解析但调不通」:
+  - `--raw-request` 遇坏文件抛未捕获 `RawRequestError`(rc=1 + traceback);
+    现与 `--config` / `--batch` 共用输入解码器,解析失败回 rc=2 + 明确原因。
+  - `--resume` 指向「合法 JSON 但不是对象」的 checkpoint 抛
+    `AttributeError`(rc=1 + traceback);损坏但存在的文件还会被当成「不存在」
+    并静默丢弃恢复进度。现 `Checkpoint.load` 校验 schema / 共用解码器,
+    CLI 区分「尚未创建」(正常从头开始)与「文件损坏」(rc=2 明确拒绝)。
+  - `--self-test` 把 8899 硬编码在 `cli_commands.py` / `tests/vuln_server.py` /
+    `tests/run_self_test.py` 三处;本机该端口被无关进程占用时功能完全不可达
+    (「Vuln server did not start within 10 seconds」)。现由
+    `XSSENTINEL_SELFTEST_PORT` 统一传递,未设置时优先 8899、被占则自动选
+    空闲 loopback 端口;单独运行两个脚本仍默认 8899。
+  - `--poc-dir` 的产物写入与报告写入共用 `except`,目录不可用时会把一次
+    **已完成的扫描**报成「Report write failed」→ exit 3。现 PoC 是可失败
+    的附加产物,失败只给 stderr 提示,不参与扫描 verdict。
+  - `--ai-timeout` 已声明却没传给 `--ai-check` 的供应商探测(`LLMPool.probe`
+    把 `timeout` 写死为 `None`);离线主机上该命令无法被限时。现 flag 生效。
+  - 守卫 `tests/test_phase360_cli_surface.py`(26 例 / 0 skip)+ 5 组变异对照
+    (`dev/phase360_surface_mutation.py`,全部 baseline 绿 → 改回旧行为红 →
+    restored 绿)。修后审计:**29 功能面用例 0 崩溃、133 个 flag 0 崩溃 / 0 超时、
+    8 种报告格式全部产出非空文件**。
+
+### Changed
+- `--config` 里带默认值的键（尤其 `format` / `timeout` / `output`）从「静默
+  不生效」变为「生效」。**这是行为变化**：若既有脚本曾依赖这些键被忽略，请
+  改用显式 CLI flag 覆盖（CLI 显式值仍优先）。按「版本策略」这属于修缺陷而
+  非改参数语义/默认值，故不标 BREAKING，但在此明示以免下游误判。
+- `-o -` 的报告帧写入改由共享的 `cli_output.write_report_frame` 负责；JSON
+  紧凑化、UTF-8 字节通道、文本流 ASCII 兜底与管道关闭信号集中在一处。
+  非 `-o -` 路径的 stdout 字节与退出码 0/1/2/3 语义不变。
+- `--self-test` 不再固定使用 8899：CLI 会自动选空闲端口并告诉两个子进程。
+  需要固定端口的脚本请设置 `XSSENTINEL_SELFTEST_PORT=8899`（或直接指定别的
+  空闲端口）；`--config` 的「带默认值的键生效」见上一条 Changed。
+- `--resume` 对一个**已存在但读不出**的 checkpoint 从「静默从头开始」变为
+  rc=2 明确报错。文件不存在仍是合法的从头开始，行为不变。
 
 ## [1.4.1] - 2026-11-04
 

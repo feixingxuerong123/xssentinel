@@ -438,6 +438,37 @@ exit 3 而不是回退 sync——报告顶层恒带 `engine` 与 `engine_fallbac
 `--verify-fix` / `--diff`（对 JSON 报告重放确认修复情况）、
 `--no-verify-ssl`。
 
+**CLI 管道兼容（Phase 359 / 360）**——被智能体 / CI / shell 管道直接调用时的约定：
+
+```bash
+httpx -l targets.txt | xssentinel --batch-stdin -o - -f json | jq -c '.findings[]'
+```
+
+- `-o -` 把报告写进 **stdout**（UTF-8 字节）：单目标一行 JSON，批处理为 JSONL
+  （每行一个目标，仅 `-f json`）；摘要 / 进度 / 错误全部走 stderr，`| jq` 拿到的
+  只有报告帧。`-f nuclei` 写目录，不支持 stdout。
+- `-o reports/scan.json` 自动创建缺失的父目录（旧行为是写失败并误报 exit 3）。
+- `--batch` / `--batch-stdin` 接受 UTF-8（带/不带 BOM）、UTF-16（BOM）、
+  GB18030/GBK 与 CRLF；无法解码时给明确错误，不再抛 traceback。
+- 退出码：`0` 成功、`1` 崩溃、`2` 用法/输入错误、`3` 扫描不完整（此时"无发现"
+  不是"无漏洞"）。无目标时 stdout 为空、错误在 stderr，不再倾倒整页 `--help`。
+- **Phase 360 补齐**：`--version` / `-V` 输出单行版本；`--ver` 仍等价于
+  `--verbose`（新增 `--version` 不会让历史缩写变成歧义错误）。`--config` 与
+  `--batch` 共用同一套输入解码（UTF-8 BOM / UTF-16 / GB18030），坏配置回 rc=2
+  + 明确原因，不再静默变成空配置或抛 traceback；配置里的 `format` / `timeout` /
+  `output` 等键现在生效（显式 CLI flag 仍优先，见 CHANGELOG 的 Changed 条目）。
+- `-o - -f nuclei` 与批量非 JSON 一样在**扫描开始前**回 rc=2；下游提前关闭管道
+  （`... | head`）视为正常结束（rc=0、stderr 一行说明），不再把剩余目标误报成
+  "扫描不完整"。所有人类文本在 `-o -` 时统一走 stderr（`__main__` /
+  `cli_runner` / `cli_commands` 三个模块由源码级守卫钉住),非 `-o -` 时
+  stdout 字节不变。
+- **功能面审计(Phase 360 后续)**:29 个功能面用例与 133 个 flag 各经真实
+  CLI 子进程调过一遍,0 崩溃 / 0 超时,8 种报告格式全部产出文件。坏
+  `--raw-request`、损坏的 `--resume` checkpoint、`--poc-dir` 目录不可用都回
+  诚实错误而不再 traceback 或误报 exit 3;`--ai-timeout` 现在对 `--ai-check`
+  生效;`--self-test` 自动避开被占用的 8899。审计覆盖**入口可达性**,不等于
+  所有 flag 组合的语义正确性(那由各功能专属测试与 194 例基准负责)。
+
 **批量输入（Phase 87 P0/P1）：**
 
 ```bash

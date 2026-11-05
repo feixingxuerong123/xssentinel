@@ -33,7 +33,9 @@ python -m xssentinel --self-test
 
 **It is slow** (minutes; default cap 900s, tunable via `XSSentinel_SELFTEST_TIMEOUT`),
 not a smoke test. If you only want to confirm the install worked,
-`python -m xssentinel --help` printing its help is enough.
+`python -m xssentinel --version` (a single-line version, handy for scripts)
+or `--help` is enough. `--self-test` picks a free loopback port (8899 first,
+another when occupied); set `XSSENTINEL_SELFTEST_PORT` to pin it.
 
 ---
 
@@ -55,6 +57,15 @@ xssentinel -u "https://target.example/search?q=1" \
 ```
 
 `-f` supports `html / json / csv / sarif / junit / markdown / burp / nuclei`.
+For machine-readable output in a pipeline, use `-o -` (summaries go to stderr,
+stdout carries only the report):
+
+```bash
+httpx -l targets.txt | xssentinel --batch-stdin -o - -f json | jq -c '.findings[]'
+```
+
+Batch URL lists accept UTF-8/UTF-16 BOM, GBK and CRLF; exit codes `0/1/2/3`
+mean ok / crash / usage error / incomplete scan.
 When unsure of the budget, use the presets instead of hand-tuning parameters:
 
 ```bash

@@ -797,6 +797,16 @@ JS config line(那本身就是 script-string sink),四例全 confirmed、safe
 | Juice Shop 持久化反馈载体 | 服务端 `sanitize-html` 在入库时剥离,18 载体 0 可执行——服务端行为,结论已定,不再投入实验(2026-11-03) |
 | Juice Shop accounting 角色 | 该版本不存在此角色,`/rest/accounting` 与 `/api/Accounting` 均 500(2026-11-03 实测) |
 | bWAPP medium/high 难度矩阵 | 本轮只接 low(security_level=0);权限维度已由 DVWA 三档矩阵覆盖(2026-11-03) |
+| shell completion(bash/zsh/fish) | Phase 360 明确不做:157 个 flag 的生成脚本本身要维护第三份清单,与「同一契约不手写两遍」冲突;现有 `--help` + 分组足够 |
+| `version` 子命令 / 位置参数形式的 URL | Phase 360 明确不做:两者都要新开一套解析路径,而 `--version` / `-V` 与 `-u` 已覆盖需求;加位置参数还会让未知首参数的报错语义变模糊 |
+| `--config` 支持 YAML | Phase 360 明确不做:引入 PyYAML 作为核心依赖(现为可选 `[nuclei]` extra),只为换一种书写格式不划算;JSON 已够 |
+| 关闭 argparse 缩写(`allow_abbrev=False`) | Phase 360 明确不做:实测 `--form` / `--max-p` 等缩写当前可用,禁用是破坏性变更;改为把有冲突风险的 `--ver` 显式注册成精确别名 |
+| 给规模快照加自指守卫 | 已有约定:文件数/行数是带日期的历史记录,自指守卫会让「加一个测试文件」反过来要求改文档(见 AGENTS.md 当前状态口径段) |
+| `--batch-stdin` 与 `-u` 并存时改成报错 | Phase 360 探针实测当前静默以 stdin 为准、忽略 `-u`;改成报错属 CLI 契约变化,且未量到真实受害场景,先记录不动 |
+| 缩短未知 flag 的 5.6KB usage | Phase 360 探针实测 usage 全在 stderr、stdout 为空,管道不受影响;改 `ArgumentParser.error()` 会波及全部用法错误,风险大于收益 |
+| 把 `--wayback` / `--gql` / `--headless` / `--webhook` / OOB 监听纳入 CLI 全 flag 冒烟 | Phase 360 功能面审计明确排除:这些需要外网、GraphQL 端点、真浏览器或会发真实流量,占位值测不出语义正确性;由各自专属测试覆盖,审计只负责「入口可达、无未捕获异常」 |
+| 穷举 161 个 flag 的组合语义 | 2^161 不可测;功能语义由 194 例基准与各功能专属测试钉住,CLI 审计只回答「能不能调到」 |
+| **Rust / 单二进制重写以提速** | 2026-11-06 实测(`dev/perf_breakdown.py` → `dev/_perf_breakdown.json`,交错 7 轮、首轮 loopback 抖动数据按劣化期协议作废不混算):单次扫描 CPU 固定 **~0.55s**,靶场加 30ms/请求延迟后墙钟 **+0.44s 而 CPU 不变** → I/O 主导。换算 README 60 例 346s(顺序、每例一个新子进程):冷启动 1.38s×60≈**83s(24%)**、CPU≈**33s(9.5%)**,其余为网络等待/浏览器/超时;**语言重写的 Amdahl 上限仅 1.10×**,且 CPU 里还有 lxml/bs4 的 C 扩展,Rust 得自己重写 HTML 解析器。旁证:transform 阶梯剪枝无收益已回退、async 仅 1.21×、**dalfox v2(Go 编译型) 同靶 1173s 反比本项目 Python 346s 慢 3.4×**。冷启动那 24% 用已有的 `--batch` / MCP / REST 常驻即可摊掉,不必换语言;真要单文件分发用 PyInstaller/Nuitka 打包现有 Python。仅当目标变成「大规模生产资产测绘」(README 已列为适用边界之外)才重议 |
 
 ---
 
@@ -1098,3 +1108,65 @@ async scan()        : [['reflected','high','high']]
    `_review_20261101/`)按既有规矩不动。
 5. 外部效度:与商业工具在同一独立靶上的对跑仍未发生;Juice Shop 20.2.0 单挑战验证(Phase 209)
    是现成起点,全集对跑是下一步。
+
+---
+
+## 8. Agent 接入面 backlog(2026-11-06 实测)
+
+> 触发问题:「作为一个能正常被智能体调用的 XSS 检测工具,还有哪些需要做的」。
+> 测量口径:`dev/agent_surface_probe.py` 用真实 `python -m xssentinel mcp`
+> 子进程发 11 帧(modern `server/discover` / `tools/list`、legacy
+> `initialize`、5 个错误形状的 `tools/call`、2 个真实 loopback 调用、带
+> `progressToken` 的调用),产物 `dev/_agent_surface_probe.json`。
+> **不凭观感列愿望清单**:下面每条都附实测数字与代码位置。
+
+### 8.0 先明确「已经具备」,避免重复投入
+
+7 个细粒度工具(`discover` / `profile` / `param_mine` / `csp_analyze` /
+`scan` / `verify` / `propose`)、每个工具 `inputSchema` + `outputSchema`、
+成功结果的 `structuredContent`、未知键即报错并给可接受键名清单
+(实测 `cokies` → 252 字节文本含完整 accepted 列表)、wall-clock
+`max_seconds` 预算、stdio 进度通知与按 request id 取消、dual-era 协议、
+UTF-8 字节 stdio、`output_safety` / `untrusted_fields` 提示注入标注、
+[SKILL.md](../skills/xssentinel-mcp/SKILL.md) Agent 编排指南、REST 异步
+job 模型(`POST /api/v1/scans` → status/findings/report)、CLI 机器通道
+(Phase 359/360)。**这些不需要再做。**
+
+### 8.1 P0 —— 安全与结果诚实性
+
+| # | 缺口(实测) | 改法 / 目标文件 | 验收 |
+|---|---|---|---|
+| 1 | **授权范围没有服务端强制**。`_TOOL_SCAN_SCHEMA` 的 11 个 property 里没有 `allow_host`;服务端信任「Agent 传的 URL = operator 授权」。`_INSTRUCTIONS` 与 `output_safety` 只是自然语言叮嘱,而 Agent 是会被目标页面 prompt injection 诱导的自主主体,工具又会主动发攻击载荷。CLI 侧已有 `--allow-host` / `--allow-any-host` 与 `egress.boundary_stops`,MCP 既没暴露也没默认约束 | MCP 启动时由 **operator** 钉定 allowlist(启动参数 / 环境变量,不接受 `tools/call` 覆盖);每次调用前对 URL 与重定向做范围校验,越界回结构化 `-32040` 并列出当前允许范围;`server/discover` 的 `instructions` 声明当前范围。复用 `core/requester.py` 的 egress 判定,不另写一套 | 真实 MCP 帧:越界 URL 被拒且**零请求发出**;同主机放行;重定向跨界被 `boundary_stops` 记录;legacy 帧字节不变 |
+| 2 | **错误结果只有纯文本**。实测 5 个错误帧全是 `isError:true` + `content[0].text`,`structuredContent` 缺席(成功帧必有)。Agent 自我纠正要解析 `"unknown argument(s): cokies. accepted: ..."` 这类自然语言 | 给错误结果**追加** `structuredContent: {error:{code, message, field, accepted_keys, hint, retryable}}`;`content` 文本保持原样(Phase 358 的 legacy 字节契约不破)。落点 `api/mcp_server.py::_tool_call` / `_rpc_error` 附近 | 每类错误(未知工具/未知键/缺必填/非法 URL/超时/扫描失败)都有稳定 `code` 与 `retryable`;现有 MCP 88 例全绿;变异对照删掉结构化字段即红 |
+| 3 | **finding 静默截断**。`api/mcp_server.py:1074` 直接 `[:_MAX_FINDINGS]`(200),`finding_count` 是截断后的值,没有 `truncated` / `total_findings`。Agent 会把「200」读成全部,与项目「零/截断不许假装完整」的规矩冲突 | 结果加 `total_findings` / `truncated` / `truncation_hint`(建议缩小 `max_payloads` 或按参数分次调);`run_param_mine_tool` 的同类切片一并处理;扩 `outputSchema` 并由 catalog parity 守卫钉住 | 构造 201+ finding 的目标,断言 `truncated=true` 且 `finding_count < total_findings`;200 以内为 `false`;变异对照去掉标记即红 |
+
+### 8.2 P1 —— 长任务与平台契约
+
+| # | 缺口(实测) | 改法 / 目标文件 | 验收 |
+|---|---|---|---|
+| 4 | **默认预算与 Agent 平台超时错位**。`max_seconds` 默认 **300s**,而主流 MCP 客户端单次工具调用常在 30–120s 超时;HTTP transport 明说不做 mid-flight cancellation。客户端断连后服务端仍会继续发攻击载荷直至预算耗尽 | ① `server/discover` 声明 `recommendedTimeoutMs` 与默认预算,允许 `_meta` 指定客户端预算并取 `min(client, server)`;② HTTP 侧检测断连即 abort;③ 给 Agent 一条**异步路径**:新增 `xssentinel_scan_async` / `xssentinel_scan_status`,**复用已有 REST job 模型**而非新造队列 | 客户端带 30s 预算时服务端 30s 内结束且不谎报「无发现」;HTTP 断连后无继续外发;async 工具能 submit → poll → 取回同一份 finding |
+| 5 | **7 个工具全无 `title` / `annotations`**(实测 `has_title=False`、`has_annotations=False`)。MCP 平台靠 `destructiveHint` / `openWorldHint` / `idempotentHint` / `readOnlyHint` 决定是否弹确认、能否缓存与并行;不声明会把「主动外发攻击载荷」当成安全的只读工具 | 在 `TOOL_DEFINITIONS` 数据里补齐注解:`readOnlyHint=false`、`destructiveHint=true`、`openWorldHint=true`、`idempotentHint=false`(`profile`/`csp_analyze` 可按实际逐项微调);现代帧才附加,legacy `tools/list` 字节不变 | `tools/list` 每个工具有注解;catalog parity 守卫钉住 7 个工具注解齐全且值正确;legacy 帧与修前逐字节相同 |
+| 6 | **进度通知没有 `total`**。实测 5 条 `notifications/progress` 只有 `progress`(已发请求数)与一条起始信标,客户端无法算百分比、Agent 难判断「卡住 vs 在跑」 | `notifications/progress` 带 `total`(按 `max_payloads × params` 估算,可随扫描更新)与单位说明 `message`;不改已发的 `progress` 语义 | 带 `progressToken` 的调用收到 `total>0` 且 `progress<=total`;无 token 时零通知 |
+| 7 | **重试不幂等**。相同 `tools/call` 重复发(探针 id 10/11)会各跑一次真实扫描,重复外发攻击载荷。Agent 超时重试是常态 | 以 `(tool, normalized args hash)` 或 `_meta.requestKey` 做短期结果复用(带 TTL 与显式 `cacheScope`,沿用 `ttlMs` 语义);只缓存成功与确定性错误,超时/取消不缓存 | 同参数第二次调用 `cache_hit=true`、`requests_made` 不增;不同参数不误命中 |
+
+### 8.3 P2 —— 编排效率与可观测性
+
+| # | 缺口 | 说明 |
+|---|---|---|
+| 8 | 结果缺 `run_id` / `elapsed_ms` / `budget_used` / `next_actions` | 实测成功 `structuredContent` 仅 `finding_count`/`findings`/`target`/`requests_made`/`waf` + 两个安全字段。`run_id` 可把进度通知、取消、日志与结果关联;`next_actions`(如 `reflected=false` → 先 `profile`)让编排更稳,但要避免把「建议」写成模型会盲从的指令 |
+| 9 | 跨工具无共享上下文 | 每次调用重传 `url` + `cookies` + `headers`,认证材料在 Agent 上下文里反复出现(token 成本 + 泄露面)。可考虑 opaque target handle,但 2026 规范趋向无状态,**先评估再决定**,别急着加会话 |
+| 10 | `instructions` 太薄 | 实测只有授权与「输出不可信」两句(`_INSTRUCTIONS`,1531 行)。可补成本量级、推荐工作流、当前授权范围、超时预算;但这是提示层,**不能替代 8.1-1 的服务端强制** |
+| 11 | 凭据回显面未测 | 需确认错误文本、`waf`、`evidence` 在任何路径下都不回显 `cookies` / `headers` 里的凭据;先做一次针对性审计再定是否需要改 |
+
+### 8.4 明确不做(沿用既有决策,不重复讨论)
+
+- 2026 规范的 MRTR、`subscriptions/listen`、SSE 流(Phase 358 已定性为「新传输」,本轮只解决连得上);
+- 恢复 `initialize` 握手(dual-era 已覆盖新旧客户端);
+- 让 LLM 判定漏洞——`confirmed` 必须由确定性 token oracle 给出(`xssentinel_propose` 已是这个形态),绝不改成模型说了算;
+- shell completion / 位置参数 URL / `--config` YAML / 禁用 argparse 缩写(§4);
+- 穷举 161 个 CLI flag 的组合语义(§4,入口可达性已由 Phase 360 功能面审计覆盖)。
+
+### 8.5 建议顺序与需要拍板的一处
+
+先做 **2 → 3 → 5**(纯增量、零行为争议、验收明确),再做 **6 → 4 → 7**,最后评估 8–11。
+**8.1-1 的默认策略需要仓库归属者拍板**:「默认拒绝所有目标、必须由 operator 显式配置 allowlist」最安全,但会让现有 MCP 配置开箱即坏;「默认放行 + `server/discover` 明示当前范围 + 可选 allowlist」兼容性好但不是强制边界。在拍板前不要动这一条。
