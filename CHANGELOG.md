@@ -16,6 +16,23 @@
 
 ## [Unreleased]
 
+## [1.4.3] - 2026-11-06
+
+### Fixed
+- **Phase 363 / XSSMaze 漏报修复**:反射 profile 新增 `quotes_dead`
+  与 `equals_dead` 两类形状判定;`bracket_dead` 命中时把全角括号语料
+  (`unicode-fullwidth-001`)与裸 attr-name 形状一起前置;验证器增加
+  NFKC 归一化候选。XSSMaze server 面 1013 例实测:TP 959 → 968,
+  FN 54 → 45,FP 0 → 0。
+- **Phase 363 / 存储型 high 档成本**:`scanner_stored` 在展开前先发一条
+  引号探针,若目标把 `<`、`'`、`"` 全部实体化则跳过 polyglot 尾
+  (bWAPP high stored 663 → 237 req、26.8 → 5.8 s);low/medium 行为不变。
+
+### Added
+- 语料:`url-008` / `url-009`(`java&#x09;script:` 变体)、
+  `attr-name-noeq-001`(`=` 被剥离时的引号逃逸形状)、
+  `unicode-fullwidth-001`(全角括号 + NFKC 形状)。
+
 ## [1.4.2] - 2026-11-06
 
 ### Added
