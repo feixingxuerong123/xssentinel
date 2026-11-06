@@ -16,6 +16,7 @@ import binascii
 import hashlib
 import os
 import re
+import unicodedata
 import urllib.parse
 
 from . import context as ctx
@@ -571,6 +572,16 @@ def _survival_candidates(payload: str) -> list:
     out = {payload,
            urllib.parse.quote(payload, safe=""),
            urllib.parse.quote_plus(payload, safe="")}
+    # NFKC-normalising sinks: a fullwidth "＜script＞" is echoed as ASCII
+    # "<script>" AFTER the app normalises it, so the sent form never matches
+    # (measured Phase 363, XSSMaze unicode/level2).  Only add the form when
+    # normalisation actually changes the string.
+    try:
+        nfkc = unicodedata.normalize("NFKC", payload)
+    except Exception:
+        nfkc = payload
+    if nfkc != payload:
+        out.add(nfkc)
     try:
         once = urllib.parse.unquote(payload)
         out.add(once)

@@ -47,7 +47,14 @@ _EXPECTED_FAMILY_SIZE = 48
 # after the change and stayed exactly on its pre-change verdicts
 # (sync TP113/FP0/TN81/FN0, async TP107/FP0/TN75/FN0, both F1=1.000 --
 # benchmark/results/phase362_matrix_{sync,async}.json).
-_EXPECTED_HTML_ELEMENT_SIZE = 212
+# 213, not 212: `unicode-fullwidth-001` (Phase 363 -- fullwidth angle
+# brackets for a sink that strips ASCII brackets and then NFKC-normalises,
+# measured live on XSSMaze unicode/level2; it rides the same bracket-dead
+# injection path).  Tail-appended.  The 194-case matrix was re-measured on
+# the final Phase 363 tree and stayed exactly on its pre-change verdicts
+# (sync TP113/FP0/TN81/FN0, async TP107/FP0/TN75/FN0, 12 async SKIP --
+# benchmark/results/gate_p363final_20261106_matrix_{sync,async}.json).
+_EXPECTED_HTML_ELEMENT_SIZE = 213
 
 
 def test_family_loads_and_is_registered():

@@ -1529,8 +1529,11 @@ class AsyncDetectionLayersMixin:
         # confirm in an HPP re-fire -- both orderings render or filter the
         # value as text, neither turns it into a live attribute (sync
         # _try_hpp parity).  Skip them so the two-payload cap spends on
-        # shapes that can.
+        # shapes that can.  Phase 363 adds the fullwidth-bracket shape to
+        # the same skip set.
         _bare_hpp = {p["payload"] for p in rp_mod.bare_attrname_payloads(
+            context)}
+        _bare_hpp |= {p["payload"] for p in rp_mod.unicode_bracket_payloads(
             context)}
         if _bare_hpp:
             cands = [c for c in cands if c not in _bare_hpp]
@@ -1734,6 +1737,18 @@ class AsyncDetectionLayersMixin:
                         cands = _bare_strs + cands
                         for _bs in _bare_strs:
                             families[_bs] = context
+                    # Phase 363: fullwidth angle brackets survive a sink
+                    # that strips ASCII brackets and then NFKC-normalises
+                    # (sync parity; XSSMaze unicode/level2, measured).
+                    _uni = await asyncio.to_thread(
+                        rp_mod.unicode_bracket_payloads, context)
+                    _uni_strs = [p["payload"] for p in _uni
+                                 if p.get("payload")
+                                 and p["payload"] not in _known]
+                    if _uni_strs:
+                        cands = _uni_strs + cands
+                        for _us in _uni_strs:
+                            families[_us] = context
                 try:
                     gen_pls = await asyncio.to_thread(gen_mod.generate, prof,
                                                       context)

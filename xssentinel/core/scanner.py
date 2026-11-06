@@ -935,6 +935,11 @@ class Scanner(StoredBlindMixin, StoredAutoMixin, AdvancedLayerMixin, CrawlMixin)
                     detail=("quote-escaping filter detected -> marker form "
                             "fan-out (single/double/backtick/numeric)"))
         tried = 0
+        # Phase 363: with every quoting style gone the quoted marker is a
+        # syntax error at a block-statement sink, while the payload's own
+        # unquoted argument survives; keep the author's style for those
+        # pages (zero extra requests -- only the marker's shape changes).
+        _native_marker = rp_mod.quotes_dead(profile)
         for base in ([] if confirmed else bases):
             if tried >= effective_max:
                 break
@@ -961,7 +966,7 @@ class Scanner(StoredBlindMixin, StoredAutoMixin, AdvancedLayerMixin, CrawlMixin)
                                  marker_forms=marker_form_budget,
                                  preserve_style=bool(
                                      isinstance(base, dict)
-                                     and base.get("id") == "custom")):
+                                     and base.get("id") == "custom") or _native_marker):
                 # Phase 20-3: mark this param as confirmed.
                 self.coverage.record_param(url, param, in_body=is_body,
                                            method=method, confirmed=True)
@@ -1198,6 +1203,22 @@ class Scanner(StoredBlindMixin, StoredAutoMixin, AdvancedLayerMixin, CrawlMixin)
                          if p.get("payload") not in _known]
                 if _bare:
                     bases = _bare + bases
+                # Phase 363: ASCII brackets are stripped, but the sink
+                # NFKC-normalises -- fullwidth angle brackets become markup
+                # after that pass (XSSMaze unicode/level2, measured).
+                _uni = [p for p in rp_mod.unicode_bracket_payloads(context)
+                         if p.get("payload") not in _known]
+                if _uni:
+                    bases = _uni + bases
+            # Phase 363: "=" stripped while brackets survive -> an
+            # attribute-NAME injection cannot assign a handler, so the
+            # quote-breakout shape that needs no "=" leads instead.
+            elif rp_mod.equals_dead(profile):
+                _known = {b.get("payload") for b in bases}
+                _noeq = [p for p in rp_mod.no_equals_payloads(context)
+                         if p.get("payload") not in _known]
+                if _noeq:
+                    bases = _noeq + bases
             # Phase 32: generative payloads built from SURVIVING chars
             # only -- they can slip past the filter that blocks the
             # corpus entries, so they lead the queue (dedup'd).
@@ -1433,11 +1454,14 @@ class Scanner(StoredBlindMixin, StoredAutoMixin, AdvancedLayerMixin, CrawlMixin)
         # Phase 362: the bracket-dead injected attr-name shapes cannot
         # confirm in an HPP re-fire -- both orderings render or filter the
         # value as text, neither turns it into a live attribute.  Skip
-        # them so the two-payload cap spends on shapes that can.
+        # them so the two-payload cap spends on shapes that can.  Phase
+        # 363 adds the fullwidth-bracket shape to the same skip set.
         bases = [b for b in bases
                  if not (isinstance(b, dict)
-                         and rp_mod.ATTR_NAME_INJECTION_TAG
-                         in (b.get("tags") or []))]
+                         and (rp_mod.ATTR_NAME_INJECTION_TAG
+                              in (b.get("tags") or [])
+                              or rp_mod.UNICODE_BRACKET_TAG
+                              in (b.get("tags") or [])))]
         self.coverage.touch_layer(
             url, "L2_hpp", method,
             detail=f"param='{param}' duplicated, both orderings probed: "
@@ -1709,7 +1733,20 @@ class Scanner(StoredBlindMixin, StoredAutoMixin, AdvancedLayerMixin, CrawlMixin)
             (form, eff, fm, ["marker:" + form])
             for form, eff, fm in extra_forms if eff in fm]
         if token not in marked:
-            plain_probes = []
+            # Phase 363: a corpus payload whose callable is confirm()/prompt()
+            # is invisible to the legacy alert-only marker, which used to
+            # leave its plain probe unstamped and therefore unverifiable.
+            # Stamp it in its own style instead of dropping the probe (the
+            # XSSMaze inframe/level4 sink strips the literal word "alert"
+            # but leaves confirm() intact).
+            _fb = verifier.stamp_forms(payload, token, 1)
+            if _fb and _fb[0][1] in _fb[0][2]:
+                primary_form, token, marked = _fb[0]
+                extra_forms = []
+                plain_probes = [(primary_form, token, marked, [])]
+            else:
+                plain_probes = []
+        _retry_done = False
         for form, eff, probe_payload, chain in plain_probes:
             probe = self._set_param(params, data, param, probe_payload, is_body)
             try:
@@ -1720,14 +1757,59 @@ class Scanner(StoredBlindMixin, StoredAutoMixin, AdvancedLayerMixin, CrawlMixin)
                 raise
             except Exception:
                 continue
+            text = presp.text or ""
             v = verifier.verify_semantic(
-                presp.text or "", eff,
+                text, eff,
                 response_headers=dict(getattr(presp, "headers", {}) or {}))
             if v["confirmed"] and verifier.payload_survived(
-                    presp.text or "", probe_payload):
+                    text, probe_payload):
                 self._record(req, url, method, param, is_body, "reflected",
                              context, probe_payload, chain, v, presp, eff)
                 return True
+            # Phase 363: two response-driven retries.  Each costs ONE probe
+            # and fires only on the symptom it exists for, so healthy pages
+            # (and the 194-case matrix) pay exactly what they paid before.
+            retry = None
+            if (not _retry_done and form != "numeric"
+                    and probe_payload[:14] in text
+                    and not verifier.payload_survived(text, probe_payload)):
+                # (a) truncated reflection: the value starts intact and is
+                # cut a few chars in, so the quoted marker (13 chars) never
+                # lands whole.  The numeric marker is 12 chars shorter and
+                # fits the observed 30-char windows (measured XSSMaze
+                # realworld/level3 + truncation/level4).
+                _m2, _e2, _f2 = verifier.stamp_form(probe_payload, token, "numeric")
+                if _m2 != probe_payload and _e2 in _m2:
+                    retry = (_m2, _e2, chain + ["marker:numeric"])
+            elif (not _retry_done and presp.status_code in (403, 406, 429)
+                    and len(probe_payload) <= 110):
+                # (b) request-facade WAF: the payload was refused because the
+                # inspection window saw it; re-send the same value behind a
+                # benign prefix that pushes it past the window (measured
+                # XSSMaze waf-facade/level2: 403 below ~100 bytes, 200 above).
+                retry = ("a" * 100 + probe_payload, eff, chain + ["pad:100"])
+            if retry is not None:
+                _retry_done = True
+                rp_payload, rp_eff, rp_chain = retry
+                rprobe = self._set_param(params, data, param, rp_payload, is_body)
+                try:
+                    rresp = req.request(method, url, params=rprobe["params"],
+                                        data=rprobe["data"])
+                    self._bump()
+                except (BudgetExhausted, CircuitOpen):
+                    raise
+                except Exception:
+                    rresp = None
+                if rresp is not None:
+                    rt = rresp.text or ""
+                    rv = verifier.verify_semantic(
+                        rt, rp_eff,
+                        response_headers=dict(getattr(rresp, "headers", {}) or {}))
+                    if rv["confirmed"] and verifier.payload_survived(rt, rp_payload):
+                        self._record(req, url, method, param, is_body,
+                                     "reflected", context, rp_payload,
+                                     rp_chain, rv, rresp, rp_eff)
+                        return True
 
         # Build the variant list.  We combine three sources, in order:
         #   1. The static _DEFAULT_TRANSFORMS list (backwards-compatible,

@@ -188,6 +188,18 @@ def triage_line(profile: dict | None) -> str | None:
 #: ordinary pages they cost at most two unconfirmed slots.
 ATTR_NAME_INJECTION_TAG = "attr_name_injection"
 
+#: Quote-breakout shape for a point that strips ``=`` but keeps the angle
+#: brackets: no assignment is possible, so the breakout ends the enclosing
+#: tag and starts a new one whose body call needs no attribute value.
+NO_EQUALS_BREAKOUT_TAG = "no_equals_breakout"
+
+#: Sink whose ASCII angle brackets are stripped but which NFKC-normalises
+#: the value afterwards, so fullwidth angle brackets turn into real markup
+#: (measured Phase 363, XSSMaze unicode/level2).  Like the attr-name shapes
+#: this is inert as reflected text and only worth a slot where the profile
+#: proves ``<`` is stripped.
+UNICODE_BRACKET_TAG = "unicode_normalize"
+
 
 def bracket_dead(profile: dict | None) -> bool:
     """True when the profile shows angle brackets STRIPPED.
@@ -217,6 +229,51 @@ def bracket_dead(profile: dict | None) -> bool:
     return "<" in set(profile.get("chars_stripped", []))
 
 
+def quotes_dead(profile: dict | None) -> bool:
+    """True when the reflection shows every quoting style gone.
+
+    A block-statement context (``var x=<param>``) needs no quotes, so the
+    quoted marker (``alert('xssv_..')``) is a syntax error there while the
+    payload's own unquoted argument survives.  Measured Phase 363 on the
+    XSSMaze script-block family where the page strips/encodes ``'`` ``"``
+    and the backtick yet echoes ``(`` ``)`` ``;`` intact.
+
+    Guarded like ``bracket_dead``: the probe must have come back, and a
+    full reflection (nothing filtered) is not this shape.
+    """
+    if not profile or profile.get("full_reflection"):
+        return False
+    if not profile.get("reflected"):
+        return False
+    kept = set(profile.get("chars_kept", []))
+    return not (kept & {"'", '"', "`"})
+
+
+def equals_dead(profile: dict | None) -> bool:
+    """True when ``=`` is stripped while ``<``/``>`` survive.
+
+    An attribute-NAME injection point cannot assign a handler once ``=``
+    is gone, so the executable shape is a quote breakout plus a tag that
+    needs no assignment (measured Phase 363, XSSMaze attrname/level4:
+    ``'><svg><script>alert(1)</script></svg>``).
+    """
+    if not profile or profile.get("full_reflection"):
+        return False
+    if not profile.get("reflected"):
+        return False
+    stripped = set(profile.get("chars_stripped", []))
+    kept = set(profile.get("chars_kept", []))
+    return "=" in stripped and "<" in kept and ">" in kept
+
+
+def no_equals_payloads(context: str) -> list[dict]:
+    """Corpus payloads tagged :data:`NO_EQUALS_BREAKOUT_TAG` for a context."""
+    from . import payloads as _payloads_mod
+    return [p for p in _payloads_mod.by_context(context)
+            if NO_EQUALS_BREAKOUT_TAG in (p.get("tags") or [])
+            and p.get("payload")]
+
+
 def bare_attrname_payloads(context: str) -> list[dict]:
     """Corpus payloads tagged :data:`ATTR_NAME_INJECTION_TAG` for a context.
 
@@ -226,6 +283,14 @@ def bare_attrname_payloads(context: str) -> list[dict]:
     from . import payloads as _payloads_mod
     return [p for p in _payloads_mod.by_context(context)
             if ATTR_NAME_INJECTION_TAG in (p.get("tags") or [])
+            and p.get("payload")]
+
+
+def unicode_bracket_payloads(context: str) -> list[dict]:
+    """Corpus payloads tagged :data:`UNICODE_BRACKET_TAG` for a context."""
+    from . import payloads as _payloads_mod
+    return [p for p in _payloads_mod.by_context(context)
+            if UNICODE_BRACKET_TAG in (p.get("tags") or [])
             and p.get("payload")]
 
 
