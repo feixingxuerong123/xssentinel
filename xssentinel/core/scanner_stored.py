@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING
 from . import payloads
 from . import verifier
 from . import transform
+from . import reflection_profile as rp_mod
 from .stored_discovery import (STORED_AUTO_BASES, resp_fingerprint,
                               same_origin, view_poll_delays)
 from . import csp as csp_mod  # noqa: F401  (Mixin 运行时引用:scanner 由 Mixin 组合,静态分析看不见)
@@ -183,14 +184,15 @@ class StoredBlindMixin:
             # text-node breakouts, and the identity transform keeps the
             # request count at one POST + one GET per view per shape.
             bases = [dict(p) for p in STORED_AUTO_BASES]
+            polyglots = []
             transform_cap = 1
         else:
             bases = (payloads.by_context("html_element")
                      + payloads.by_context("script_block")
                      + payloads.by_context("event_handler")
                      + payloads.by_context("svg_context"))[:self.max_payloads]
-            bases += [p for p in payloads.all_polyglots()
-                      if "html_element" in p.get("contexts", [])]
+            polyglots = [p for p in payloads.all_polyglots()
+                         if "html_element" in p.get("contexts", [])]
             transform_cap = self.max_transforms
         # Phase 156: skip pairs that prove nothing new.  Measured on
         # benchmark neg-stored-01 (49 payloads x 12 transform sets):
@@ -225,6 +227,64 @@ class StoredBlindMixin:
                     baseline[cand] = resp_fingerprint(snap)
                 except Exception:
                     baseline[cand] = None
+
+        def _write_variant(variant: str):
+            """One write of ``variant`` through the carrier this face uses."""
+            if header_param:
+                # Phase 277: header-borne writes (True-Client-IP, XFF, ...).
+                # Companion fields have no meaning in a header write, so they
+                # are sent as the body only when --stored-extra was used.
+                hdrs = {header_param: variant}
+                extras_body = dict(extra_fields or {})
+                if method.upper() == "POST" and extras_body:
+                    return req.request(method, inject_url, data=extras_body,
+                                       headers=hdrs)
+                return req.request(method, inject_url, headers=hdrs)
+            if method.upper() != "GET":
+                # Phase 241/274/281: body-borne writes, JSON when the page's
+                # own write face was JSON; companion fields ride along and the
+                # payload always wins on `param`.
+                body = dict(extra_fields or {})
+                body[param] = variant
+                if data_json:
+                    return req.request(method, inject_url, json=body)
+                return req.request(method, inject_url, data=body)
+            return req.request(method, inject_url, params={param: variant})
+
+        # Phase 363: quote probe before the 49-base / 12-transform ladder.
+        # Measured on a stored NEGATIVE (bWAPP high, 2026-11-06): 663 requests
+        # / 26.8 s, of which the polyglot tail is 71% (mp=0 control: 469 req).
+        # Every polyglot shape breaks out through ``<`` or a ``'``/``"`` quote,
+        # so if the observed reflection point entity-encodes ``<`` AND both
+        # quote styles no polyglot can execute there -- the same verdict-neutral
+        # argument the transform filter below already uses ("a pair that
+        # cannot confirm only ever returns not confirmed").  The corpus bases
+        # (which include the ``javascript:`` / URL shapes) still run in full,
+        # and a sink that keeps ``<`` or any quote keeps the whole ladder.
+        polyglot_tail_dead = False
+        if not auto:
+            _ptok = "xssv_" + secrets.token_hex(4)
+            try:
+                _write_variant(rp_mod.build_probe(_ptok))
+                self._bump()
+                if hasattr(req, "invalidate"):
+                    req.invalidate(view_url)
+                _vresp = view_req.get(view_url, cache_get=False)
+                self._bump()
+                _profile = rp_mod.profile_reflection(_vresp.text or "", _ptok)
+            except Exception:
+                _profile = None
+            if _profile and _profile.get("reflected"):
+                _kept = set(_profile.get("chars_kept") or [])
+                # Only the two quote STYLES the polyglots actually use matter
+                # here; a bare backtick cannot break out of HTML markup.
+                if "<" not in _kept and "'" not in _kept and '"' not in _kept:
+                    polyglot_tail_dead = True
+                    _log.debug("stored: quote probe says < and quotes are "
+                               "entity-encoded; skipping polyglot tail")
+        if polyglots and not polyglot_tail_dead:
+            bases = bases + polyglots
+
         # Phase 356: marker-form fan-out.  A stored view that applies
         # addslashes turns alert('tok') into a syntax error while leaving the
         # unquoted/double/backtick shapes executable.  Each base payload gets
@@ -286,40 +346,7 @@ class StoredBlindMixin:
                 seen_variants.add(key)
                 presp = None
                 try:
-                    if header_param:
-                        # Phase 277: header-borne writes.  Some endpoints take
-                        # the attacker string from a request header
-                        # (True-Client-IP, X-Forwarded-For, Referer, ...) and
-                        # persist it for a later view -- the payload cannot
-                        # ride in a body or query there.  Companion fields have
-                        # no meaning in a header write, so they are sent as the
-                        # body only when --stored-extra was used.
-                        hdrs = {header_param: variant}
-                        extras_body = dict(extra_fields or {})
-                        if method.upper() == "POST" and extras_body:
-                            presp = req.request(method, inject_url,
-                                                data=extras_body, headers=hdrs)
-                        else:
-                            presp = req.request(method, inject_url, headers=hdrs)
-                    elif method.upper() != "GET":
-                        # Phase 241: data_json sends the injection as a JSON
-                        # body, matching the encoding the page itself used
-                        # for this field (an observed SPA write face).
-                        # Phase 274: companion fields ride along in both
-                        # encodings; the payload always wins on `param`.
-                        # Phase 281: any non-GET method carries a body --
-                        # PUT/PATCH are REST update writes, and sending their
-                        # payload as a query param (the old `else` branch)
-                        # could never reach a JSON/form body parser.
-                        body = dict(extra_fields or {})
-                        body[param] = variant
-                        if data_json:
-                            presp = req.request(method, inject_url, json=body)
-                        else:
-                            presp = req.request(method, inject_url, data=body)
-                    else:
-                        presp = req.request(method, inject_url,
-                                            params={param: variant})
+                    presp = _write_variant(variant)
                     injected.append((variant, token, tset))
                     self._bump()
                     # Phase 21-3: invalidate any cached GET for the view URL
