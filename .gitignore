@@ -92,6 +92,14 @@ xssentinel/data/llm_providers.json
 # dev/ 沿用根目录约定:_ 前缀 = 探针/日志/产物,不入库。
 # (2026-10-31 核对:当前无任何 tracked 的 dev/_ 文件。)
 /dev/_*
+# 例外(2026-11-08):wrapper.py 是官方 XSSMaze 跑分的**测量口径实现**,
+# 被 CHANGELOG 1.4.4、AGENTS.md 状态段、跑分报告与
+# tests/test_xssmaze_post_aware_wrapper.py 直接引用;它不入库会让该守卫在
+# CI 上因文件缺失整组报错,且 opt-in POST-aware 口径不可复现。只放这一个文件,
+# 同目录其余探针/日志/产物仍按约定不入库。
+!/dev/_xssmaze/
+/dev/_xssmaze/*
+!/dev/_xssmaze/wrapper.py
 
 # 跑分产物里的机器相关/证据日志,不入库(历史追踪文件不受影响)
 benchmark/results/*_log.txt

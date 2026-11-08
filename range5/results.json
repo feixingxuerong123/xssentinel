@@ -1,10 +1,9 @@
 {
   "meta": {
     "range": "range5",
-    "generated": "2026-11-03 00:11:19",
+    "generated": "2026-11-07 03:13:10",
     "engines": [
-      "sync",
-      "async"
+      "sync"
     ],
     "max_payloads": 8,
     "max_transforms": 4,
@@ -13,13 +12,6 @@
   },
   "counts": {
     "sync": {
-      "TP": 1,
-      "FP": 0,
-      "TN": 1,
-      "FN": 0,
-      "ERROR": 0
-    },
-    "async": {
       "TP": 1,
       "FP": 0,
       "TN": 1,
@@ -34,7 +26,7 @@
       "verdict": "TP",
       "findings": 2,
       "confirmed": 1,
-      "elapsed_s": 5.3,
+      "elapsed_s": 3.5,
       "retries": 0,
       "findings_detail": [
         {
@@ -58,42 +50,7 @@
       "verdict": "TN",
       "findings": 0,
       "confirmed": 0,
-      "elapsed_s": 9.2,
-      "retries": 0,
-      "findings_detail": [],
-      "error": ""
-    },
-    {
-      "engine": "async",
-      "case_id": "r5-pos-lit-unsafehtml",
-      "verdict": "TP",
-      "findings": 2,
-      "confirmed": 1,
-      "elapsed_s": 11.4,
-      "retries": 0,
-      "findings_detail": [
-        {
-          "type": "framework_lit_xss",
-          "severity": "medium",
-          "context": "framework_lit",
-          "headless_outcome": null
-        },
-        {
-          "type": "dom_dynamic",
-          "severity": "high",
-          "context": "Element.innerHTML",
-          "headless_outcome": "fired"
-        }
-      ],
-      "error": ""
-    },
-    {
-      "engine": "async",
-      "case_id": "r5-neg-lit-text",
-      "verdict": "TN",
-      "findings": 0,
-      "confirmed": 0,
-      "elapsed_s": 14.9,
+      "elapsed_s": 3.9,
       "retries": 0,
       "findings_detail": [],
       "error": ""
