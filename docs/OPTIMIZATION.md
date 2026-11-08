@@ -1187,3 +1187,15 @@ legacy 错误结果没有 `structuredContent`。
 `discovered_count` 从「总数」改为「实际返回条数」(此前返回前 200 行却报
 总数),已在 `CHANGELOG.md` 的 `[Unreleased] / Changed` 明示。
 下一步仍是 **#6 → #4 → #7 → 评估 8–11**;**8.1-1 的默认策略仍未拍板,继续不动**。
+
+### 8.7 处置记录(2026-11-08 续):#6 完成
+
+`notifications/progress` 现带 `total` 与单位说明 `message`。估算走
+`_tool_call` 层的一次 scoped emit 包装:`max_payloads × params`
+(复用 Phase 365 的 `split_target_url`,不另写 URL 解析)、`param_mine` 用
+`max_params`;`total` 是**估计上界**,真实请求超过时自动抬高,保证
+`progress <= total` 恒成立。`progress` 语义、起始信标、无 token 零通知、
+runner / `_RequestGuard` / transport 全部不变。守卫
+`test_phase375_mcp_progress_total.py`(4 例,真实 stdio 会话)与变异对照
+`dev/phase375_mutation.py`(**1/1**,删掉 `total` 即红)同轮落地。
+下一步 **#4 → #7 → 评估 8–11**;**#1 仍未拍板,继续不动**。

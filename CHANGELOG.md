@@ -24,6 +24,11 @@
 - **Phase 374 / 工具注解**:现代 `tools/list` 为 7 个工具补 `title` 与
   `annotations`(`readOnlyHint=false` / `destructiveHint=true` /
   `openWorldHint=true` / `idempotentHint=false`);legacy 目录逐字节不变。
+- **Phase 375 / 进度通知带 total**:`notifications/progress` 增 `total`
+  (按 `max_payloads × params` 估算,复用 `split_target_url`;真实请求超出估算
+  时自动抬高,保证 `progress <= total`)与单位说明 `message`;`progress`
+  仍是「已发请求数」、起始信标仍是 0,无 `progressToken` 时零通知。
+  runner / `_RequestGuard` / transport 均未改。
 
 ### Changed
 - **Phase 373 / 截断显式化**:`scan` 与 `param_mine` 结果补 `total_findings` /
@@ -38,6 +43,12 @@
   **3/3 通过**(baseline 绿 → 删结构化字段 / 置 `truncated=False` / 关掉
   modern 分支各自红 → restored 绿,源码字节已还原);既有 MCP 契约 86 例全绿;
   ruff 全仓零基线。
+- Phase 375 追加:`test_phase375_mcp_progress_total.py` **4 passed / 0 skip**
+  (真实 stdio 会话),`dev/phase375_mutation.py` **1/1**(删掉 `total` → 红 →
+  还原绿);19 文件回归 **182 passed / 1 failed / 1 rerun**,102.3s。唯一的红
+  仍是 `test_phase327` 的 loopback 环境形态(该用例直接调 `run_scan_tool`,
+  不经过 `_tool_call` 的 emit 包装;上一轮 A/B 已在改动前源码上复现);
+  ruff 全仓零基线。全量分批门禁与四档 strict gate 仍未跑。
 - 17 文件回归 **167 passed / 1 failed / 1 rerun**:唯一的红是
   `test_phase327_mcp_scan_budget.py::test_scan_against_a_blackholed_port_fails_fast`
   (30s deadline 到期的 `_ToolTimeout`,单跑 68.8s)。A/B 把源码换回改动前

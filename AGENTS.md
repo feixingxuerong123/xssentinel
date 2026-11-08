@@ -139,6 +139,20 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
     **29 passed / 0 skip**。**未跑全量分批门禁与四档 strict gate**:
     本轮是 MCP 接口层纯增量,判定面零改动,但按「绿和跑过是两个词」不拿
     旧 run 的数字顶上,下轮环境干净时补跑。
+- **Phase 375 / §8.2 #6(2026-11-08 晚,`[Unreleased]` 增量)**:进度通知补
+  `total` 与单位说明。`_tool_call` 用 scoped emit 包装:估算
+  `max_payloads × params`(复用 Phase 365 的 `split_target_url`,不另写 URL
+  解析;`param_mine` 用 `max_params`),`total` 只是**估计上界**,真实请求超过
+  估算时自动抬高,保证 `progress <= total` 恒成立;每条通知带 `message`
+  说明单位。`progress` 语义仍是「已发请求数」,起始信标仍是 0,
+  无 `progressToken` 时 `emit=None`、**零通知**;`_RequestGuard` / runner /
+  transport 一律未改。守卫 `test_phase375_mcp_progress_total.py`(4 例,
+  真实 stdio 会话),变异对照 `dev/phase375_mutation.py` **1/1**
+  (删掉 `total` → 红 → 还原绿,源码字节已还原)。回归口径(2026-11-08):
+  19 文件 **182 passed / 1 failed**、1 rerun,102.3s;唯一的红仍是上一条
+  A/B 已定性的 `test_phase327` 环境形态——该用例直接调 `run_scan_tool`,
+  不经过 `_tool_call` 的 emit 包装。ruff 全仓零基线。未跑全量分批门禁与
+  四档 strict gate,理由同上条。
 - **验收(本轮自己的运行,引用带跳过数)**:四档 strict gate 全 exit 0——
   quick 64 sync **0 SKIP**、quick 64 async **1 SKIP**、full 194 sync
   **0 SKIP**、full 194 async **12 SKIP**,全部 FP0/FN0/ERROR0;官方 XSSMaze
@@ -163,7 +177,7 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
   将来要切换须显式决定并整体重跑,不靠单轮数字改口径。
 - **开放项(需拍板,不擅自做)**:① `docs/OPTIMIZATION.md` §8.1-1 授权范围默认策略
   (默认拒绝 vs 默认放行)——§8.5 明确「拍板前不要动这一条」,**仍未动**;
-  #2 / #3 / #5 已按建议顺序完成(见上条),下一步是 #6 → #4 → #7,最后评估 8–11。
+  #2 / #3 / #5 / #6 已按建议顺序完成(见上条),下一步是 #4 → #7,最后评估 8–11。
   ② PyPI Trusted Publisher 未配。**环境阻塞**:2026-11-08 傍晚起本机
   `wsl.exe` 被安全策略拦,Docker Desktop 后端起不来,XSSMaze 复测当前无法进行;
   同晚 loopback 劣化还造成 `test_phase327` 超时用例的环境形态红(见上条 A/B)。

@@ -1894,6 +1894,45 @@ def _attach_structured_error(result: dict) -> dict:
     return attached
 
 
+# ---------------------------------------------------------------------------
+# Phase 375 / OPTIMIZATION.md §8.2 #6: progress needs a TOTAL and a UNIT.
+#
+# ``progress`` has always meant "requests sent" and still does.  What was
+# missing was a denominator: with only a start beacon and raw counters an
+# agent cannot tell "running" from "stuck", and cannot compute a percentage.
+# ``total`` is an ESTIMATE (max_payloads x injection points, or the mining
+# budget), never a promise: it grows if real traffic exceeds the estimate,
+# so ``progress <= total`` always holds.  Every notification states the unit.
+#
+# No transport/runner change: the wrapper sits in _tool_call, so a tool
+# without a progressToken still has emit=None and emits NOTHING.
+# ---------------------------------------------------------------------------
+_PROGRESS_UNIT = ("unit = requests sent; total is an estimate and may grow "
+                  "during the scan")
+
+
+def _estimate_progress_total(name: str, arguments: dict) -> int:
+    """Conservative request-budget hint for one tool call (never exact)."""
+    if name == "xssentinel_param_mine":
+        try:
+            return max(1, int(arguments.get("max_params") or 40))
+        except (TypeError, ValueError):
+            return 40
+    n_params = 1
+    url = (arguments.get("url") or "").strip()
+    if url:
+        try:
+            _, query = split_target_url(url)   # ONE URL contract (Phase 365)
+            n_params = max(1, len(query))
+        except (TypeError, ValueError):
+            n_params = 1
+    try:
+        payloads = int(arguments.get("max_payloads") or 14)
+    except (TypeError, ValueError):
+        payloads = 14
+    return max(1, n_params * max(1, payloads))
+
+
 def _tool_call(params, cancel_event=None, emit=None):
     if not isinstance(params, dict):
         return {"content": [{"type": "text",
@@ -1922,6 +1961,23 @@ def _tool_call(params, cancel_event=None, emit=None):
         return {"content": [{"type": "text", "text": err}],
                 "isError": True}
     if emit is not None:
+        # Phase 375: every downstream emit (the beacon AND _RequestGuard's
+        # per-request ticks) gets the same estimate and unit without any
+        # runner having to know about progress tokens.
+        estimated_total = _estimate_progress_total(name, normalized)
+        raw_emit = emit
+
+        def scoped_emit(progress, total=None, message=None):
+            nonlocal estimated_total
+            if progress > estimated_total:
+                estimated_total = progress + 1
+            text = (f"{message} | {_PROGRESS_UNIT}" if message
+                    else _PROGRESS_UNIT)
+            raw_emit(progress,
+                     total if total is not None else estimated_total,
+                     text)
+
+        emit = scoped_emit
         try:                              # a start beacon before any request
             emit(0, None, f"started {name}")
         except Exception:
