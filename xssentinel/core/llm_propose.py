@@ -28,6 +28,9 @@ Hard boundaries
   (promotion is a reviewed, measured decision; see AGENTS Phase 318).
 * No judgment semantics change anywhere: this module adds a REPLAY path,
   not a detection path.
+* Phase 365: GET replays go through ``core.target_url.split_target_url`` so
+  an existing ``?q=...`` is REPLACED, never appended -- appending made the
+  marked payload invisible to first-param servers. POST keeps its query.
 * The LLM is optional by design -- an unconfigured/exhausted pool raises
   and the caller degrades honestly (``LLMConfigError`` /
   ``LLMPoolExhausted`` from :mod:`llm_pool`).
@@ -40,6 +43,7 @@ import secrets
 
 from . import verifier
 from .logger import get_logger
+from .target_url import split_target_url
 from .verifier import has_execution_point
 
 _log = get_logger("llm_propose")
@@ -179,12 +183,19 @@ def propose_and_verify(requester, url: str, param: str, *,
                        waf: str = "", method: str = "GET",
                        count: int = 5, headless: bool = False,
                        headers: dict | None = None,
+                       llm_timeout: float | None = None,
                        pool=None, config_path: str | None = None) -> dict:
     """One propose -> filter -> replay -> verify cycle.
 
     ``pool`` may be injected (tests); by default the shared pool is
     built from the standard discovery order.  Raises ``LLMConfigError`` /
     ``LLMPoolExhausted`` unchanged -- callers degrade honestly.
+
+    ``llm_timeout`` bounds the GENERATION call. ``None`` means "use the
+    pool's configured timeout" (``LLMPool.timeout``, 90s by default). It used
+    to be hard-coded to 60s, which turned a slow reasoning model into a
+    misleading ``pool exhausted`` -- a local GLM-5.3-Flash answered the same
+    prompt in 68.5s, i.e. already past that line.
     """
     if pool is None:
         from .llm_pool import default_pool
@@ -192,7 +203,7 @@ def propose_and_verify(requester, url: str, param: str, *,
 
     res = pool.complete(
         build_messages(context_hint, meta_chars, waf, count),
-        temperature=0.7, timeout=60, min_chars=2)
+        temperature=0.7, timeout=llm_timeout, min_chars=2)
     raw = parse_candidates(res.text, limit=count * 2)
     if not raw:
         raise LLMProposeError(
@@ -205,11 +216,18 @@ def propose_and_verify(requester, url: str, param: str, *,
     for payload in passed[:_MAX_LIVE_VERIFY]:
         token = "xssp_" + secrets.token_hex(4)
         marked = verifier.mark(payload, token)
+        if method.upper() == "POST":
+            req_url, send_params, send_data = url, None, {param: marked}
+        else:
+            # Phase 365: strip the live query and REPLACE the target key, so
+            # requests cannot append a second q that first-param servers
+            # ignore. The same pair feeds the headless replay below.
+            base_url, send_params = split_target_url(url)
+            send_params[param] = marked
+            req_url, send_data = base_url, None
         try:
-            if method.upper() == "POST":
-                resp = requester.request(method, url, data={param: marked})
-            else:
-                resp = requester.request(method, url, params={param: marked})
+            resp = requester.request(method, req_url, params=send_params,
+                                     data=send_data)
             text = resp.text or ""
             hdrs = dict(resp.headers)
         except Exception as e:
@@ -223,9 +241,7 @@ def propose_and_verify(requester, url: str, param: str, *,
         headless_out = None
         if headless and not confirmed:
             hv = verifier.verify_headless(
-                url, method,
-                None if method.upper() == "POST" else {param: marked},
-                {param: marked} if method.upper() == "POST" else None,
+                req_url, method, send_params, send_data,
                 dict(headers or {}), token)
             headless_out = {"available": bool(hv.get("available")),
                             "confirmed": bool(hv.get("confirmed"))}

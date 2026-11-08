@@ -93,6 +93,8 @@ import threading
 import time
 from urllib.parse import urlparse
 
+from ..core.target_url import split_target_url
+
 __all__ = ["MCPServer", "serve", "dispatch_message",
            "run_scan_tool", "TOOL_DEFINITIONS"]
 
@@ -435,6 +437,13 @@ _TOOL_PROPSE_SCHEMA = {
         "timeout": {
             "type": "integer", "default": 15, "minimum": 1, "maximum": 120,
             "description": "Per-request timeout in seconds.",
+        },
+        "llm_timeout": {
+            "type": "integer", "minimum": 5, "maximum": 600,
+            "description": ("Timeout for the GENERATION call, in seconds. "
+                            "Omit to use the pool's configured timeout. Set "
+                            "it for slow local models whose reasoning "
+                            "channel takes a minute or more."),
         },
     },
     "required": ["url", "param"],
@@ -1034,13 +1043,10 @@ def run_scan_tool(args: dict, cancel_event=None, emit=None) -> dict:
         return {"content": [{"type": "text",
                              "text": f"not an absolute http(s) URL: {url}"}],
                 "isError": True}
-    base_url = parsed.scheme + "://" + parsed.netloc + parsed.path
-    params: dict = {}
-    if parsed.query:
-        for pair in parsed.query.split("&"):
-            if "=" in pair:
-                k, v = pair.split("=", 1)
-                params.setdefault(k, v)
+    # Phase 365: the ONE definition of injection-point extraction. profile /
+    # verify / propose used to hand-roll this and append to a live query,
+    # which first-param servers never see.
+    base_url, params = split_target_url(url)
 
     # Phase 327: bounded tool call.  A pre-flight connect check turns a
     # black-holed target from "hundreds of SYN-timeout stalls" into a few
@@ -1166,7 +1172,13 @@ def run_profile_tool(args: dict, cancel_event=None, emit=None) -> dict:
     probe_value = rp_mod.build_probe(token)
     try:
         requester = _make_requester(args, cancel_event, emit)
-        resp = requester.request("GET", url, params={param: probe_value})
+        # Phase 365: REPLACE the target key on a query-free URL. Passing the
+        # original `url` appended `?q=<original>&q=<probe>`, and a server that
+        # reads the first q never sees the probe -- profile then answered
+        # "not reflected" for a parameter a scan finds vulnerable.
+        base_url, params = split_target_url(url)
+        params[param] = probe_value
+        resp = requester.request("GET", base_url, params=params)
         text = resp.text or ""
         status = getattr(resp, "status_code", 0)
     except Exception as e:
@@ -1255,14 +1267,19 @@ def run_verify_tool(args: dict, cancel_event=None, emit=None) -> dict:
         requester = _make_requester(args, cancel_event, emit)
         send_params = send_data = None
         if method == "GET":
-            send_params = {param: marked}
+            # Phase 365: strip the caller's query and REPLACE the target key.
+            # Appending produced `?q=<original>&q=<marked>`, so the replayed
+            # payload never reached a first-param server.
+            base_url, send_params = split_target_url(url)
+            send_params[param] = marked
         else:
+            base_url = url
             send_data = {param: marked}
             for pair in (args.get("data") or "").split("&"):
                 if "=" in pair:
                     k, v = pair.split("=", 1)
                     send_data.setdefault(k, v)
-        resp = requester.request(method, url, params=send_params,
+        resp = requester.request(method, base_url, params=send_params,
                                  data=send_data)
         text = resp.text or ""
         hdrs = dict(resp.headers)
@@ -1287,7 +1304,7 @@ def run_verify_tool(args: dict, cancel_event=None, emit=None) -> dict:
     headless_out = None
     if args.get("headless"):
         hv = verifier.verify_headless(
-            url, method, send_params, send_data,
+            base_url, method, send_params, send_data,
             dict(args.get("headers") or {}), token)
         headless_out = {"available": bool(hv.get("available")),
                         "confirmed": bool(hv.get("confirmed"))}
@@ -1473,6 +1490,10 @@ def run_propose_tool(args: dict, _pool=None, cancel_event=None,
             count=int(args.get("count", 5)),
             headless=bool(args.get("headless", False)),
             headers=args.get("headers") or {},
+            # Phase 366: generation timeout is config-driven; this tool used
+            # to inherit a hard-coded 60s and reported slow-but-working local
+            # models as "pool exhausted".
+            llm_timeout=args.get("llm_timeout"),
             pool=_pool)
     except LLMConfigError as e:
         return {"content": [{"type": "text",
