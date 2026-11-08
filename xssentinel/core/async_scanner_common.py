@@ -12,6 +12,7 @@ had reset the cache).
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urljoin
+from .url_safety import is_crawlable_link
 from .scanner import Finding
 from .scanner_layers import AdvancedLayerMixin
 from .scanner_crawl import CrawlMixin
@@ -504,12 +505,12 @@ def _extract_links(html: str, base_url: str) -> list[str]:
         links = set()
         for a in soup.find_all("a", href=True):
             href = a["href"].strip()
-            if href and not href.startswith(("#", "javascript:", "mailto:")):
+            if is_crawlable_link(base_url, href):
                 links.add(urljoin(base_url, href))
         # Also extract form actions.
         for form in soup.find_all("form", action=True):
             action = form["action"].strip()
-            if action and not action.startswith(("javascript:", "mailto:")):
+            if is_crawlable_link(base_url, action):
                 links.add(urljoin(base_url, action))
         return list(links)
     except Exception:

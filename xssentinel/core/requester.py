@@ -20,6 +20,7 @@ import requests
 from .budget import Budget, BudgetExhausted, CircuitOpen, CircuitBreaker  # noqa: F401 (re-exported)
 from .egress import EgressPolicy
 from .logger import get_logger
+from .url_safety import is_safe_redirect
 from .stealth import HeaderRotator, ProxyPool, jitter_interval, load_proxies  # noqa: F401 (re-exported)
 
 _log = get_logger("requester")
@@ -206,6 +207,33 @@ class GuardedSession(requests.Session):
     def request(self, method, url, *args, **kwargs):
         self.egress.note(url)
         return super().request(method, url, *args, **kwargs)
+
+    def get_redirect_target(self, resp):
+        """Stop the chain at the first hop that is not an http(s) URL.
+
+        A ``Location`` header is attacker-controlled bytes: the official
+        XSSMaze target reflects our own ``javascript:`` probe into a 302,
+        and requests would turn that into the next PreparedRequest and fail
+        with ``InvalidSchema``.  That failure was counted, which marked
+        14-16 of 86 targets ``partial`` on a perfectly healthy scan
+        (measured 2026-11-08).
+
+        requests calls this once before its redirect loop and again after
+        every hop, so returning ``None`` stops at the FIRST unsafe hop.  No
+        request is attempted, so the 3xx comes back untouched, the tally
+        records no transport failure, and the scan stays ``completed``.
+        The allowlist is shared with the rest of the codebase and resolves
+        the Location first, so legal relative / protocol-relative hops keep
+        working.
+        """
+        location = super().get_redirect_target(resp)
+        if location is None:
+            return None
+        if not is_safe_redirect(getattr(resp, "url", ""), location):
+            _log.warning("redirect: not following non-http(s) hop %s",
+                         location[:120])
+            return None
+        return location
 
     def resolve_redirects(self, resp, req, *args, **kwargs):
         """Refuse to follow a hop that leaves every origin the operator named.

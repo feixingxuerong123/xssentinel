@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from . import payloads  # noqa: F401  (Mixin 运行时引用:scanner 由 Mixin 组合,静态分析看不见)
 from . import layer_guard
+from .url_safety import is_crawlable_link
 from . import param_miner
 from . import form_miner
 from . import js_miner
@@ -291,8 +292,7 @@ class CrawlMixin:
             soup = BeautifulSoup(resp.text, _bs_parser())
             for a in soup.find_all("a", href=True):
                 href = (a["href"] or "").strip()
-                if not href or href.startswith(("#", "javascript:",
-                                                "mailto:", "tel:", "data:")):
+                if not is_crawlable_link(url, href):
                     continue
                 full = urljoin(url, href)
                 fu = urlparse(full)
