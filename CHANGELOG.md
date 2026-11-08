@@ -16,6 +16,52 @@
 
 ## [Unreleased]
 
+## [1.4.4] - 2026-11-08
+
+> 缺陷修复与内部工程收敛为主，无破坏性变更；按版本策略「只修缺陷 /
+> 补齐既有能力走 patch」定级。以下数字均来自本轮自己的运行。
+
+### Fixed
+- **Phase 368 / `javascript:` Location 跟随**：靶场把探针反射进
+  `302 Location: javascript:...` 时，requests 自动跟随并把下一跳当成 URL，
+  抛 `InvalidSchema` 并计入请求失败，使健康目标被标 `partial`。新增
+  `core/url_safety.py` 共享白名单，`GuardedSession.get_redirect_target`
+  在每一跳拒绝非 http(s) 目标。XSSMaze 86 例分层抽样实测：
+  `partial 14 → 0`、`requests_failed 26 → 0`，而 TP59 / FP0 / findings 96
+  逐位不变。
+- **Phase 369 / 链接 scheme 契约漂移**：sync 与 async 的链接提取各手写一份
+  scheme 黑名单且已不一致（async 漏 `tel:` / `data:`），两者都漏
+  `vbscript:` / `blob:` / `file:` 与大小写·Tab 变形。统一到
+  `is_crawlable_link` 白名单，合法相对 / 协议相对跳转行为不变。
+- **Phase 371 / 层注册漂移**：Phase 364 新增的 3 个 layer id
+  （`L1_srcdoc_entity` / `L1_js_callback` / `L1_param_name`）未注册
+  `coverage.LAYERS`，`record_layer()` 走兜底导致统计、摘要与覆盖矩阵
+  全部看不到它们。已按「两处同时注册」补齐 `coverage.LAYERS` 与
+  `benchmark/layer_coverage.py`（矩阵用 `None` 如实标记无对应 case）。
+  这是 AGENTS.md 记录的同一课第三次踩。
+- **Phase 364 / 反射形状漏报**：补齐 srcdoc 实体拼写 handler、
+  JavaScript 响应反引号回调、参数名注入三类形状探测；现位于
+  `core/scanner_shapes.py`。
+
+### Changed
+- **Phase 367 / 引号逃逸契约**：sync / async 两处手写的探针构造与判级
+  收敛到 `core/quote_escaping.py` 一个定义；无行为变化。
+- **Phase 371 / 架构瘦身**：`scanner.py` 2793 → 2624 行（预算 2650），
+  Phase 364 的 3 个形状方法**字节级原样**搬进 `scanner_shapes.py`
+  （`ShapesMixin`），同步登记 `BUDGETS` 与 `HIERARCHIES`。纯搬运、零逻辑改动。
+- **Phase 370 / dev 测试口径（非产品能力）**：`dev/_xssmaze/wrapper.py`
+  增加 opt-in 的 `XSSMAZE_POST_AWARE`，让官方 runner 的 POST-only 端点拿到
+  POST body。默认关闭，旧口径逐字节可复现；新口径数字**不得与旧口径直接
+  比较，也不代表检测能力提升**。
+
+### 验收
+- 四档 strict gate 全 exit 0：quick 64 sync（0 SKIP）、quick 64 async
+  （1 SKIP）、全量 194 sync（0 SKIP）、全量 194 async（12 SKIP），
+  全部 FP0 / FN0 / ERROR0。
+- 官方 XSSMaze 1013 例（旧 GET-only 口径）：TP 975 / FN 38 / FP 0，
+  P 100%、R 96.2%、F1 0.981，27 条 controls 零误报。
+- ruff 全仓零基线；架构、Mixin 契约、层注册、覆盖矩阵守卫全绿。
+
 ## [1.4.3] - 2026-11-06
 
 ### Fixed

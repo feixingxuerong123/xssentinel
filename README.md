@@ -847,6 +847,32 @@ release 资产）；其 chromedp headless 层在本机不稳而 `--skip-headless
 一个量级。工具版本、逐项 deviation 与逐例数据见
 [`benchmark/results/phase342_xssmaze/`](benchmark/results/phase342_xssmaze/p342_meta.json)。
 
+### 引用限定（2026-11-08 复核）
+
+[`external_validity_20261108.md`](benchmark/results/external_validity_20261108.md)
+把散落的跑分按「样本量 / 工具版本 / 口径 / 不可比项」整理成第三方可复核清单。
+引用本节任何数字前先读这几条：
+
+- **本轮全量（2026-11-08，未提交 WIP 树，不是已发布 1.4.3 的成绩）**：
+  旧 GET-only 口径 TP 975 / FN 38 / FP 0（R 96.2%、F1 0.981，1959.1s）；
+  opt-in POST-aware 口径 TP 987 / FN 26 / FP 0（R 97.4%、F1 0.987，2039.6s）。
+  **0.987 不是检测能力提升**——POST-only 端点终于拿到 body，两口径不可直接比较，
+  且两者都不与上面的 0.965 / 0.957 比较。
+- **三个时点（10-24 / 10-30 / 11-08）不能连成进步曲线**：代码树不同（当前 WIP
+  未提交）、Phase 364–371 改动混杂、wrapper 超时设置不同（100s / 30s / 90s）、
+  本机 loopback 状态不同。
+- **dalfox 结果不可外推到现行版本**：对跑的是 Go 冻结分支 v2.13.0，
+  Rust v3 从未对跑。
+- **自证与第三方证据分开**：194 例矩阵、range3–7、bWAPP 是自建目标 + 自建答案，
+  F1=1.0 只证明没写坏，不得与 XSSMaze 的 F1 并列展示为「两个满分」；
+  controls FP=0 只说明靶场控制例，不等于生产环境误报率。
+- **空白**：Burp Pro / Acunetix / Netsparker 零对跑，OWASP ZAP 全 BLOCKED /
+  unavailable，真实授权目标与生产流量零样本；性能多个口径均比 nuclei 慢一个量级。
+  这一层不是再加靶场用例能补上的，本项目也不宣称超越商业 XSS 工具。
+- **超时伪影**：本机间歇失稳多次造成假 FN / `partial`，每轮都单跑复现定性，
+  不得把未复现的偏差当成判定变化。2026-11-08 傍晚起 `wsl.exe` 被安全策略拦，
+  Docker 后端起不来，XSSMaze 复测当前无法进行。
+
 ### 基准工具链
 
 - `benchmark/run_benchmark_batched.py [out.json] [batch] [port] [sync|async] [max_payloads] [max_transforms] [timeout]`——分批评估、每批落盘、支持中断续跑与失败重试；**Windows 本机跑完整矩阵请用这个入口**（默认预算 6–7 分钟全矩阵，14/12/90 口径 sync 约 12 分钟、async 约 25 分钟）。续跑时预算变了会丢弃旧结果，不静默合并。

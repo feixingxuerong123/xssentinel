@@ -138,6 +138,38 @@ detection-surface commits between trees). nuclei remains an order of magnitude
 faster (406 s vs 5741 s). Versions, per-arm deviations and per-case data:
 [benchmark/results/phase342_xssmaze/](benchmark/results/phase342_xssmaze/p342_meta.json).
 
+### Reference caveats (re-checked 2026-11-08)
+
+[external_validity_20261108.md](benchmark/results/external_validity_20261108.md)
+organises every figure above by sample size, tool version, scoring convention and
+non-comparable items. Read these before quoting any number in this section:
+
+- **Full run of 2026-11-08 (uncommitted WIP tree, NOT the released 1.4.3):**
+  legacy GET-only convention TP 975 / FN 38 / FP 0 (R 96.2%, F1 0.981, 1959.1 s);
+  opt-in POST-aware convention TP 987 / FN 26 / FP 0 (R 97.4%, F1 0.987,
+  2039.6 s). **0.987 is not a detection improvement** — POST-only endpoints
+  finally received their body. The two conventions are not comparable, and
+  neither is comparable to the 0.965 / 0.957 figures above.
+- **The three snapshots (10-24 / 10-30 / 11-08) do not form a progress curve:**
+  different code trees (the current one is uncommitted WIP), mixed Phase 364–371
+  changes, different wrapper timeouts (100 s / 30 s / 90 s) and different loopback
+  conditions on this host.
+- **dalfox results do not extrapolate to its current release**: the compared arm
+  is the frozen Go branch v2.13.0; Rust v3 has never been run.
+- **Self-authored evidence is not third-party evidence**: the 194-case matrix,
+  range3–7 and bWAPP use our own targets and our own answer key; F1 = 1.0 there
+  only means "not broken" and must not be shown next to the XSSMaze F1 as two
+  perfect scores. FP = 0 on 27 controls says nothing about production
+  false-positive rates.
+- **Blanks**: zero comparisons against Burp Pro / Acunetix / Netsparker, OWASP
+  ZAP BLOCKED/unavailable, no authorised production targets or traffic, and a
+  speed gap of roughly one order of magnitude behind nuclei. More lab cases cannot
+  fill this layer, and this project makes no claim of beating commercial XSS tools.
+- **Timeout artefacts**: intermittent host instability has produced false FNs and
+  `partial` scans; every such deviation was re-run and attributed individually.
+  Since 2026-11-08 evening `wsl.exe` is blocked by local security policy, so the
+  Docker backend cannot start and XSSMaze re-runs are currently impossible.
+
 PortSwigger cheat-sheet corpus coverage (822 vectors; re-run 2026-11-01 against
 the 2026-09-30 cheat-sheet snapshot, product: benchmark/results/portswigger_corpus_coverage.json):
 the "no user interaction" group is **100%** on events, tags and protocols (gap

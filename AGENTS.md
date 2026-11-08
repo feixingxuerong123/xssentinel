@@ -13,6 +13,7 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
 | 逐 Phase 过程日志(176f–345,每项改动的归因、门禁证据、自我纠正) | `docs/archive/AGENTS_phase_log_to_20261031.md` |
 | README 历史 Phase 叙事(基线演化、缺陷家族、自我纠正;2026-11-01 蒸馏出库) | `docs/archive/README_phase_log_to_20261101.md` |
 | Phase 350–357 轮次报告(345 之后的逐轮实测数字与归因) | `benchmark/results/round2..round5_*_20261103.md`、`zap_unavailable_20261103.md`;Phase 357 证据见 `benchmark/results/benchmark_full_{sync,async}_20261104.json`、`bwapp_matrix_pre_fix_20261103.md` 与提交 `f80af43` |
+| Phase 364–371 轮次报告(2026-11-07~08) | `benchmark/results/*_20261107.md`、`*_20261108.md`;外部效度证据分级与不可比项见 `external_validity_20261108.md` |
 | 开发约定 / 回归靶场 / 架构约定 | `CONTRIBUTING.md` |
 | 门禁体系如何运作 / Mixin 隐式契约 | `docs/ARCHITECTURE.md` |
 | 优化 backlog(含明确不做清单) | `docs/OPTIMIZATION.md` |
@@ -53,7 +54,85 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
 
 - 新增检测层必须**同时**注册 `coverage.LAYERS` 与 `layer_coverage` 矩阵(Phase 187/192 两次被门禁抓到的同一课)。
 
-## 当前状态(2026-11-06)
+## 当前状态(2026-11-08)
+
+- **1.4.4(2026-11-08,patch)**:承接 Phase 364–371(反射形状补齐、Agent 接入面两处
+  FN 修复、契约收敛、`javascript:` 重定向与链接 scheme、测量口径、架构瘦身与
+  层注册补齐),无破坏性变更,按「只修缺陷/补齐既有能力走 patch」定级。
+  `__version__` 与 CHANGELOG 最新章节同源,版本同源守卫
+  `test_doc_gate_parity.py::test_changelog_latest_version_matches_package_version` 绿。
+- **交付状态(2026-11-08 收口后)**:收口前工作区实测 20 M + 36 未跟踪;现已按
+  **依赖闭包**拆成 5 个本地提交(`f1126bf` 形状/引号契约/架构搬运、
+  `e071677` Agent 接入面、`da5ee89` 重定向与链接 scheme、`d07717b` 测量口径与
+  靶场证据、本条所在的 release 提交)。未按单个 Phase 做 hunk 级拆分:
+  `scanner.py` / `verifier.py` 同文件跨 364/367/371,拆开会出现
+  「Scanner 引用尚不存在的 ShapesMixin」的不可运行中间树;理由写进首个提交信息,
+  每个提交都是可导入可运行的完整闭包并在信息里列全所含 Phase。
+  **工作区干净、仍未推送**:本地 `main` 领先 `origin/main` **14 个提交**,
+  远端停在 `67a1a80`(Phase 358 时代)。⇒ 11-07/11-08 的全部跑分都是
+  **未发布 WIP 树**的数字,不是已发布 1.4.3 的成绩;推送与发版仍待授权。
+- 口径复测(2026-11-08,含本轮 4 个新源码文件与 7 个新守卫):源码
+  **140 文件 62,332 行**;测试按 tracked + 本轮待提交 `test_*.py`
+  **290 文件 65,530 行**。口径仍是 `wc -l` 物理行、排除 `__pycache__` /
+  `tests/_pytest_tmp/`,包含未跟踪的本轮文件(与 11-06 那行「tracked +
+  本轮待提交」一致)。带日期的历史记录保留不改。
+- Phase 364–371 落地(逐轮报告见 `benchmark/results/*_2026110{7,8}.md`):
+  - **364**:三类反射形状漏报(srcdoc 实体拼写 handler、JS 响应反引号回调、
+    参数名注入),现位于 `core/scanner_shapes.py`;守卫 `test_phase364_shapes.py`。
+  - **365/366**:由外部 CLI 型智能体 e2e(`agent_cli_e2e_20261107.md`)量出的
+    两处接入面缺陷——MCP `profile` 工具对 GET 已有同名参数应替换而非追加
+    (否则首参遮蔽探针、假阴性跳过整次扫描)、`propose` 生成超时改由
+    `llm_timeout` 配置驱动(硬编码 60s 会把 68.5s 的正常响应误报成
+    「LLM pool exhausted」)。守卫 `test_phase365_mcp_url_parity.py` /
+    `test_phase366_propose_timeout.py`。
+  - **367**:sync/async 两处手写的引号逃逸探针与判级收敛到
+    `core/quote_escaping.py` 一个定义,守卫同时钉行为与两引擎调用点源码。
+  - **368**:`302 Location: javascript:...` 被 requests 自动跟随并抛
+    `InvalidSchema`,健康目标被标 `partial`;新增 `core/url_safety.py` 共享
+    白名单,每跳拒绝非 http(s) 目标。XSSMaze 86 例分层抽样实测
+    `partial 14→0`、`requests_failed 26→0`,TP59/FP0/findings 96 逐位不变。
+  - **369**:sync/async 各手写一份 scheme 黑名单且已漂移(async 漏 `tel:` /
+    `data:`,两者都漏 `vbscript:` / `blob:` / `file:` 与大小写·Tab 变形),
+    统一为 `is_crawlable_link` 白名单;合法相对/协议相对行为不变。报告先纠正
+    上一轮「静态扫描列缺口」的误判(上游已有防线),不为修而修。
+  - **370**:`dev/_xssmaze/wrapper.py` 增加 opt-in `XSSMAZE_POST_AWARE`,
+    让官方 runner 的 POST-only 端点拿到 POST body;默认关闭、旧口径逐字节可复现。
+    **这是测量口径修复,不是检测能力提升**,新数字不得与旧口径直接比较。
+  - **371**:`scanner.py` 2793→2624 行(预算 2650),Phase 364 三个形状方法
+    **字节级原样**搬进 `scanner_shapes.py`(`ShapesMixin`,7650 B / 171 行
+    sha256 一致),同步登记 `BUDGETS` / `HIERARCHIES`,纯搬运零逻辑改动;
+    广回归顺带抓到 Phase 364 的 3 个 layer id 未注册 `coverage.LAYERS`
+    (统计/摘要/覆盖矩阵全看不到),按「两处同时注册」补齐——AGENTS.md 记的
+    同一课**第三次踩**,根因是前几轮回归组漏了层注册守卫。
+- **验收(本轮自己的运行,引用带跳过数)**:四档 strict gate 全 exit 0——
+  quick 64 sync **0 SKIP**、quick 64 async **1 SKIP**、full 194 sync
+  **0 SKIP**、full 194 async **12 SKIP**,全部 FP0/FN0/ERROR0;官方 XSSMaze
+  1013 例(旧 GET-only 口径)**TP 975 / FN 38 / FP 0,P 100% / R 96.2% /
+  F1 0.981**,1959.1s,27 controls 零误报;POST-aware 新口径 TP 987 / FN 26 /
+  F1 0.987(2039.6s),**两口径不可比**且不代表能力提升;五靶场 50 例 sync
+  TP31/FP0/TN19/FN0、5 门 exit 0,OOB 回连 e2e 成立(`blind/high/oob-confirmed`);
+  ruff 全仓零基线,架构/Mixin/层注册/覆盖矩阵守卫全绿。产物
+  `benchmark/results/xssmaze_full_20261108.{json,md}`、
+  `xssmaze_full_post_aware_20261108.{json,md}`、`gate_p364_*`、
+  `redirect_scheme_fix_and_xssmaze_full_20261108.md`。
+- **外部效度清单** `benchmark/results/external_validity_20261108.md`:
+  强证据=官方靶+官方答案键+官方评分器;194 矩阵/range/bWAPP 属自证;
+  商业工具(Burp/Acunetix/Netsparker)、真实授权目标**零对跑**,ZAP 永久
+  `unavailable`,性能仍比 nuclei 慢一个量级。**三个时点(10-24 / 10-30 /
+  11-08)不可连成进步曲线**:代码树、wrapper 超时、loopback 状态都不同;
+  自证矩阵 F1=1.0 不得与 XSSMaze 并列展示为「两个满分」。
+- **开放项(需拍板,不擅自做)**:① 是否把 POST-aware 定为新官方口径(一旦定,
+  历史数字要重跑或标断点);② `docs/OPTIMIZATION.md` §8 Agent 接入面 backlog
+  11 项的 P0 三件(授权范围服务端强制 / 错误结构化 / 200 finding 静默截断),
+  其中「授权范围默认拒绝 vs 默认放行」明确需仓库归属者拍板;
+  ③ PyPI Trusted Publisher 未配。**环境阻塞**:2026-11-08 傍晚起本机
+  `wsl.exe` 被安全策略拦,Docker Desktop 后端起不来,XSSMaze 复测当前无法进行。
+- 下一节起为**带日期的历史状态记录**,保留不改;「当前状态」以本节为准。
+
+## 历史状态(2026-11-06 及更早,带日期记录保留不改)
+
+> 本节全部为带日期的历史记录(门禁、CI、规模快照、开放项),按规矩保留不改,
+> 不以现在时引用。最新状态见上一节。
 
 - **1.4.2(2026-11-06,patch)**:承接 Phase 358–362(MCP 双协议、CLI 管道
   与功能面收口、XSSMaze 残余 FN 归因与三修),无破坏性变更(唯一行为变化是
