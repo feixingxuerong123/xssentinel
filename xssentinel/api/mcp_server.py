@@ -132,6 +132,12 @@ _ERR_HEADER_MISMATCH = -32020
 #: being protected here, not memory.
 _MAX_FINDINGS = 200
 _MAX_FIELD = 500
+#: Phase 373: a silent [:200] taught agents that "finding_count: 200" meant
+#: "all of them".  Every capped result now says how many existed, that it was
+#: capped, and what to do about it.
+_TRUNCATION_HINT = (
+    "result capped at {limit} entries; lower max_payloads / max_params or "
+    "split the scan per parameter to see the rest").format(limit=_MAX_FINDINGS)
 
 #: Fields each tool derives from the scanned target.  The target controls
 #: these bytes, so every successful result names them explicitly -- an agent
@@ -468,6 +474,9 @@ _TOOL_SCAN_OUTPUT = {
         "requests_made": {"type": "integer"},
         "waf": {"type": ["string", "null"]},
         "finding_count": {"type": "integer"},
+        "total_findings": {"type": "integer"},
+        "truncated": {"type": "boolean"},
+        "truncation_hint": {"type": ["string", "null"]},
         "findings": {
             "type": "array",
             "items": {
@@ -545,6 +554,9 @@ _TOOL_PARAM_MINE_OUTPUT = {
         "url": {"type": "string"},
         "method": {"type": "string"},
         "discovered_count": {"type": "integer"},
+        "total_discovered": {"type": "integer"},
+        "truncated": {"type": "boolean"},
+        "truncation_hint": {"type": ["string", "null"]},
         "discovered": {
             "type": "array",
             "items": {
@@ -704,6 +716,42 @@ TOOL_DEFINITIONS = [
 for _definition in TOOL_DEFINITIONS:
     _definition["outputSchema"] = _TOOL_OUTPUT_SCHEMAS[_definition["name"]]
 del _definition
+
+
+# ---------------------------------------------------------------------------
+# Phase 374 / OPTIMIZATION.md §8.1-5: tool titles + annotations.
+#
+# MCP platforms use these hints to decide whether to ask for confirmation,
+# cache a result, or run calls in parallel.  Without them a tool that
+# ACTIVELY SENDS ATTACK PAYLOADS looks like a safe read-only tool.  One
+# deliberately conservative set for all seven: none is read-only, none is
+# idempotent (repeating a call re-sends traffic), all reach the open world.
+#
+# Phase 358 contract: annotations are attached ONLY to a MODERN tools/list
+# response.  TOOL_DEFINITIONS itself stays byte-identical, so legacy clients
+# receive exactly the catalogue they always did.
+# ---------------------------------------------------------------------------
+_TOOL_TITLES = {
+    "xssentinel_scan": "Scan a target for XSS",
+    "xssentinel_discover": "Discover input fields and endpoints",
+    "xssentinel_profile": "Profile one parameter's reflection context",
+    "xssentinel_verify": "Verify one payload against a parameter",
+    "xssentinel_param_mine": "Mine hidden parameters",
+    "xssentinel_csp_analyze": "Analyze a target's CSP",
+    "xssentinel_propose": "Propose and replay payloads with an LLM pool",
+}
+_TOOL_ANNOTATIONS = {
+    "readOnlyHint": False,
+    "destructiveHint": True,
+    "openWorldHint": True,
+    "idempotentHint": False,
+}
+
+
+def _modernize_tools(tools: list) -> list:
+    """Copy the catalogue with titles + annotations (modern frames only)."""
+    return [dict(tool, title=_TOOL_TITLES[tool["name"]],
+                 annotations=dict(_TOOL_ANNOTATIONS)) for tool in tools]
 
 
 # ---------------------------------------------------------------------------
@@ -1075,6 +1123,7 @@ def run_scan_tool(args: dict, cancel_event=None, emit=None) -> dict:
                             data=args.get("data") or None,
                             oob_collect=False)
         scanner.dedup()
+        total_findings = len(scanner.findings)
         findings = [_compact_finding(f.to_dict() if hasattr(f, "to_dict")
                                      else dict(f))
                     for f in scanner.findings][:_MAX_FINDINGS]
@@ -1083,11 +1132,15 @@ def run_scan_tool(args: dict, cancel_event=None, emit=None) -> dict:
                              "text": f"scan failed: {type(e).__name__}: {e}"}],
                 "isError": True}
 
+    truncated = total_findings > len(findings)
     result = {
         "target": url,
         "requests_made": getattr(scanner, "requests_made", 0),
         "waf": getattr(scanner, "waf_name", None),
         "finding_count": len(findings),
+        "total_findings": total_findings,
+        "truncated": truncated,
+        "truncation_hint": _TRUNCATION_HINT if truncated else None,
         "findings": findings,
     }
     return {"content": [{"type": "text",
@@ -1384,9 +1437,14 @@ def run_param_mine_tool(args: dict, cancel_event=None, emit=None) -> dict:
     # reflected names first -- those are the ones worth scanning
     rows = sorted((_row(p) for p in found),
                   key=lambda r: (not r.get("reflected"),))
+    shown = rows[:_MAX_FINDINGS]
+    truncated = len(rows) > len(shown)
     result = {"url": url, "method": method,
-              "discovered_count": len(rows),
-              "discovered": rows[:_MAX_FINDINGS]}
+              "discovered_count": len(shown),
+              "total_discovered": len(rows),
+              "truncated": truncated,
+              "truncation_hint": _TRUNCATION_HINT if truncated else None,
+              "discovered": shown}
     return {"content": [{"type": "text",
                          "text": json.dumps(result, ensure_ascii=False,
                                             indent=2)}]}
@@ -1744,6 +1802,98 @@ def _attach_structured(result: dict) -> dict:
     return attached
 
 
+# ---------------------------------------------------------------------------
+# Phase 372 / OPTIMIZATION.md §8.1-2: machine-readable tool ERRORS.
+#
+# Legacy frames keep byte-for-byte the responses they have always had
+# (Phase 358 contract; test_phase324_mcp_http.py pins that a legacy error
+# result has NO structuredContent).  Only a request that DECLARED a modern
+# revision receives this extra channel, and ``content[0].text`` is never
+# rewritten -- a text-only client sees the exact same sentence as before.
+#
+# The classifier only ever sees strings THIS module emits, never bytes from
+# the target or the agent.  Rules are exact prefixes / narrow substrings,
+# each pinned by tests/test_phase372_mcp_structured_errors.py.
+# ---------------------------------------------------------------------------
+def _classify_tool_error(text: str) -> dict:
+    """Map our own error sentence to a stable, machine-readable shape."""
+    code = "tool_error"
+    field = None
+    accepted_keys: list = []
+    hint = "inspect the message and fix the call"
+    retryable = False
+    if text.startswith("unknown tool:"):
+        code = "unknown_tool"
+        hint = "call tools/list for the supported tool names"
+    elif text.startswith("unknown argument(s):"):
+        code = "unknown_argument"
+        names = text[len("unknown argument(s):"):].split(". accepted:", 1)[0]
+        field = names.split(",")[0].strip() or None
+        if ". accepted:" in text:
+            accepted = text.split(". accepted:", 1)[1].split("; aliases", 1)[0]
+            accepted_keys = [k.strip() for k in accepted.split(",")
+                             if k.strip()]
+        hint = "use a key from accepted_keys; unknown keys are never dropped"
+    elif " is required" in text or text.endswith(" are required"):
+        code = "missing_required_argument"
+        field = text.split()[0] if text.split() else None
+        hint = "supply the required argument"
+    elif text.startswith("not an absolute http(s) URL:"):
+        code = "invalid_url"
+        field = "url"
+        hint = "provide an absolute http(s) URL"
+    elif text.startswith("argument '") and " must be " in text:
+        code = "invalid_argument_value"
+        field = text.split("'", 2)[1]
+        hint = "fix the argument type or enum member"
+    elif text.startswith("unsupported method:"):
+        code = "invalid_argument_value"
+        field = "method"
+        hint = "use GET or POST"
+    elif text.startswith(("params must be an object",
+                          "arguments must be an object")):
+        code = "invalid_request_shape"
+        hint = "tools/call params and arguments must be JSON objects"
+    elif ("timed out" in text.lower() or "timeout" in text.lower()
+          or "budget" in text.lower()):
+        code = "timeout"
+        retryable = True
+        hint = "raise max_seconds / timeout or narrow the scan"
+    elif text.startswith("target unreachable:"):
+        code = "target_unreachable"
+        retryable = True
+        hint = "check target reachability and retry"
+    elif " failed:" in text:
+        code = "tool_execution_failed"
+        retryable = True
+        hint = "check the target / tool inputs and retry"
+    return {
+        "code": code,
+        "message": text,
+        "field": field,
+        "accepted_keys": accepted_keys,
+        "hint": hint,
+        "retryable": retryable,
+    }
+
+
+def _attach_structured_error(result: dict) -> dict:
+    """Add the modern-only structured error channel; leave text untouched."""
+    if not isinstance(result, dict) or not result.get("isError"):
+        return result
+    if "structuredContent" in result:
+        return result
+    try:
+        text = result["content"][0]["text"]
+    except (KeyError, IndexError, TypeError):
+        return result
+    if not isinstance(text, str):
+        return result
+    attached = dict(result)
+    attached["structuredContent"] = {"error": _classify_tool_error(text)}
+    return attached
+
+
 def _tool_call(params, cancel_event=None, emit=None):
     if not isinstance(params, dict):
         return {"content": [{"type": "text",
@@ -1834,11 +1984,21 @@ def dispatch_message(msg: dict, *, cancel_event=None, emit=None):
                 "instructions": _INSTRUCTIONS,
             })
         if method == "tools/list":
-            return _ok({"tools": TOOL_DEFINITIONS})
+            # Phase 374: hints are a modern-era capability; a legacy frame
+            # keeps byte-for-byte the catalogue it has always received.
+            if modern:
+                catalogue = _modernize_tools(TOOL_DEFINITIONS)
+            else:
+                catalogue = TOOL_DEFINITIONS
+            return _ok({"tools": catalogue})
         if method == "tools/call":
             result = _tool_call(msg.get("params"), cancel_event, emit)
             if result is None:
                 return None
+            # Phase 372: structured errors are a MODERN-frame capability.
+            # A legacy frame keeps byte-for-byte its old isError result.
+            if modern and result.get("isError"):
+                result = _attach_structured_error(result)
             return _ok(result)
         if method == "ping":
             return _ok({})
