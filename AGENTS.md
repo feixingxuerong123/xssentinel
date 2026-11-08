@@ -68,9 +68,11 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
   `scanner.py` / `verifier.py` 同文件跨 364/367/371,拆开会出现
   「Scanner 引用尚不存在的 ShapesMixin」的不可运行中间树;理由写进首个提交信息,
   每个提交都是可导入可运行的完整闭包并在信息里列全所含 Phase。
-  **工作区干净、仍未推送**:本地 `main` 领先 `origin/main` **14 个提交**,
-  远端停在 `67a1a80`(Phase 358 时代)。⇒ 11-07/11-08 的全部跑分都是
-  **未发布 WIP 树**的数字,不是已发布 1.4.3 的成绩;推送与发版仍待授权。
+  **已推送(2026-11-08 晚)**:`git push origin main` 把这 14 个提交推到
+  `origin/main`(`67a1a80..13b0227`),远端不再停在 Phase 358 时代。
+  ⇒ 11-07/11-08 的全部跑分仍是**测量当时的 WIP 树**数字,不是已发布 1.4.3
+  的成绩(与是否推送无关)。Phase 372–374 为之后的 `[Unreleased]` 增量
+  (代码提交 + 文档收口共 2 个,见下条),完成后一并推送到 `origin/main`。
 - 口径复测(2026-11-08,含本轮 4 个新源码文件与 7 个新守卫):源码
   **140 文件 62,332 行**;测试按 tracked + 本轮待提交 `test_*.py`
   **290 文件 65,530 行**。口径仍是 `wc -l` 物理行、排除 `__pycache__` /
@@ -104,6 +106,39 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
     广回归顺带抓到 Phase 364 的 3 个 layer id 未注册 `coverage.LAYERS`
     (统计/摘要/覆盖矩阵全看不到),按「两处同时注册」补齐——AGENTS.md 记的
     同一课**第三次踩**,根因是前几轮回归组漏了层注册守卫。
+- **Phase 372–374(2026-11-08 晚,`[Unreleased]` 增量)**:按
+  `docs/OPTIMIZATION.md` §8.5 的建议顺序先做零争议的三件,全部落在
+  `api/mcp_server.py`,**不碰扫描判定、不改 legacy 帧字节**:
+  - **372 / §8.1-2**:`tools/call` 的错误结果追加
+    `structuredContent.error{code,message,field,accepted_keys,hint,retryable}`,
+    分类只认本模块自己生成的句子(精确前缀 + 窄子串),覆盖未知工具/未知键/
+    缺必填/非法 URL/参数类型/超时/执行失败。**仅 modern 帧附加**:
+    `test_phase324_mcp_http.py` 钉住 legacy 错误结果没有 `structuredContent`,
+    Phase 358 的逐字节契约优先。
+  - **373 / §8.1-3**:`run_scan_tool` 的 `[:200]` 补
+    `total_findings` / `truncated` / `truncation_hint`;`run_param_mine_tool`
+    同类切片补 `total_discovered` 等并把 `discovered_count` 统一为
+    **实际返回条数**(此前是总数却只返回前 200 行);两个 `outputSchema`
+    同步扩字段。
+  - **374 / §8.1-5**:7 个工具补 `title` + `annotations`
+    (readOnly=false / destructive=true / openWorld=true / idempotent=false),
+    **只在现代 `tools/list` 附加**,`TOOL_DEFINITIONS` 本身不变。
+  - 守卫 `test_phase372_mcp_structured_errors.py`(16 例)、
+    `test_phase373_mcp_truncation.py`(9 例)、
+    `test_phase374_mcp_annotations.py`(4 例),各有 AST 钉子锁 modern-only 接线。
+    变异对照 `dev/phase372_374_mutations.py` **3/3 通过**
+    (baseline 绿 → 删结构化字段 / 置 `truncated=False` / 关掉 modern 分支
+    各自红 → restored 绿),源码字节已还原。
+  - 回归口径(2026-11-08,本机):17 文件 **167 passed / 1 failed**、1 rerun,
+    97.8s;唯一的红是
+    `test_phase327_mcp_scan_budget.py::test_scan_against_a_blackholed_port_fails_fast`
+    —— `_ToolTimeout` 在 30s deadline 到期时冒出(单跑 68.8s)。**A/B 对照**:
+    把源码换回 `HEAD`(改动前)跑同一用例,同样 FAILED、同样异常与耗时
+    ⇒ 定性为本机 loopback 劣化期环境形态,不是本轮回归;按「未验证」记账,
+    不当绿也不当回归。ruff 全仓 `All checks passed`;三守卫恢复后单跑
+    **29 passed / 0 skip**。**未跑全量分批门禁与四档 strict gate**:
+    本轮是 MCP 接口层纯增量,判定面零改动,但按「绿和跑过是两个词」不拿
+    旧 run 的数字顶上,下轮环境干净时补跑。
 - **验收(本轮自己的运行,引用带跳过数)**:四档 strict gate 全 exit 0——
   quick 64 sync **0 SKIP**、quick 64 async **1 SKIP**、full 194 sync
   **0 SKIP**、full 194 async **12 SKIP**,全部 FP0/FN0/ERROR0;官方 XSSMaze
@@ -121,12 +156,17 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
   `unavailable`,性能仍比 nuclei 慢一个量级。**三个时点(10-24 / 10-30 /
   11-08)不可连成进步曲线**:代码树、wrapper 超时、loopback 状态都不同;
   自证矩阵 F1=1.0 不得与 XSSMaze 并列展示为「两个满分」。
-- **开放项(需拍板,不擅自做)**:① 是否把 POST-aware 定为新官方口径(一旦定,
-  历史数字要重跑或标断点);② `docs/OPTIMIZATION.md` §8 Agent 接入面 backlog
-  11 项的 P0 三件(授权范围服务端强制 / 错误结构化 / 200 finding 静默截断),
-  其中「授权范围默认拒绝 vs 默认放行」明确需仓库归属者拍板;
-  ③ PyPI Trusted Publisher 未配。**环境阻塞**:2026-11-08 傍晚起本机
-  `wsl.exe` 被安全策略拦,Docker Desktop 后端起不来,XSSMaze 复测当前无法进行。
+- **已定(2026-11-08,保守默认)**:POST-aware **不**定为新官方口径,GET-only
+  仍是唯一官方口径(F1 0.981 那套);POST-aware 只作 opt-in 诊断口径,
+  历史数字一律不改、不制造口径断点。理由:切换需重跑全部历史跑分或标注断点
+  (`external_validity_20261108.md` §7 第 4 条),而当前收益只是补齐测量盲区。
+  将来要切换须显式决定并整体重跑,不靠单轮数字改口径。
+- **开放项(需拍板,不擅自做)**:① `docs/OPTIMIZATION.md` §8.1-1 授权范围默认策略
+  (默认拒绝 vs 默认放行)——§8.5 明确「拍板前不要动这一条」,**仍未动**;
+  #2 / #3 / #5 已按建议顺序完成(见上条),下一步是 #6 → #4 → #7,最后评估 8–11。
+  ② PyPI Trusted Publisher 未配。**环境阻塞**:2026-11-08 傍晚起本机
+  `wsl.exe` 被安全策略拦,Docker Desktop 后端起不来,XSSMaze 复测当前无法进行;
+  同晚 loopback 劣化还造成 `test_phase327` 超时用例的环境形态红(见上条 A/B)。
 - 下一节起为**带日期的历史状态记录**,保留不改;「当前状态」以本节为准。
 
 ## 历史状态(2026-11-06 及更早,带日期记录保留不改)

@@ -149,7 +149,9 @@ non-comparable items. Read these before quoting any number in this section:
   opt-in POST-aware convention TP 987 / FN 26 / FP 0 (R 97.4%, F1 0.987,
   2039.6 s). **0.987 is not a detection improvement** — POST-only endpoints
   finally received their body. The two conventions are not comparable, and
-  neither is comparable to the 0.965 / 0.957 figures above.
+  neither is comparable to the 0.965 / 0.957 figures above. **Decision of
+  2026-11-08: GET-only remains the official convention**; POST-aware is an
+  opt-in diagnostic convention and rewrites no historical figure.
 - **The three snapshots (10-24 / 10-30 / 11-08) do not form a progress curve:**
   different code trees (the current one is uncommitted WIP), mixed Phase 364–371
   changes, different wrapper timeouts (100 s / 30 s / 90 s) and different loopback

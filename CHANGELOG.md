@@ -16,6 +16,35 @@
 
 ## [Unreleased]
 
+### Added
+- **Phase 372 / MCP 结构化错误**:声明了现代协议版本的 `tools/call` 错误结果
+  追加 `structuredContent.error`(`code` / `message` / `field` /
+  `accepted_keys` / `hint` / `retryable`);`content` 文本与 legacy 帧字节不变,
+  未知工具 / 未知键 / 缺必填 / 非法 URL / 参数类型 / 超时 / 执行失败各有稳定码。
+- **Phase 374 / 工具注解**:现代 `tools/list` 为 7 个工具补 `title` 与
+  `annotations`(`readOnlyHint=false` / `destructiveHint=true` /
+  `openWorldHint=true` / `idempotentHint=false`);legacy 目录逐字节不变。
+
+### Changed
+- **Phase 373 / 截断显式化**:`scan` 与 `param_mine` 结果补 `total_findings` /
+  `total_discovered` / `truncated` / `truncation_hint`,两个 `outputSchema`
+  同步扩字段。`discovered_count` 由「总数」改为**实际返回条数**——此前返回
+  前 200 行却报告总数,Agent 会把截断读成完整。**这是本段唯一行为变化。**
+- **跑分口径决定**:POST-aware 仍为 opt-in 诊断口径,GET-only 保持唯一官方口径,
+  历史跑分数字一律不改;中英 README 的「引用限定」已写明。
+
+### 验收
+- 新守卫 **29 passed / 0 skip**;变异对照 `dev/phase372_374_mutations.py`
+  **3/3 通过**(baseline 绿 → 删结构化字段 / 置 `truncated=False` / 关掉
+  modern 分支各自红 → restored 绿,源码字节已还原);既有 MCP 契约 86 例全绿;
+  ruff 全仓零基线。
+- 17 文件回归 **167 passed / 1 failed / 1 rerun**:唯一的红是
+  `test_phase327_mcp_scan_budget.py::test_scan_against_a_blackholed_port_fails_fast`
+  (30s deadline 到期的 `_ToolTimeout`,单跑 68.8s)。A/B 把源码换回改动前
+  `HEAD` 跑同一用例,同样 FAILED ⇒ 本机 loopback 劣化期环境形态,不是本轮回归,
+  按「未验证」记账。**未跑全量分批门禁与四档 strict gate**:本轮是 MCP 接口层
+  纯增量、判定面零改动,但不拿旧 run 数字顶上,下轮环境干净时补跑。
+
 ## [1.4.4] - 2026-11-08
 
 > 缺陷修复与内部工程收敛为主，无破坏性变更；按版本策略「只修缺陷 /

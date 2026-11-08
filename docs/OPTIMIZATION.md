@@ -1170,3 +1170,20 @@ job 模型(`POST /api/v1/scans` → status/findings/report)、CLI 机器通道
 
 先做 **2 → 3 → 5**(纯增量、零行为争议、验收明确),再做 **6 → 4 → 7**,最后评估 8–11。
 **8.1-1 的默认策略需要仓库归属者拍板**:「默认拒绝所有目标、必须由 operator 显式配置 allowlist」最安全,但会让现有 MCP 配置开箱即坏;「默认放行 + `server/discover` 明示当前范围 + 可选 allowlist」兼容性好但不是强制边界。在拍板前不要动这一条。
+
+### 8.6 处置记录(2026-11-08)
+
+按本节顺序完成 **#2 → #3 → #5**(Phase 372 / 373 / 374),改动只在
+`api/mcp_server.py`,不碰扫描判定面。三个守卫
+(`test_phase372_mcp_structured_errors.py` 16 例、
+`test_phase373_mcp_truncation.py` 9 例、
+`test_phase374_mcp_annotations.py` 4 例)与变异对照
+`dev/phase372_374_mutations.py`(**3/3**,baseline 绿 → mutated 红 →
+restored 绿)同轮落地。共同边界:**新字段只在声明现代协议版本的帧上附加**
+——Phase 358 承诺 legacy 逐字节兼容,`test_phase324_mcp_http.py` 也钉住
+legacy 错误结果没有 `structuredContent`。
+
+如实更正一处措辞:#3 并非「零行为变化」——`run_param_mine_tool` 的
+`discovered_count` 从「总数」改为「实际返回条数」(此前返回前 200 行却报
+总数),已在 `CHANGELOG.md` 的 `[Unreleased] / Changed` 明示。
+下一步仍是 **#6 → #4 → #7 → 评估 8–11**;**8.1-1 的默认策略仍未拍板,继续不动**。
