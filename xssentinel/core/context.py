@@ -175,6 +175,33 @@ def find_reflected_marker(text: str, marker: str) -> str | None:
     return text[index:index + len(marker)]
 
 
+def find_prefix_encoded_marker(text: str, marker: str) -> tuple[str, int] | None:
+    """Detect a marker whose LEADING characters came back entity-encoded.
+
+    XSSMaze encodingedge/level4 entity-encodes only the first ten characters
+    of the input: the plain marker reflects, but its first ten characters
+    arrive as ``&#x..;`` while the tail is literal, so ``find_reflected_marker``
+    (a literal search) reports "not reflected" and the parameter is skipped
+    before any payload is tried.  Digits and punctuation are left alone by
+    that encoder, so only the alphabetic characters of the prefix are
+    rewritten here.
+
+    Returns ``(marker, prefix_len)`` when a prefix of at least 4 characters
+    was encoded, else None.  A FULLY encoded marker is deliberately not
+    reported: that is the ordinary escaped-reflection case, already covered
+    by ``is_marker_escaped`` and the Phase 27-1 budget cut.
+    """
+    if not text or not marker or len(marker) < 6:
+        return None
+    for k in range(len(marker) - 1, 3, -1):
+        prefix = "".join(
+            f"&#x{ord(ch.lower()):x};" if ch.isalpha() else ch
+            for ch in marker[:k])
+        if prefix + marker[k:] in text:
+            return marker, k
+    return None
+
+
 def is_marker_escaped(text: str, marker: str) -> bool:
     """True when the marker reflected but the input around it was encoded.
 

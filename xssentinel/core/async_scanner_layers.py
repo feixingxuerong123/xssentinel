@@ -8,7 +8,6 @@ source and compares it against the pre-split snapshot.
 """
 from __future__ import annotations
 import asyncio
-import re
 import secrets
 from typing import AsyncIterator
 from urllib.parse import urlencode
@@ -21,6 +20,7 @@ from . import reflection_profile as rp_mod   # Phase 37: reflection-profile pari
 from . import generator as gen_mod            # Phase 37: generative payload parity
 from . import bypass as bypass_mod            # Phase 29-2: WAF bypass chains
 from . import verifier
+from . import quote_escaping as qe_mod
 from . import pre_encode as pre_mod
 from . import cors_check as cors_mod   # Phase 54: sync CORS audit parity
 from . import dom_engine as dom_engine_mod  # Phase 65: DOM-dynamic parity
@@ -1828,9 +1828,7 @@ class AsyncDetectionLayersMixin:
         One request per parameter buys the marker-form fan-out only where
         it can matter.
         """
-        t1 = "xssq_" + secrets.token_hex(3)
-        t2 = "xssq_" + secrets.token_hex(3)
-        probe_payload = "<script>alert('%s');alert(\"%s\")</script>" % (t1, t2)
+        t1, t2, probe_payload = qe_mod.build_quote_probe()
         send_params, send_data = self._probe_kv(
             params, data, param, probe_payload, is_body)
         try:
@@ -1849,8 +1847,7 @@ class AsyncDetectionLayersMixin:
             raise
         except Exception:
             return False
-        return bool(re.search(r"\\+['\"]" + re.escape(t1), text)
-                    or re.search(r"\\+['\"]" + re.escape(t2), text))
+        return qe_mod.quote_escaping_detected(text, t1, t2)
 
     async def _fire_probe_variants(self, session, url, method, param,
                                    params, data, is_body, context, marker,

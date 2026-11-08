@@ -83,6 +83,12 @@ COVERAGE = {
     "L1_pre_encoded": (["pe_vuln"], "added in Phase 122 (param_value container)"),
     "L1_reflection_profile": (["raw_*", "attr_*"], "helper: runs on every reflection case"),
     "L1_marker_forms": (["raw_*", "attr_*"], "helper: Phase 356 fan-out, one plain probe per quoting shape before the transform ladder"),
+    # Phase 371: Phase-364 reflection shapes.  No manifest mode exercises
+    # them (they are XSSMaze-specific); None is the matrix's honest "no case"
+    # marker and puts them on the next case-writing shopping list.
+    "L1_srcdoc_entity": (None, "Phase 364: entity-spelled handler in iframe[srcdoc]; XSSMaze html5-sanitizer/level2"),
+    "L1_js_callback": (None, "Phase 364: backtick dialog call in a JS response; XSSMaze callback/level2"),
+    "L1_param_name": (None, "Phase 364: inject into the parameter NAME; XSSMaze realworld/level5"),
     "L2_position_shift": (["pshift_vuln"], "added in Phase 122 (WAF guards body only)"),
     "L7_cors": (["cors_reflect"], "added in Phase 113"),
     "L7_nonce_bypass": (["csp_nonce_*"], "partial (nonce-leak chain)"),

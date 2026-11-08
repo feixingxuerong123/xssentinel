@@ -43,6 +43,7 @@ HIERARCHIES = {
         ("scanner_stored_auto.py", "StoredAutoMixin"),
         ("scanner_layers.py", "AdvancedLayerMixin"),
         ("scanner_crawl.py", "CrawlMixin"),
+        ("scanner_shapes.py", "ShapesMixin"),
     ),
     "AsyncScanner (async)": (
         ("async_scanner.py", "AsyncScanner"),

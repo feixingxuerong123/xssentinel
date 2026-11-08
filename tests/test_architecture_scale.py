@@ -43,6 +43,9 @@ BUDGETS = {
     "scanner.py": 2650,
     "scanner_layers.py": 1050,
     "scanner_crawl.py": 550,
+    # Phase 371: three Phase-364 shape probes moved out of scanner.py
+    # (193 lines measured at split time) so the core stays under its ceiling.
+    "scanner_shapes.py": 215,
     "scanner_stored.py": 1200,
     # Phase 352: stored auto-discovery is its own Mixin (125 lines measured)
     # so the stored round-trip file stays under its ceiling.

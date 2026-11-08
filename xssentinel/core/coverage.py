@@ -102,6 +102,12 @@ LAYERS: list[tuple[str, str, str]] = [
     ("L8_request",            "Request-level checks (async shim)", "L8"),
     ("L9_scenario",           "Scenario replay",                  "L9"),
     ("L9_upload_filename",    "Upload filename probing",          "L9"),
+    # Phase 371: three Phase-364 reflection-shape probes (now in
+    # scanner_shapes.py) used touch_layer() with ids that were never
+    # registered, so their rows vanished from every coverage report.
+    ("L1_srcdoc_entity",      "Entity-spelled handler in srcdoc", "L1"),
+    ("L1_js_callback",        "JavaScript-response callback",     "L1"),
+    ("L1_param_name",         "Parameter-name injection",         "L1"),
 ]
 
 LAYER_IDS = {lid for lid, _, _ in LAYERS}

@@ -20,6 +20,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 
 from . import payloads, transform
+from . import quote_escaping as qe_mod
 from .budget import BudgetExhausted, CircuitOpen
 from . import context as ctx
 from . import waf as wafmod
@@ -88,6 +89,7 @@ from .scanner_stored import StoredBlindMixin  # noqa: E402
 from .scanner_stored_auto import StoredAutoMixin  # noqa: E402
 from .scanner_layers import AdvancedLayerMixin  # noqa: E402
 from .scanner_crawl import CrawlMixin  # noqa: E402
+from .scanner_shapes import ShapesMixin  # noqa: E402
 from .stealth import marker as _stem_marker  # noqa: E402
 
 
@@ -126,7 +128,8 @@ def _set_json_leaf(obj, path: str, value) -> None:
     cur[tokens[-1]] = value
 
 
-class Scanner(StoredBlindMixin, StoredAutoMixin, AdvancedLayerMixin, CrawlMixin):
+class Scanner(StoredBlindMixin, StoredAutoMixin, AdvancedLayerMixin,
+             CrawlMixin, ShapesMixin):
     # Which engine produced these findings.  Until this existed the artifact
     # could not answer the question at all: `--async` with aiohttp missing
     # falls back to this class (cli_runner._run_async_scan returns None), and
@@ -717,6 +720,11 @@ class Scanner(StoredBlindMixin, StoredAutoMixin, AdvancedLayerMixin, CrawlMixin)
             self._check_cancel()
             return
         reflected_marker = ctx.find_reflected_marker(resp.text, marker)
+        # Phase 364: leading-prefix entity encoding (XSSMaze
+        # encodingedge/level4 encodes only the first N characters of the
+        # input).  The literal search above misses that spelling, so the
+        # parameter used to be abandoned before any payload was tried.
+        _prefix_pad = 0
         if reflected_marker is None:
             # Phase 178c: a container param whose endpoint echoes only the
             # DECODED value shows nothing for a plain marker probe -- and
@@ -735,12 +743,29 @@ class Scanner(StoredBlindMixin, StoredAutoMixin, AdvancedLayerMixin, CrawlMixin)
                                            method=method, confirmed=True)
                 self.coverage.record_finding(url, method)
                 return
-            # Phase 306: the parameter may itself be decoded by the app
-            # (base64 / multi-URL-decode) rather than being a container the
-            # scanner wrapped.  Bounded encoding-first pass; see helper.
-            self._try_encoding_first(req, url, method, params, data, param,
-                                     is_body, resp)
-            return  # not reflected -> skip
+            _prefix_hit = ctx.find_prefix_encoded_marker(resp.text, marker)
+            if _prefix_hit is not None:
+                reflected_marker, _prefix_pad = _prefix_hit
+            else:
+                # Phase 364: some endpoints echo only parameter NAMES, never
+                # values (XSSMaze realworld/level5 renders "Parameters: ...").
+                # A value-only probe therefore sees zero reflection on a
+                # genuinely exploitable parameter.  The name channel is
+                # bounded and only paid when the tiny response literally
+                # contains this parameter's name.
+                if self._try_param_name_injection(
+                        req, url, method, params, data, param, is_body, resp):
+                    self.coverage.record_param(url, param, in_body=is_body,
+                                               method=method, confirmed=True)
+                    self.coverage.record_finding(url, method)
+                    return
+                # Phase 306: the parameter may itself be decoded by the app
+                # (base64 / multi-URL-decode) rather than being a container
+                # the scanner wrapped.  Bounded encoding-first pass; see
+                # helper.
+                self._try_encoding_first(req, url, method, params, data,
+                                         param, is_body, resp)
+                return  # not reflected -> skip
         # Phase 308: the application may have changed only the case of the
         # input.  Use the reflected spelling for context analysis and the
         # escaped-marker check.
@@ -838,6 +863,35 @@ class Scanner(StoredBlindMixin, StoredAutoMixin, AdvancedLayerMixin, CrawlMixin)
         if _rcd_tag and self.verbose:
             _log.debug(f"    [rcdata] reflection inside <{_rcd_tag}> -> "
                        "breakout variants lead the queue")
+        # Phase 364: same idea, three more measured shapes -- all generated
+        # from the existing queue, so a healthy endpoint pays nothing.
+        #   * prefix bypass: the sandwich probe was rejected outright while
+        #     the plain marker reflected (whole-value WAF) or only its
+        #     leading characters were entity-encoded (prefix encoder).
+        #   * noscript breakout: the token sits in RAWTEXT.
+        #   * srcdoc entity: the token sits in an iframe[srcdoc] value.
+        if profile is None and not marker_escaped:
+            _prefixes = (("0" * _prefix_pad, "\x00") if _prefix_pad
+                         else rp_mod.PREFIX_BYPASS_PREFIXES)
+            bases, _pfx_tag = rp_mod.surface_prefix_bypasses(bases, _prefixes)
+            if _pfx_tag and self.verbose:
+                _log.debug(f"    [prefix] probe rejected -> {_prefixes} "
+                           "variants lead the queue")
+        _nos_seeds = None
+        if isinstance(profile, dict) and profile.get("noscript_tag"):
+            # The reflection may be classified as url_href (meta refresh) or
+            # something else; the breakout itself must be a real tag, so seed
+            # from the HTML corpus head instead of the classified corpus.
+            _nos_seeds = self._build_candidates("html_element", False)[0][:3]
+        bases, _nos_tag = rp_mod.surface_noscript_breakouts(
+            profile, bases, seeds=_nos_seeds)
+        if _nos_tag and self.verbose:
+            _log.debug("    [noscript] reflection inside <noscript> -> "
+                       "breakout variants lead the queue")
+        bases, _srcdoc_tag = rp_mod.surface_srcdoc_entities(profile, bases)
+        if _srcdoc_tag and self.verbose:
+            _log.debug("    [srcdoc] reflection inside iframe[srcdoc] -> "
+                       "entity-spelled handler variants lead the queue")
         # Phase 95: profile-backed escape convergence.  ``is_marker_escaped``
         # looks at the characters ADJACENT to the marker, but for a plain
         # alphanumeric marker echoed inside an element body those neighbours
@@ -985,6 +1039,33 @@ class Scanner(StoredBlindMixin, StoredAutoMixin, AdvancedLayerMixin, CrawlMixin)
                 and not is_body):
             confirmed = self._try_encoding_first(
                 req, url, method, params, data, param, is_body, resp)
+        # Phase 364: a callback/JSONP endpoint answers with Content-Type
+        # application/javascript and echoes the value as the function name.
+        # The HTML corpus is inert there (the endpoint strips parentheses),
+        # while a backtick call survives verbatim.  One request, and only on
+        # a script media type -- measured XSSMaze callback/level2.
+        if (not confirmed and not marker_escaped and not csp_strict
+                and not is_body):
+            confirmed = self._try_js_callback(
+                req, url, method, params, data, param, is_body, resp)
+            if confirmed:
+                self.coverage.record_param(url, param, in_body=is_body,
+                                           method=method, confirmed=True)
+                self.coverage.record_finding(url, method)
+        # Phase 364: handler-stripping sanitizers (XSSMaze
+        # html5-sanitizer/level2 removes every literal ``on*=`` while the
+        # browser still decodes entities inside an attribute VALUE such as
+        # iframe[srcdoc]).  One bounded probe per unconfirmed HTML-element
+        # reflection; the verifier only confirms an executable tree, so a
+        # healthy endpoint pays one request and gains nothing.
+        if (not confirmed and not marker_escaped and not csp_strict
+                and not is_body and context == "html_element"):
+            confirmed = self._try_srcdoc_bypass(
+                req, url, method, params, data, param, is_body, context)
+            if confirmed:
+                self.coverage.record_param(url, param, in_body=is_body,
+                                           method=method, confirmed=True)
+                self.coverage.record_finding(url, method)
         # Phase 308: a case-inverting application turned our lowercase
         # <script>/alert/token into uppercase, so every payload above is
         # dead.  A swap-cased payload is restored by the same transform; the
@@ -2114,9 +2195,7 @@ class Scanner(StoredBlindMixin, StoredAutoMixin, AdvancedLayerMixin, CrawlMixin)
         a guess about the filter's name.  One request per parameter buys the
         marker-form fan-out only where it can matter.
         """
-        t1 = "xssq_" + secrets.token_hex(3)
-        t2 = "xssq_" + secrets.token_hex(3)
-        probe_payload = "<script>alert('%s');alert(\"%s\")</script>" % (t1, t2)
+        t1, t2, probe_payload = qe_mod.build_quote_probe()
         send = self._set_param(params, data, param, probe_payload, is_body)
         send_params, send_data = self._skip_filtered(
             send["params"], send["data"])
@@ -2128,8 +2207,7 @@ class Scanner(StoredBlindMixin, StoredAutoMixin, AdvancedLayerMixin, CrawlMixin)
         except Exception:
             return False
         text = getattr(resp, "text", "") or ""
-        return bool(re.search(r"\\+['\"]" + re.escape(t1), text)
-                    or re.search(r"\\+['\"]" + re.escape(t2), text))
+        return qe_mod.quote_escaping_detected(text, t1, t2)
 
     def _probe_reflection_profile(self, req, url, method, params, data,
                                   param, is_body):
