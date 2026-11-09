@@ -78,6 +78,18 @@
   补充观察**不进分母**。`scoring_policy` 与 `## Why no score` 写明限定;
   守卫 `tests/test_phase380_juice_cross_tool.py` 钉住口径全文、URL 派生的
   可达性、官方答案键、分母边界与 MD/JSON 逐字节同源。
+- **Phase 381 / 官方 XSS 挑战逐例投递事实表**:`benchmark/run_juice_challenges.py`
+  从目标自带 `challenges.yml` 读取 9 个 `category: XSS` 挑战(含 bonus
+  payload),对 2026-11-09 未覆盖的 7 个逐例测量「能否投递 + 服务端回读成什么」,
+  产物 `benchmark/results/juice_challenges_20261110.{json,md}`。**只发布
+  事实,不计算任何率**:7 个不是 7 个可比用例(认证写入 / hash fragment /
+  6 星前置阻塞混合),且「字段里存了 payload」不等于「SPA 渲染执行」。
+  实测 delivered 2 / accepted_not_reflected 3 / blocked 1 / fragment_only 1;
+  `blocked` 行零请求、写明原因、不进分母。判据只认**本轮请求自己的
+  解码后响应字段**,避免早前运行留下的持久化状态冒充回读证据;
+  `tree` 拿不到归属即 ABORT,不写 `unknown`。守卫
+  `tests/test_phase381_juice_challenges.py`(9 例)钉住官方 key 集合、
+  投递形状、verdict 证据来源、解码比较(AST)与 MD/JSON 逐字节同源。
 
 ### Changed
 - **Phase 373 / 截断显式化**:`scan` 与 `param_mine` 结果补 `total_findings` /
@@ -190,6 +202,23 @@
   记账,不当绿也不当回归,详见 AGENTS.md「当前状态」补记);
   **`full 194` 两档与全量分批门禁本轮未跑**,判定面零改动、
   不拿 11-09 的门禁数字顶账。
+- **Phase 381 / 逐例投递事实表(2026-11-10,树 `f9ec777`)**:真实靶场
+  18900 上对 7 个未覆盖官方挑战各跑一次投递测量,7 行全有客观证据
+  (HTTP 状态、解码后服务端回显、原因)。delivered 2 是
+  `PUT /api/Products/1` 与 `True-Client-IP → /rest/saveLoginIp`;
+  accepted_not_reflected 3 分别是 username 被改写、feedback 的
+  `comment` 被 sanitizer 剥成空串、legacy 页不回显;
+  `videoXssChallenge` 因缺 6 星前置能力**未发任何请求**;
+  `xssBonusChallenge` 用官方 bonus payload 跑真实 CLI 得 1 条
+  `dom_dynamic`(6.26s),但注入点在 URL fragment,HTTP 请求不携带。
+  **三处测量口径自我纠正**:JSON 转义导致原文包含误判、历史持久化
+  数据污染回读、沙箱内 `git` 被拒导致 `tree: "unknown"` ⇒ 分别改为
+  解码字段比较、只认本轮响应、拿不到归属即 ABORT。守卫
+  **9 passed / 0 skip**,变异 `dev/phase381_mutations.py` **11/11**
+  (每个变异只跑一个具名 node,字节已还原),回归组
+  **39 passed / 0 skip**,ruff 全仓 `All checks passed`。
+  **四档 strict gate 与全量分批门禁本轮未跑**,判定面零改动,
+  不拿 11-09 数字顶账。
 
 ## [1.4.4] - 2026-11-08
 

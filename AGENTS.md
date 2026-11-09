@@ -277,6 +277,49 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
   不当绿也不当回归**;判定面本轮零改动(只删一个未使用 import),
   不拿 11-09 的四档数字顶账。`full 194` 两档与全量分批门禁
   **本轮未跑**,下轮环境干净时一并补跑并诊断该挂起形态。
+- **Phase 381 / 官方 XSS 挑战逐例投递事实表(2026-11-10,树 `f9ec777`)**:
+  承接 Phase 379「9 个官方挑战只覆盖 2 个」的空白,在**同一个**官方
+  Juice Shop v20.2.0 真实目标上对另外 7 个逐例测量「能不能投递、
+  服务端回读成什么」,仍**不出任何率**:
+  - runner `benchmark/run_juice_challenges.py` 从目标自带的
+    `data/static/challenges.yml` 读 9 个 `category: XSS` 挑战的
+    key/name/difficulty/disabledEnv 与 bonus payload(不凭记忆手写);
+    产物 `benchmark/results/juice_challenges_20261110.{json,md}`。
+  - 实测 7 行:**delivered 2**(`restfulXssChallenge` PUT
+    `/api/Products/1` 的 `description` 原样回读、`httpHeaderXssChallenge`
+    `True-Client-IP` → `/rest/saveLoginIp` 的 `lastLoginIp` 原样回读);
+    **accepted_not_reflected 3**(`persistedXssUserChallenge` 201 但
+    username 被改写成 `rc="javascript:alert(...)">`、
+    `persistedXssFeedbackChallenge` 201 但 `comment` 被 sanitizer 剥成空串、
+    `usernameXssChallenge` legacy 页 200 但 username 参数不回显);
+    **blocked 1**(`videoXssChallenge` 官方 hint 要求先拿到另一个 6 星
+    文件写入能力,本轮**零请求**、写明原因、不进任何分母);
+    **fragment_only 1**(`xssBonusChallenge` 注入点在 URL fragment,
+    用官方 bonus payload 跑了一次真实 CLI,1 条 `dom_dynamic`,6.26s)。
+    **delivered 只表示「本轮请求自己的响应里字段值等于 payload」,
+    不表示浏览器执行**;SPA 渲染与跨工具可达性未测。
+  - **三处自我纠正(都是测量口径,不是产品问题)**:① JSON 里引号被转义,
+    `payload in r.text` 会把原样存储误判成未回显 ⇒ 改为解析后比较
+    **解码字段值**;② 首版用 `/api/Users` 列表与 JWT 快照作回读,
+    命中了**前几轮试跑写入的持久化状态** ⇒ 判据收紧为「只认本轮
+    请求自己的响应」,列表/快照降为补充字段;③ 本沙箱 Python 子进程
+    调 `git` 被 `WinError 5` 拒绝,`_git_head()` 首版静默写
+    `tree: "unknown"` ⇒ 改为**拿不到归属就 ABORT**,由调用方传
+    `--tree f9ec777`;守卫钉住不得回潮。
+  - 守卫 `tests/test_phase381_juice_challenges.py` **9 passed / 0 skip**:
+    钉住口径全文与 counts 无分数字段、9 个官方 key 集合与 `PLANS`
+    同源、投递形状客观、verdict 只认本轮响应、`_carries` 必须比较
+    解码值(AST)、`_git_head` 不得静默 unknown、MD/JSON 逐字节同源、
+    bonus CLI 只是事实。变异 `dev/phase381_mutations.py` **11/11**
+    (每个变异只跑一个具名 node),源码/产物字节已还原。
+  - **边界**:7 个不是 7 个独立靶、更不是 7 个可比用例;不与 XSSMaze
+    1013 例 / 194 矩阵 / Phase 379 的 5 面 / Phase 380 的跨工具表并列,
+    不改变唯一官方跑分口径。靶场被本轮写入 3 个 throwaway 用户、
+    2 条 feedback 与 lastLoginIp,产品 1 的 `description` 已恢复;
+    `dev/_*` 不进版本库。验收(本轮自己的运行):守卫 9 passed / 0 skip、
+    变异 11/11、回归组(含 Phase 380 守卫)**39 passed / 0 skip**、
+    ruff 全仓零基线。**四档 strict gate 与全量分批门禁本轮未跑**
+    (判定面零改动;上轮 quick 补跑挂起仍记为未验证),不拿旧数字顶账。
 - **验收(本轮自己的运行,引用带跳过数)**:四档 strict gate 全 exit 0——
   quick 64 sync **0 SKIP**、quick 64 async **1 SKIP**、full 194 sync
   **0 SKIP**、full 194 async **12 SKIP**,全部 FP0/FN0/ERROR0;官方 XSSMaze
