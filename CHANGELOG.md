@@ -146,6 +146,21 @@
   工作区外,并用 `PYTEST_ADDOPTS='-o tmp_path_retention_policy=all -o
   tmp_path_retention_count=10000'` 关掉该清理 ⇒ R3 全绿。上面各 Phase
   当时写的「未跑」是带日期的历史记账,保留不改。
+- **真实外部应用靶场(2026-11-09,树 `ba1016c`)**:用官方 OWASP Juice Shop
+  v20.2.0 release(MD5 与官方一致 `1191bb6e…`,126,207,633 B)作第三方目标,
+  `dev/juiceshop_external.py` 的 5 种投递方式全 exit 0:**4/5 面各 1 条
+  `dom_dynamic` / high / `browser-executed`**,REST 面 0(`surfaces` 已测该面
+  `reflects=False`),控制面零误报(`/redirect` 仅 HTML 转义、feedback 入库即被
+  `sanitize-html` 剥离)。对照官方 `challenges.yml` 的 9 个 XSS 挑战,本轮
+  **只覆盖 2 个**(DOM / Reflected),其余 7 个根本未投递 ⇒ 既非 TP 也非 FN,
+  不得据此计算任何率。完整判词与复现命令见
+  `benchmark/results/juiceshop_external_20261109.md`。**环境**:XSSMaze 因
+  `wsl.exe` 被安全策略拉黑(明确不得重试或等价绕过)、Docker daemon 不可用而
+  放弃;Juice Shop 的 `build/` + `node_modules/` 曾被工作区清空删除,本轮经
+  GitHub API 查 release + `ghfast.top` 镜像取回官方包,解压 44,140 文件
+  (`dev/_*` 已被 gitignore,不进版本库)。**未做跨工具同台对跑**:dalfox /
+  nuclei 输出口径不同且 hash 路由非其设计输入面,仓促对比会误导,留作单列一轮。
+  本报告不与 XSSMaze 1013 例、194 自编矩阵或商业工具并列。
 
 ## [1.4.4] - 2026-11-08
 

@@ -224,6 +224,19 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
   50 次/turn 删除守卫。修法零产品改动:`dev/batched_gate_scratch.py`
   重定向日志 + `PYTEST_ADDOPTS` 关掉清理 ⇒ R3 全绿。
   **带日期的历史「未跑」记账一律保留不改**,本条只追加新证据。
+- **Phase 379 / 真实外部应用靶场(2026-11-09,树 `ba1016c`)**:用官方 OWASP
+  Juice Shop v20.2.0 release(MD5 校验一致)作第三方真实目标,
+  `dev/juiceshop_external.py` 5 面全 exit 0:**4 面各 1 条 `dom_dynamic` /
+  high / `browser-executed`**,REST 面 0(该面独立测得 `reflects=False`),
+  控制面 FP 0。对照官方 `challenges.yml` 的 9 个 XSS 挑战**只覆盖 2 个**
+  (DOM / Reflected),其余 7 个未投递、既非 TP 也非 FN ⇒ **5 是同一应用的
+  5 种调用形态,不是 5 个独立靶,任何率都不得计算**。证据与不可比项见
+  `benchmark/results/juiceshop_external_20261109.md`。环境:XSSMaze 因
+  `wsl.exe` 被安全策略拉黑 + Docker daemon 不可用而**放弃**(需仓库归属者
+  到安全中心解除黑名单);Juice Shop 的 `build/`+`node_modules/` 曾被清空,
+  经 GitHub API + `ghfast.top` 镜像取回官方包、MD5 校验、解压 44,140 文件
+  (`dev/_*` 被 gitignore,不进版本库)。**跨工具同台对跑未做**(口径与
+  hash 路由适配问题,单列一轮),不与 XSSMaze 1013 例 / 194 矩阵 / 商业工具并列。
 - **验收(本轮自己的运行,引用带跳过数)**:四档 strict gate 全 exit 0——
   quick 64 sync **0 SKIP**、quick 64 async **1 SKIP**、full 194 sync
   **0 SKIP**、full 194 async **12 SKIP**,全部 FP0/FN0/ERROR0;官方 XSSMaze

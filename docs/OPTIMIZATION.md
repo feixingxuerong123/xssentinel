@@ -1371,3 +1371,40 @@ tmp_path_retention_count=10000'` 关掉旧目录清理。补一次 A/B
 在终树上全部通过;R1/R2 不当绿也不当回归。
 
 **下一步仍是评估 8–11(P2),#1 授权范围默认策略仍未拍板。**
+
+### 8.12 处置记录(2026-11-09 四续):补一块真实外部应用证据
+
+用户转向「外部靶场」。先按 §1.0 的分级确认了两条本地路径都被环境卡住:
+XSSMaze 官方靶要 Docker,而 `wsl.exe` 被本机安全策略**明确拉黑**
+(工具明确要求不得重试、不得找等价绕过),`docker version` 连不上 daemon;
+Juice Shop 的 `build/app.js` + `node_modules/` 已被 2026-10 工作区清空删除
+(`dev/juiceshop_external.py` 的 docstring 早就写明这是环境事实、不是目标事实)。
+
+**先修环境再量**,没有拿历史数字充数:经直连 `api.github.com` 查
+v20.2.0 的 release assets,取 `node22_win32_x64` 自包含包,经
+`ghfast.top` 镜像下载 126,207,633 B,官方 `.md5` 与实际 `md5sum` 一致,
+解压 44,140 文件(`build/app.js` + 848 个 node_modules 包)。`dev/_*`
+已被 gitignore,恢复物不进版本库。Node 22 + `NO_PROXY` 全程固定。
+
+**结果(终树 `ba1016c`,5 面全 exit 0 / requests_failed 0)**:
+`oneshot` / `discover` / `dom-route` / `dom-route-result` 各 1 条
+`dom_dynamic` high `browser-executed`;`api-surface` 0(该面 `surfaces`
+独立测得 `reflects=False`);`writes` 证明 `/redirect` 仅转义、feedback
+被 sanitizer 剥离 ⇒ 控制面 FP 0。逐面 requests 249 / 3609 / 25 / 9 / 9,
+耗时 48.5 / 318.5 / 1.6 / 6.4 / 6.4s。**`discover` 用 3609 次请求才拿到
+与 `oneshot` 相同的 1 条,是成本事实不是能力差异。**
+
+**最关键的一条限定**:官方 `data/static/challenges.yml` 有 9 个 XSS 挑战,
+本轮 5 面**只覆盖 2 个**(`localXssChallenge` / `reflectedXssChallenge`);
+其余 7 个(API-only、CSP Bypass、两个 persisted、HTTP-Header、Video、
+Bonus Payload)本轮根本没投递 ⇒ 既非 TP 也非 FN,不计入任何分母。
+**5 是同一应用的 5 种调用形态,不是 5 个独立靶**,把「4/5 面命中」写成
+80% 检出率、或与 XSSMaze 1013 例并列,都是错的。
+
+**明确未做**:跨工具同台对跑。dalfox v2.13.0 / nuclei v3.9.0 都在本机,
+但输出格式与「什么算 finding」口径不同,且 Angular hash 路由不是二者的
+设计输入面;仓促对跑只会产出误导性对比。要做需先定统一判定口径、
+工具版本清单与逐例矩阵,单列一轮。商业工具对跑仍是空白(§1.0)。
+
+证据与复现:`benchmark/results/juiceshop_external_20261109.md`。
+下一步仍以 **评估 8–11 / #1 待拍板** 为准。
