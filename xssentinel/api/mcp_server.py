@@ -124,6 +124,19 @@ LATEST_PROTOCOL_VERSION = "2025-06-18"
 CURRENT_PROTOCOL_VERSION = MODERN_PROTOCOL_VERSIONS[-1]
 _META_VERSION_KEY = "io.modelcontextprotocol/protocolVersion"
 _META_SERVER_INFO_KEY = "io.modelcontextprotocol/serverInfo"
+#: Phase 376 / OPTIMIZATION.md §8.2 #4: a modern client declares its own
+#: per-call wall-clock limit here.  The server folds it into the tool's
+#: ``max_seconds`` with min(client, server) -- a client can SHORTEN a scan,
+#: never lengthen one.  Custom namespace: the MCP spec leaves ``_meta``
+#: keys to implementations, and no standard key carries this value.
+_META_CLIENT_TIMEOUT_KEY = "io.xssentinel/clientTimeoutMs"
+#: ONE definition of the default scan budget.  Schema default, the runner's
+#: fallback and server/discover all read this instead of hand-writing 300.
+_DEFAULT_MAX_SECONDS = 300
+#: Mainstream MCP hosts time a single tool call out at 30-120s.  We do NOT
+#: lower the server default (that would silently truncate existing scans);
+#: we advertise the platform reality so the client declares its own limit.
+_RECOMMENDED_TIMEOUT_MS = 120000
 #: Error codes the 2026-07-28 revision allocates from the reserved range.
 _ERR_UNSUPPORTED_VERSION = -32022
 _ERR_HEADER_MISMATCH = -32020
@@ -217,11 +230,14 @@ _TOOL_SCAN_SCHEMA = {
             "description": "Per-request timeout in seconds.",
         },
         "max_seconds": {
-            "type": "integer", "default": 300, "minimum": 5, "maximum": 3600,
+            "type": "integer", "default": _DEFAULT_MAX_SECONDS,
+            "minimum": 5, "maximum": 3600,
             "description": ("Wall-clock budget for the whole call (Phase "
                             "327). The scan stops at the next request once "
                             "it expires and returns an error -- a scan that "
-                            "ran out of time is NOT 'no findings'."),
+                            "ran out of time is NOT 'no findings'. A modern "
+                            "client's _meta.clientTimeoutMs can only LOWER "
+                            "this value (Phase 376)."),
         },
     },
     "required": ["url"],
@@ -477,6 +493,10 @@ _TOOL_SCAN_OUTPUT = {
         "total_findings": {"type": "integer"},
         "truncated": {"type": "boolean"},
         "truncation_hint": {"type": ["string", "null"]},
+        # Phase 376: the budget the runner ACTUALLY used, after folding in
+        # a client-declared timeout.  Without it an agent cannot tell
+        # whether its _meta budget was honoured.
+        "effective_max_seconds": {"type": "integer"},
         "findings": {
             "type": "array",
             "items": {
@@ -1101,7 +1121,9 @@ def run_scan_tool(args: dict, cancel_event=None, emit=None) -> dict:
     # seconds, and a wall-clock deadline guarantees the agent gets an
     # answer (success or honest error) instead of a call that never ends.
     timeout = int(args.get("timeout", 15) or 15)
-    max_seconds = max(5, min(int(args.get("max_seconds", 300) or 300), 3600))
+    max_seconds = max(5, min(
+        int(args.get("max_seconds", _DEFAULT_MAX_SECONDS)
+            or _DEFAULT_MAX_SECONDS), 3600))
     err = _preflight(args, base_url, budget_s=min(5.0, float(timeout)))
     if err:
         return {"content": [{"type": "text", "text": err}], "isError": True}
@@ -1141,6 +1163,9 @@ def run_scan_tool(args: dict, cancel_event=None, emit=None) -> dict:
         "total_findings": total_findings,
         "truncated": truncated,
         "truncation_hint": _TRUNCATION_HINT if truncated else None,
+        # Phase 376: what the runner ACTUALLY used (after min(client,
+        # server)).  An agent can verify its _meta budget was honoured.
+        "effective_max_seconds": max_seconds,
         "findings": findings,
     }
     return {"content": [{"type": "text",
@@ -1724,6 +1749,21 @@ def _discover_result() -> dict:
         "instructions": _INSTRUCTIONS,
         "ttlMs": 3600000,
         "cacheScope": "public",
+        # Phase 376 / OPTIMIZATION.md §8.2 #4: the platform timeout reality
+        # was invisible -- the server advertised no budget at all while
+        # defaulting to 300s on a host that usually kills the call at
+        # 30-120s.  Declare both, and tell the client the ONE key it can
+        # use to make the server stop before ITS OWN deadline.
+        "recommendedTimeoutMs": _RECOMMENDED_TIMEOUT_MS,
+        "defaultMaxSeconds": _DEFAULT_MAX_SECONDS,
+        "clientBudgetMetaKey": _META_CLIENT_TIMEOUT_KEY,
+        "budgetPolicy": (
+            "Declare your per-call timeout in milliseconds at "
+            f"params._meta['{_META_CLIENT_TIMEOUT_KEY}']. The server uses "
+            "min(client budget, max_seconds) as the wall-clock limit, so a "
+            "client can shorten a scan but never lengthen it. When the "
+            "limit is reached the tool returns an explicit timeout error, "
+            "NOT an empty finding list."),
     }
 
 
@@ -1854,6 +1894,21 @@ def _classify_tool_error(text: str) -> dict:
                           "arguments must be an object")):
         code = "invalid_request_shape"
         hint = "tools/call params and arguments must be JSON objects"
+    # Phase 376: these all contain the word "budget", so they MUST be
+    # classified before the generic timeout arm below.
+    elif text.startswith("client budget too small:"):
+        code = "invalid_argument_value"
+        field = _META_CLIENT_TIMEOUT_KEY
+        hint = "declare at least the max_seconds minimum, or omit the key"
+    elif text.startswith(f"invalid {_META_CLIENT_TIMEOUT_KEY}:"):
+        code = "invalid_argument_value"
+        field = _META_CLIENT_TIMEOUT_KEY
+        hint = "send a finite positive number of milliseconds"
+    elif "client-declared budget" in text:
+        code = "timeout"
+        retryable = True
+        hint = ("raise params._meta clientTimeoutMs or narrow the scan; "
+                "a timed-out scan is not 'no findings'")
     elif ("timed out" in text.lower() or "timeout" in text.lower()
           or "budget" in text.lower()):
         code = "timeout"
@@ -1933,7 +1988,62 @@ def _estimate_progress_total(name: str, arguments: dict) -> int:
     return max(1, n_params * max(1, payloads))
 
 
-def _tool_call(params, cancel_event=None, emit=None):
+# ---------------------------------------------------------------------------
+# Phase 376 / OPTIMIZATION.md §8.2 #4: client/server budget negotiation.
+#
+# Measured gap: max_seconds defaults to 300s while MCP hosts kill a single
+# tools/call at 30-120s.  The client disappears; the server keeps sending
+# attack payloads until its own budget runs out, and the client never gets
+# an answer.  Fix: let the client state its deadline in _meta, fold it into
+# the EXISTING max_seconds contract with min(client, server), and advertise
+# the policy on server/discover.  No new runner parameter, no new deadline
+# implementation -- _RequestGuard remains the one place that enforces time.
+#
+# Only MODERN frames negotiate (legacy frames keep their byte-for-byte
+# behaviour).  A malformed declaration is an explicit error, never a silent
+# fall back to the 300s default: ignoring "I time out at 30s" is the bug.
+# ---------------------------------------------------------------------------
+def _client_budget_seconds(params: dict):
+    """Parse ``params._meta`` client timeout -> ``(seconds, error_text)``."""
+    meta = params.get("_meta")
+    if not isinstance(meta, dict) or _META_CLIENT_TIMEOUT_KEY not in meta:
+        return None, None
+    raw = meta[_META_CLIENT_TIMEOUT_KEY]
+    if isinstance(raw, bool) or not isinstance(raw, (int, float)):
+        return None, (f"invalid {_META_CLIENT_TIMEOUT_KEY}: expected a "
+                      "positive number of milliseconds")
+    ms = float(raw)
+    # NaN and inf both fail the comparison; no ``math`` import needed.
+    if not (0 < ms < float("inf")):
+        return None, (f"invalid {_META_CLIENT_TIMEOUT_KEY}: expected a "
+                      "finite positive number of milliseconds")
+    return ms / 1000.0, None
+
+
+def _apply_client_budget(schema: dict, arguments: dict, budget_s: float):
+    """Fold a client budget into a tool's ``max_seconds`` argument.
+
+    Returns ``(arguments, error_text)``.  The SCHEMA decides whether a tool
+    has a wall-clock budget at all -- no hard-coded tool-name list that can
+    drift the next time a tool gains one.
+    """
+    prop = schema.get("properties", {}).get("max_seconds")
+    if prop is None:
+        return arguments, None
+    minimum = int(prop.get("minimum", 5))
+    if budget_s < minimum:
+        return None, (f"client budget too small: {budget_s:.3f}s is below "
+                      f"the {minimum}s minimum for max_seconds")
+    server_s = int(arguments.get("max_seconds") or prop.get(
+        "default", _DEFAULT_MAX_SECONDS))
+    out = dict(arguments)
+    # Floor, so the server never outlives the client's deadline; min, so a
+    # client can shorten a scan but NEVER lengthen one.
+    out["max_seconds"] = min(server_s, int(budget_s))
+    return out, None
+
+
+def _tool_call(params, cancel_event=None, emit=None, modern: bool = False):
     if not isinstance(params, dict):
         return {"content": [{"type": "text",
                              "text": "params must be an object"}],
@@ -1960,6 +2070,23 @@ def _tool_call(params, cancel_event=None, emit=None):
     if err:
         return {"content": [{"type": "text", "text": err}],
                 "isError": True}
+    # Phase 376: fold a MODERN client's declared deadline into the existing
+    # max_seconds contract.  Kept here, at the single dispatch point, so
+    # every runner sees one already-negotiated argument and no runner has
+    # to learn about protocol metadata.
+    client_budget_s = None
+    if modern:
+        budget_s, budget_err = _client_budget_seconds(params)
+        if budget_err:
+            return {"content": [{"type": "text", "text": budget_err}],
+                    "isError": True}
+        if budget_s is not None:
+            normalized, budget_err = _apply_client_budget(
+                schema, normalized, budget_s)
+            if budget_err:
+                return {"content": [{"type": "text", "text": budget_err}],
+                        "isError": True}
+            client_budget_s = budget_s
     if emit is not None:
         # Phase 375: every downstream emit (the beacon AND _RequestGuard's
         # per-request ticks) gets the same estimate and unit without any
@@ -1996,7 +2123,15 @@ def _tool_call(params, cancel_event=None, emit=None):
         return None                       # caller must NOT answer (MCP spec)
     except _ToolTimeout as e:
         # Phase 327: a spent budget is a visible failure, never silence.
-        return {"content": [{"type": "text", "text": str(e)}],
+        # Phase 376: when the CLIENT's deadline was the binding limit, the
+        # old hint ("raise max_seconds") is actively wrong -- the server
+        # would still be limited by the client.  Name the real knob.
+        text = str(e)
+        if client_budget_s is not None:
+            text += (f" (client-declared budget of {client_budget_s:g}s was "
+                     "the binding limit; raise params._meta "
+                     "clientTimeoutMs or narrow the scan)")
+        return {"content": [{"type": "text", "text": text}],
                 "isError": True}
 
 
@@ -2048,7 +2183,8 @@ def dispatch_message(msg: dict, *, cancel_event=None, emit=None):
                 catalogue = TOOL_DEFINITIONS
             return _ok({"tools": catalogue})
         if method == "tools/call":
-            result = _tool_call(msg.get("params"), cancel_event, emit)
+            result = _tool_call(msg.get("params"), cancel_event, emit,
+                                modern=modern)
             if result is None:
                 return None
             # Phase 372: structured errors are a MODERN-frame capability.

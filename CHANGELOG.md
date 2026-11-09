@@ -29,6 +29,18 @@
   时自动抬高,保证 `progress <= total`)与单位说明 `message`;`progress`
   仍是「已发请求数」、起始信标仍是 0,无 `progressToken` 时零通知。
   runner / `_RequestGuard` / transport 均未改。
+- **Phase 376 / §8.2 #4 ①② 客户端超时协商 + HTTP 断连中止**:`server/discover`
+  现在声明 `recommendedTimeoutMs`(120000) / `defaultMaxSeconds`(300) /
+  `clientBudgetMetaKey` / `budgetPolicy`;现代帧可用
+  `params._meta['io.xssentinel/clientTimeoutMs']` 声明自己的单次调用超时,
+  服务端按 `min(client, max_seconds)` 折进**既有**预算(只能缩短、不能抬高),
+  成功结果回显 `effective_max_seconds`,预算耗尽时错误明确点名客户端旋钮而
+  不再误导 Agent 去调 `max_seconds`。默认 300s 收敛为一个常量(schema /
+  runner / discover 同源)。legacy 帧行为不变;非法或过小的声明显式结构化报错
+  且**不启动扫描**。HTTP transport 增加 opt-in 断连观察:仅在 `tools/call`
+  且存在真实 socket 时用 `MSG_PEEK` 窥探 EOF(有 pipelined 数据不算断连),
+  命中后复用 stdio 既有的 `cancel_event`,在下一个请求边界停止外发攻击载荷;
+  Flask 适配器与单测上下文无 socket ⇒ 完全不武装。
 
 ### Changed
 - **Phase 373 / 截断显式化**:`scan` 与 `param_mine` 结果补 `total_findings` /
@@ -55,6 +67,21 @@
   `HEAD` 跑同一用例,同样 FAILED ⇒ 本机 loopback 劣化期环境形态,不是本轮回归,
   按「未验证」记账。**未跑全量分批门禁与四档 strict gate**:本轮是 MCP 接口层
   纯增量、判定面零改动,但不拿旧 run 数字顶上,下轮环境干净时补跑。
+- Phase 376 追加:`test_phase376_mcp_timeout_contract.py` **29 passed / 0 skip**
+  (真实 `dispatch_message` / `_tool_call` / `_RequestGuard` 链 + 真实
+  `socketpair` EOF + 「已取消零外发 / 未取消跑满 5 次」对照),变异对照
+  `dev/phase376_mutations.py` **4/4 通过**(`min`→`max` / `modern`→`False` /
+  删 discover 声明 / 断开 `cancel_event` 接线,各自 baseline 绿 → mutated 红
+  → restored 绿,源码字节已还原)。广回归 18 文件 **296 passed / 0 failed**,
+  102.4s;ruff 全仓 `All checks passed`。**本轮仍未跑全量分批门禁与四档
+  strict gate**:改动只在 MCP 传输层、判定面零改动;但基线组里昨晚 A/B
+  定性的 `test_phase327` 环境形态红已随 loopback 恢复转绿,按「绿和跑过是
+  两个词」不拿 11-08 的四档数字顶账。**补跑(2026-11-09,本轮自己跑)**:
+  quick 64 strict gate 双引擎各 exit 0 —— sync **64 scored / 0 SKIP**、
+  async **63 scored / 1 SKIP**,均 FP0 / FN0 / ERROR0(端口 18931 / 18932,
+  报告落 `dev/gate_run_scratch.py` 指定的工作区外 scratch 目录)。
+  **full 194 两档与全量分批门禁仍未跑**:判定面零改动;昨晚 A/B 定性的
+  `test_phase327` 环境形态红已随 loopback 恢复转绿,补跑 full 的条件具备。
 
 ## [1.4.4] - 2026-11-08
 

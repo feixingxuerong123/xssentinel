@@ -17,6 +17,8 @@ from __future__ import annotations
 import hmac
 import json
 import re
+import select
+import socket
 import sys
 import threading
 from datetime import datetime
@@ -432,10 +434,15 @@ def base_local_hosts(bind_host: str | None = None) -> set:
 
 class RequestCtx:
     """Per-request context shared with route handlers."""
-    def __init__(self, server: "StdlibServer", headers: dict) -> None:
+    def __init__(self, server: "StdlibServer", headers: dict,
+                 handler=None) -> None:
         self.server = server
         self.headers = headers
         self.api_key_valid = server._check_api_key(headers)
+        # Phase 376: the stdlib handler owns the client socket, which is
+        # the only place an HTTP disconnect can be observed.  Optional so
+        # the Flask adapter and unit contexts keep their old constructor.
+        self.handler = handler
 
 
 class Response:
@@ -841,6 +848,72 @@ def _handle_diff(ctx, m, body, query) -> Response:
 # independently -- the tools are stateless too, so a session would only be
 # state that can go stale.  Auth reuses the API server's ``--api-key``; the
 # shared same-origin gate (Phase 70/196) already polices browser callers.
+
+
+class _ClientDisconnectWatcher:
+    """Arm a cancel Event when the HTTP client's socket reaches EOF.
+
+    Phase 376 / OPTIMIZATION.md §8.2 #4.  Streamable HTTP has no in-band
+    cancellation notification: when the host times out and closes the
+    connection, the handler thread would keep sending ATTACK PAYLOADS until
+    its own ``max_seconds`` expired.  Watching for EOF arms the SAME
+    ``cancel_event`` that stdio's ``notifications/cancelled`` sets, so
+    ``mcp_server._RequestGuard._tick`` aborts at the next request boundary.
+    One cancellation contract, no new runner parameter, no new transport.
+
+    Only MSG_PEEK is used: a readable socket carrying data means the client
+    pipelined another request, NOT that it left.  Only an empty peek is EOF.
+    Strictly opt-in -- without a real socket (Flask adapter, unit contexts)
+    nothing is armed, ``active`` stays False and the dispatch keeps exactly
+    its previous behaviour.
+    """
+
+    POLL_S = 0.2
+
+    def __init__(self, sock) -> None:
+        self._sock = sock
+        self.cancel_event = threading.Event()
+        self._stop = threading.Event()
+        self._thread = None
+        self.active = False
+
+    def start(self) -> None:
+        if self._sock is None:
+            return
+        try:
+            # Cheap validity probe: select() rejects non-sockets outright.
+            select.select([self._sock], [], [], 0)
+        except (OSError, ValueError, TypeError):
+            return
+        self.active = True
+        self._thread = threading.Thread(
+            target=self._loop, name="mcp-disconnect-watch", daemon=True)
+        self._thread.start()
+
+    def _loop(self) -> None:
+        while not self._stop.wait(self.POLL_S):
+            try:
+                ready, _, _ = select.select([self._sock], [], [], 0)
+                if not ready:
+                    continue
+                if self._sock.recv(1, socket.MSG_PEEK) == b"":
+                    self.cancel_event.set()
+                    return
+            except (ConnectionResetError, ConnectionAbortedError):
+                self.cancel_event.set()
+                return
+            except (OSError, ValueError):
+                # Detection became unavailable.  Do NOT guess "disconnected"
+                # -- falsely aborting a live scan is worse than letting the
+                # existing wall-clock deadline end it.
+                return
+
+    def stop(self) -> None:
+        self._stop.set()
+        if self._thread is not None:
+            self._thread.join(timeout=self.POLL_S * 3)
+
+
 def _handle_mcp(ctx, m, body, query) -> Response:
     """One JSON-RPC message (or batch) -> one JSON-RPC response.
 
@@ -868,20 +941,33 @@ def _handle_mcp(ctx, m, body, query) -> Response:
     batch = isinstance(body, list)
     msgs = body if batch else [body]
     responses: list = []
-    for msg in msgs:
-        if not isinstance(msg, dict):
-            responses.append({"jsonrpc": "2.0", "id": None,
-                              "error": {"code": -32600,
-                                        "message": ("invalid request: "
-                                                    "expected object")}})
-            continue
-        mismatch = validate_http_headers(msg, ctx.headers)
-        if mismatch is not None:
-            responses.append(mismatch)
-            continue
-        resp = dispatch_message(msg)
-        if resp is not None:                  # notifications never answer
-            responses.append(resp)
+    # Phase 376: only a real tool call can send a probe storm, so only then
+    # do we arm the socket watcher.  The SAME cancel_event flows into the
+    # shared dispatch; nothing about the JSON-RPC answer shape changes.
+    needs_watch = any(isinstance(x, dict)
+                      and x.get("method") == "tools/call" for x in msgs)
+    watcher = _ClientDisconnectWatcher(
+        getattr(getattr(ctx, "handler", None), "connection", None)
+        if needs_watch else None)
+    watcher.start()
+    try:
+        for msg in msgs:
+            if not isinstance(msg, dict):
+                responses.append({"jsonrpc": "2.0", "id": None,
+                                  "error": {"code": -32600,
+                                            "message": ("invalid request: "
+                                                        "expected object")}})
+                continue
+            mismatch = validate_http_headers(msg, ctx.headers)
+            if mismatch is not None:
+                responses.append(mismatch)
+                continue
+            cancel = watcher.cancel_event if watcher.active else None
+            resp = dispatch_message(msg, cancel_event=cancel)
+            if resp is not None:              # notifications never answer
+                responses.append(resp)
+    finally:
+        watcher.stop()
     if not responses:
         # Notifications only: JSON-RPC forbids a response body; the
         # Streamable HTTP transport answers 202 Accepted.
@@ -1056,7 +1142,8 @@ class _StdlibHandler(BaseHTTPRequestHandler):
             # works when no API key is configured -- used in some unit
             # tests that bypass the full StdlibServer).
             xss_server = self.server
-        ctx = RequestCtx(xss_server, self._headers_dict())  # type: ignore[arg-type]
+        ctx = RequestCtx(xss_server, self._headers_dict(),
+                         handler=self)  # type: ignore[arg-type]
         body = None
         if method in ("POST", "PUT", "PATCH"):
             body = self._parse_json_body()

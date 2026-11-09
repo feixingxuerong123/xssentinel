@@ -153,6 +153,31 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
   A/B 已定性的 `test_phase327` 环境形态——该用例直接调 `run_scan_tool`,
   不经过 `_tool_call` 的 emit 包装。ruff 全仓零基线。未跑全量分批门禁与
   四档 strict gate,理由同上条。
+- **Phase 376 / §8.2 #4 ①②(2026-11-09,`[Unreleased]` 增量)**:客户端超时
+  协商 + HTTP 断连中止。`server/discover` 声明 `recommendedTimeoutMs` /
+  `defaultMaxSeconds` / `clientBudgetMetaKey` / `budgetPolicy`;现代帧的
+  `params._meta['io.xssentinel/clientTimeoutMs']` 按 `min(client,
+  max_seconds)` 折进**既有**预算(只能缩短、不能抬高),成功结果回显
+  `effective_max_seconds`,超时错误点名客户端旋钮;默认 300s 收敛为单一常量
+  (schema / runner / discover 同源)。legacy 帧行为不变,非法或过小的声明
+  显式结构化报错且**不启动扫描**。HTTP 侧新增 opt-in
+  `_ClientDisconnectWatcher`:仅 `tools/call` + 真实 socket 时用 `MSG_PEEK`
+  窥探 EOF(pipelined 数据不误判),命中后复用 stdio 既有的 `cancel_event`,
+  在 `_RequestGuard._tick` 的下一请求边界停止外发;Flask 适配器与单测上下文
+  无 socket ⇒ 完全不武装。守卫 `test_phase376_mcp_timeout_contract.py`
+  **29 passed / 0 skip**(真实 dispatch + 真实 socketpair + 零外发对照),
+  变异对照 `dev/phase376_mutations.py` **4/4**,广回归 18 文件
+  **296 passed / 0 failed**、102.4s,ruff 全仓零基线。**未跑全量分批门禁与
+  四档 strict gate**:判定面零改动,不拿 11-08 的数字顶账;11-09 基线组
+  109 例与广回归 296 例全绿、昨晚 A/B 定性的 `test_phase327` 环境形态红
+  已转绿 ⇒ loopback 环境已恢复,补跑条件具备。**已补跑 quick 双引擎
+  strict gate(2026-11-09 自己跑,带跳过数)**:sync 64 scored **0 SKIP**、
+  async 63 scored **1 SKIP**,各 exit 0、FP0 / FN0 / ERROR0(端口
+  18931 / 18932)。**full 194 两档与全量分批门禁仍未跑**,不拿 11-08
+  的四档数字顶账。
+  **#4-③(异步工具)未做,单独一轮**:新增 2 个工具会撞 `len(tools)==7`
+  三处守卫与 README「七个工具」声明,且 Phase 358 的 legacy `tools/list`
+  逐字节契约要求新工具不能进 `TOOL_DEFINITIONS`,改动面与 ①② 不同。
 - **验收(本轮自己的运行,引用带跳过数)**:四档 strict gate 全 exit 0——
   quick 64 sync **0 SKIP**、quick 64 async **1 SKIP**、full 194 sync
   **0 SKIP**、full 194 async **12 SKIP**,全部 FP0/FN0/ERROR0;官方 XSSMaze
@@ -177,7 +202,8 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
   将来要切换须显式决定并整体重跑,不靠单轮数字改口径。
 - **开放项(需拍板,不擅自做)**:① `docs/OPTIMIZATION.md` §8.1-1 授权范围默认策略
   (默认拒绝 vs 默认放行)——§8.5 明确「拍板前不要动这一条」,**仍未动**;
-  #2 / #3 / #5 / #6 已按建议顺序完成(见上条),下一步是 #4 → #7,最后评估 8–11。
+  #2 / #3 / #5 / #6 已按建议顺序完成,#4 的 ①② 于 Phase 376 完成(见上条),
+  **下一步是 #4-③ → #7**,最后评估 8–11。
   ② PyPI Trusted Publisher 未配。**环境阻塞**:2026-11-08 傍晚起本机
   `wsl.exe` 被安全策略拦,Docker Desktop 后端起不来,XSSMaze 复测当前无法进行;
   同晚 loopback 劣化还造成 `test_phase327` 超时用例的环境形态红(见上条 A/B)。

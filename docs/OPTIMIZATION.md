@@ -1199,3 +1199,50 @@ runner / `_RequestGuard` / transport 全部不变。守卫
 `test_phase375_mcp_progress_total.py`(4 例,真实 stdio 会话)与变异对照
 `dev/phase375_mutation.py`(**1/1**,删掉 `total` 即红)同轮落地。
 下一步 **#4 → #7 → 评估 8–11**;**#1 仍未拍板,继续不动**。
+
+### 8.8 处置记录(2026-11-09):#4 的 ①② 完成,③ 留独立一轮
+
+拆成两轮的理由是**改动面不同**,不是把一件事拖两次。①② 只碰 MCP 传输层,
+判定面零改动;③ 要新增两个工具,会同时撞
+`tests/test_phase324_mcp_http.py` 与 `test_phase374_mcp_annotations.py`
+的 `len(tools)==7` 三处断言、README「七个工具」声明,以及 Phase 358 的
+legacy `tools/list` 逐字节契约(新工具不能进 `TOOL_DEFINITIONS`,只能
+modern-only 附加)。混进一轮,任何一条 legacy 回归红都无法归因。
+
+**① 预算协商(Phase 376)**:`server/discover` 声明
+`recommendedTimeoutMs=120000` / `defaultMaxSeconds=300` /
+`clientBudgetMetaKey` / `budgetPolicy`;现代帧在
+`params._meta['io.xssentinel/clientTimeoutMs']` 声明自己的单次调用超时,
+`_tool_call` 按 `min(client, max_seconds)` 折进**既有**预算 —— 客户端只能
+缩短扫描,不能抬高。`_RequestGuard` 仍是唯一执行时限的地方,没有第二套
+deadline 实现。成功结果回显 `effective_max_seconds`;预算耗尽时错误文本
+点名客户端旋钮(旧 hint「raise max_seconds」在这个场景是错的),结构化错误
+给对应 `hint`。默认 300s 收敛成 `_DEFAULT_MAX_SECONDS` 一个定义(schema /
+runner / discover 同源),守卫用源码断言钉住 runner 不再硬写 300。
+legacy 帧行为完全不变;非法 / 过小声明显式报错且 runner 从不被调用。
+
+**② 断连中止(Phase 376)**:HTTP 没有 in-band cancellation,客户端超时断连后
+handler 线程原本继续外发攻击载荷。新增 opt-in `_ClientDisconnectWatcher`:
+只在 `tools/call` 且 `ctx.handler` 有真实 socket 时启动,用 `MSG_PEEK`
+窥探 EOF —— readable 但有数据说明是 pipelined 请求,不是断连;只有空 peek
+才是 EOF。命中后设置**stdio 既有的** `cancel_event`,由
+`_RequestGuard._tick` 在下一个请求边界抛 `_ToolCancelled`,零新增契约。
+Flask 适配器 / 单测上下文无 socket ⇒ `active=False`,行为与修前一致。
+`RequestCtx` 新增可选 `handler` 参数,不影响既有构造点。
+
+**验收(本轮自己的运行)**:`test_phase376_mcp_timeout_contract.py`
+**29 passed / 0 skip** —— 真实 `dispatch_message` / `_tool_call` /
+`run_scan_tool` / `_make_requester` 链,真实 `socketpair` EOF 与 pipelined
+数据对照,「已取消零外发 / 未取消跑满 5 次」成对反证;`dev/phase376_mutations.py`
+**4/4**(`min`→`max`、`modern`→`False`、删 discover 声明、断开
+`cancel_event` 接线,各自 baseline 绿 → mutated 红 → restored 绿,源码字节
+已还原)。广回归 18 文件 **296 passed / 0 failed**,102.4s;ruff 全仓
+`All checks passed`。**未跑全量分批门禁与四档 strict gate**:判定面零改动,
+不拿 11-08 的数字顶账;11-09 实测 loopback 已恢复(基线 109 例与广回归
+296 例全绿,昨晚 A/B 定性的 `test_phase327` 环境形态红转绿),补跑条件具备,
+本轮已兑现 **quick 双引擎 strict gate**:sync 64 scored **0 SKIP** / async
+63 scored **1 SKIP**,各 exit 0 且 FP0 / FN0 / ERROR0(端口 18931 / 18932,
+`dev/gate_run_scratch.py`)。**full 194 两档与全量分批门禁仍未跑**。
+
+下一步 **#4-③(异步工具,复用 `JobManager`) → #7 → 评估 8–11**;
+**#1 仍未拍板,继续不动**。
