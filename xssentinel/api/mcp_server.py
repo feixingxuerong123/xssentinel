@@ -86,11 +86,13 @@ caller's responsibility, exactly as with the CLI and the REST API.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import sys
 import threading
 import time
+from collections import OrderedDict
 from urllib.parse import urlparse
 
 from ..core.target_url import split_target_url
@@ -2090,6 +2092,19 @@ def _discover_result() -> dict:
             "xssentinel_scan_async (returns immediately with scan_id), then "
             "poll xssentinel_scan_status until state is terminal. A failed "
             "or cancelled job is NOT a clean scan."),
+        # Phase 378: say out loud what a retry costs.  An agent that times
+        # out must know it can resend the SAME call without doubling the
+        # attack traffic, and how to opt out when it really wants a re-scan.
+        "resultReuse": {
+            "ttlMs": _CACHE_DEFAULT_TTL_MS,
+            "scope": "private",
+            "key": ("tool name + normalized arguments; or "
+                    "params._meta.requestKey"),
+            "disable": "params._meta.cacheScope = 'none'",
+            "note": ("only successful results are reused; failures, "
+                     "timeouts and cancellations always retry for real; "
+                     "xssentinel_scan_status is never replayed"),
+        },
     }
 
 
@@ -2204,6 +2219,13 @@ def _classify_tool_error(text: str) -> dict:
         code = "missing_required_argument"
         field = text.split()[0] if text.split() else None
         hint = "supply the required argument"
+    elif text.startswith("invalid cacheScope:"):
+        # Phase 378: there is no public scope.  Rejecting the value beats
+        # silently treating it as private and letting the client believe its
+        # result may be shared.
+        code = "invalid_cache_scope"
+        field = "cacheScope"
+        hint = "use 'private' (default) or 'none' to disable reuse"
     elif text.startswith("unknown scan_id:"):
         # Phase 377: jobs are in-memory and bounded (max_jobs), so an id can
         # legitimately expire.  Tell the agent to SUBMIT again instead of
@@ -2377,6 +2399,146 @@ def _apply_client_budget(schema: dict, arguments: dict, budget_s: float):
     return out, None
 
 
+# ---------------------------------------------------------------------------
+# Phase 378 / OPTIMIZATION.md §8.2 #7: idempotent retries.
+#
+# Measured gap (dev/agent_surface_probe.py, probe ids 10/11): the SAME
+# tools/call sent twice ran TWO real scans.  An agent whose host times out
+# at 30s and retries is the NORMAL case, so a retry silently doubles the
+# attack traffic.  Fix: a short-lived, in-process result cache keyed by
+# (tool, canonical normalized arguments), or by an explicit _meta.requestKey.
+#
+# Deliberately narrow, because a cache that returns a stale verdict is worse
+# than a duplicate request:
+#   * MODERN frames only -- legacy results stay byte-for-byte unchanged;
+#   * SUCCESS results only.  Timeouts, cancellations, unreachable targets
+#     and execution failures must be retried for real; local argument
+#     validation errors never sent a request, so caching them buys nothing;
+#   * the polling tool is excluded (its whole job is to report NEW state);
+#   * the key covers the FULL normalized argument dict INCLUDING headers /
+#     cookies, so two different authenticated contexts cannot collide;
+#   * bounded (LRU) and TTL'd, never a growing process-lifetime store.
+# ---------------------------------------------------------------------------
+_META_REQUEST_KEY = "requestKey"
+_META_CACHE_SCOPE_KEY = "cacheScope"
+_META_CACHE_TTL_KEY = "cacheTtlMs"
+_CACHE_DEFAULT_TTL_MS = 60000
+_CACHE_MAX_TTL_MS = 300000
+_CACHE_MAX_ENTRIES = 128
+#: Tools whose result must always be FRESH.  A status poll is a read of
+#: changing state; replaying it would freeze an agent's view of its job.
+_CACHE_EXCLUDED = frozenset({"xssentinel_scan_status"})
+#: Every CACHEABLE tool's outputSchema declares the three replay fields.
+#: Excluded tools must NOT declare them -- a schema promising a field the
+#: result never carries is the same lie as Phase 373's silent [:200] cap.
+for _name, _schema in (list(_TOOL_OUTPUT_SCHEMAS.items())
+                       + list(_ASYNC_TOOL_OUTPUT_SCHEMAS.items())):
+    if _name in _CACHE_EXCLUDED:
+        continue
+    _props = _schema.setdefault("properties", {})
+    _props["cache_hit"] = {"type": "boolean"}
+    _props["cache_scope"] = {"type": "string"}
+    _props["cache_ttl_ms"] = {"type": "integer"}
+del _name, _schema, _props
+_CACHE_LOCK = threading.Lock()
+_TOOL_RESULT_CACHE: OrderedDict = OrderedDict()
+
+
+def _cache_policy(params: dict):
+    """Return ``(meta, scope, ttl_ms, error_text)`` for one modern call."""
+    meta = params.get("_meta")
+    if not isinstance(meta, dict):
+        meta = {}
+    scope = meta.get(_META_CACHE_SCOPE_KEY, "private")
+    if scope not in ("private", "none"):
+        # There is deliberately NO "public": results can contain
+        # target-derived text from an authenticated scan, and this store is
+        # process-local.  Pretending otherwise would be a false promise.
+        return meta, None, 0, (
+            f"invalid {_META_CACHE_SCOPE_KEY}: {scope!r}; "
+            "use 'private' or 'none' (results are in-process only)")
+    raw_ttl = meta.get(_META_CACHE_TTL_KEY, _CACHE_DEFAULT_TTL_MS)
+    try:
+        ttl_ms = int(raw_ttl)
+    except (TypeError, ValueError):
+        ttl_ms = _CACHE_DEFAULT_TTL_MS
+    ttl_ms = max(0, min(ttl_ms, _CACHE_MAX_TTL_MS))
+    return meta, str(scope), ttl_ms, None
+
+
+def _cache_key(name: str, schema: dict, arguments: dict, meta: dict):
+    """One key for one logical call -- never for a raw JSON byte string.
+
+    Defaults are FILLED IN before hashing, so ``{}`` and
+    ``{"max_payloads": 14}`` are the same call.  Aliases were already folded
+    by _normalize_arguments (Phase 323).
+    """
+    request_key = meta.get(_META_REQUEST_KEY)
+    if request_key is not None and str(request_key):
+        return (name, "rk:" + str(request_key))
+    canonical = {}
+    for key, prop in schema.get("properties", {}).items():
+        value = arguments.get(key, prop.get("default"))
+        if value is not None:
+            canonical[key] = value
+    blob = json.dumps(canonical, sort_keys=True, ensure_ascii=False,
+                      default=str)
+    return (name, hashlib.sha256(blob.encode("utf-8")).hexdigest())
+
+
+def _cache_lookup(key, now: float):
+    with _CACHE_LOCK:
+        entry = _TOOL_RESULT_CACHE.get(key)
+        if entry is None:
+            return None
+        expires_at, result, ttl_ms, scope = entry
+        if now >= expires_at:
+            _TOOL_RESULT_CACHE.pop(key, None)
+            return None
+        _TOOL_RESULT_CACHE.move_to_end(key)        # LRU
+        return result, ttl_ms, scope
+
+
+def _cache_store(key, result, ttl_ms: int, scope: str, now: float) -> None:
+    with _CACHE_LOCK:
+        _TOOL_RESULT_CACHE[key] = (now + ttl_ms / 1000.0, result,
+                                   ttl_ms, scope)
+        _TOOL_RESULT_CACHE.move_to_end(key)
+        while len(_TOOL_RESULT_CACHE) > _CACHE_MAX_ENTRIES:
+            _TOOL_RESULT_CACHE.popitem(last=False)
+
+
+def _clear_result_cache() -> int:
+    """Drop every cached result; returns the number of entries removed.
+
+    Test isolation and operator-triggered invalidation both need ONE
+    lock-protected entry point: poking the OrderedDict directly from a
+    fixture would race with an in-flight MCP worker thread.
+    """
+    with _CACHE_LOCK:
+        count = len(_TOOL_RESULT_CACHE)
+        _TOOL_RESULT_CACHE.clear()
+        return count
+
+
+def _stamp_cache(result: dict, hit: bool, scope: str, ttl_ms: int) -> dict:
+    """Put the SAME cache verdict in text AND structuredContent (Phase 324)."""
+    fields = {"cache_hit": hit, "cache_scope": scope, "cache_ttl_ms": ttl_ms}
+    out = dict(result)
+    structured = out.get("structuredContent")
+    if isinstance(structured, dict):
+        out["structuredContent"] = {**structured, **fields}
+    try:
+        payload = json.loads(out["content"][0]["text"])
+    except (KeyError, IndexError, TypeError, json.JSONDecodeError):
+        return out
+    if isinstance(payload, dict):
+        out["content"] = [{"type": "text",
+                           "text": json.dumps({**payload, **fields},
+                                              ensure_ascii=False, indent=2)}]
+    return out
+
+
 def _tool_call(params, cancel_event=None, emit=None, modern: bool = False):
     if not isinstance(params, dict):
         return {"content": [{"type": "text",
@@ -2426,6 +2588,26 @@ def _tool_call(params, cancel_event=None, emit=None, modern: bool = False):
                 return {"content": [{"type": "text", "text": budget_err}],
                         "isError": True}
             client_budget_s = budget_s
+    # Phase 378: replay a recent identical call instead of re-sending the
+    # attack payloads.  Placed AFTER normalization + budget negotiation, so
+    # the key describes one LOGICAL call, and BEFORE the progress emitter,
+    # so a hit emits no beacon and sends no request.
+    cache_key = None
+    cache_scope = "private"
+    cache_ttl_ms = 0
+    if modern and name not in _CACHE_EXCLUDED:
+        cache_meta, cache_scope, cache_ttl_ms, cache_err = _cache_policy(
+            params)
+        if cache_err:
+            return {"content": [{"type": "text", "text": cache_err}],
+                    "isError": True}
+        if cache_scope != "none" and cache_ttl_ms > 0:
+            cache_key = _cache_key(name, schema, normalized, cache_meta)
+    if cache_key is not None:
+        hit = _cache_lookup(cache_key, time.monotonic())
+        if hit is not None:
+            cached_result, ttl_ms, scope = hit
+            return _stamp_cache(cached_result, True, scope, ttl_ms)
     if emit is not None:
         # Phase 375: every downstream emit (the beacon AND _RequestGuard's
         # per-request ticks) gets the same estimate and unit without any
@@ -2454,10 +2636,17 @@ def _tool_call(params, cancel_event=None, emit=None, modern: bool = False):
         # ``None`` (HTTP, library, tests) leaves the runners unchanged.
         # Phase 328: the untrusted-source note is added before structured
         # attachment, so text and structuredContent carry the same object.
-        return _attach_structured(
+        result = _attach_structured(
             _annotate_output_safety(
                 runner(normalized, cancel_event=cancel_event, emit=emit),
                 name))
+        # Phase 378: only SUCCESS is reusable.  An isError result (timeout,
+        # unreachable, execution failure) must always be retried for real.
+        if cache_key is not None and not result.get("isError"):
+            _cache_store(cache_key, result, cache_ttl_ms, cache_scope,
+                         time.monotonic())
+            result = _stamp_cache(result, False, cache_scope, cache_ttl_ms)
+        return result
     except _ToolCancelled:
         return None                       # caller must NOT answer (MCP spec)
     except _ToolTimeout as e:

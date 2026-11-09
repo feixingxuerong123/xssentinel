@@ -95,6 +95,23 @@ remain synchronous, and progress/cancellation still belong to stdio only.
   while a tool call runs (progress = requests sent, plus a start beacon).
   Long scan: watch the token instead of guessing.
 
+## Retrying after a timeout
+
+On a modern frame, resending the EXACT SAME `tools/call` is SAFE: for 60s the
+server replays the earlier **successful** result instead of sending the
+attack payloads again. The result tells you it happened — `cache_hit: true`,
+plus `cache_scope` and `cache_ttl_ms`, in both the text and
+`structuredContent`. The key includes every normalized argument (including
+`headers` and `cookies`), so two different authenticated contexts never
+share a result.
+
+- Need a genuinely fresh scan? Set `params._meta.cacheScope` to `"none"`.
+- Want to control what counts as "the same call"? Set
+  `params._meta.requestKey`; adjust the window with `cacheTtlMs` (cap 300s).
+- Failed, timed-out and cancelled calls are NEVER cached — retry those for
+  real. `xssentinel_scan_status` polls are never replayed either.
+- `server/discover` publishes the current policy under `resultReuse`.
+
 ## Cancelling a long call
 
 Send `notifications/cancelled` with the request id:

@@ -232,3 +232,7 @@ def test_skill_documents_the_boundary():
     assert "xssentinel_scan_async" in text
     assert "xssentinel_scan_status" in text
     assert "NOT a clean scan" in text
+    # Phase 378: an agent that does not know a retry is safe will either
+    # avoid retrying (a lost scan) or invent its own duplicate request.
+    assert "cache_hit" in text
+    assert "cacheScope" in text

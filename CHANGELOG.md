@@ -53,6 +53,18 @@
   双 schema 齐全。取消或断连的 job 一律 `failed` + 明确原因,**绝不记成零
   findings 的「干净扫描」**。`server/discover` 增 `asyncTools` /
   `asyncWorkflow`;中英 README 与 `skills/xssentinel-mcp/SKILL.md` 同步补齐。
+- **Phase 378 / §8.2 #7 重试幂等**:现代帧的相同 `tools/call` 在 TTL 内复用
+  最近一次**成功**结果,不再重复外发攻击载荷。键为 `tool + 归一化参数`
+  (schema 默认值先填满、别名已折叠、含 `headers` / `cookies`),或由客户端
+  `params._meta.requestKey` 显式指定;`cacheScope='none'` 关闭、
+  `cacheTtlMs` 调整(上限 300000ms),默认 60000ms、LRU 上限 128 条、线程安全。
+  成功结果的 text 与 `structuredContent` 同步带 `cache_hit` / `cache_scope` /
+  `cache_ttl_ms`,所有可缓存工具的 `outputSchema` 同源声明这三字段;
+  `server/discover` 增 `resultReuse` 声明策略。**失败 / 超时 / 取消一律不缓存**
+  (必须真实重试),`xssentinel_scan_status` 轮询永不复用,legacy 帧逐字节不变。
+  不提供 `public` 作用域:结果含目标派生文本且缓存是进程内,`cacheScope`
+  取其他值显式报错。缓存是模块级状态,`tests/conftest.py` 加 autouse
+  fixture 在测试边界清理(不动产品路径)。
 
 ### Changed
 - **Phase 373 / 截断显式化**:`scan` 与 `param_mine` 结果补 `total_findings` /
@@ -106,6 +118,16 @@
   21 文件广回归 **336 passed / 0 failed**,115.0s;ruff 全仓 `All checks passed`。
   **full 194 两档与全量分批门禁仍未跑**:本轮只动 MCP 接入面与 Job 元数据,
   判定面零改动。
+- Phase 378 追加:`test_phase378_mcp_idempotency.py` **22 passed / 0 skip**
+  (真实 dispatch;核心反证:第二次同参调用 `cache_hit=true` 且 runner 零重跑、
+  text / structuredContent 一致、命中不发 progress beacon;不同参数 / 不同
+  cookies / 别名与默认值归一化 / requestKey / TTL 过期 / LRU 淘汰 /
+  失败与超时与取消不缓存 / status 不复用 / legacy 零变化),变异对照
+  `dev/phase378_mutations.py` **7/7**(关掉 modern 门 / 不查缓存 / 缓存错误
+  结果 / 不排除轮询 / 不填默认值 / 命中不标记 / 两通道不一致,各自
+  baseline 绿 → mutated 红 → restored 绿,源码字节已还原)。22 文件广回归
+  **358 passed / 0 failed**,116.3s;ruff 全仓 `All checks passed`。
+  **full 194 两档与全量分批门禁仍未跑**:判定面零改动。
 
 ## [1.4.4] - 2026-11-08
 

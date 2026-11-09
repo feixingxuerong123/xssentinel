@@ -565,6 +565,14 @@ python -m xssentinel --serve --host 127.0.0.1 --port 8080      # 生产建议再
 `effective_max_seconds` 一起透传；`cancel=true` 可中止，**失败或被取消的 job
 绝不记成「无发现」**。job 复用既有 REST `JobManager` 状态机（内存态、有上限），
 进程重启后旧 `scan_id` 失效。
+**重试幂等（Phase 378，仅现代帧）**：宿主超时后重发**完全相同**的
+`tools/call`，服务端在 60s 内复用上一次**成功**结果，不再重复外发攻击载荷；
+结果的 text 与 `structuredContent` 同步带 `cache_hit` / `cache_scope` /
+`cache_ttl_ms`。键包含归一化后的全部参数（含 `headers` / `cookies`），
+不同认证上下文不会串结果；可用 `params._meta.requestKey` 指定键、
+`cacheScope='none'` 关闭、`cacheTtlMs` 调 TTL（上限 300s）。失败 / 超时 /
+取消**不缓存**，`xssentinel_scan_status` 轮询永不复用；legacy 帧逐字节不变。
+`server/discover` 的 `resultReuse` 会声明当前策略。
 **Agent 面默认与信任边界（Phase 328/328e）**：`xssentinel_scan` 默认与 CLI normal 对齐
 （`dom_engine=auto`、`max_transforms=12`；DOM 层默认运行，Playwright 缺失时静态降级，
 `headless` 只负责浏览器确认）。每个工具在 `untrusted_fields` 里列出自己由目标派生的

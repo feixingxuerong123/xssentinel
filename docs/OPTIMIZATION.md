@@ -1293,3 +1293,44 @@ dispatch / 关掉 pending 取消检查 / 不 settle 被中止的 worker / 不透
 `async_args` / 删 `total_findings`),源码字节已还原。
 21 文件广回归 **336 passed / 0 failed**,115.0s;ruff 全仓 `All checks passed`。
 **full 194 两档与全量分批门禁仍未跑**:判定面零改动。
+
+### 8.10 处置记录(2026-11-09 三续):#7 完成,P1 清空
+
+**#7 完成,#4(三子项)+ #5 + #6 + #7 全部落地 ⇒ P1 已清空。**
+下一步是**评估 8–11**;**P0 只剩 #1 授权范围默认策略,仍未拍板,继续不动**。
+
+**实现**:`_tool_call` 在参数归一化 + Phase 376 预算协商之后、progress
+beacon 之前查一个模块级 LRU 缓存(默认 60s / 上限 300s / 128 条 / 加锁)。
+键是 `tool + 归一化参数`:schema 默认值先填满、Phase 323 的别名已折叠、
+`headers` / `cookies` 也在键里,所以「`{}` 与 `{"max_payloads":14}`」是
+同一次调用,而两个不同认证上下文绝不会串结果。客户端可用
+`params._meta.requestKey` 显式定键、`cacheScope='none'` 关闭、
+`cacheTtlMs` 调窗口。成功结果的 text 与 `structuredContent` 同源带
+`cache_hit` / `cache_scope` / `cache_ttl_ms`,**只给可缓存工具**的
+`outputSchema` 声明这三个字段(被排除的 status 不声明,避免「schema 承诺
+一个从不出现的字段」——与 Phase 373 的静默截断同族)。`server/discover`
+的 `resultReuse` 公布策略,中英 README 与 SKILL.md 同步,守卫钉住不漂移。
+
+**对原方案的一处收窄(有理由,不是漏做)**:原文写「只缓存成功与确定性
+错误」。实测下来,本地参数校验类错误本来**一个请求都不发**,缓存它们
+收益为零;而 `target_unreachable` / `tool_execution_failed` 会随网络状态
+变化,并非确定。真正会重复外发攻击载荷的只有**成功扫描**,所以实现为
+**只缓存成功**,错误(含超时、取消)一律真实重试。这比原方案更窄、
+更不容易返回陈旧裁决,且满足「超时/取消不缓存」的硬要求。
+
+**一处根因修复**:缓存是模块级状态(重试必须能找到上一次调用),
+于是两个用相同 modern `tools/call` 的守卫会互相命中 —— 首个实测
+**10 个 MCP 守卫因此变红**,而产品行为本身是对的。修法不是给 10 个
+守卫逐个加清理(那是打补丁),而是 `tests/conftest.py` 加 autouse
+fixture 在**测试边界**调 `_clear_result_cache()`;单个测试内部仍能
+真实命中,产品路径零改动。这与项目「同一个 bug 家族会反复出现」的
+纪律一致:第 379 个守卫也不会再踩。
+
+**验收(本轮自己的运行)**:`test_phase378_mcp_idempotency.py`
+**22 passed / 0 skip** —— 真实 dispatch,核心是「第二次同参调用
+`cache_hit=true` 且 runner 零重跑」「text / structuredContent 一致」
+「命中不发 beacon」三组反证,外加键正确性 / TTL / LRU / 失败不缓存 /
+status 不复用 / legacy 零变化。`dev/phase378_mutations.py` **7/7**,
+源码字节已还原。22 文件广回归 **358 passed / 0 failed**,116.3s;
+ruff 全仓 `All checks passed`。**full 194 两档与全量分批门禁仍未跑**:
+判定面零改动。

@@ -195,6 +195,21 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
   `dev/phase377_mutations.py` **6/6**,21 文件广回归 **336 passed / 0 failed**、
   115.0s,ruff 全仓零基线。**full 194 两档与全量分批门禁仍未跑**:判定面
   零改动,不拿旧数字顶账。
+- **Phase 378 / §8.2 #7(2026-11-09,`[Unreleased]` 增量)**:现代帧的相同
+  `tools/call` 在 TTL(默认 60s,上限 300s)内复用最近一次**成功**结果,
+  不再重复外发攻击载荷。键 = `tool + 归一化参数`(schema 默认值先填满、
+  别名已折叠、含 headers/cookies),或客户端 `params._meta.requestKey`;
+  `cacheScope='none'` 关闭。成功结果 text 与 `structuredContent` 同步带
+  `cache_hit` / `cache_scope` / `cache_ttl_ms`,可缓存工具的 outputSchema
+  同源声明;`server/discover` 增 `resultReuse`。**失败 / 超时 / 取消一律
+  不缓存**,`xssentinel_scan_status` 轮询永不复用,legacy 帧逐字节不变;
+  缓存 LRU 上限 128、加锁、进程内,不提供 `public` 作用域(取其他值显式报错)。
+  **测试隔离是根因修法**:模块级缓存会让两个同参守卫互相命中,首个实测
+  有 10 个 MCP 守卫因此变红 ⇒ `tests/conftest.py` 加 autouse fixture 在
+  测试边界调 `_clear_result_cache()`,产品路径零改动。守卫
+  `test_phase378_mcp_idempotency.py` **22 passed / 0 skip**,变异
+  `dev/phase378_mutations.py` **7/7**,22 文件广回归 **358 passed / 0 failed**、
+  116.3s,ruff 全仓零基线。**full 194 两档与全量分批门禁仍未跑**:判定面零改动。
 - **验收(本轮自己的运行,引用带跳过数)**:四档 strict gate 全 exit 0——
   quick 64 sync **0 SKIP**、quick 64 async **1 SKIP**、full 194 sync
   **0 SKIP**、full 194 async **12 SKIP**,全部 FP0/FN0/ERROR0;官方 XSSMaze
@@ -220,7 +235,8 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
 - **开放项(需拍板,不擅自做)**:① `docs/OPTIMIZATION.md` §8.1-1 授权范围默认策略
   (默认拒绝 vs 默认放行)——§8.5 明确「拍板前不要动这一条」,**仍未动**;
   #2 / #3 / #5 / #6 已按建议顺序完成,#4 的 ①② 于 Phase 376 完成(见上条),
-  **#4 三子项已于 376/377 全部完成,下一步是 #7(重试不幂等)**,最后评估 8–11。
+  **#4 三子项(376/377)与 #7(378)均已完成 ⇒ P1 已清空**,下一步是
+  **评估 8–11**;P0 仅剩 **#1 授权范围默认策略**,仍未拍板、继续不动。
   ② PyPI Trusted Publisher 未配。**环境阻塞**:2026-11-08 傍晚起本机
   `wsl.exe` 被安全策略拦,Docker Desktop 后端起不来,XSSMaze 复测当前无法进行;
   同晚 loopback 劣化还造成 `test_phase327` 超时用例的环境形态红(见上条 A/B)。

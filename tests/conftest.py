@@ -361,3 +361,24 @@ def _isolate_logging():
             xs.addHandler(h)
     xs.setLevel(saved_level)
     _logger_mod._configured = saved_configured
+
+
+# ---------------------------------------------------------------------------
+# Phase 378: the MCP result cache is module-global BY DESIGN (an agent's
+# retry must find the earlier call).  That makes it cross-test state: two
+# guards that dispatch the same modern `tools/call` with the same arguments
+# would otherwise hit each other's cached result, and the second one's
+# spy runner never runs.  Measured: 10 MCP guards went red purely from this
+# leakage on the first run.
+#
+# Clear at BOTH test boundaries, never in a product code path.  A single
+# test can still exercise a real hit (the cache is filled and read inside
+# that test); only cross-test contamination is removed.
+# ---------------------------------------------------------------------------
+@pytest.fixture(autouse=True)
+def _isolate_mcp_result_cache():
+    from xssentinel.api import mcp_server as _mcp
+
+    _mcp._clear_result_cache()
+    yield
+    _mcp._clear_result_cache()

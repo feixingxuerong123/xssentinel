@@ -352,6 +352,18 @@ active job. A failed or cancelled job is NEVER reported as a clean scan. Jobs
 reuse the existing REST `JobManager` state machine (in-memory, bounded), so
 old `scan_id`s do not survive a process restart.
 
+**Idempotent retries (Phase 378, modern frames only)**: when a host times
+out and resends the EXACT SAME `tools/call`, the server reuses the previous
+SUCCESSFUL result for 60s instead of re-sending attack payloads. The result
+carries `cache_hit` / `cache_scope` / `cache_ttl_ms` in BOTH the text and
+`structuredContent`. The key covers all normalized arguments (including
+`headers` / `cookies`), so different authenticated contexts never collide;
+`params._meta.requestKey` sets an explicit key, `cacheScope: 'none'` disables
+reuse, and `cacheTtlMs` adjusts the TTL (cap 300s). Failures, timeouts and
+cancellations are NEVER cached; `xssentinel_scan_status` polls are never
+replayed; a legacy frame is byte-for-byte unchanged. `server/discover`
+declares the current policy in `resultReuse`.
+
 **Agent-surface defaults and trust boundary**: `xssentinel_scan` matches the
 CLI's normal policy (`dom_engine=auto`, `max_transforms=12`; the DOM layer
 runs by default with a static fallback, and `headless` only adds browser
