@@ -1408,3 +1408,56 @@ Bonus Payload)本轮根本没投递 ⇒ 既非 TP 也非 FN,不计入任何分�
 
 证据与复现:`benchmark/results/juiceshop_external_20261109.md`。
 下一步仍以 **评估 8–11 / #1 待拍板** 为准。
+
+### 8.13 处置记录(2026-11-10 凌晨):跨工具事实表,不给分
+
+§8.12 把「跨工具同台对跑」列为**明确未做、单列一轮**(带日期的历史记录
+保留不改)。本轮把它关掉,但**关法不是补一个比分**:在同一个官方 Juice
+Shop v20.2.0 目标上,给三个工具喂逐字相同的 5 个 URL,只记录各工具
+实际输出(`benchmark/run_juice_cross_tool.py` →
+`benchmark/results/juice_cross_tool_20261110.{json,md}`)。
+
+**为什么不给分**(不是谦辞,是分母不存在):
+1. 3 个正例都在 Angular hash 路由(`/#/search?q=` 等),注入点位于 URL
+   fragment。**fragment 不进 HTTP 请求**,dalfox / nuclei 这类请求型工具
+   根本拿不到注入点 ⇒ 它们的 `detected=False` 是「未测量」,不是 FN。
+   仓里既有的 `run_cross_tool.py` + `adapters.not_comparable()` 是
+   **按用例形状**判不可比,表达不了「对浏览器驱动工具可达、对 HTTP-only
+   工具不可达」;本 runner 没有削弱那份既有契约,只复用统一的
+   `scan_case -> detected` 输出,把投递形状另列成客观列。
+2. 两个所有工具都能投递的面都是**真阴性**(`/rest/products/search`
+   `reflects=False`、`/redirect` 仅 HTML 转义)⇒ 没有 server-deliverable
+   positive,TP 与召回率没有分母。
+3. 工具配置不同(nuclei DAST 含浏览器 `dom-xss.yaml`、dalfox 是请求型、
+   本仓适配器按门禁预算跑且**无 `--headless`**),与 Phase 379 那次
+   `--headless` 不是同一配置,不混用。
+
+⇒ 表头写 `Counts (NOT a confusion matrix)`,`scoring_policy` 明确
+`FACT TABLE ONLY. No TP/FP/TN/FN or F1`。XSSentinel 5 例检出 3 /
+错误 0 / 23.07s,dalfox 0 / 3 次 `rc=2` / 29.26s,nuclei 0 / 0 错误 /
+902.82s(每例约 180s)——**这只是三份原始输出,不是胜负**。
+
+**口径守卫不空转**:`tests/test_phase380_juice_cross_tool.py` 7 例钉住
+口径全文、summary 不得有分数字段、每行 fragment 形状必须由真实的
+`_delivery_shape(url)` 推导(AST 反查函数体不得出现工具名白名单)、
+官方答案键不丢失、`pos-derived` 补充行不进分母、summary 由 rows 重算、
+MD 与 JSON 经 `to_markdown` **逐字节同源**。变异对照
+`dev/phase380_mutations.py` **7/7**:每个变异只跑一个具名 test node,
+避免「另一条断言红了」冒充守卫有效;源码/产物字节已还原。
+
+**真实靶场复现抽验**:18900 服务在跑,`--tools XSSentinel` 单跑 5 例
+22.88s,detected 3 / errors 0 / detected_on_server 0,与 00:31 正式产物
+逐例一致(墙钟差属本机噪声);复现产物落在 gitignore 的
+`benchmark/results/_local_archive/`,不覆盖正式证据。收口删掉 runner
+一处未使用 `import time`,零行为变化。
+
+**验收(本轮自己的运行,带跳过数)**:守卫 **7 passed / 0 skip**、变异
+**7/7**、回归组(口径/切片/架构守卫)**30 passed / 0 skip**、ruff 全仓
+`All checks passed`;quick 双引擎 strict gate 本轮补跑**未完成**
+(sync 档挂起 11m34s 后终止,未做 A/B 归因 ⇒ 按未验证记账,不当绿
+也不当回归,详见 AGENTS.md「当前状态」);`full 194` 两档与全量分批
+门禁**本轮未跑**,判定面零改动、不拿 11-09 的门禁数字顶账。
+
+**边界**:商业工具零对跑、ZAP `unavailable` 不变;本表不与 XSSMaze
+1013 例 / 194 矩阵 / Phase 379 的 5 面并列,不改变唯一官方跑分口径。
+下一步仍以 **评估 8–11(P2) / #1 授权范围默认策略待拍板** 为准。

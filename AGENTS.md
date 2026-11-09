@@ -237,6 +237,46 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
   经 GitHub API + `ghfast.top` 镜像取回官方包、MD5 校验、解压 44,140 文件
   (`dev/_*` 被 gitignore,不进版本库)。**跨工具同台对跑未做**(口径与
   hash 路由适配问题,单列一轮),不与 XSSMaze 1013 例 / 194 矩阵 / 商业工具并列。
+- **Phase 380 / 真实外部应用上的跨工具事实表(2026-11-10 凌晨,树 `7d3b9f7`)**:
+  承接 §8.12「跨工具同台对跑未做」(带日期的历史记录保留不改),在**同一个**
+  官方 Juice Shop v20.2.0 真实目标上给 XSSentinel / dalfox v2.13.0 /
+  nuclei v3.9.0 喂逐字相同的 5 个 URL,只记各工具实际输出,**不出分数**:
+  - 5 面 = 官方 `challenges.yml` 的 2 个挑战 + 2 个独立测得的控制面
+    (`/rest/products/search` `reflects=False`、`/redirect` 仅 HTML 转义)
+    + 1 个 `pos-derived` 补充观察(`/#/search-result`,**不进分母**)。
+    runner `benchmark/run_juice_cross_tool.py`,产物
+    `benchmark/results/juice_cross_tool_20261110.{json,md}`。
+  - 实测 15 行:XSSentinel 检出 3 / 错误 0 / 23.07s,dalfox 0 / 3 次
+    `rc=2` / 29.26s,nuclei 0 / 0 错误 / 902.82s(每例约 180s)。
+    **这不是胜负也不是率**:3 个正例的注入点在 URL fragment,HTTP 请求
+    根本不携带 ⇒ 请求型工具的 0 是「未测量」不是漏报;两个服务端可达面
+    都是真阴性 ⇒ 无 server-deliverable positive,TP / 召回率无分母;
+    工具配置亦不同(nuclei DAST 含浏览器模板、本仓适配器无 `--headless`)。
+    `scoring_policy` 明确 `FACT TABLE ONLY. No TP/FP/TN/FN or F1`。
+  - 守卫 `tests/test_phase380_juice_cross_tool.py` **7 passed / 0 skip**:
+    钉住口径全文、summary 无分数字段、每行 fragment 形状必须由
+    `_delivery_shape(url)` 真实函数推导(AST 反查函数体不得出现工具名
+    白名单)、官方答案键不丢失、`pos-derived` 不进分母、summary 由 rows
+    重算、MD 与 JSON 经 `to_markdown` 逐字节同源。变异对照
+    `dev/phase380_mutations.py` **7/7**,每个变异只跑一个具名 test node
+    (避免「另一条断言红了」的假绿),源码/产物字节已还原。
+  - 真实靶场复现抽验(18900 在跑):`--tools XSSentinel` 5 例 22.88s,
+    detected 3 / errors 0 / detected_on_server 0,与 00:31 产物逐例一致;
+    复现产物落 `benchmark/results/_local_archive/`(gitignore),不覆盖
+    正式证据。收口顺手删 runner 一处未使用的 `import time`(零行为变化)。
+  - **边界**:商业工具仍零对跑、ZAP 仍 unavailable;本表不与 XSSMaze
+    1013 例 / 194 矩阵 / Phase 379 的 `--headless` 结果并列,不改变唯一
+    官方跑分口径。验收(本轮自己的运行):守卫 7 passed / 0 skip、
+    变异 7/7、回归组 30 passed / 0 skip、ruff 全仓零基线、
+    真实靶场复现抽验 5 例;门禁补跑判词见下条。
+- **Phase 380 验收补记 / quick strict gate 本轮未完成(2026-11-10)**:
+  本轮尝试补跑 `--quick --strict-gate` 双引擎(sync,端口 18931),
+  sync 档启动后 **11m34s 仍停在单引擎**:进程 CPU 持续满载
+  (624s→681s),scratch 目录无任何逐例报告落盘、无扫描器子进程,
+  遂终止,async 档未启动。**未做 A/B 归因 ⇒ 按「未验证」记账,
+  不当绿也不当回归**;判定面本轮零改动(只删一个未使用 import),
+  不拿 11-09 的四档数字顶账。`full 194` 两档与全量分批门禁
+  **本轮未跑**,下轮环境干净时一并补跑并诊断该挂起形态。
 - **验收(本轮自己的运行,引用带跳过数)**:四档 strict gate 全 exit 0——
   quick 64 sync **0 SKIP**、quick 64 async **1 SKIP**、full 194 sync
   **0 SKIP**、full 194 async **12 SKIP**,全部 FP0/FN0/ERROR0;官方 XSSMaze

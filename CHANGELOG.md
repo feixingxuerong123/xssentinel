@@ -65,6 +65,19 @@
   不提供 `public` 作用域:结果含目标派生文本且缓存是进程内,`cacheScope`
   取其他值显式报错。缓存是模块级状态,`tests/conftest.py` 加 autouse
   fixture 在测试边界清理(不动产品路径)。
+- **Phase 380 / 真实外部应用跨工具事实表**:`benchmark/run_juice_cross_tool.py`
+  在同一个官方 Juice Shop v20.2.0 目标上,给 XSSentinel / dalfox v2.13.0 /
+  nuclei v3.9.0 喂**逐字相同**的 5 个 URL,逐例记录 detected / error /
+  墙钟 / fragment 可达性与原始输出头,产物
+  `benchmark/results/juice_cross_tool_20261110.{json,md}`。**只发布事实表,
+  不计算 TP/FP/TN/FN、精确率 / 召回率 / F1**:3 个正例的注入点在 URL
+  fragment(HTTP 请求根本不携带),2 个服务端可达面都是真阴性 ⇒ 没有
+  server-deliverable positive,任何率都无合法分母;工具配置亦不同
+  (nuclei DAST 含浏览器模板、本仓适配器无 `--headless`)。5 面里 2 个来自
+  官方 `challenges.yml`、2 个是独立测得的控制面、1 个 `pos-derived`
+  补充观察**不进分母**。`scoring_policy` 与 `## Why no score` 写明限定;
+  守卫 `tests/test_phase380_juice_cross_tool.py` 钉住口径全文、URL 派生的
+  可达性、官方答案键、分母边界与 MD/JSON 逐字节同源。
 
 ### Changed
 - **Phase 373 / 截断显式化**:`scan` 与 `param_mine` 结果补 `total_findings` /
@@ -161,6 +174,22 @@
   (`dev/_*` 已被 gitignore,不进版本库)。**未做跨工具同台对跑**:dalfox /
   nuclei 输出口径不同且 hash 路由非其设计输入面,仓促对比会误导,留作单列一轮。
   本报告不与 XSSMaze 1013 例、194 自编矩阵或商业工具并列。
+- **Phase 380 / 跨工具事实表(2026-11-10 凌晨,树 `7d3b9f7`)**:上一条记的
+  「未做跨工具同台对跑」是带日期的历史记账,保留不改;本轮已单列完成。
+  5 个逐字相同的 URL、3 个工具、15 行,**只报事实不给分**(理由见
+  `### Added` 与 `benchmark/results/juice_cross_tool_20261110.md` 的
+  `## Why no score`)。实测 XSSentinel 检出 3 / 错误 0 / 23.07s,dalfox
+  0 / 3 次 `rc=2` / 29.26s,nuclei 0 / 0 错误 / 902.82s —— **不得读作
+  优劣或检出率**。守卫 `test_phase380_juice_cross_tool.py`
+  **7 passed / 0 skip**,变异对照 `dev/phase380_mutations.py` **7/7**
+  (每个变异只跑一个具名 test node,源码/产物字节已还原),口径/切片/架构
+  回归组 **30 passed / 0 skip**,ruff 全仓 `All checks passed`;真实靶场
+  `--tools XSSentinel` 复现抽验 5 例 22.88s,detected 3 / errors 0 /
+  detected_on_server 0,与正式产物逐例一致。quick 双引擎 strict gate 本轮
+  补跑**未完成**(sync 档挂起 11m34s 后终止,未做 A/B 归因 ⇒ 按未验证
+  记账,不当绿也不当回归,详见 AGENTS.md「当前状态」补记);
+  **`full 194` 两档与全量分批门禁本轮未跑**,判定面零改动、
+  不拿 11-09 的门禁数字顶账。
 
 ## [1.4.4] - 2026-11-08
 
