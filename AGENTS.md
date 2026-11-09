@@ -210,6 +210,20 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
   `test_phase378_mcp_idempotency.py` **22 passed / 0 skip**,变异
   `dev/phase378_mutations.py` **7/7**,22 文件广回归 **358 passed / 0 failed**、
   116.3s,ruff 全仓零基线。**full 194 两档与全量分批门禁仍未跑**:判定面零改动。
+- **终树全量门禁补跑(2026-11-09 晚,树 `00a017d`)**:上面三轮「未跑」的债
+  已关闭,完整判词与归因见 `benchmark/results/gate_evidence_20261109.md`。
+  四档 strict gate 各 exit 0、FP0/FN0/ERROR0,带跳过数:quick 64 sync
+  **0 SKIP** / quick 64 async **1 SKIP**(同日早些)、full 194 sync
+  **194 scored / 0 SKIP**(344s,18941)、full 194 async
+  **182 scored / 12 SKIP**(343s,18942)。全量分批门 `--jobs 4 --quiet`
+  **297/297 文件绿 / 459s / 失败 0**,**skip 13 例 / 6 文件
+  (2 个整文件零贡献)**。R1(265/297,32 红)与 R2(261/297,36 红)
+  是**环境形态**:35/35 失败日志含 `SAFE_DELETE_BULK_CONFIRM_REQUIRED`、
+  **0 个真实 pytest 失败**;A/B 单跑 121 passed 否证 TEMP 假设,
+  真因是工作区内 `tests/_pytest_tmp` 的旧 numbered 目录清理撞上
+  50 次/turn 删除守卫。修法零产品改动:`dev/batched_gate_scratch.py`
+  重定向日志 + `PYTEST_ADDOPTS` 关掉清理 ⇒ R3 全绿。
+  **带日期的历史「未跑」记账一律保留不改**,本条只追加新证据。
 - **验收(本轮自己的运行,引用带跳过数)**:四档 strict gate 全 exit 0——
   quick 64 sync **0 SKIP**、quick 64 async **1 SKIP**、full 194 sync
   **0 SKIP**、full 194 async **12 SKIP**,全部 FP0/FN0/ERROR0;官方 XSSMaze

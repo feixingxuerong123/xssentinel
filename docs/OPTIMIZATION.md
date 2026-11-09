@@ -1334,3 +1334,40 @@ status 不复用 / legacy 零变化。`dev/phase378_mutations.py` **7/7**,
 源码字节已还原。22 文件广回归 **358 passed / 0 failed**,116.3s;
 ruff 全仓 `All checks passed`。**full 194 两档与全量分批门禁仍未跑**:
 判定面零改动。
+
+### 8.11 验收债结清(2026-11-09 晚,终树 `00a017d`)
+
+§8.6–§8.10 每轮都如实记了「**未跑全量分批门禁与四档 strict gate**」,
+理由是判定面零改动、不拿旧 run 数字顶账。理由成立,但债滚了三轮,
+本轮一次性补跑关闭。**带日期的历史记录一条不改**,只追加新证据:
+`benchmark/results/gate_evidence_20261109.md`。
+
+| 门 | 结果 | 跳过 | 耗时 |
+|---|---|---|---|
+| quick 64 strict gate sync(同日早些) | 64 scored,FP0/FN0/ERROR0,exit 0 | **0 SKIP** | — |
+| quick 64 strict gate async(同日早些) | 63 scored,FP0/FN0/ERROR0,exit 0 | **1 SKIP** | — |
+| full 194 strict gate sync(18941) | 194 scored,FP0/FN0/ERROR0,exit 0 | **0 SKIP** | 344s |
+| full 194 strict gate async(18942) | 182 scored,FP0/FN0/ERROR0,exit 0 | **12 SKIP** | 343s |
+| 全量分批门 `--jobs 4 --quiet` | **297/297 文件绿,失败 0** | **skip 13 例 / 6 文件,2 个整文件零贡献** | 459s |
+
+**两次红不是回归,是一次完整的 A/B 归因**:R1 265/297(32 红)、
+R2 261/297(36 红),35/35 保留日志全部含
+`SAFE_DELETE_BULK_CONFIRM_REQUIRED`、**0 个真实 pytest 失败**,每个
+「失败」文件的 stdout 都是 `[100%]` 全绿,只是 rc 被守卫改成 1。
+先假设「自定义 TEMP 把 pytest tmp 拉进监控区」⇒ A/B 单跑三个失败文件
+121 passed,但 R2 换回系统 TEMP 全量重跑仍 36 红 ⇒ **假设被否证**。
+R2 日志的 targets 给出真因:
+`D:\qoder\xssentinel\tests\_pytest_tmp\pytest-of-Administrator\garbage-*`
+—— 项目把 pytest tmp 根钉在**工作区内**,297 个并发子进程共享它,
+每个 session 按 retention 清理旧 numbered 目录,累计超过 safe-delete 的
+50 次/turn 阈值。改 TEMP 无效,因为删的不是 TEMP 下的路径。
+
+修法**不动产品/测试代码**:新增 `dev/batched_gate_scratch.py`(同
+`gate_run_scratch.py` 的做法,在进程内把 `LOG_DIR` 重绑定到工作区外),
+并给子进程加 `PYTEST_ADDOPTS='-o tmp_path_retention_policy=all -o
+tmp_path_retention_count=10000'` 关掉旧目录清理。补一次 A/B
+(2 文件 68 passed、工作区新增 `garbage-*` 为 0),随后 R3
+**297/297 绿 / 459s**。⇒ 判定面零改动的前提下,四档精度门与全量分批门
+在终树上全部通过;R1/R2 不当绿也不当回归。
+
+**下一步仍是评估 8–11(P2),#1 授权范围默认策略仍未拍板。**

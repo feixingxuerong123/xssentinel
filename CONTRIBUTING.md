@@ -31,6 +31,21 @@ python tests/run_all_batched.py --jobs 4  # 并行档(可选,见下)
 python -m pytest tests/test_report.py -q  # 单文件快速迭代
 ```
 
+**Windows 本机的 safe-delete 守卫(每 turn 限 50 次工作区内删除)**:项目把 pytest
+tmp 根钉在工作区内的 `tests/_pytest_tmp`,`--jobs 4` 的数百个子进程会共享它并
+互相清理旧 numbered 目录,累计撞线后把「stdout 全绿」的进程改判 rc=1。
+2026-11-09 实测 R1/R2 分别 32 / 36 个**假红**,35/35 失败日志含
+`SAFE_DELETE_BULK_CONFIRM_REQUIRED` 且零真实 pytest 失败。本机跑全量请用下面
+两个开关(不改产品/测试代码),R3 随即 297/297 绿:
+
+```bash
+export PYTEST_ADDOPTS='-o tmp_path_retention_policy=all -o tmp_path_retention_count=10000'
+python dev/batched_gate_scratch.py --jobs 4 --quiet   # 日志重定向到工作区外
+```
+
+完整归因、A/B 对照与四档精度门证据见
+`benchmark/results/gate_evidence_20261109.md`。
+
 - 并行档 `--jobs N`(可选,默认 1 = 历史顺序行为逐字节不变):N 个文件子进程并发,
   每文件的预算/重试/verdict/日志/耗时报告语义不变。A/B 实测(2026-11-02,11 文件
   头部权重抽样):顺序 465s → jobs=4 **124s(3.75×)**,逐文件 verdict 与单文件耗时

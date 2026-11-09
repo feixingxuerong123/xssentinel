@@ -128,6 +128,24 @@
   baseline 绿 → mutated 红 → restored 绿,源码字节已还原)。22 文件广回归
   **358 passed / 0 failed**,116.3s;ruff 全仓 `All checks passed`。
   **full 194 两档与全量分批门禁仍未跑**:判定面零改动。
+- **终树全量门禁补跑(2026-11-09 晚,树 `00a017d`,带跳过数)**:三轮
+  `[Unreleased]` 增量欠下的验收债一次关掉,完整判词与归因见
+  `benchmark/results/gate_evidence_20261109.md`。**四档 strict gate**:
+  quick 64 sync **64 scored / 0 SKIP**、quick 64 async
+  **63 scored / 1 SKIP**(同日早些补跑)、full 194 sync
+  **194 scored / 0 SKIP**(344s,端口 18941)、full 194 async
+  **182 scored / 12 SKIP**(343s,端口 18942),四档各 exit 0、
+  FP0 / FN0 / ERROR0。**全量分批门** `--jobs 4 --quiet`
+  **297/297 文件绿 / 459s / 失败 0**,**skip 13 例 / 6 文件
+  (2 个整文件零贡献)** —— 三个数必须一起引用。**前两轮红是环境形态**:
+  R1 265/297(32 红)、R2 261/297(36 红),35/35 失败日志含
+  `SAFE_DELETE_BULK_CONFIRM_REQUIRED` 且 **0 个真实 pytest 失败**;
+  A/B 单跑 121 passed 否证了「TEMP 路径」假设,R2 日志把真因指向工作区内
+  `tests/_pytest_tmp` 的旧 numbered 目录清理撞上 50 次/turn 删除守卫。
+  修法不改产品/测试代码:新增 `dev/batched_gate_scratch.py` 把日志重定向到
+  工作区外,并用 `PYTEST_ADDOPTS='-o tmp_path_retention_policy=all -o
+  tmp_path_retention_count=10000'` 关掉该清理 ⇒ R3 全绿。上面各 Phase
+  当时写的「未跑」是带日期的历史记账,保留不改。
 
 ## [1.4.4] - 2026-11-08
 
