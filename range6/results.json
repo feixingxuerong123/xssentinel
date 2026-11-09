@@ -1,9 +1,10 @@
 {
   "meta": {
     "range": "range6",
-    "generated": "2026-11-07 03:13:29",
+    "generated": "2026-11-10 04:48:56",
     "engines": [
-      "sync"
+      "sync",
+      "async"
     ],
     "max_payloads": 8,
     "max_transforms": 4,
@@ -17,6 +18,13 @@
       "TN": 1,
       "FN": 0,
       "ERROR": 0
+    },
+    "async": {
+      "TP": 1,
+      "FP": 0,
+      "TN": 1,
+      "FN": 0,
+      "ERROR": 0
     }
   },
   "rows": [
@@ -25,7 +33,7 @@
       "case_id": "r6-pos-dompurify-207",
       "verdict": "TP",
       "findings": 6,
-      "elapsed_s": 8.6,
+      "elapsed_s": 8.8,
       "retries": 0,
       "findings_detail": [
         {
@@ -66,7 +74,7 @@
       "case_id": "r6-neg-dompurify-3417",
       "verdict": "TN",
       "findings": 4,
-      "elapsed_s": 9.3,
+      "elapsed_s": 9.6,
       "retries": 0,
       "findings_detail": [
         {
@@ -88,6 +96,78 @@
           "type": "sanitizer_output_to_innerhtml",
           "severity": "low",
           "context": "sanitizer_sanitizer_output_to_innerhtml"
+        }
+      ],
+      "error": ""
+    },
+    {
+      "engine": "async",
+      "case_id": "r6-pos-dompurify-207",
+      "verdict": "TP",
+      "findings": 6,
+      "elapsed_s": 9.3,
+      "retries": 0,
+      "findings_detail": [
+        {
+          "type": "trusted_types_taint_flow",
+          "severity": "low",
+          "context": "trusted_types_innerHTML"
+        },
+        {
+          "type": "trusted_types_no_policy",
+          "severity": "low",
+          "context": "trusted_types_innerHTML"
+        },
+        {
+          "type": "sanitizer_vulnerable_version",
+          "severity": "medium",
+          "context": "sanitizer_sanitizer_vulnerable_version"
+        },
+        {
+          "type": "sanitizer_output_to_innerhtml",
+          "severity": "medium",
+          "context": "sanitizer_sanitizer_output_to_innerhtml"
+        },
+        {
+          "type": "dom_dynamic",
+          "severity": "high",
+          "context": "Element.outerHTML"
+        },
+        {
+          "type": "dom_dynamic",
+          "severity": "high",
+          "context": "Element.innerHTML"
+        }
+      ],
+      "error": ""
+    },
+    {
+      "engine": "async",
+      "case_id": "r6-neg-dompurify-3417",
+      "verdict": "TN",
+      "findings": 4,
+      "elapsed_s": 10.1,
+      "retries": 0,
+      "findings_detail": [
+        {
+          "type": "trusted_types_taint_flow",
+          "severity": "low",
+          "context": "trusted_types_innerHTML"
+        },
+        {
+          "type": "trusted_types_no_policy",
+          "severity": "low",
+          "context": "trusted_types_innerHTML"
+        },
+        {
+          "type": "sanitizer_output_to_innerhtml",
+          "severity": "low",
+          "context": "sanitizer_sanitizer_output_to_innerhtml"
+        },
+        {
+          "type": "dom_sink_reachability",
+          "severity": "low",
+          "context": "Element.innerHTML"
         }
       ],
       "error": ""
