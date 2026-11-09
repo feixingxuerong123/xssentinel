@@ -1246,3 +1246,50 @@ Flask 适配器 / 单测上下文无 socket ⇒ `active=False`,行为与修前�
 
 下一步 **#4-③(异步工具,复用 `JobManager`) → #7 → 评估 8–11**;
 **#1 仍未拍板,继续不动**。
+
+### 8.9 处置记录(2026-11-09 续):#4-③ 完成,#4 结案
+
+按 §8.8 的理由单独一轮。**#4 的三个子项至此全部完成**(① 预算协商、
+② HTTP 断连中止见 Phase 376,③ 异步路径见本条),下一步是 **#7(重试不幂等)**,
+再评估 8–11。**#1 授权范围默认策略仍未拍板,继续不动。**
+
+**实现**:新增 `xssentinel_scan_async` / `xssentinel_scan_status` 两个
+**仅现代帧**工具 —— 留在 `TOOL_DEFINITIONS` 之外,由 `_modernize_tools`
+附加到 modern `tools/list`、`_tool_call` 只在 `modern=True` 时查
+`_ASYNC_TOOL_TABLE`。这是 Phase 358 legacy 逐字节契约的唯一干净解法:
+legacy 目录仍是 7 个工具,legacy 帧调新工具仍是 `unknown tool`。
+`test_phase324_mcp_http.py` 的 `len(tools)==7`(legacy 帧)保持不变;
+`test_phase374_mcp_annotations.py` / `test_phase358_mcp_dual_era.py` /
+`test_phase372_mcp_structured_errors.py` / `test_phase328_mcp_trust_parity.py`
+四处随能力更新,但**断言强度不降**:modern 9 个工具逐一检查
+title / hints / 双 schema,trust 契约覆盖两个表的并集,catalogue /
+dispatch / schema / title 四表 key 集合互相钉住。
+
+**复用而非新造**:模块级 lazy `JobManager` 单例(就是 REST 的
+`api/jobs.py` 状态机),stdio 与 HTTP /mcp 共用 ⇒ Phase 324 的「两 transport
+答案一致」不被破坏(用 `--serve` 那个实例会让 stdio 走另一套)。
+worker 直接调 `run_scan_tool`,所以 submit → poll 拿到的**就是同步扫描
+同一份 compact findings**,而不是重扫一遍或另写一份结果格式。
+`Job` 仅加可选 `result_meta`(存 `truncated` / `total_findings` /
+`effective_max_seconds` 等非 finding 元数据),`to_summary` / `to_detail` /
+`job_to_store_dict` 都不暴露它 ⇒ REST 响应与 SQLite 行零变化。
+`server/discover` 声明 `asyncTools` / `asyncWorkflow`,中英 README 与
+`skills/xssentinel-mcp/SKILL.md` 补上 Agent 编排说明(并有守卫钉住不漂移)。
+
+**诚实性**:取消或断连的 job 一律 `mark_failed` 且带明确原因,**绝不**以
+「COMPLETED + 零 findings」收敛 —— 后者正是本项目门禁规则反复禁止的
+「把没测过报成干净」。job 是内存态且有 `max_jobs` 上限,旧 `scan_id` 可能
+被淘汰,错误分类给 `unknown_scan_id` 并提示重新提交。
+已知边界(如实记账):job 不跨进程存活;MCP 侧实例与 REST 侧实例是**同一个类
+的两个实例**,不是同一个对象;`scan_status` 的 `cancel=true` 走
+`request_cancel` + Phase 376 既有的 `cancel_event`,没有第三套取消契约。
+
+**验收(本轮自己的运行)**:`test_phase377_mcp_async_tools.py`
+**17 passed / 0 skip** —— 真实 JobManager + reaper + worker + `run_scan_tool`,
+仅替换 socket 层;核心是「submit 零外发」「poll 的 findings 与同步扫描
+逐位相同」「250 条时截断真相透传」「取消不是干净扫描」四组反证。
+`dev/phase377_mutations.py` **6/6**(关掉 modern 目录附加 / 放开 legacy
+dispatch / 关掉 pending 取消检查 / 不 settle 被中止的 worker / 不透传
+`async_args` / 删 `total_findings`),源码字节已还原。
+21 文件广回归 **336 passed / 0 failed**,115.0s;ruff 全仓 `All checks passed`。
+**full 194 两档与全量分批门禁仍未跑**:判定面零改动。

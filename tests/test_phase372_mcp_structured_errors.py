@@ -181,5 +181,9 @@ def test_tools_list_shape_is_unchanged():
     res = dispatch_message({**REQ, "method": "tools/list",
                             "params": _meta()})["result"]
     assert "structuredContent" not in res
+    # Phase 377: a modern tools/list is the seven legacy tools PLUS the two
+    # modern-only async tools.  What this guard forbids is still forbidden:
+    # the structured-error channel must not leak into a tools/list result.
     assert [t["name"] for t in res["tools"]] == [
-        t["name"] for t in m.TOOL_DEFINITIONS]
+        t["name"] for t in (m.TOOL_DEFINITIONS
+                            + m._ASYNC_TOOL_DEFINITIONS)]

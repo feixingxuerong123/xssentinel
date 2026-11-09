@@ -168,6 +168,12 @@ _UNTRUSTED_FIELDS = {
     "xssentinel_csp_analyze": ("families", "weak_points",
                                "bypass_candidates", "channels"),
     "xssentinel_propose": ("results[].semantic_detail",),
+    # Phase 377: the async status result carries the SAME compact findings
+    # (and therefore the same target-derived text) as a synchronous scan.
+    "xssentinel_scan_async": ("target_url",),
+    "xssentinel_scan_status": ("target_url", "error", "waf",
+                               "findings[].evidence", "findings[].detail",
+                               "findings[].param", "findings[].payload"),
 }
 _DEFAULT_UNTRUSTED_FIELDS = ("evidence", "detail", "param")
 _OUTPUT_SAFETY = (
@@ -626,6 +632,90 @@ _TOOL_PROPOSE_OUTPUT = {
     "required": ["url", "param", "confirmed"],
 }
 
+# ---------------------------------------------------------------------------
+# Phase 377 / OPTIMIZATION.md §8.2 #4 (item 3): an ASYNC path for agents.
+#
+# MCP hosts time a single tools/call out at 30-120s while a full scan can
+# legitimately take minutes.  Phase 376 let the client state its budget;
+# this phase gives it somewhere to go instead: submit -> poll -> collect
+# the SAME findings a synchronous scan would have returned.
+#
+# The seven synchronous tools stay byte-identical for LEGACY clients
+# (Phase 358).  These two are MODERN-only, appended to tools/list by
+# _modernize_tools and dispatched only for a modern frame.  They reuse the
+# REST JobManager state machine (api/jobs.py) -- no new queue, no new status
+# vocabulary -- and the SAME run_scan_tool, so "same finding" is literal.
+# ---------------------------------------------------------------------------
+
+#: A submit accepts EXACTLY the arguments of a synchronous scan.  Sharing the
+#: schema (shallow copy) means one validation path, not a second copy of the
+#: parameter definitions that can drift.
+_TOOL_SCAN_ASYNC_SCHEMA = dict(_TOOL_SCAN_SCHEMA)
+
+_TOOL_SCAN_STATUS_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "scan_id": {
+            "type": "string",
+            "description": "The scan_id returned by xssentinel_scan_async.",
+        },
+        "cancel": {
+            "type": "boolean", "default": False,
+            "description": ("If true, cooperatively cancel a still-active "
+                            "job before returning its current state."),
+        },
+        "include_findings": {
+            "type": "boolean", "default": True,
+            "description": ("Set false to omit the findings array (counts "
+                            "and metadata are still returned) when polling."),
+        },
+    },
+    "required": ["scan_id"],
+}
+
+_TOOL_SCAN_ASYNC_OUTPUT = {
+    "type": "object",
+    "properties": {
+        "scan_id": {"type": "string"},
+        "state": {"type": "string"},
+        "target_url": {"type": "string"},
+        "status_tool": {"type": "string"},
+        "poll_after_ms": {"type": "integer"},
+        "hint": {"type": "string"},
+    },
+    "required": ["scan_id", "state", "status_tool"],
+}
+
+_TOOL_SCAN_STATUS_OUTPUT = {
+    "type": "object",
+    "properties": {
+        "scan_id": {"type": "string"},
+        "state": {"type": "string"},
+        "terminal": {"type": "boolean"},
+        "target_url": {"type": "string"},
+        "created_at": {"type": "string"},
+        "started_at": {"type": "string"},
+        "finished_at": {"type": "string"},
+        "error": {"type": ["string", "null"]},
+        "finding_count": {"type": "integer"},
+        "total_findings": {"type": "integer"},
+        "truncated": {"type": "boolean"},
+        "truncation_hint": {"type": ["string", "null"]},
+        "requests_made": {"type": "integer"},
+        "waf": {"type": ["string", "null"]},
+        "effective_max_seconds": {"type": ["integer", "null"]},
+        "findings": {"type": "array", "items": {"type": "object"}},
+        "cancelled": {"type": "boolean"},
+        "poll_after_ms": {"type": ["integer", "null"]},
+    },
+    "required": ["scan_id", "state", "terminal", "finding_count"],
+}
+
+_ASYNC_TOOL_OUTPUT_SCHEMAS = {
+    "xssentinel_scan_async": _TOOL_SCAN_ASYNC_OUTPUT,
+    "xssentinel_scan_status": _TOOL_SCAN_STATUS_OUTPUT,
+}
+
 _TOOL_OUTPUT_SCHEMAS = {
     "xssentinel_scan": _TOOL_SCAN_OUTPUT,
     "xssentinel_discover": _TOOL_DISCOVER_OUTPUT,
@@ -636,8 +726,10 @@ _TOOL_OUTPUT_SCHEMAS = {
     "xssentinel_propose": _TOOL_PROPOSE_OUTPUT,
 }
 # Every successful result carries the same untrusted-source note (Phase 328);
-# declaring it in one loop keeps the seven output schemas from drifting.
-for _schema in _TOOL_OUTPUT_SCHEMAS.values():
+# declaring it in one loop keeps all output schemas (7 legacy + 2 modern)
+# from drifting.
+for _schema in (list(_TOOL_OUTPUT_SCHEMAS.values())
+                + list(_ASYNC_TOOL_OUTPUT_SCHEMAS.values())):
     _props = _schema.setdefault("properties", {})
     _props["output_safety"] = {"type": "string"}
     _props["untrusted_fields"] = {"type": "array",
@@ -739,6 +831,45 @@ del _definition
 
 
 # ---------------------------------------------------------------------------
+# Phase 377: MODERN-ONLY catalogue extension.  Kept OUT of TOOL_DEFINITIONS
+# on purpose: a legacy tools/list must stay byte-identical (Phase 358), and
+# the len(tools)==7 guards in test_phase324 / test_phase374 are that
+# contract's witnesses.  _modernize_tools appends these for modern frames.
+# ---------------------------------------------------------------------------
+_ASYNC_TOOL_DEFINITIONS = [
+    {
+        "name": "xssentinel_scan_async",
+        "description": (
+            "Submit a scan that runs in the background and return IMMEDIATELY "
+            "with a scan_id. Use when the target needs more time than your "
+            "single tools/call timeout allows, or to parallelise targets. "
+            "Arguments are identical to xssentinel_scan. Poll "
+            "xssentinel_scan_status with the returned scan_id until state is "
+            "terminal. A failed or cancelled job is NOT a clean scan. Only "
+            "scan targets you are authorized to test."),
+        "inputSchema": _TOOL_SCAN_ASYNC_SCHEMA,
+        "outputSchema": _TOOL_SCAN_ASYNC_OUTPUT,
+    },
+    {
+        "name": "xssentinel_scan_status",
+        "description": (
+            "Poll a scan submitted with xssentinel_scan_async. Returns job "
+            "state plus the SAME compact findings xssentinel_scan would have "
+            "returned, including the truncation flags so a capped list is "
+            "never mistaken for 'all of them'. Set cancel=true to abort an "
+            "active job; include_findings=false for cheap polling."),
+        "inputSchema": _TOOL_SCAN_STATUS_SCHEMA,
+        "outputSchema": _TOOL_SCAN_STATUS_OUTPUT,
+    },
+]
+
+_ASYNC_TOOL_TITLES = {
+    "xssentinel_scan_async": "Submit a background XSS scan",
+    "xssentinel_scan_status": "Poll a background scan's status and findings",
+}
+
+
+# ---------------------------------------------------------------------------
 # Phase 374 / OPTIMIZATION.md §8.1-5: tool titles + annotations.
 #
 # MCP platforms use these hints to decide whether to ask for confirmation,
@@ -769,9 +900,16 @@ _TOOL_ANNOTATIONS = {
 
 
 def _modernize_tools(tools: list) -> list:
-    """Copy the catalogue with titles + annotations (modern frames only)."""
-    return [dict(tool, title=_TOOL_TITLES[tool["name"]],
-                 annotations=dict(_TOOL_ANNOTATIONS)) for tool in tools]
+    """Copy the catalogue with titles + annotations (modern frames only).
+
+    Phase 377: the modern catalogue ALSO carries the two async tools that
+    legacy clients must never see.  Appending here (rather than in
+    TOOL_DEFINITIONS) is exactly what keeps the legacy frame byte-identical.
+    """
+    titles = {**_TOOL_TITLES, **_ASYNC_TOOL_TITLES}
+    return [dict(tool, title=titles[tool["name"]],
+                 annotations=dict(_TOOL_ANNOTATIONS))
+            for tool in list(tools) + _ASYNC_TOOL_DEFINITIONS]
 
 
 # ---------------------------------------------------------------------------
@@ -1602,6 +1740,176 @@ def run_propose_tool(args: dict, _pool=None, cancel_event=None,
                                             indent=2)}]}
 
 
+# ---------------------------------------------------------------------------
+# Phase 377 / OPTIMIZATION.md §8.2 #4 (item 3): async scan tools.
+#
+# ONE module-level JobManager (the REST job model, api/jobs.py) is shared by
+# the stdio transport and HTTP /mcp, so the two transports answer the same
+# submit/poll identically (Phase 324).  It is deliberately NOT the REST
+# server's instance: that one exists only under --serve, and using it would
+# make stdio and HTTP behave differently.  Constructed lazily so importing
+# this module does not start the reaper thread for clients that never
+# submit a job.
+# ---------------------------------------------------------------------------
+_job_manager_lock = threading.Lock()
+_job_manager = None
+_async_cancel_events: dict = {}
+
+
+def _get_job_manager():
+    global _job_manager
+    if _job_manager is None:
+        with _job_manager_lock:
+            if _job_manager is None:
+                from .jobs import JobManager
+                _job_manager = JobManager(max_jobs=200, max_concurrent=2,
+                                          job_timeout_s=3600)
+    return _job_manager
+
+
+def _async_error(text: str) -> dict:
+    return {"content": [{"type": "text", "text": text}], "isError": True}
+
+
+#: Non-finding fields carried from the synchronous runner's payload into
+#: Job.result_meta.  One list, so status and a synchronous scan cannot
+#: disagree about the cap or the effective budget.
+_ASYNC_RESULT_META_KEYS = (
+    "target", "total_findings", "truncated", "truncation_hint",
+    "effective_max_seconds",
+)
+
+
+def _async_scan_worker(job) -> None:
+    """Run ONE submit through the SAME synchronous runner, then settle it."""
+    mgr = _get_job_manager()
+    # A client can cancel while the job is still PENDING (the reaper starts
+    # workers on a 2s tick).  Honour that BEFORE any request is sent.
+    if mgr.is_cancel_requested(job.scan_id):
+        mgr.mark_failed(job.scan_id, "scan cancelled before it started")
+        return
+    cancel = threading.Event()
+    with _job_manager_lock:
+        _async_cancel_events[job.scan_id] = cancel
+    try:
+        args = dict(job.options.get("async_args") or {})
+        result = run_scan_tool(args, cancel_event=cancel)
+        text = (result.get("content") or [{}])[0].get("text") or ""
+        if result.get("isError"):
+            mgr.mark_failed(job.scan_id, str(text))
+            return
+        payload = json.loads(text)
+        mgr.mark_completed(
+            job.scan_id,
+            findings=list(payload.get("findings") or []),
+            requests_made=int(payload.get("requests_made") or 0),
+            waf_name=payload.get("waf"),
+            result_meta={k: payload.get(k)
+                         for k in _ASYNC_RESULT_META_KEYS},
+        )
+    except _ToolCancelled:
+        # A cancelled/disconnected scan produced NO verdict.  Never settle
+        # it as COMPLETED with zero findings -- that is exactly the
+        # "clean scan" lie the gate rules forbid.
+        mgr.mark_failed(
+            job.scan_id,
+            "scan aborted before completion (cancelled or client "
+            "disconnected); no verdict was produced")
+    except Exception as e:                # noqa: BLE001 -- must settle job
+        mgr.mark_failed(job.scan_id, f"{type(e).__name__}: {e}")
+    finally:
+        with _job_manager_lock:
+            _async_cancel_events.pop(job.scan_id, None)
+
+
+def run_scan_async_tool(args: dict, cancel_event=None, emit=None) -> dict:
+    """``xssentinel_scan_async``: submit and return immediately.
+
+    NO request to the target is sent by this call: validation is local and
+    the scan starts on a JobManager worker.  That is the whole point -- a
+    client's 30s tool timeout can no longer truncate the scan.
+    """
+    url = (args.get("url") or "").strip()
+    if not url:
+        return _async_error("url is required")
+    parsed = urlparse(url)
+    if not parsed.scheme or not parsed.netloc:
+        return _async_error(f"not an absolute http(s) URL: {url}")
+    method = (args.get("method") or "GET").upper()
+    if method not in ("GET", "POST"):
+        return _async_error(f"unsupported method: {method}")
+
+    mgr = _get_job_manager()
+    base_url, params = split_target_url(url)
+    # The FULL normalized argument dict rides in options: the worker calls
+    # run_scan_tool with it, so async and sync share one scan definition.
+    job = mgr.create(base_url, method=method, params=params,
+                     options={"async_args": dict(args)})
+    try:
+        mgr.start(job.scan_id, _async_scan_worker)
+    except Exception as e:
+        return _async_error(f"scan_start_failed: {type(e).__name__}: {e}")
+    payload = {
+        "scan_id": job.scan_id,
+        "state": job.state,
+        "target_url": url,
+        "status_tool": "xssentinel_scan_status",
+        "poll_after_ms": 1000,
+        "hint": ("Call xssentinel_scan_status with this scan_id until state "
+                 "is terminal. A failed or cancelled job is NOT a clean "
+                 "scan."),
+    }
+    return {"content": [{"type": "text",
+                         "text": json.dumps(payload, ensure_ascii=False,
+                                            indent=2)}]}
+
+
+def run_scan_status_tool(args: dict, cancel_event=None, emit=None) -> dict:
+    """``xssentinel_scan_status``: poll / cancel / collect findings."""
+    from .jobs import JobNotFoundError, JobState
+    scan_id = (args.get("scan_id") or "").strip()
+    if not scan_id:
+        return _async_error("scan_id is required")
+    mgr = _get_job_manager()
+    try:
+        job = mgr.get(scan_id)
+    except JobNotFoundError:
+        return _async_error(f"unknown scan_id: {scan_id}")
+    cancelled = False
+    if bool(args.get("cancel", False)):
+        cancelled = bool(mgr.request_cancel(scan_id))
+        with _job_manager_lock:
+            event = _async_cancel_events.get(scan_id)
+        if event is not None:
+            event.set()
+    meta = dict(getattr(job, "result_meta", {}) or {})
+    terminal = job.state in JobState.TERMINAL
+    payload = {
+        "scan_id": job.scan_id,
+        "state": job.state,
+        "terminal": terminal,
+        "target_url": meta.get("target") or job.target_url,
+        "created_at": job.created_at,
+        "started_at": job.started_at,
+        "finished_at": job.finished_at,
+        "error": job.error,
+        "finding_count": job.finding_count,
+        "total_findings": meta.get("total_findings", job.finding_count),
+        "truncated": bool(meta.get("truncated", False)),
+        "truncation_hint": meta.get("truncation_hint"),
+        "requests_made": job.requests_made,
+        "waf": job.waf_name,
+        "effective_max_seconds": meta.get("effective_max_seconds"),
+        "cancelled": cancelled,
+        "poll_after_ms": None if terminal else 1000,
+    }
+    if args.get("include_findings", True):
+        payload["findings"] = list(job.findings)
+    return {"content": [{"type": "text",
+                         "text": json.dumps(payload, ensure_ascii=False,
+                                            indent=2)}]}
+
+
 #: name -> (inputSchema, runner) -- the dispatch table behind ``_tool_call``.
 #: Kept in one place so the catalogue (``TOOL_DEFINITIONS``, what agents
 #: see) and the dispatch (what the server runs) cannot drift apart; the
@@ -1614,6 +1922,15 @@ _TOOL_TABLE = {
     "xssentinel_param_mine": (_TOOL_PARAM_MINE_SCHEMA, run_param_mine_tool),
     "xssentinel_csp_analyze": (_TOOL_CSP_SCHEMA, run_csp_analyze_tool),
     "xssentinel_propose": (_TOOL_PROPSE_SCHEMA, run_propose_tool),
+}
+
+#: Phase 377: dispatch for the two MODERN-ONLY async tools.  Kept separate
+#: from _TOOL_TABLE so Phase 323's catalogue/dispatch parity guard still
+#: pins the seven legacy tools, while _tool_call gates these on `modern`.
+_ASYNC_TOOL_TABLE = {
+    "xssentinel_scan_async": (_TOOL_SCAN_ASYNC_SCHEMA, run_scan_async_tool),
+    "xssentinel_scan_status": (_TOOL_SCAN_STATUS_SCHEMA,
+                               run_scan_status_tool),
 }
 
 
@@ -1764,6 +2081,15 @@ def _discover_result() -> dict:
             "client can shorten a scan but never lengthen it. When the "
             "limit is reached the tool returns an explicit timeout error, "
             "NOT an empty finding list."),
+        # Phase 377: the long-task escape hatch.  Declaring it here means a
+        # modern Agent can find the async path from discover alone instead
+        # of guessing a tool name.
+        "asyncTools": [t["name"] for t in _ASYNC_TOOL_DEFINITIONS],
+        "asyncWorkflow": (
+            "For targets that need longer than one tools/call, submit with "
+            "xssentinel_scan_async (returns immediately with scan_id), then "
+            "poll xssentinel_scan_status until state is terminal. A failed "
+            "or cancelled job is NOT a clean scan."),
     }
 
 
@@ -1878,6 +2204,14 @@ def _classify_tool_error(text: str) -> dict:
         code = "missing_required_argument"
         field = text.split()[0] if text.split() else None
         hint = "supply the required argument"
+    elif text.startswith("unknown scan_id:"):
+        # Phase 377: jobs are in-memory and bounded (max_jobs), so an id can
+        # legitimately expire.  Tell the agent to SUBMIT again instead of
+        # leaving it to parse a generic sentence.
+        code = "unknown_scan_id"
+        field = "scan_id"
+        hint = ("submit a new scan with xssentinel_scan_async; jobs are "
+                "in-memory and old ones may have been evicted")
     elif text.startswith("not an absolute http(s) URL:"):
         code = "invalid_url"
         field = "url"
@@ -2050,6 +2384,11 @@ def _tool_call(params, cancel_event=None, emit=None, modern: bool = False):
                 "isError": True}
     name = params.get("name")
     entry = _TOOL_TABLE.get(name)
+    # Phase 377: async tools exist ONLY for a modern frame.  A legacy client
+    # that somehow names one still gets the same "unknown tool" answer it
+    # always would have -- no capability appears behind its back.
+    if entry is None and modern:
+        entry = _ASYNC_TOOL_TABLE.get(name)
     if entry is None:
         return {"content": [{"type": "text",
                              "text": f"unknown tool: {name}"}],

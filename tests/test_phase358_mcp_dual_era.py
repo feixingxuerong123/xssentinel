@@ -109,8 +109,12 @@ def test_modern_tools_list_is_cacheable_and_identifies_the_server():
     assert res["ttlMs"] > 0 and res["cacheScope"] == "public"
     assert res["_meta"]["io.modelcontextprotocol/serverInfo"]["name"] \
         == "xssentinel"
+    # Phase 358's legacy catalogue is unchanged; Phase 377 appends the two
+    # async tools ONLY here, in a fixed order.  A legacy frame still gets
+    # exactly the seven (test_legacy_tools_list_shape + the Phase 377 guard).
     assert [t["name"] for t in res["tools"]] == [
-        t["name"] for t in m.TOOL_DEFINITIONS]
+        t["name"] for t in (m.TOOL_DEFINITIONS
+                            + m._ASYNC_TOOL_DEFINITIONS)]
 
 
 def test_unsupported_declared_version_offers_a_retry_list():

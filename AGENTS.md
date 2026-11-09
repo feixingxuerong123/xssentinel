@@ -177,7 +177,24 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
   的四档数字顶账。
   **#4-③(异步工具)未做,单独一轮**:新增 2 个工具会撞 `len(tools)==7`
   三处守卫与 README「七个工具」声明,且 Phase 358 的 legacy `tools/list`
-  逐字节契约要求新工具不能进 `TOOL_DEFINITIONS`,改动面与 ①② 不同。
+  逐字节契约要求新工具不能进 `TOOL_DEFINITIONS`,改动面与 ①② 不同
+  ⇒ 已于 Phase 377 单独一轮完成(见下条)。
+- **Phase 377 / §8.2 #4 ③(2026-11-09,`[Unreleased]` 增量)**:新增 2 个
+  **仅现代帧**工具 `xssentinel_scan_async`(提交即返回 `scan_id`、零目标请求)
+  / `xssentinel_scan_status`(轮询、`cancel=true`、`include_findings=false`)。
+  复用既有 REST `JobManager` 状态机(模块级 lazy 单例,stdio 与 HTTP /mcp 共用,
+  不是 REST server 那个实例),worker 直调 `run_scan_tool` ⇒ 轮询结果就是同步
+  扫描同一份 compact findings,截断与预算元数据一并透传。`Job` 加可选
+  `result_meta`(不进 `to_summary` / `to_detail` / SQLite,REST 契约零变化)。
+  **legacy `tools/list` 仍逐字节 7 个工具**,legacy 帧调新工具仍是 unknown
+  tool;modern 为 9 个,title / annotations / 双 schema 齐全(4 个既有守卫
+  随能力更新、强度不降)。取消或断连的 job 一律 `failed` + 明确原因,
+  绝不记成零 findings 的「干净扫描」。`server/discover` 增 `asyncTools` /
+  `asyncWorkflow`,中英 README 与 SKILL.md 同步补齐编排说明。守卫
+  `test_phase377_mcp_async_tools.py` **17 passed / 0 skip**,变异对照
+  `dev/phase377_mutations.py` **6/6**,21 文件广回归 **336 passed / 0 failed**、
+  115.0s,ruff 全仓零基线。**full 194 两档与全量分批门禁仍未跑**:判定面
+  零改动,不拿旧数字顶账。
 - **验收(本轮自己的运行,引用带跳过数)**:四档 strict gate 全 exit 0——
   quick 64 sync **0 SKIP**、quick 64 async **1 SKIP**、full 194 sync
   **0 SKIP**、full 194 async **12 SKIP**,全部 FP0/FN0/ERROR0;官方 XSSMaze
@@ -203,7 +220,7 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
 - **开放项(需拍板,不擅自做)**:① `docs/OPTIMIZATION.md` §8.1-1 授权范围默认策略
   (默认拒绝 vs 默认放行)——§8.5 明确「拍板前不要动这一条」,**仍未动**;
   #2 / #3 / #5 / #6 已按建议顺序完成,#4 的 ①② 于 Phase 376 完成(见上条),
-  **下一步是 #4-③ → #7**,最后评估 8–11。
+  **#4 三子项已于 376/377 全部完成,下一步是 #7(重试不幂等)**,最后评估 8–11。
   ② PyPI Trusted Publisher 未配。**环境阻塞**:2026-11-08 傍晚起本机
   `wsl.exe` 被安全策略拦,Docker Desktop 后端起不来,XSSMaze 复测当前无法进行;
   同晚 loopback 劣化还造成 `test_phase327` 超时用例的环境形态红(见上条 A/B)。

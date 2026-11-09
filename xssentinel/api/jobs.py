@@ -97,6 +97,13 @@ class Job:
     # the same scan cannot both bill a model call for identical output.
     _ai_lock: threading.Lock = field(default_factory=threading.Lock,
                                      repr=False)
+    # Phase 377: the MCP async tools reuse THIS job model instead of
+    # inventing a second result store.  Non-finding metadata from the scan
+    # runner (cap flags, effective budget, target) lives here.  Deliberately
+    # absent from to_summary()/to_detail()/job_to_store_dict(): the REST
+    # response shape and the SQLite row stay exactly as they were, and the
+    # field is in-process only (MCP jobs have no durable store).
+    result_meta: dict = field(default_factory=dict, repr=False)
 
     def to_summary(self) -> dict:
         """Return a JSON-serializable summary (no findings list)."""
@@ -411,6 +418,7 @@ class JobManager:
         self, scan_id: str, *, findings: list[dict],
         requests_made: int = 0, waf_name: str | None = None,
         coverage_summary: dict | None = None,
+        result_meta: dict | None = None,
     ) -> None:
         with self._lock:
             job = self._jobs.get(scan_id)
@@ -425,6 +433,7 @@ class JobManager:
             job.requests_made = requests_made
             job.waf_name = waf_name
             job.coverage_summary = coverage_summary
+            job.result_meta = dict(result_meta or {})
             job.state = JobState.CANCELLED if job._cancel_requested.is_set() \
                 else JobState.COMPLETED
             job.finished_at = datetime.now().isoformat(timespec="seconds")

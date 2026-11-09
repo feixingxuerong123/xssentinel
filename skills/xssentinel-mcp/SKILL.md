@@ -5,7 +5,8 @@ description: Drive the XSSentinel XSS scanner through its MCP tools (discover �
 
 # Driving XSSentinel over MCP
 
-XSSentinel is a dual-engine XSS scanner exposed as seven MCP tools. Each
+XSSentinel is a dual-engine XSS scanner exposed as seven core MCP tools
+(nine for modern `2026-07-28` clients — see "Long scans" below). Each
 tool returns a JSON payload as text content AND as `structuredContent`;
 read whichever your client supports — they are the same object.
 
@@ -100,6 +101,25 @@ Send `notifications/cancelled` with the request id:
 `{"requestId": 42, "reason": "changed plan"}`. The runner aborts at its
 next request and **no response is sent for the cancelled call** (the MCP
 rule). The id must match the `id` of the `tools/call` you want to stop.
+
+## Long scans: submit, then poll (modern clients only)
+
+If your host times out a single `tools/call` at 30-120s, do NOT shrink
+`max_seconds` and accept a partial answer. On a modern `2026-07-28` frame:
+
+1. `xssentinel_scan_async` — takes the SAME arguments as `xssentinel_scan`
+   and returns `{scan_id, state: "pending", status_tool, poll_after_ms}`
+   immediately. It sends NO requests to the target.
+2. `xssentinel_scan_status` — poll with `{scan_id}` until `terminal: true`.
+   Use `include_findings: false` for cheap polls; add `cancel: true` to abort.
+3. Read `findings` from the terminal result. They are the SAME compact
+   findings `xssentinel_scan` would have returned, with `truncated` and
+   `total_findings` preserved — a capped list is never "all of them".
+
+A `state: "failed"` (including a cancelled or disconnected job) is NOT a clean scan:
+`error` explains why, so never present it as "no findings". Jobs
+live in the server process's memory and are bounded, so an old `scan_id` can
+expire — submit again when you get an `unknown_scan_id` error.
 
 ## Reading verdicts honestly
 

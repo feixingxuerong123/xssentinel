@@ -515,8 +515,11 @@ python -m xssentinel --wayback target.com -o reports/ -f json
 ```
 
 **MCP stdio server（Phase 192/202/322/323，dalfox v3 同款）**——把扫描器作为工具暴露给
-LLM Agent（JSON-RPC over stdin/stdout），七个工具覆盖「侦察 → 扫描 → 调整重试」
+LLM Agent（JSON-RPC over stdin/stdout），七个核心工具覆盖「侦察 → 扫描 → 调整重试」
 全链路（2025-26 Agent 工具的主流形态是细粒度可组合，不是单一巨型调用）。
+声明现代协议版本 `2026-07-28` 的客户端另有 2 个异步工具
+（`xssentinel_scan_async` / `xssentinel_scan_status`，Phase 377）；legacy
+`tools/list` 仍逐字节是那七个工具。
 **参数契约（Phase 323，对标 dalfox v3.2.4 #1464/#1513 的语义级修复）**：`tools/call`
 按各工具 inputSchema 校验参数——**未知键 = isError + 可接受键名清单，永不静默丢弃**
 （拼错的 `cookies` 曾会让扫描不带认证跑完、回一份假"无发现"）；REST 同义拼写
@@ -549,11 +552,19 @@ python -m xssentinel --serve --host 127.0.0.1 --port 8080      # 生产建议再
 传输形态：单条或批量 JSON-RPC 数组（逐条响应）；全通知批量回 202 空体；畸形 JSON
 回 JSON-RPC `-32700`（不是 HTTP 400）；GET/DELETE `/mcp` 为 405（不提供 SSE 升级、
 无 session 可删）。安全层与 REST 同一套：`--api-key`、同源门（跨源 POST 403）、
-无 key 时 Host 限本机。**结构化输出（Phase 324）**：七个工具都带 `outputSchema`，
+无 key 时 Host 限本机。**结构化输出（Phase 324）**：所有工具（含现代帧的 2 个
+异步工具）都带 `outputSchema`，
 成功结果额外携带 `structuredContent`（与文本内容同一对象；错误结果只回文本）。
 **进度与取消（Phase 325，stdio）**：`tools/call` 的 `_meta.progressToken` 会收到
 `notifications/progress`（progress = 已发请求数 + 起始信标）；`notifications/cancelled`
 按 request id 中止（下一个请求处停，被取消的请求**不回响应**——MCP 规范）。
+**长扫描（Phase 377，仅现代帧）**：单次 `tools/call` 会被宿主在 30–120s 掐断时，
+改用 `xssentinel_scan_async` 提交——它**当场返回 `scan_id`、不发任何目标请求**，
+再轮询 `xssentinel_scan_status` 直到 `terminal`。取回的是与 `xssentinel_scan`
+同一份 compact findings，连 `truncated` / `total_findings` /
+`effective_max_seconds` 一起透传；`cancel=true` 可中止，**失败或被取消的 job
+绝不记成「无发现」**。job 复用既有 REST `JobManager` 状态机（内存态、有上限），
+进程重启后旧 `scan_id` 失效。
 **Agent 面默认与信任边界（Phase 328/328e）**：`xssentinel_scan` 默认与 CLI normal 对齐
 （`dom_engine=auto`、`max_transforms=12`；DOM 层默认运行，Playwright 缺失时静态降级，
 `headless` 只负责浏览器确认）。每个工具在 `untrusted_fields` 里列出自己由目标派生的

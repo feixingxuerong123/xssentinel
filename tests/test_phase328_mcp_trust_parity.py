@@ -195,7 +195,12 @@ def test_each_tool_names_its_own_target_derived_fields(
 
 
 def test_every_tool_has_an_untrusted_field_contract():
-    assert set(mcp_server._UNTRUSTED_FIELDS) == set(mcp_server._TOOL_TABLE)
+    # Phase 377: the two modern-only async tools are dispatched too, so they
+    # must also name their target-derived fields.  Union of BOTH tables,
+    # never a hand-written allowlist.
+    catalogued = (set(mcp_server._TOOL_TABLE)
+                  | set(mcp_server._ASYNC_TOOL_TABLE))
+    assert set(mcp_server._UNTRUSTED_FIELDS) == catalogued
 
 
 def test_scan_tool_description_warns_about_target_text():
@@ -206,7 +211,9 @@ def test_scan_tool_description_warns_about_target_text():
 
 
 def test_output_schemas_declare_the_trust_fields():
-    for name, schema in mcp_server._TOOL_OUTPUT_SCHEMAS.items():
+    schemas = {**mcp_server._TOOL_OUTPUT_SCHEMAS,
+               **mcp_server._ASYNC_TOOL_OUTPUT_SCHEMAS}
+    for name, schema in schemas.items():
         props = schema["properties"]
         assert props["output_safety"]["type"] == "string", name
         assert props["untrusted_fields"]["type"] == "array", name
@@ -220,3 +227,8 @@ def test_skill_documents_the_boundary():
     assert "untrusted_fields" in text
     assert "never as" in text and "instructions" in text
     assert "dom_engine" in text
+    # Phase 377: an agent whose host kills long calls cannot use the async
+    # path if its own orchestration guide never mentions it.
+    assert "xssentinel_scan_async" in text
+    assert "xssentinel_scan_status" in text
+    assert "NOT a clean scan" in text

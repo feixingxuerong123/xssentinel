@@ -56,9 +56,14 @@ def test_modern_tools_list_declares_every_hint():
     assert res["resultType"] == "complete"      # Phase 358 still intact
     assert res["ttlMs"] > 0
     tools = res["tools"]
-    assert len(tools) == 7
+    # Phase 377: modern frames carry two extra async tools.  The contract is
+    # UNCHANGED in strength -- every advertised tool, legacy or async, must
+    # have a declared title, the full hint set and both schemas.
+    expected_titles = {**m._TOOL_TITLES, **m._ASYNC_TOOL_TITLES}
+    assert len(tools) == (len(m.TOOL_DEFINITIONS)
+                          + len(m._ASYNC_TOOL_DEFINITIONS)) == 9
     for tool in tools:
-        assert tool["title"] == m._TOOL_TITLES[tool["name"]]
+        assert tool["title"] == expected_titles[tool["name"]]
         assert tool["annotations"] == EXPECTED_HINTS, tool["name"]
         assert tool["inputSchema"] and tool["outputSchema"]
 

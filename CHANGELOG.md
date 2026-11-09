@@ -41,6 +41,18 @@
   且存在真实 socket 时用 `MSG_PEEK` 窥探 EOF(有 pipelined 数据不算断连),
   命中后复用 stdio 既有的 `cancel_event`,在下一个请求边界停止外发攻击载荷;
   Flask 适配器与单测上下文无 socket ⇒ 完全不武装。
+- **Phase 377 / §8.2 #4 ③ 异步扫描路径**:新增 2 个**仅现代帧**工具
+  `xssentinel_scan_async`(提交即返回 `scan_id`、**零目标请求**)与
+  `xssentinel_scan_status`(轮询 / `cancel=true` / `include_findings=false`)。
+  **复用既有 REST `JobManager` 状态机**(模块级 lazy 单例,stdio 与 HTTP /mcp
+  共用),worker 直接调 `run_scan_tool` ⇒ 轮询拿到的就是同步扫描**同一份**
+  compact findings,`truncated` / `total_findings` / `effective_max_seconds`
+  一并透传;`Job` 增加可选 `result_meta` 承载非 finding 元数据,REST 响应与
+  SQLite 行不变。legacy `tools/list` 仍逐字节是 7 个工具、legacy 帧调新工具
+  仍是 unknown tool;modern `tools/list` 为 9 个,每工具 title / annotations /
+  双 schema 齐全。取消或断连的 job 一律 `failed` + 明确原因,**绝不记成零
+  findings 的「干净扫描」**。`server/discover` 增 `asyncTools` /
+  `asyncWorkflow`;中英 README 与 `skills/xssentinel-mcp/SKILL.md` 同步补齐。
 
 ### Changed
 - **Phase 373 / 截断显式化**:`scan` 与 `param_mine` 结果补 `total_findings` /
@@ -82,6 +94,18 @@
   报告落 `dev/gate_run_scratch.py` 指定的工作区外 scratch 目录)。
   **full 194 两档与全量分批门禁仍未跑**:判定面零改动;昨晚 A/B 定性的
   `test_phase327` 环境形态红已随 loopback 恢复转绿,补跑 full 的条件具备。
+- Phase 377 追加:`test_phase377_mcp_async_tools.py` **17 passed / 0 skip**
+  (真实 JobManager + reaper + worker + `run_scan_tool`,仅替换 socket 层;
+  核心断言 submit → poll 的 findings 与同步扫描逐位相同、250 条截断真相
+  透传、取消不是干净扫描、legacy 目录逐字节不变),变异对照
+  `dev/phase377_mutations.py` **6/6**(关掉 modern 目录附加 / 放开 legacy
+  dispatch / 关掉 pending 取消检查 / 不 settle 被中止的 worker / 不透传
+  `async_args` / 删 `total_findings`,各自 baseline 绿 → mutated 红 →
+  restored 绿,源码字节已还原)。四个既有守卫随能力更新且**强度不降**
+  (7→9 的并集断言、每工具 title/hints/双 schema、trust 契约覆盖 9 个工具)。
+  21 文件广回归 **336 passed / 0 failed**,115.0s;ruff 全仓 `All checks passed`。
+  **full 194 两档与全量分批门禁仍未跑**:本轮只动 MCP 接入面与 Job 元数据,
+  判定面零改动。
 
 ## [1.4.4] - 2026-11-08
 

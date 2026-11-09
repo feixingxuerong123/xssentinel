@@ -50,9 +50,10 @@ layer is replaceable on its own. Highlights:
   HAR / OpenAPI / sitemap / wayback imports, hidden-parameter mining, parameter
   position mutation, HPP, source-map ingestion, and more — see
   [docs/COMPETITORS.md](docs/COMPETITORS.md).
-- **MCP server** (stdio + Streamable HTTP): seven tools for LLM agents with
-  argument validation, `structuredContent`/`outputSchema`, progress
-  notifications and cancellation — see `skills/xssentinel-mcp/SKILL.md`.
+- **MCP server** (stdio + Streamable HTTP): seven core tools for LLM agents,
+  plus two modern-era async tools (Phase 377), with argument validation,
+  `structuredContent`/`outputSchema`, progress notifications and
+  cancellation — see `skills/xssentinel-mcp/SKILL.md`.
 - **Eight report formats** (`-f`): HTML / JSON / CSV / SARIF 2.1.0 / JUnit / Markdown + Burp XML / nuclei export.
 - **CLI pipeline compatibility (Phase 359)**: `-o -` writes the report to stdout as UTF-8 bytes — one JSON line for a single target, JSON Lines for a batch (`-f json` only) — while every summary, progress line and error goes to stderr, so `... | jq` sees only report frames. `-o reports/scan.json` creates missing parent directories. `--batch` / `--batch-stdin` accept UTF-8 (with or without BOM), UTF-16 (BOM), GB18030/GBK and CRLF, with an honest decode error instead of a traceback. Exit codes: `0` ok, `1` crash, `2` usage/input, `3` incomplete scan ("no findings" is not evidence of absence).
 - **CLI compatibility sweep (Phase 360)**: `--version` / `-V` print a single-line version; `--ver` stays an exact alias of `--verbose` rather than becoming ambiguous. `--config` shares the batch decoder (UTF-8 BOM / UTF-16 / GB18030); a broken config returns rc=2 with a clear reason instead of silently becoming an empty config or raising a traceback, and keys such as `format` / `timeout` / `output` now take effect (explicit CLI flags still win — see the Changed entry in the changelog). `-o - -f nuclei` is rejected before any scan (rc=2), and a consumer that closes the pipe early (`... | head`) ends the run cleanly (rc=0) instead of reporting every remaining target as a failed scan. Every human-facing line in all three CLI modules is source-pinned to the `-o -` stream; stdout bytes are unchanged when `-o -` is not used.
@@ -296,7 +297,9 @@ always win over the preset.
 python -m xssentinel --mcp
 ```
 
-Seven tools cover recon → scan → adjust-and-retry:
+Seven core tools cover recon → scan → adjust-and-retry (modern `2026-07-28`
+clients additionally get `xssentinel_scan_async` / `xssentinel_scan_status`;
+a legacy `tools/list` stays byte-identical with the seven below):
 `xssentinel_discover` (render once, harvest SPA fields/API endpoints/hash
 routes), `xssentinel_profile` (one-request reflection triage), `xssentinel_param_mine`
 (hidden parameters), `xssentinel_csp_analyze` (CSP posture per delivery family),
@@ -338,6 +341,16 @@ that then reported "clean"), REST spellings (`target`/`cookie`/`header`/
 text serializes). A `_meta.progressToken` yields `notifications/progress`
 while a call runs; `notifications/cancelled` aborts at the next request and
 the cancelled request gets **no response** (MCP spec).
+
+**Long scans (Phase 377, modern frames only)**: when a host kills a single
+`tools/call` at 30-120s, submit with `xssentinel_scan_async` instead — it
+returns a `scan_id` IMMEDIATELY and sends ZERO requests to the target — then
+poll `xssentinel_scan_status` until `terminal`. The polled findings are the
+same compact findings `xssentinel_scan` would return, with `truncated` /
+`total_findings` / `effective_max_seconds` preserved; `cancel=true` aborts an
+active job. A failed or cancelled job is NEVER reported as a clean scan. Jobs
+reuse the existing REST `JobManager` state machine (in-memory, bounded), so
+old `scan_id`s do not survive a process restart.
 
 **Agent-surface defaults and trust boundary**: `xssentinel_scan` matches the
 CLI's normal policy (`dom_engine=auto`, `max_transforms=12`; the DOM layer
