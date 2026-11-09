@@ -90,14 +90,15 @@ def main() -> int:
     args = ap.parse_args()
 
     started = threading.Event()
-    threading.Thread(target=run_server, args=(19704,),
+    threading.Thread(target=run_server, args=(int(os.environ.get("XS_RANGE4_PORT", "19704")),),
                      kwargs={"ready_callback": lambda s: started.set()},
                      daemon=True).start()
     if not started.wait(10):
         print("[!] range4 server failed to start")
         return 1
     time.sleep(0.3)
-    base = "http://127.0.0.1:19704"
+    _r4port = os.environ.get("XS_RANGE4_PORT", "19704")
+    base = f"http://127.0.0.1:{_r4port}"
     # The runner owns this server: trust it only after a real probe.
     r = requests.get(f"{base}/", timeout=5)
     assert r.status_code == 200 and "Range4" in r.text, "probe failed"

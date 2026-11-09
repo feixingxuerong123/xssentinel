@@ -85,8 +85,12 @@ def _run_cli(args, timeout=240):
     env["PYTHONIOENCODING"] = "utf-8"
     proc = subprocess.run(
         [sys.executable, "-m", "xssentinel"] + args,
-        cwd=ROOT, env=env, capture_output=True, text=True, timeout=timeout)
-    return proc.returncode, proc.stdout + proc.stderr
+        cwd=ROOT, env=env, capture_output=True, text=True, timeout=timeout,
+        encoding="utf-8", errors="replace")
+    # A child killed by the host security product can surface None streams
+    # (measured 2026-11-10: TypeError on the concat below, twice in a row).
+    # "" keeps the contract checks string-based instead of raising.
+    return proc.returncode, (proc.stdout or "") + (proc.stderr or "")
 
 
 # --------------------------------------------------------------------------
