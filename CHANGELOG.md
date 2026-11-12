@@ -16,6 +16,29 @@
 
 ## [Unreleased]
 
+### Added
+- **Phase 383 / MCP 授权边界(OPTIMIZATION §8.1-1,P0 清零)**:授权范围由
+  operator 在服务启动时钉定,不接受 `tools/call` 覆盖——`--allow-host`
+  (host 模式,语法与 CLI 导入靶门同源)或 `XSSENTINEL_MCP_ALLOW_HOSTS`
+  环境变量;默认为**首用钉定(TOFU)**:第一个成功的带 url 调用钉定其 origin,
+  之后跨 origin 调用返回结构化错误 `scope_denied` 且**零请求外发**(预检探针
+  不发、失败的调用不烧 pin、拒绝不进结果缓存);`--allow-any-host` 显式回到
+  无边界。`server/discover` 以 `scope` 对象与 instructions 同时声明当前范围;
+  配置了范围时 sync 引擎重定向边界随之开启,被拒的跨源跳转记入扫描结果新增的
+  `boundary_stops` 字段(async status 同步透传),落点服务器不会被访问。
+  守卫 `tests/test_phase383_mcp_scope.py`(13 例,真实 dispatch + 真实 stdio
+  子进程,以 loopback 服务器的请求计数证明「零外发」),变异对照
+  `dev/phase383_mutations.py` 6/6;SKILL.md 与中英 README 同步(文档守卫
+  随能力扩展、强度不降)。
+
+### Changed
+- **BREAKING: Phase 383 / MCP 多 origin 会话需显式配置**:默认 TOFU 下,
+  同一 MCP 服务进程内第二次扫不同 origin 会按上述契约被拒——多靶工作流须在
+  启动时用 `--allow-host` 钉定范围(或 `--allow-any-host` 显式放弃边界)。
+  legacy 帧同样被拒(错误保持 legacy 文本形状,既有 legacy 响应字节不受影响);
+  单靶工作流(README/SKILL.md 主路径)行为不变。CLI 与 REST `/api/v1/scans`
+  的 operator 直驱模型不变。
+
 ## [1.5.0] - 2026-11-12
 
 > 承接 Phase 372–381 的 MCP 接入面增量与 Phase 382 的独立浏览器事实表。

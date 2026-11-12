@@ -236,3 +236,23 @@ def test_skill_documents_the_boundary():
     # avoid retrying (a lost scan) or invent its own duplicate request.
     assert "cache_hit" in text
     assert "cacheScope" in text
+    # Phase 383: an agent that hits the authorization boundary must know
+    # what it is, that retrying cannot help, and who can lift it.
+    assert "scope_denied" in text
+    assert "first-use pinning" in text
+    assert "boundary_stops" in text
+
+
+def test_readme_documents_the_scope_boundary():
+    """Phase 383: both READMEs state the operator-pinned scope -- the
+    default (TOFU), the allowlist grammar, and the zero-request refusal --
+    so an operator does not learn it from a refused call."""
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    for name in ("README.md", "README.en.md"):
+        with open(os.path.join(root, name), encoding="utf-8") as f:
+            text = f.read()
+        assert "--allow-host" in text, name
+        assert "XSSENTINEL_MCP_ALLOW_HOSTS" in text, name
+        assert "scope_denied" in text, name
+        assert "boundary_stops" in text, name
+        assert "TOFU" in text or "first-use pinning" in text, name

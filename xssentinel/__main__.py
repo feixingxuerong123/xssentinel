@@ -1422,7 +1422,12 @@ def _main_impl(argv=None):
         from .core.term_safe import uninstall_cli_print_guard
         uninstall_cli_print_guard()
         from .api.mcp_server import serve as _mcp_serve
-        return _mcp_serve()
+        # Phase 383: the operator's --allow-host / --allow-any-host values
+        # pin the MCP authorization scope at server start; with neither, the
+        # first-use-pinning default applies.
+        return _mcp_serve(
+            allow_hosts=getattr(args, "allow_host", None),
+            allow_any_host=bool(getattr(args, "allow_any_host", False)))
 
     # Phase 80: --fuzz-body marker injection mode.
     if getattr(args, "fuzz_body", None):

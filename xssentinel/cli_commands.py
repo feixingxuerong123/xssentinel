@@ -336,6 +336,12 @@ def _run_self_test():
 
 def _run_serve(args):
     """Start the REST API server (Phase 27-4 microservice mode)."""
+    # Phase 383: the /mcp face shares the stdio scope contract -- same
+    # flags, same first-use-pinning default.  The REST /api/v1/scans path
+    # stays operator-driven (the operator POSTs the target themselves).
+    from .api.mcp_server import configure_scope
+    configure_scope(getattr(args, "allow_host", None),
+                    bool(getattr(args, "allow_any_host", False)))
     from .api.server import run_stdio
     return run_stdio(
         host=args.host, port=args.port,

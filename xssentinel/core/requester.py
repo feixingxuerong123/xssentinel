@@ -274,7 +274,8 @@ class Requester:
                  tally: "_Tally | None" = None,
                  max_response_bytes: int = 0,
                  egress: "EgressPolicy | None" = None,
-                 stop_at_cross_origin: bool = False):
+                 stop_at_cross_origin: bool = False,
+                 scope_patterns=None):
         self.timeout = timeout
         self.rate_limiter = RateLimiter(rate_limit, jitter=jitter)
         # Phase 46: optional shared request budget.  Every REAL network call
@@ -291,7 +292,10 @@ class Requester:
         # not per-worker.
         self.egress = egress if egress is not None else EgressPolicy(
             operator_headers=headers,
-            stop_at_boundary=stop_at_cross_origin)
+            stop_at_boundary=stop_at_cross_origin,
+            # Phase 383: operator-configured host allowlist (--allow-host
+            # grammar); None keeps the boundary origin-exact as before.
+            scope_patterns=scope_patterns)
         self.session = GuardedSession(self.egress)
         self.session.headers.update(DEFAULT_HEADERS)
         if headers:

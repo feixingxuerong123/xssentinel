@@ -80,9 +80,13 @@ agent-chosen payload through the same deterministic judge the engine uses
 (so an agent can adjust a payload and re-try without re-scanning),
 ``xssentinel_param_mine`` discovers hidden parameters, and
 ``xssentinel_csp_analyze`` returns the page's CSP posture per delivery
-family.  All tools inherit the operator's trust model: the agent scanning
-a URL is the operator scanning a URL -- scoping/authorization is the
-caller's responsibility, exactly as with the CLI and the REST API.
+family.  Phase 383 tightened the trust model: an agent is an autonomous
+subject the scanned page can prompt-inject, so "the agent scanning a URL
+is the operator scanning a URL" no longer holds at this boundary.  The
+OPERATOR pins the authorization scope at server start (``--allow-host``
+patterns, the ``--allow-any-host`` opt-out, or the default first-use
+pinning); a call outside the scope is refused before any request is
+built.  The CLI and the REST API keep their operator-driven model.
 """
 from __future__ import annotations
 
@@ -95,10 +99,13 @@ import time
 from collections import OrderedDict
 from urllib.parse import urlparse
 
+from ..core.egress import origin as _url_origin
+from ..core.scoping import _matches as _host_matches_pattern
 from ..core.target_url import split_target_url
 
 __all__ = ["MCPServer", "serve", "dispatch_message",
-           "run_scan_tool", "TOOL_DEFINITIONS"]
+           "run_scan_tool", "configure_scope", "scope_summary",
+           "TOOL_DEFINITIONS"]
 
 #: Phase 358: dual-era MCP.
 #:
@@ -142,6 +149,148 @@ _RECOMMENDED_TIMEOUT_MS = 120000
 #: Error codes the 2026-07-28 revision allocates from the reserved range.
 _ERR_UNSUPPORTED_VERSION = -32022
 _ERR_HEADER_MISMATCH = -32020
+
+# ---------------------------------------------------------------------------
+# Phase 383 / OPTIMIZATION.md §8.1-1: the operator's authorization scope.
+#
+# Until this section existed the server trusted "the URL the agent passed
+# = operator authorization".  An agent is an autonomous subject that the
+# scanned page can prompt-inject, and these tools send real attack
+# payloads -- so the scope is pinned by the OPERATOR at process start and
+# cannot be changed per call.  Three modes:
+#
+#   * "open"      -- only via --allow-any-host (or the env opt-out).  No
+#                    boundary; server/discover says so out loud instead of
+#                    leaving the absence silent.
+#   * "allowlist" -- operator patterns (--allow-host grammar, normalized
+#                    by the same scoping module the CLI import gate uses).
+#                    A call to any other host is refused BEFORE a request
+#                    is built.
+#   * "tofu"      -- the default.  The FIRST SUCCESSFUL url-taking call
+#                    pins its origin; later calls to other origins are
+#                    refused.  A FAILED call burns no pin, so an
+#                    unreachable first target cannot lock the server onto
+#                    itself.  Concurrent first calls to different origins
+#                    each pin (documented edge; operators who care use
+#                    --allow-host).
+#
+# Configuration happens in :func:`serve` (both CLI entries); the module
+# default is "open" so that library callers of dispatch_message keep the
+# exact behaviour they always had.  The pin lives in this process only --
+# a stdio server restarted by the client re-pins on its first call.
+# ---------------------------------------------------------------------------
+_scope_lock = threading.Lock()
+_scope_mode = "open"
+_scope_patterns: tuple = ()
+_scope_pins: set = set()
+
+#: Environment fallback for MCP client configs that cannot pass argv.
+_ENV_ALLOW_HOSTS = "XSSENTINEL_MCP_ALLOW_HOSTS"
+_ENV_ALLOW_ANY_HOST = "XSSENTINEL_MCP_ALLOW_ANY_HOST"
+
+
+def _origin_str(org: tuple) -> str:
+    scheme, host, port = org
+    default = {"http": 80, "https": 443}.get(scheme)
+    if port and port != default:
+        return f"{scheme}://{host}:{port}"
+    return f"{scheme}://{host}"
+
+
+def configure_scope(allow_hosts=None, allow_any_host: bool = False) -> dict:
+    """Pin the operator's authorization scope.  CLI entries call this once.
+
+    ``allow_hosts`` accepts ``--allow-host`` values (URLs tolerated,
+    normalized through :func:`core.scoping.baseline_hosts` exactly like the
+    CLI's import gate).  With neither patterns nor the explicit opt-out the
+    server starts in first-use-pinning ("tofu") mode.
+    """
+    global _scope_mode, _scope_patterns, _scope_pins
+    if not allow_hosts and not allow_any_host:
+        raw = os.environ.get(_ENV_ALLOW_HOSTS, "")
+        allow_hosts = [p for p in raw.replace(",", " ").split() if p]
+        if not allow_hosts:
+            allow_any_host = os.environ.get(
+                _ENV_ALLOW_ANY_HOST, "").strip().lower() in (
+                "1", "true", "yes", "on")
+    from ..core.scoping import baseline_hosts
+    patterns = tuple(baseline_hosts((), extra=allow_hosts or ()))
+    with _scope_lock:
+        _scope_pins = set()
+        if allow_any_host:
+            _scope_mode = "open"
+            _scope_patterns = ()
+        elif patterns:
+            _scope_mode = "allowlist"
+            _scope_patterns = patterns
+        else:
+            _scope_mode = "tofu"
+            _scope_patterns = ()
+    return scope_summary()
+
+
+def scope_summary() -> dict:
+    """The current scope, for server/discover and for denial hints."""
+    with _scope_lock:
+        return {
+            "mode": _scope_mode,
+            "allowed_hosts": list(_scope_patterns),
+            "pinned": sorted(_origin_str(o) for o in _scope_pins),
+        }
+
+
+def _clear_scope_state() -> None:
+    """Test isolation: back to the library default (open, no pins)."""
+    global _scope_mode, _scope_patterns, _scope_pins
+    with _scope_lock:
+        _scope_mode = "open"
+        _scope_patterns = ()
+        _scope_pins = set()
+
+
+def _scope_denial(url) -> "str | None":
+    """Denial sentence for an out-of-scope target, or None when allowed.
+
+    Unparseable URLs pass here -- the runner's own absolute-http(s)
+    validation rejects them, and a scope gate that answered malformed
+    input would hand the agent a verdict about the wrong problem.
+    """
+    org = _url_origin(url)
+    if not org:
+        return None
+    with _scope_lock:
+        if _scope_mode == "open":
+            return None
+        if _scope_mode == "allowlist":
+            if _host_matches_pattern(org[1], _scope_patterns):
+                return None
+            allowed = "hosts " + ", ".join(_scope_patterns)
+        else:                                    # tofu
+            if not _scope_pins or org in _scope_pins:
+                return None
+            allowed = ("pinned origin(s) " + ", ".join(
+                sorted(_origin_str(o) for o in _scope_pins)))
+    return (f"target outside authorized scope: {url} "
+            f"(authorized: {allowed}; only the operator can extend the "
+            f"scope -- --allow-host / {_ENV_ALLOW_HOSTS} at server start)")
+
+
+def _pin_scope(url) -> None:
+    """TOFU: the first SUCCESSFUL url-taking call fixes the authorized origin."""
+    org = _url_origin(url)
+    if not org:
+        return
+    with _scope_lock:
+        if _scope_mode == "tofu":
+            _scope_pins.add(org)
+
+
+def _scope_engine_options() -> "tuple[str, tuple]":
+    """(mode, patterns) for the request layer: the redirect boundary is ON
+    whenever a scope exists, so a page-chosen hop to another origin is
+    recorded and refused instead of followed."""
+    with _scope_lock:
+        return _scope_mode, _scope_patterns
 
 #: Findings/response bounds -- an agent's context window is the resource
 #: being protected here, not memory.
@@ -505,6 +654,8 @@ _TOOL_SCAN_OUTPUT = {
         # a client-declared timeout.  Without it an agent cannot tell
         # whether its _meta budget was honoured.
         "effective_max_seconds": {"type": "integer"},
+        # Phase 383: redirect targets the authorization boundary refused.
+        "boundary_stops": {"type": "array", "items": {"type": "string"}},
         "findings": {
             "type": "array",
             "items": {
@@ -1169,6 +1320,22 @@ def _connect_failure(exc: BaseException) -> bool:
                             _rexc.ProxyError))
 
 
+def _apply_scope_options(options: dict) -> dict:
+    """Phase 383: with a configured scope, MCP-built requesters run the
+    sync engine's redirect boundary -- a page-chosen hop to another origin
+    is recorded (``boundary_stops``) and refused instead of followed.
+    MCP scans always run the sync engine, so this covers ``xssentinel_scan``
+    and the ``xssentinel_scan_async`` worker alike; the pre-flight probe
+    gets the same treatment so the two requesters cannot disagree about
+    where a redirect chain may go.
+    """
+    mode, patterns = _scope_engine_options()
+    if mode in ("tofu", "allowlist"):
+        options["stop_at_cross_origin"] = True
+        options["scope_patterns"] = list(patterns) or None
+    return options
+
+
 def _preflight(args: dict, url: str, budget_s: float = 5.0):
     """One cheap reachability probe before a probe storm.
 
@@ -1184,11 +1351,11 @@ def _preflight(args: dict, url: str, budget_s: float = 5.0):
     is there, which is exactly what this check asks).
     """
     from .server import _build_requester
-    probe = _build_requester({
+    probe = _build_requester(_apply_scope_options({
         "headers": args.get("headers") or {},
         "cookies": args.get("cookies") or {},
         "timeout": budget_s,
-    })
+    }))
     try:
         probe.request("GET", url)
     except _ToolCancelled:
@@ -1211,14 +1378,22 @@ def _make_requester(args: dict, cancel_event=None, emit=None,
     and change nothing for every other caller.
     """
     from .server import _build_requester
-    base = _build_requester({
+    base = _build_requester(_apply_scope_options({
         "headers": args.get("headers") or {},
         "cookies": args.get("cookies") or {},
         "timeout": args.get("timeout", default_timeout),
-    })
+    }))
     if cancel_event is None and emit is None and deadline is None:
         return base
     return _RequestGuard(base, cancel_event, emit, deadline=deadline)
+
+
+def _requester_egress(requester):
+    """The scan requester's EgressPolicy, through the _RequestGuard wrapper."""
+    direct = getattr(requester, "egress", None)
+    if direct is not None:
+        return direct
+    return getattr(getattr(requester, "_inner", None), "egress", None)
 
 
 def run_scan_tool(args: dict, cancel_event=None, emit=None) -> dict:
@@ -1295,6 +1470,12 @@ def run_scan_tool(args: dict, cancel_event=None, emit=None) -> dict:
                 "isError": True}
 
     truncated = total_findings > len(findings)
+    # Phase 383: redirects the authorization boundary refused.  Empty is
+    # the normal case; non-empty means the target tried to bounce the scan
+    # to another origin and was stopped -- reported, never swallowed.
+    eg = _requester_egress(requester)
+    boundary_stops = list(getattr(eg, "boundary_stops", []) or []) \
+        if eg is not None else []
     result = {
         "target": url,
         "requests_made": getattr(scanner, "requests_made", 0),
@@ -1306,6 +1487,7 @@ def run_scan_tool(args: dict, cancel_event=None, emit=None) -> dict:
         # Phase 376: what the runner ACTUALLY used (after min(client,
         # server)).  An agent can verify its _meta budget was honoured.
         "effective_max_seconds": max_seconds,
+        "boundary_stops": boundary_stops,
         "findings": findings,
     }
     return {"content": [{"type": "text",
@@ -1778,7 +1960,7 @@ def _async_error(text: str) -> dict:
 #: disagree about the cap or the effective budget.
 _ASYNC_RESULT_META_KEYS = (
     "target", "total_findings", "truncated", "truncation_hint",
-    "effective_max_seconds",
+    "effective_max_seconds", "boundary_stops",
 )
 
 
@@ -2052,6 +2234,33 @@ def validate_http_headers(msg: dict, headers: dict | None):
     return None
 
 
+def _instructions_with_scope(summary: dict) -> str:
+    """The standing instructions, extended with the authorization scope.
+
+    Declared even in open mode: silence about a MISSING boundary is how an
+    agent ends up scanning third parties nobody authorized.
+    """
+    if summary["mode"] == "open":
+        return _INSTRUCTIONS + (
+            " NO authorization boundary is configured (--allow-any-host): "
+            "every target you pass will be scanned as-is, so only pass "
+            "targets the operator authorized.")
+    if summary["mode"] == "allowlist":
+        return _INSTRUCTIONS + (
+            " Authorized scope: hosts " + ", ".join(summary["allowed_hosts"])
+            + "; calls to other hosts are refused before any request is sent.")
+    if summary["pinned"]:
+        return _INSTRUCTIONS + (
+            " Authorized scope: pinned origin(s) "
+            + ", ".join(summary["pinned"])
+            + "; calls to other origins are refused. Only the operator can "
+            "extend the scope.")
+    return _INSTRUCTIONS + (
+        " Authorization scope: first-use pinning -- the first successful "
+        "call fixes the authorized origin and later calls to other origins "
+        "are refused; only the operator can extend the scope.")
+
+
 def _discover_result() -> dict:
     """The mandatory ``server/discover`` result of the 2026-07-28 revision.
 
@@ -2060,12 +2269,17 @@ def _discover_result() -> dict:
     therefore always carries the modern shape even when the caller omitted
     ``_meta`` entirely.
     """
+    summary = scope_summary()
     return {
         "resultType": "complete",
         "supportedVersions": list(SUPPORTED_PROTOCOL_VERSIONS),
         "capabilities": {"tools": {}},
         "_meta": {_META_SERVER_INFO_KEY: _server_info()},
-        "instructions": _INSTRUCTIONS,
+        "instructions": _instructions_with_scope(summary),
+        # Phase 383: the operator's authorization boundary as data, next to
+        # the prose above -- an agent should not have to parse a sentence
+        # to learn what it is allowed to scan.
+        "scope": summary,
         "ttlMs": 3600000,
         "cacheScope": "public",
         # Phase 376 / OPTIMIZATION.md §8.2 #4: the platform timeout reality
@@ -2234,6 +2448,15 @@ def _classify_tool_error(text: str) -> dict:
         field = "scan_id"
         hint = ("submit a new scan with xssentinel_scan_async; jobs are "
                 "in-memory and old ones may have been evicted")
+    elif text.startswith("target outside authorized scope:"):
+        # Phase 383: the operator's boundary, not a tool bug.  Classified
+        # BEFORE the substring arms: the refused URL is agent-supplied
+        # bytes and could carry " is required" or "timeout" inside it.
+        code = "scope_denied"
+        field = "url"
+        hint = ("scan a target inside the authorized scope; only the "
+                "operator can extend it (--allow-host / "
+                "XSSENTINEL_MCP_ALLOW_HOSTS at server start)")
     elif text.startswith("not an absolute http(s) URL:"):
         code = "invalid_url"
         field = "url"
@@ -2571,6 +2794,17 @@ def _tool_call(params, cancel_event=None, emit=None, modern: bool = False):
     if err:
         return {"content": [{"type": "text", "text": err}],
                 "isError": True}
+    # Phase 383: the authorization boundary.  Runs for BOTH protocol eras
+    # (a boundary a legacy frame could bypass by downgrading would be a
+    # wall with a door in it) and BEFORE any request is built -- the
+    # pre-flight probe included, so a refused call sends zero requests.
+    # scan_status takes no url and is not gated; every other tool's schema
+    # carries one.
+    if (schema.get("properties") or {}).get("url") and normalized.get("url"):
+        denial = _scope_denial(normalized["url"])
+        if denial:
+            return {"content": [{"type": "text", "text": denial}],
+                    "isError": True}
     # Phase 376: fold a MODERN client's declared deadline into the existing
     # max_seconds contract.  Kept here, at the single dispatch point, so
     # every runner sees one already-negotiated argument and no runner has
@@ -2640,6 +2874,11 @@ def _tool_call(params, cancel_event=None, emit=None, modern: bool = False):
             _annotate_output_safety(
                 runner(normalized, cancel_event=cancel_event, emit=emit),
                 name))
+        # Phase 383: pin-on-success.  A failed call burns no pin, so an
+        # unreachable first target cannot lock the server onto itself.
+        if not result.get("isError") and \
+                (schema.get("properties") or {}).get("url"):
+            _pin_scope(normalized.get("url"))
         # Phase 378: only SUCCESS is reusable.  An isError result (timeout,
         # unreachable, execution failure) must always be retried for real.
         if cache_key is not None and not result.get("isError"):
@@ -2913,6 +3152,13 @@ class MCPServer:
                 self._stdout.flush()
 
 
-def serve() -> int:
-    """CLI entry (``xssentinel --mcp``): serve the MCP stdio protocol."""
+def serve(allow_hosts=None, allow_any_host: bool = False) -> int:
+    """CLI entry (``xssentinel --mcp``): serve the MCP stdio protocol.
+
+    Phase 383: the operator pins the authorization scope HERE, at process
+    start -- per-call override would let the scanned page decide it.  With
+    no configuration the server starts in first-use-pinning ("tofu") mode;
+    ``--allow-any-host`` restores the unbounded behaviour, loudly.
+    """
+    configure_scope(allow_hosts, allow_any_host)
     return MCPServer().serve()

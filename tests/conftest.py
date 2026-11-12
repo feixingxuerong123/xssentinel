@@ -382,3 +382,19 @@ def _isolate_mcp_result_cache():
     _mcp._clear_result_cache()
     yield
     _mcp._clear_result_cache()
+
+
+# ---------------------------------------------------------------------------
+# Phase 383: same discipline for the MCP authorization scope.  A guard that
+# configures an allowlist / pins a TOFU origin must not leak that state into
+# the next test -- an out-of-scope denial in an unrelated file is exactly the
+# kind of cross-test contamination that took ten red guards to diagnose for
+# the result cache.  Product paths never call this; only the test boundary.
+# ---------------------------------------------------------------------------
+@pytest.fixture(autouse=True)
+def _isolate_mcp_scope_state():
+    from xssentinel.api import mcp_server as _mcp
+
+    _mcp._clear_scope_state()
+    yield
+    _mcp._clear_scope_state()

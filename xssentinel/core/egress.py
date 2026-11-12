@@ -27,11 +27,21 @@ still looks like a browser rather than like a scanner.
 
 Detection semantics are untouched: the redirect is followed and its body
 parsed exactly as before -- only the credential material is withheld.
+
+Scope patterns (Phase 383): an operator-configured allowlist of host
+patterns (the same ``--allow-host`` grammar as ``core/scoping.py``, e.g.
+``app.example.com`` / ``.example.com``) extends "named" beyond the exact
+origins a top-level request happened to touch.  The pattern judgment is
+*reused*, not re-written: ``_matches`` comes from scoping so MCP and the
+CLI cannot drift into two definitions of "in scope".  Default (no
+patterns) keeps every existing behaviour byte-identical.
 """
 from __future__ import annotations
 
 import threading
 from urllib.parse import urlparse
+
+from .scoping import _matches as _host_matches_pattern
 
 # Never sent cross-origin, whoever set them: they exist to authenticate.
 CREDENTIAL_HEADERS = frozenset({
@@ -94,7 +104,7 @@ class EgressPolicy:
     """Track which origins the operator named, and strip secrets from the rest."""
 
     def __init__(self, operator_headers=None, extra_secrets=None,
-                 stop_at_boundary: bool = False):
+                 stop_at_boundary: bool = False, scope_patterns=None):
         secrets = set(CREDENTIAL_HEADERS)
         for name in operator_headers or ():
             if name.lower() not in BROWSER_SHAPED_HEADERS:
@@ -106,6 +116,10 @@ class EgressPolicy:
         # and the payloads still reach a host nobody scoped -- which is the
         # other half of "only test what you were authorized to test".
         self.stop_at_boundary = bool(stop_at_boundary)
+        #: Operator-configured host allowlist (Phase 383).  Empty means the
+        #: boundary works on named origins alone -- exactly the pre-383 rule.
+        self._scope_patterns = tuple(
+            p for p in (scope_patterns or ()) if p)
         #: Redirect targets the boundary refused (reported, never silent).
         self.boundary_stops: list = []
         # Origins named by a top-level request.  Lock-guarded: the sync engine
@@ -128,12 +142,20 @@ class EgressPolicy:
         Unknown/unparseable origins pass (see :func:`same_origin`).  Before any
         origin has been named the guard is inert -- a caller that issues
         requests without going through :meth:`note` must not have its headers
-        eaten by an empty allowlist.
+        eaten by an empty allowlist.  With scope patterns configured the
+        operator HAS expressed a scope, so the inert rule stops applying:
+        a host that matches no pattern must be explicitly named to pass --
+        otherwise the allowlist would silently degrade into "allow
+        everything until the first request", the one thing it exists to
+        prevent.
         """
         org = origin(url)
         if not org:
             return True
         with self._lock:
+            if self._scope_patterns:
+                return (org in self._explicit
+                        or _host_matches_pattern(org[1], self._scope_patterns))
             return not self._explicit or org in self._explicit
 
     def scrub(self, headers, url) -> list:

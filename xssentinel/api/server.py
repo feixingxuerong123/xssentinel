@@ -91,6 +91,11 @@ def _build_requester(options: dict):
         cookies=cookies or None,
         verify_ssl=options.get("verify_ssl", True),
         rate_limit=options.get("rate_limit", 0),
+        # Phase 383: MCP scope enforcement rides the same construction --
+        # the egress judgment stays the one definition in core/egress.py.
+        # Both keys default to falsy, so every existing caller is unchanged.
+        stop_at_cross_origin=bool(options.get("stop_at_cross_origin", False)),
+        scope_patterns=options.get("scope_patterns") or None,
     )
 
 

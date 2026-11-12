@@ -319,6 +319,32 @@ Protocol behavior: single or batched JSON-RPC arrays; notification-only batches
 GET/DELETE `/mcp` → 405 (no SSE upgrade, no session to terminate). Same auth
 and same-origin gate as the REST API.
 
+**Authorization scope (Phase 383, enforced by the operator)** — an agent is
+an autonomous subject a scanned page can prompt-inject, and these tools send
+real attack payloads, so the scope is pinned by the **operator at server
+start** and cannot be overridden per call:
+
+```bash
+python -m xssentinel mcp --allow-host app.example.com --allow-host .cdn.example.com
+# equivalent env form when client config cannot pass argv:
+#   XSSENTINEL_MCP_ALLOW_HOSTS="app.example.com,.cdn.example.com"
+# explicit opt-out (loudly disclosed): --allow-any-host / XSSENTINEL_MCP_ALLOW_ANY_HOST=1
+```
+
+Three modes: **first-use pinning (TOFU) by default** — the first SUCCESSFUL
+url-taking call pins its origin; later calls to other origins return `isError`
+with a structured `scope_denied` error and send **zero requests** (the
+pre-flight probe included; a failed call burns no pin). With `--allow-host`
+values the scope is host-pattern matching (the CLI import-gate grammar;
+`.example.com` = whole domain). The scope is declared in `server/discover`
+as a `scope` object plus the instructions text; with a scope configured the
+sync engine's redirect boundary engages too — a page-chosen cross-origin hop
+lands in the scan result's `boundary_stops` and the landing server is never
+visited. Legacy frames are refused as well (a boundary bypassable by
+downgrading would be a wall with a door in it). The `/mcp` face of `serve`
+shares the same flags; the REST `/api/v1/scans` path keeps its
+operator-driven model.
+
 **Dual-era protocol support (Phase 358)** — the current MCP revision
 `2026-07-28` removed the `initialize` handshake and requires
 `server/discover`. This server answers both eras: legacy clients keep their

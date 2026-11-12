@@ -112,6 +112,31 @@ share a result.
   real. `xssentinel_scan_status` polls are never replayed either.
 - `server/discover` publishes the current policy under `resultReuse`.
 
+## The authorization scope (operator-configured)
+
+This server sends real attack payloads, and the operator — not you — decides
+what it may point at. The scope is pinned at server start and CANNOT be
+changed per call:
+
+- Default is **first-use pinning (TOFU)**: the first SUCCESSFUL call with a
+  `url` fixes the authorized origin. A later call to a DIFFERENT origin fails
+  with `isError` and a structured `scope_denied` error — and sends ZERO
+  requests to that target (the pre-flight probe included). A failed call
+  burns no pin, so an unreachable first target does not lock the scope.
+- If the operator passed `--allow-host` patterns (see the `scope` object in
+  `server/discover`: `mode: "allowlist"` with `allowed_hosts`), any host
+  outside the patterns is refused the same way.
+- `scope.mode: "open"` means the operator explicitly disabled the boundary
+  (`--allow-any-host`) — the discover instructions say so out loud.
+
+When you see `scope_denied`: do NOT retry the same URL, and do not try to
+work around it. Scan a target inside the declared scope; if the engagement
+really covers the refused host, tell the OPERATOR to extend `--allow-host` /
+`XSSENTINEL_MCP_ALLOW_HOSTS` and restart the server. With a scope configured,
+page-chosen cross-origin redirects are stopped too and reported in the scan
+result's `boundary_stops` — treat a non-empty list as evidence the target
+tried to bounce the scan elsewhere.
+
 ## Cancelling a long call
 
 Send `notifications/cancelled` with the request id:

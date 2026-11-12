@@ -541,6 +541,27 @@ python -m xssentinel --mcp
 #                        confirmed=令牌执行,永远不是模型说了算(pool 未配置则诚实报错)
 ```
 
+**授权范围（Phase 383，MCP 边界由 operator 强制）**——Agent 是会被目标页面
+prompt injection 诱导的自主主体，而这些工具会发真实攻击载荷，所以授权范围由
+**operator 在服务启动时钉定**，不接受 `tools/call` 覆盖：
+
+```bash
+python -m xssentinel mcp --allow-host app.example.com --allow-host .cdn.example.com
+# 客户端配置不便传 argv 时的等价写法：XSSENTINEL_MCP_ALLOW_HOSTS="app.example.com,.cdn.example.com"
+# 显式回到无边界（强披露）：--allow-any-host / XSSENTINEL_MCP_ALLOW_ANY_HOST=1
+```
+
+三种模式：**默认为首用钉定（TOFU）**——第一个**成功**的带 url 调用把其 origin
+钉定为授权范围，之后跨 origin 的调用返回 `isError` + 结构化错误
+`scope_denied` 且**零请求外发**（预检探针也不发；失败的调用不烧 pin）；
+`--allow-host` 给出时按 host 模式匹配（语法与 CLI 导入靶门一致，`.example.com`
+= 整域）；`--allow-any-host` 回到无边界。范围在 `server/discover` 以 `scope`
+对象与 instructions 同时声明；配置了范围时 sync 引擎的重定向边界同时开启——
+页面选择的跨源跳转记入扫描结果的 `boundary_stops`，落点服务器不会被访问。
+legacy 帧同样被拒（边界不可被降级协议绕过，错误形状保持 legacy 文本）。
+`serve` 模式的 `/mcp` 面共用同一组 flag；REST `/api/v1/scans` 保持 operator
+直驱模型不变。
+
 **远程 MCP（Phase 324，Streamable HTTP）**——同一套 JSON-RPC 分发也挂在 REST API 的
 `POST /mcp` 上，按 URL 挂工具的 Agent 平台（ARTEX / Claude / Cursor 类）无需起子进程：
 
