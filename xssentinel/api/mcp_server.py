@@ -1517,6 +1517,16 @@ def run_discover_tool(args: dict, cancel_event=None, emit=None) -> dict:
                                       "installed -- xssentinel_discover "
                                       "requires a headless browser")}],
                 "isError": True}
+    # Phase 384 (found by the credential-echo audit's unreachable arm): the
+    # browser swallows navigation failures, so an unreachable target used to
+    # come back as a SUCCESS with three empty lists -- the exact
+    # "finds nothing == tested clean" lie Phase 327 killed for scan.  The
+    # same bounded connect probe gates discover before the browser spins up.
+    err = _preflight(args, url,
+                     budget_s=min(5.0, float(args.get("timeout", 20) or 20)))
+    if err:
+        return {"content": [{"type": "text", "text": err}],
+                "isError": True}
     # auth state flows through the analyzer the same way the CLI's
     # --discover pass wires it (headers ride the page, cookies the context)
     _built = _make_requester(args, cancel_event, emit, default_timeout=20)

@@ -17,6 +17,27 @@
 ## [Unreleased]
 
 ### Added
+- **Phase 384 / 凭据回显审计(OPTIMIZATION §8.3 #11)**:金丝雀凭据(自定义
+  cookie + header)经真实 MCP 帧发往真实 loopback 靶场,全响应字节(文本 +
+  `structuredContent` + `waf` + `boundary_stops`)逐一检索,并附**服务端到达性
+  证明**(靶场记录到金丝雀凭据真实抵达,clean 结论不空转)。实测结论
+  **NO ECHO**:静态靶成功扫描、失败/不可达错误句(6 个带 url 工具)、abrupt
+  close、以及靶场自己回显凭据进页面的 reflecting 靶——凭据一律不回现在
+  target-derived finding 字段之外的任何通道;`scan failed:`/`target
+  unreachable:` 的异常串实测只含 host/port/path,URL userinfo 被剥离。
+  守卫 `tests/test_phase384_credential_echo.py`(4 例),变异对照
+  `dev/phase384_mutations.py` 2/2(错误句 / `waf` 元数据被注入凭据时守卫变红);
+  审计产物 `dev/_credential_echo_audit.json`(gitignore)。
+
+### Fixed
+- **Phase 384 / `xssentinel_discover` 对不可达目标谎报成功**:浏览器层吞掉导航
+  失败,关闭端口上的目标曾返回 isError 缺席 + 三个空字段——正是 Phase 327
+  在 scan 上杀掉的「没测到 = 干净」形状(scan 有 `_preflight`,discover 没有)。
+  现 discover 在启动浏览器前走同一条 bounded 连接预检,不可达 → 明确
+  `target unreachable` 错误。由本轮审计的 unreachable 臂量出并修复,
+  守卫 `test_unreachable_error_sentences_echo_no_credentials` 钉住。
+
+### Added
 - **Phase 383 / MCP 授权边界(OPTIMIZATION §8.1-1,P0 清零)**:授权范围由
   operator 在服务启动时钉定,不接受 `tools/call` 覆盖——`--allow-host`
   (host 模式,语法与 CLI 导入靶门同源)或 `XSSENTINEL_MCP_ALLOW_HOSTS`
