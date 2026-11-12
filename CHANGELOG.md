@@ -17,6 +17,19 @@
 ## [Unreleased]
 
 ### Added
+- **Phase 385 / 结果元数据 + instructions 补强(OPTIMIZATION §8.3 #8/#10)**:
+  每个工具的成功结果现在带 `run_id`(`run_` + 16 hex,双通道 text 与
+  `structuredContent` 同值)与 `elapsed_ms`(实测 runner 墙钟),全部 9 个工具的
+  `outputSchema` 同源声明;缓存重放携带**产生该结果的原始 run** 的 id(与
+  `cache_hit=true` 并列,重放不冒充新扫描)。**评估后不加**:`budget_used`
+  (`requests_made` + `effective_max_seconds` 已覆盖,不造冗余字段)、
+  `next_actions`(写给模型的建议是注入放大面,错误路径的 `hint` 已覆盖恢复
+  建议);#9(opaque target handle / 跨调用共享上下文)评估为**不做**
+  (2026 规范趋向无状态,会引入会话状态与生命周期,结论记 OPTIMIZATION §8.16)。
+  `_INSTRUCTIONS` 由两句扩为四句,补成本现实与「先便宜后扫描」工作流;授权
+  范围仍由 Phase 383 的 `scope` 对象承担。守卫
+  `tests/test_phase385_mcp_run_meta.py`(5 例),变异对照
+  `dev/phase385_mutations.py` 3/3(去掉 stamp / 双通道不一致 / 删成本句各自红)。
 - **Phase 384 / 凭据回显审计(OPTIMIZATION §8.3 #11)**:金丝雀凭据(自定义
   cookie + header)经真实 MCP 帧发往真实 loopback 靶场,全响应字节(文本 +
   `structuredContent` + `waf` + `boundary_stops`)逐一检索,并附**服务端到达性
