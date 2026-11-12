@@ -1,0 +1,106 @@
+{
+  "generated_utc": "2026-11-09T17:50:25+00:00",
+  "tree": "edfe91d",
+  "target": "http://127.0.0.1:18900",
+  "scoring_policy": "FACT TABLE ONLY. Independent Chromium dialog/DOM evidence per arm; no TP/FP/TN/FN, precision, recall or F1. A dialog in the control arm means contamination, not a detection.",
+  "official_payload": "<iframe src=\"javascript:alert(`xss`)\">",
+  "clean_control_values": {
+    "ip": "203.0.113.7",
+    "description": "The all-time classic."
+  },
+  "browser": "independent Playwright Chromium, headless, dialog oracle",
+  "cases": [
+    "httpHeaderXssChallenge",
+    "restfulXssChallenge"
+  ],
+  "arms": [
+    "payload",
+    "control"
+  ],
+  "rows": [
+    {
+      "key": "httpHeaderXssChallenge",
+      "arm": "payload",
+      "setup": "True-Client-IP header -> fresh-login JWT -> SPA route",
+      "view_url": "http://127.0.0.1:18900/#/privacy-security/last-login-ip",
+      "click": null,
+      "inject_status": 200,
+      "server_echo": "<iframe src=\"javascript:alert(`xss`)\">",
+      "server_has_payload": true,
+      "click_method": null,
+      "dialogs": [
+        "xss"
+      ],
+      "iframe_count": 1,
+      "payload_in_dom": true,
+      "javascript_src_in_dom": true,
+      "html_len": 190217,
+      "verdict": "browser_executed",
+      "error": null
+    },
+    {
+      "key": "httpHeaderXssChallenge",
+      "arm": "control",
+      "setup": "True-Client-IP header -> fresh-login JWT -> SPA route",
+      "view_url": "http://127.0.0.1:18900/#/privacy-security/last-login-ip",
+      "click": null,
+      "inject_status": 200,
+      "server_echo": "203.0.113.7",
+      "server_has_payload": false,
+      "click_method": null,
+      "dialogs": [],
+      "iframe_count": 0,
+      "payload_in_dom": false,
+      "javascript_src_in_dom": false,
+      "html_len": 190173,
+      "verdict": "not_executed",
+      "error": null
+    },
+    {
+      "key": "restfulXssChallenge",
+      "arm": "payload",
+      "setup": "PUT /api/Products/1 description -> dispatch_event click on the product info section (the app's welcome overlay blocks real pointer clicks; BOTH arms use the same method)",
+      "view_url": "http://127.0.0.1:18900/#/search?q=Apple",
+      "click": "mat-card section[role=button]",
+      "inject_status": 200,
+      "server_echo": "<iframe src=\"javascript:alert(`xss`)\">",
+      "server_has_payload": true,
+      "click_method": "dispatch_event",
+      "dialogs": [
+        "xss"
+      ],
+      "iframe_count": 1,
+      "payload_in_dom": true,
+      "javascript_src_in_dom": true,
+      "html_len": 240080,
+      "verdict": "browser_executed",
+      "error": null
+    },
+    {
+      "key": "restfulXssChallenge",
+      "arm": "control",
+      "setup": "PUT /api/Products/1 description -> dispatch_event click on the product info section (the app's welcome overlay blocks real pointer clicks; BOTH arms use the same method)",
+      "view_url": "http://127.0.0.1:18900/#/search?q=Apple",
+      "click": "mat-card section[role=button]",
+      "inject_status": 200,
+      "server_echo": "The all-time classic.",
+      "server_has_payload": false,
+      "click_method": "dispatch_event",
+      "dialogs": [],
+      "iframe_count": 0,
+      "payload_in_dom": false,
+      "javascript_src_in_dom": false,
+      "html_len": 240054,
+      "verdict": "not_executed",
+      "error": null
+    }
+  ],
+  "counts": {
+    "browser_executed": 2,
+    "not_executed": 2
+  },
+  "wall_s": 15.54,
+  "restored": {
+    "product_1_description": "The all-time classic."
+  }
+}

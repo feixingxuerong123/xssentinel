@@ -54,8 +54,40 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
 
 - 新增检测层必须**同时**注册 `coverage.LAYERS` 与 `layer_coverage` 矩阵(Phase 187/192 两次被门禁抓到的同一课)。
 
-## 当前状态(2026-11-08)
+## 当前状态(2026-11-12)
 
+- **1.5.0(2026-11-12,minor)**:承接 Phase 372–381 的 MCP 接入面增量与
+  Phase 382 的独立浏览器事实表。Phase 376 新增客户端超时协商、
+  Phase 377 新增 2 个仅现代帧异步扫描工具,按「新增能力走 minor」定级;
+  无破坏性变更(legacy MCP 帧逐字节不变、CLI 契约不变、判定层零改动)。
+  `__version__` 与 CHANGELOG 最新章节同源,`test_doc_gate_parity`
+  的版本守卫绿。**仍是 `[Unreleased]` 的旧条目已全部归入 1.5.0 章节**,
+  文件顶部保留空的 `[Unreleased]` 段(守卫要求)。
+- **交付轮收口(2026-11-12)**:5 个此前未跟踪产物按性质拆开——
+  `benchmark/run_juice_render.py` + `juice_render_20261110.{json,md}`
+  入库(Phase 382 事实表,守卫 `tests/test_phase382_juice_render.py`
+  8 例,变异对照 baseline 绿 → 改 counts 红 → 字节还原绿);11-10 的
+  两份 HTML 报告移进 gitignore 的 `benchmark/results/_local_archive/`,
+  仅本机留档。Phase 382 的测量树是 `edfe91d`,**不是 1.5.0 终树**,
+  只作外部效度补充、不冒充终树跑分。
+- **交付轮发现的打包缺陷(已修)**:`pyproject.toml` 的 `data/*.json`
+  通配把 gitignore 掉的 `llm_state.json` 打进了本机实测 wheel(同类
+  `llm_providers.json` 含密钥,存在时也会被带走)——`.gitignore`
+  对构建没有约束力。新增 `exclude-package-data` 与守卫
+  `tests/test_package_data_hygiene.py`,把 `.gitignore` 与排除清单
+  逐项钉在一起(单向漂移 / 集合增删 / 名单被掏空都红);变异对照
+  baseline 绿 → 改一个排除项红 → 字节还原绿。
+- **交付前门禁(2026-11-12,终树自跑)**:逐项数字与 skip 数统一记在
+  CHANGELOG [1.5.0]「验收(交付轮)」与交付验收报告,不引用 11-10
+  在 `edfe91d` 旧树上跑出的 299 文件 / 194 例数字。同期邻项目
+  `D:\qoder\vuln-agent` 有并发测试批,按既有协议对红项做 A/B 归因。
+- **本机环境新事实(2026-11-12)**:`%TEMP%` 对本进程不可写,
+  `tempfile.gettempdir()` 会静默回退到仓库根;而精度门
+  `dev/gate_run_scratch.py` 直接读 `os.environ["TEMP"]`,结果目录
+  写不进去。本轮把 `TEMP`/`TMP` 指到工作区外的可写 scratch 再跑门禁。
+  `pip wheel` / `pip install --target` 在本机仍是数分钟级挂起(与
+  「pip 通路病态」同一形态),构建验证改用 `uv build --wheel`
+  + 解压 wheel 做等价安装冒烟,不改产品/测试代码。
 - **1.4.4(2026-11-08,patch)**:承接 Phase 364–371(反射形状补齐、Agent 接入面两处
   FN 修复、契约收敛、`javascript:` 重定向与链接 scheme、测量口径、架构瘦身与
   层注册补齐),无破坏性变更,按「只修缺陷/补齐既有能力走 patch」定级。

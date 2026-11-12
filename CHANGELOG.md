@@ -16,6 +16,14 @@
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-11-12
+
+> 承接 Phase 372–381 的 MCP 接入面增量与 Phase 382 的独立浏览器事实表。
+> Phase 376 新增客户端超时协商、Phase 377 新增 2 个仅现代帧的异步扫描工具,
+> 按版本策略「新增能力走 minor」定为 1.5.0;**无破坏性变更**:legacy MCP 帧
+> 逐字节不变、CLI 参数契约不变、检测判定层零改动。
+> 交付轮(2026-11-12)的门禁实测数字见本节末尾「验收(交付轮)」。
+
 ### Added
 - **Phase 372 / MCP 结构化错误**:声明了现代协议版本的 `tools/call` 错误结果
   追加 `structuredContent.error`(`code` / `message` / `field` /
@@ -90,6 +98,17 @@
   `tree` 拿不到归属即 ABORT,不写 `unknown`。守卫
   `tests/test_phase381_juice_challenges.py`(9 例)钉住官方 key 集合、
   投递形状、verdict 证据来源、解码比较(AST)与 MD/JSON 逐字节同源。
+- **Phase 382 / 已投递行的独立浏览器执行证据**:`benchmark/run_juice_render.py`
+  用**产品判定之外**的 Playwright Chromium,给 Phase 381 的两条 `delivered`
+  行各配一组 payload / clean control 臂,以真实 `dialog` 事件为执行证据
+  (不是 DOM 里的 iframe,也不是产品自己的 finding);control 臂出现 dialog
+  只记 `control_contaminated`,绝不算命中。产物
+  `benchmark/results/juice_render_20261110.{json,md}` 是 4 行事实表:
+  `browser_executed` 2 / `not_executed` 2。**仍不出 TP/FP/TN/FN、precision、
+  recall 或 F1** —— 两条投递形状不同,没有合法分母。测量当时的树是
+  `edfe91d`,**不是 1.5.0 终树**;本条是外部效度补充,不冒充终树跑分。
+  守卫 `tests/test_phase382_juice_render.py` 钉住无分数字段、matched arms、
+  dialog 判据、tree 归属与 MD/JSON 同源。
 
 ### Changed
 - **Phase 373 / 截断显式化**:`scan` 与 `param_mine` 结果补 `total_findings` /
@@ -98,6 +117,14 @@
   前 200 行却报告总数,Agent 会把截断读成完整。**这是本段唯一行为变化。**
 - **跑分口径决定**:POST-aware 仍为 opt-in 诊断口径,GET-only 保持唯一官方口径,
   历史跑分数字一律不改;中英 README 的「引用限定」已写明。
+- **打包制品不再夹带运行期状态(交付轮发现并修复)**:`pyproject.toml` 的
+  `package-data` 通配 `data/*.json`,会把 gitignore 掉的
+  `xssentinel/data/llm_state.json`(运行期失败计数)以及可能存在的
+  `llm_providers.json`(API 密钥)一并打进 wheel —— `.gitignore` 对构建没有
+  约束力。新增 `[tool.setuptools.exclude-package-data]` 显式排除两者;
+  守卫 `tests/test_package_data_hygiene.py` 把 `.gitignore` 与排除清单逐项
+  钉在一起(单向漂移、集合增删、名单被掏空都会红),本轮变异对照
+  baseline 绿 → 改掉一个排除项红 → 字节还原绿。
 
 ### 验收
 - 新守卫 **29 passed / 0 skip**;变异对照 `dev/phase372_374_mutations.py`
@@ -219,6 +246,55 @@
   **39 passed / 0 skip**,ruff 全仓 `All checks passed`。
   **四档 strict gate 与全量分批门禁本轮未跑**,判定面零改动,
   不拿 11-09 数字顶账。
+
+### 验收(交付轮,2026-11-12;全部为本轮在 1.5.0 终树上的自跑)
+
+- **口径**:重活串行(基准与套件不并行),全量分批用 `--jobs 4`;
+  `TEMP`/`TMP` 指向工作区外可写 scratch、`PYTEST_ADDOPTS` 关闭 pytest
+  tmp 自动清理(否则本机 safe-delete 守卫造出成片假红);除显式 A/B
+  对照外一律 `env -u PYTHONPATH` 干净环境。**每个绿都连 skip 数一起报**。
+- **静态**:ruff 全仓 `All checks passed`;结构/文档/本轮新守卫 7 文件
+  **41 passed / 0 skip**;版本四处同源(`__version__` 1.5.0、dist 元数据
+  1.5.0、`-V` 输出 `xssentinel 1.5.0`、CHANGELOG 最新章节 1.5.0)。
+- **quick 64 双引擎 strict**:sync **64 scored / 0 SKIP**,
+  TP36 / FP0 / TN28 / FN0;async **63 scored / 1 SKIP**,
+  TP36 / FP0 / TN27 / FN0;两档 FP0 / FN0 / ERROR0、exit 0,合计 5m27s。
+- **全量分批门禁(干净环境)**:301 文件 **301/301 绿**,468s,
+  failures 0、exit 0;**skip 13 例 / 6 文件**,其中
+  `test_oracle_default_sent.py`(3)与 `test_stored_e2e_acceptance.py`(3)
+  是**整文件零贡献**、被 runner 计入绿。这两个数字必须一起引用。
+- **唯一红的 A/B 归因**:首轮(带宿主注入的 `PYTHONPATH` shim)
+  300/301、484s,唯一红 `test_phase360_cli_compat.py` 的
+  `--version` / `-V` 两例断言 `stderr == b""` —— stderr 里是
+  `sitecustomize.py` 的 PermissionError,来自
+  `D:\Program Files\WorkBuddy AI\...\shim` 被 Low 完整性标签挡住。
+  同树对照:原环境单跑 **2 failed / 32 passed / 2 rerun**,
+  `env -u PYTHONPATH` 单跑 **34 passed / 0 failed**,CLI 输出
+  `xssentinel 1.5.0`。⇒ 环境形态,不是本轮回归、也不是定版引起;
+  交付口径取干净环境那轮。
+- **full 194 双引擎 strict**:sync **194 scored / 0 SKIP**,
+  TP113 / FP0 / TN81 / FN0,F1 **1.0000**;async **182 scored / 12 SKIP**,
+  TP107 / FP0 / TN75 / FN0,F1 **1.0000**;两档 FP0 / FN0 / ERROR0、exit 0。
+- **行为靶场(range3–6,均 `--engine both`、exit 0)**:range3
+  sync TP19 / FP0 / TN7 / FN0 / SKIP0 / ERROR0,
+  async TP17 / FP0 / TN7 / FN0 / SKIP2 / ERROR0;range4 双引擎各
+  TP2 / FP0 / TN2 / FN0 / ERROR0,所有阳性 `browser-confirmed=12/12`;
+  range5、range6 双引擎各 TP1 / FP0 / TN1 / FN0 / ERROR0。
+- **打包冒烟**:`uv build --wheel` 得 `xssentinel-1.5.0-py3-none-any.whl`;
+  元数据 Version 1.5.0 / Requires-Python >=3.10 / License-Expression MIT;
+  解压后独立 import 与 `-V` 正常;wheel 内**不含**
+  `llm_state.json` / `llm_providers.json`(修复前实测夹带了前者),
+  8 个 data 语料齐全,两个 console script 入口齐全。本机
+  `pip wheel` / `pip install --target` 仍挂起(与既有「pip 通路病态」
+  同形),故构建与安装冒烟走 uv + 解压,不改产品/测试代码。
+- **本轮新守卫与变异对照**:`test_package_data_hygiene.py` 3 例、
+  `test_phase382_juice_render.py` 8 例,各做一次
+  baseline 绿 → mutated 红 → 字节还原绿(前者 rc 0→1→0,
+  后者 8 绿 → 2 failed → 8 绿);ruff 零基线。
+- **边界**:同期邻项目 `D:\qoder\vuln-agent` 有并发测试批(已记账,
+  未做跨项目停跑);Phase 382 浏览器事实表测于 `edfe91d`,
+  **不是本终树**,只作外部效度补充;2 个整文件零贡献的 skip 与
+  async 的 12 例 sync-only SKIP 均如实列出,不宣称「全都跑过」。
 
 ## [1.4.4] - 2026-11-08
 

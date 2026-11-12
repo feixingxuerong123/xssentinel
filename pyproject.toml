@@ -114,6 +114,15 @@ version = { attr = "xssentinel.__version__" }
 [tool.setuptools.package-data]
 xssentinel = ["data/*.json", "desktop/ui/*.html"]
 
+# Measured 2026-11-12: ``data/*.json`` above also swept the gitignored
+# runtime files into the wheel -- a locally built wheel contained
+# ``llm_state.json`` (failure counters / provider errors) and would have
+# contained ``llm_providers.json`` (API keys) had it existed.  Gitignore is
+# not a build exclusion.  Keep this list in sync with .gitignore; the
+# two lists are pinned together by tests/test_package_data_hygiene.py.
+[tool.setuptools.exclude-package-data]
+xssentinel = ["data/llm_state.json", "data/llm_providers.json"]
+
 [tool.pytest.ini_options]
 minversion = "7.0"
 testpaths = ["tests"]

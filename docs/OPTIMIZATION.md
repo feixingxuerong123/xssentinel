@@ -1518,3 +1518,35 @@ Phase 380 的跨工具表并列,不改变唯一官方跑分口径。靶场被写
 `description` 已恢复),`dev/_*` 不进版本库。下一步仍是
 **评估 8–11(P2) / #1 授权范围默认策略待拍板**;若要给跨工具
 造合法分母,需先单列一轮设计 server-deliverable positive。
+
+### 8.15 交付轮(2026-11-12):1.5.0 定版、制品收口与打包缺陷
+
+**Phase 382 收口**:把 11-10 遗留的 3 个未跟踪产物
+(`benchmark/run_juice_render.py` + `juice_render_20261110.{json,md}`)
+正式入库。它补的正是 §8.14 自己写下的缺口——「字段里存了 payload
+不等于 SPA 渲染执行,浏览器证据本轮没做」:独立 Playwright Chromium
+给两条 `delivered` 行各配 payload / clean control 臂,以真实 `dialog`
+事件为执行证据;control 臂出现 dialog 记 `control_contaminated`,
+不算命中。**仍不给分**,两条投递形状不同、无合法分母。守卫
+`tests/test_phase382_juice_render.py` 8 例钉住无分数字段、counts
+由 rows 重算、cases/arms 显式名单、verdict 由 dialogs 推导、runner
+的 AST 里必须仍有 `page.on("dialog")` 与污染分支、MD 与真实
+`to_markdown(json)` 逐字节同源、tree 归属不得 `unknown`。变异对照
+baseline 8 绿 → 改 counts 红(2 failed) → 字节还原 8 绿。
+测量树 `edfe91d`,**不冒充 1.5.0 终树跑分**。
+
+**交付冒烟抓到并修掉的真实缺陷**:构建 wheel 时发现
+`package-data` 的 `data/*.json` 通配把 gitignore 的
+`llm_state.json` 打了进去(同类 `llm_providers.json` 带密钥)。
+修法是 `exclude-package-data` + 把两处清单钉在一起的守卫,
+不是「以后小心」。这与 §7 的教训同形:清单分散在 N 处时,
+缺的不是细心,是把它们钉在一起的测试。
+
+**定级**:[Unreleased] 含 Phase 376/377 的新增能力,按版本策略走
+minor ⇒ 1.5.0;无破坏性变更,legacy MCP 帧与 CLI 契约逐字节不变。
+逐项门禁数字、skip 数与红项归因统一记在 CHANGELOG [1.5.0]
+「验收(交付轮)」和交付验收报告,**本节不复制数字**(没有第二份
+数字就没有第二处腐烂)。
+
+**下一步不变**:评估 8–11(P2);#1 授权范围默认策略仍待仓库归属者
+拍板,拍板前不动。
