@@ -150,8 +150,6 @@ def main() -> int:
         # 2. tool catalogues: modern 9 with titles, legacy byte-7
         tl = cli.call({"jsonrpc": "2.0", "method": "tools/list",
                        "params": MODERN})["result"]["tools"]
-        init = cli.call({"jsonrpc": "2.0", "method": "initialize",
-                         "params": {}})["result"]
         legacy = cli.call({"jsonrpc": "2.0", "method": "tools/list"})[
             "result"]["tools"]
         check("modern tools/list has 9 annotated tools",

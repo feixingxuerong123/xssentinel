@@ -149,7 +149,6 @@ def main() -> int:
                              "arguments": {"url": a.url, "max_payloads": 1,
                                            "timeout": 5, "max_seconds": 60},
                              **MODERN}})
-        p = json.loads(r["result"]["content"][0]["text"])
         check("/mcp scan A succeeds (same origin as the REST scan)",
               not r["result"].get("isError"), json.dumps(r)[:200])
 
