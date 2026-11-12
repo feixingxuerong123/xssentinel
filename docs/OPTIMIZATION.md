@@ -1550,3 +1550,39 @@ minor ⇒ 1.5.0;无破坏性变更,legacy MCP 帧与 CLI 契约逐字节不变�
 
 **下一步不变**:评估 8–11(P2);#1 授权范围默认策略仍待仓库归属者
 拍板,拍板前不动。
+
+### 8.16 处置记录(2026-11-13):P0 清零 + P2 评估收口,2.0.0 定版
+
+归属者拍板:**#1 授权范围默认策略 = 首用钉定(TOFU)**。三案(默认拒绝 /
+默认放行+强披露 / TOFU)中选 TOFU:零配置单靶工作流(README/SKILL.md 主路径)
+行为不变,而 prompt injection 诱导的横向移动被边界挡住。
+
+- **#1(Phase 383)**:operator 启动时钉定(`--allow-host` 经 `core/scoping`
+  同一 grammar / `XSSENTINEL_MCP_ALLOW_HOSTS`;`--allow-any-host` 显式回
+  open 并强披露);默认 TOFU——首个**成功**的带 url 调用钉定其 origin,跨
+  origin 调用拒绝且**零请求**(预检不发、失败不烧 pin、拒绝不进缓存),
+  legacy 帧同拒(边界不可被降级绕过)。范围配置时 sync 引擎重定向边界随之
+  开启,被拒跳转入 `boundary_stops`。判定原语复用 `core/egress.py`
+  (`is_named` 窄扩展 pattern;配置 pattern 后空集惰性规则停用——allowlist
+  不得退化为「首个请求前全放行」)。守卫 13 例(真实 dispatch + 真实 stdio,
+  loopback 计数器证明零外发),变异 6/6。**§8.5 的「评估 8–11」清零**。
+- **#11(Phase 384)**:金丝雀审计结论 **NO ECHO**(成功/错误/abrupt/靶场
+  自回显四类臂 + 服务端到达性证明;requests 异常串实测不含 URL userinfo)。
+  审计的 unreachable 臂**量出真缺陷**:discover 对不可达目标谎报成功(浏览器
+  吞导航失败)——Phase 327「假无发现」家族,补 `_preflight` 修复并钉守卫。
+  变异 2/2(错误句 / `waf` 元数据注入凭据 → 守卫红)。
+- **#8(Phase 385)**:成功结果带 `run_id` + `elapsed_ms`(双通道同值,9 个
+  outputSchema 同源;缓存重放携带原始 run 的 id)。**budget_used 不加**
+  (requests_made + effective_max_seconds 已覆盖);**next_actions 不加**
+  (写给模型的建议 = 注入放大面;错误 `hint` 已覆盖恢复)。
+- **#9**:评估为**不做**——2026 规范趋向无状态;opaque handle 引入会话
+  状态与生命周期;result cache(Phase 378)+ JobManager(Phase 377)已覆盖
+  主要重用场景。本条结项,不再列为待办。
+- **#10(Phase 385)**:`_INSTRUCTIONS` 两句 → 四句,补成本现实与
+  cheap-first 工作流;范围声明不进静态串(由 discover `scope` 对象承担)。
+- **版本**:TOFU 改变 MCP 多 origin 会话默认语义 = 破坏性变更,按 §版本策略
+  走 major ⇒ **2.0.0**(CHANGELOG 带 `BREAKING:` 条目;单靶工作流、CLI、
+  REST `/api/v1/scans` 契约不变)。交付门禁数字记 CHANGELOG [2.0.0]
+  「验收(交付轮)」,本节不复制。
+- **外部待办(归属者)**:PyPI Trusted Publisher 未配置(GitHub 仓库设置,
+  本机无法代配);v1.4.2/1.4.3/1.4.4/1.5.0 历史发布无 tag,已于本轮补齐。

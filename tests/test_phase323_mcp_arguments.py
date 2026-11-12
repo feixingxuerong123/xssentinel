@@ -213,7 +213,13 @@ def test_dispatch_alias_round_trip_against_a_live_page():
         canon_payload = json.loads(canonical["content"][0]["text"])
         alias_payload = json.loads(aliased["content"][0]["text"])
         assert canon_payload["reflected"] is True
-        assert alias_payload == canon_payload
+        # Phase 385: run_id/elapsed_ms are per-run metadata and differ
+        # between two real calls by design; everything semantic must
+        # still be identical.
+        per_run = ("run_id", "elapsed_ms")
+        assert {k: v for k, v in alias_payload.items()
+                if k not in per_run} == \
+            {k: v for k, v in canon_payload.items() if k not in per_run}
     finally:
         server.shutdown()
         server.server_close()

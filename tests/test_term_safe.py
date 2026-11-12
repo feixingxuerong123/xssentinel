@@ -192,6 +192,8 @@ def test_mcp_mode_leaves_print_alone():
     # the mcp branch uninstalls BEFORE handing over to the protocol server
     mcp_pos = src.index('getattr(args, "mcp", False)')
     uninstall_pos = src.index("uninstall_cli_print_guard()", mcp_pos)
-    serve_pos = src.index("return _mcp_serve()", mcp_pos)
+    # Phase 383: the handover passes the operator's scope flags, so
+    # the pin matches the call, not the empty-paren form.
+    serve_pos = src.index("_mcp_serve(", mcp_pos)
     assert uninstall_pos < serve_pos, \
         "--mcp must drop the guard before stdout becomes the protocol"

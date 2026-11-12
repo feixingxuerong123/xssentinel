@@ -54,8 +54,26 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
 
 - 新增检测层必须**同时**注册 `coverage.LAYERS` 与 `layer_coverage` 矩阵(Phase 187/192 两次被门禁抓到的同一课)。
 
-## 当前状态(2026-11-12)
+## 当前状态(2026-11-13)
 
+- **2.0.0(2026-11-13,major,交付轮)**:唯一遗留 P0 清零 + P2 评估收口。
+  **#1 授权范围默认策略已由归属者拍板为 TOFU(首用钉定)** 并落地
+  (Phase 383,`feat(mcp):` 提交):operator 启动时以 `--allow-host` /
+  `XSSENTINEL_MCP_ALLOW_HOSTS` 钉定范围(或 `--allow-any-host` 显式回
+  open 并强披露),默认首个**成功**的带 url 调用钉定其 origin,跨 origin
+  调用拒绝且**零请求外发**;legacy 帧同拒;范围配置时 sync 重定向边界随之
+  开启,被拒跳转入结果的 `boundary_stops`。**破坏性变更**:MCP 多 origin
+  会话需显式配置,按版本策略走 major ⇒ 2.0.0(单靶工作流、CLI、REST
+  `/api/v1/scans` 契约不变)。Phase 384 凭据回显审计结论 **NO ECHO**
+  (守卫钉住),其 unreachable 臂量出并修复 `xssentinel_discover` 对不可达
+  目标谎报成功的真缺陷(补 `_preflight`,Phase 327「假无发现」家族)。
+  Phase 385 成功结果带 `run_id`/`elapsed_ms`(双通道同源),`budget_used` /
+  `next_actions` 评估为不加、#9 评估为不做(P2 全部收口)。三个 Phase 各有
+  守卫(13/4/5 例,0 skip)与变异对照(6/6、2/2、3/3),MCP 回归组全绿,
+  ruff 全仓零基线。门禁实测数字记 CHANGELOG [2.0.0]「验收(交付轮)」,
+  不在本文件复制。历史 tag 缺失已补齐(v1.4.2/1.4.3/1.4.4/1.5.0 +
+  本版 v2.0.0);**PyPI Trusted Publisher 仍是外部待办(归属者在 GitHub
+  仓库设置里配)**。
 - **1.5.0(2026-11-12,minor)**:承接 Phase 372–381 的 MCP 接入面增量与
   Phase 382 的独立浏览器事实表。Phase 376 新增客户端超时协商、
   Phase 377 新增 2 个仅现代帧异步扫描工具,按「新增能力走 minor」定级;

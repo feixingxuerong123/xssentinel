@@ -16,6 +16,14 @@
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-11-13
+
+> 承接 Phase 383–385:唯一遗留 P0(MCP 授权边界,§8.1-1)清零、凭据回显
+> 审计与 `xssentinel_discover` 诚实性修复、结果元数据与 instructions 补强。
+> **破坏性变更**:Phase 383 的默认首用钉定(TOFU)改变 MCP 多 origin 会话
+> 语义(单靶工作流不变、CLI 与 REST 契约不变、检测判定层零改动),按版本
+> 策略走 major。门禁实测数字见本节末尾「验收(交付轮)」。
+
 ### Added
 - **Phase 385 / 结果元数据 + instructions 补强(OPTIMIZATION §8.3 #8/#10)**:
   每个工具的成功结果现在带 `run_id`(`run_` + 16 hex,双通道 text 与
@@ -72,6 +80,36 @@
   legacy 帧同样被拒(错误保持 legacy 文本形状,既有 legacy 响应字节不受影响);
   单靶工作流(README/SKILL.md 主路径)行为不变。CLI 与 REST `/api/v1/scans`
   的 operator 直驱模型不变。
+
+### 验收(交付轮,2026-11-13,终树自跑)
+
+> 树:交付终树(本轮改动全部落地后);与本发布提交的唯一差异是本节数字文本。
+> 口径照 1.5.0 交付轮:重活串行、`env -u PYTHONPATH` 干净环境、`TEMP`/`TMP`
+> 指向工作区外 scratch、批量门加 `PYTEST_ADDOPTS` 关 pytest tmp 清理
+> (`dev/gate_run_scratch.py` / `dev/batched_gate_scratch.py`)。
+> 绿一律连 skip 数一起报;零永远不是通过。
+
+| 门禁 | 结果 | skip |
+|---|---|---|
+| ruff 全仓 E/F/W | `All checks passed` | — |
+| 新守卫 383/384/385 | 13 + 4 + 5 passed / 0 failed | **0** |
+| MCP 回归组(13 文件) | **177 passed / 0 failed** | 0 |
+| quick 64 `--strict-gate` sync(18931) | **64 scored**,FP0 FN0 ERROR0,exit 0 | **0 SKIP** |
+| quick 64 `--strict-gate` async(18932) | **63 scored**,FP0 FN0 ERROR0,exit 0 | **1 SKIP** |
+| full 194 `--strict-gate` sync(18941) | **194 scored**,FP0 FN0 ERROR0,exit 0 | **0 SKIP** |
+| full 194 `--strict-gate` async(18942) | **182 scored**,FP0 FN0 ERROR0,exit 0 | **12 SKIP**(manifest 声明 sync-only) |
+| 全量分批门禁 `--jobs 4` | **304/304 文件绿,502s,failures 0**,exit 0 | **13 例 / 6 文件**(2 个整文件零贡献) |
+| 打包冒烟(`uv build --wheel`) | wheel `2.0.0`;`data/` 仅 8 个语料文件(无 `llm_state.json`/`llm_providers.json`);解压 import / `-V` = `xssentinel 2.0.0` | — |
+
+**首轮分批门的 2 红已归因并修复(非环境形态)**:
+`test_term_safe`(钉子找 `return _mcp_serve()`,Phase 383 改为带参调用)
+与 `test_phase323`(别名等价断言未剥离 per-run 的 `run_id`/`elapsed_ms`)——
+均为守卫需随能力更新,语义断言强度不降;修复后同口径复跑 304/304 定谳。
+
+**整文件零贡献**:`test_oracle_default_sent.py`(3)与
+`test_stored_e2e_acceptance.py`(3),与 1.5.0 交付轮同一形状;runner 自己
+打了 `! 2 file(s) contributed nothing`。「304/304 绿」与「skip 13 例 / 6 文件」
+必须一起引用。
 
 ## [1.5.0] - 2026-11-12
 
