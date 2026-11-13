@@ -1631,3 +1631,85 @@ minor ⇒ 1.5.0;无破坏性变更,legacy MCP 帧与 CLI 契约逐字节不变�
   (sync scan_target),参数对称(两侧 advanced_layers 均默认 True),
   故为行为性分歧 = sync 侧潜在挖矿 FN。修复需对照矩阵级工程,列为下轮
   候选;官方 strict 口径四档全绿不受影响。
+
+### 8.18 处置记录(2026-11-13 三续):Phase 387——给 strict gate 补墙钟维度
+
+**起点是工作区里的一处半截改动,不是文档待办**:2.0.1 提交后工作区残留
+`benchmark/runner.py`(只加了一行 import)、新建的 `benchmark/perf_budget.py`
+(四条基线全是 `baseline_s=0.0 / measured="" / ceiling_s=0`)与一份
+64 例 quick sync 产物;模块注释却写着「四档 11-13 已测」,且没有守卫、
+没有变异、没有文档。按「测量先行」与「量过是不需要的更不该进代码」,
+只有两条路:按纪律补齐,或撤掉。**选补齐**,因为缺口是真的:runner 一直
+记录 `total_time_s`,却从没有任何门看它,扫描器慢到 10 倍仍会 FP0/FN0/
+ERROR0 全绿——正是「比 nuclei 慢一个数量级」那种失败形状。
+
+**做法(全部走真实入口,不写第二份契约)**:
+- `dev/phase387_measure.py` 串行重测四档 strict gate(quick/full ×
+  sync/async)。独立干净端口(18951 起自动找可 bind 的)、`TEMP`/`TMP`
+  指到工作区外 scratch(绕 safe-delete 守卫上限)、`NO_PROXY` 含 loopback
+  (防代理把静态资源回成首页)、`PYTHONPATH` 清空;`--only` 可续跑,
+  `--force` 强制重测,**红/退化产物一律不得晋级基线**(FP/FN/ERROR 非零、
+  scored 为零、`total_cases` 与 cases 数组不等都判不可用)。四档**串行**:
+  并行会争 loopback,直接污染被测的墙钟。
+- ceiling 只由实测推导:`round_up_to_5(baseline_s * MARGIN)`,MARGIN=2
+  只抓数量级漂移(本机 loopback 噪声带撑不住更紧的门),守卫重算每一条,
+  手工改 ceiling 或改 baseline 都会让门变红。
+- runner 侧 `_perf_gate_line()` 是唯一判定入口,`--strict-gate` 在质量判级
+  之外单独打印性能判级,任一门红都返回 1。**未测量组合一律明说
+  UNBUDGETED 且不冒充通过**:rotated quick slice、CI 周轮切片、未测 case
+  数、非默认 `--concurrency`,以及尚未填表的占位条目。
+- 守卫 `tests/test_phase387_perf_budget.py` 逐份重读 artifact(数字、
+  引擎、日期、严格门洁净度同源)、复算 ceiling、钉住 `budget_for` 的
+  None 语义,并用 **AST 源码断言**钉住 runner 的调用点、失败返回与
+  「不得硬写 ceiling / 不得绕过表」——函数体不会腐化,调用点会走回手写
+  (与 Phase 259/176u 同族)。`dev/phase387_mutations.py` 每个变异只跑一个
+  具名 node,baseline 绿 → 变异红 → 字节还原绿。
+
+**两处自我纠正(都是实测抓出来的,不是事后补话)**:① 占位表第一次接到
+runner 时,64 例 quick/sync 恰好匹配占位条目的 `cases=64`,于是
+`_perf_gate_line` 打印 `FAILED: 165.7s vs ceiling 0s`——一张没填完的表会
+用一个假上限判红。修法不是把 cases 改成 0 躲开,而是 `budget_for` 明确
+「`baseline_s<=0` 的条目不是预算」(**零永远不是通过**的又一处实例)。
+② CHANGELOG 先写下「非默认并发度属未测量组合」后复核代码,发现
+`budget_for` 当时根本没有 concurrency 维度 ⇒ 文档比代码诚实,补字段
+与调用点,再加一条真实入口守卫;先写下的那句话才成立。
+
+**边界(明确不做)**:预算锚定本机(loopback 画像 / CPU / TEMP 标签),
+**不套 CI**——hosted runner 的绝对速度与噪声分布不同,要钉 CI 预算得先有
+CI 自跑的基线,未预算的跑只会被说出、不会被默认判绿;skip 数仍只由质量
+门报,性能门只判墙钟;判定层、CLI 契约、MCP/REST 契约零改动;性能门接在
+`--strict-gate` 上(opt-in),legacy 阈值路径行为不变。
+
+**四档实测基线(本轮自己的运行,2026-11-13,串行,均 FP0/FN0/ERROR0)**:
+
+| 组合 | cases | scored | SKIP | baseline | ceiling | artifact |
+|---|---|---|---|---|---|---|
+| quick/sync | 64 | 64 | 0 | 163.69s | 330s | `perf_baseline_quick_sync_20261113.json` |
+| quick/async | 64 | 63 | 1 | 173.24s | 350s | `perf_baseline_quick_async_20261113.json` |
+| full/sync | 194 | 194 | 0 | 397.09s | 795s | `perf_baseline_full_sync_20261113.json` |
+| full/async | 194 | 182 | 12 | 418.03s | 840s | `perf_baseline_full_async_20261113.json` |
+
+ceiling = `round_up_to_5(baseline × 2)`。四档全部由
+`C:/Python39/python.exe dev/phase387_measure.py --force --date 20261113`
+产生,逐档日志在 `benchmark/results/_local_archive/phase387_*.log`,
+汇总在 `_local_archive/phase387_summary_20261113.json`;08:59 那份旧的
+quick sync 产物移到 `_local_archive/` 留档,不覆盖正式证据。**测量时 perf
+臂尚未启用**(四档日志均打印 `UNBUDGETED`),所以基线是纯质量门的墙钟;
+启用后的 enforcement 另由补跑验证(见本节末验收)。
+
+**验收(本轮自己的运行,带跳过数,2026-11-13 晚)**:
+
+| 门禁 | 结果 | skip |
+|---|---|---|
+| 新守卫 `tests/test_phase387_perf_budget.py` | **11 passed / 0 failed** | **0** |
+| 变异对照 `dev/phase387_mutations.py` | **7/7**(baseline 绿 → 具名 node 红 → 字节还原绿) | — |
+| 真实 main 链 `dev/phase387_enforcement_check.py` | **4/4**:基线 rc=0 / 超 ceiling 1s rc=1,两个门各自出结论 | — |
+| 邻接组(benchmark / runner / gate / scale 等 13 文件) | **227 passed / 0 failed**,43.85s | **0** |
+| ruff 全仓 E/F/W | `All checks passed` | — |
+| 四档 strict gate(即上表,本轮实测) | **4/4 FP0 FN0 ERROR0**,exit 0 | quick/async **1**、full/async **12** |
+| 启用后真实补跑 quick/sync(18956) | **167.6s vs ceiling 330s → PASSED**;质量门 FP0 FN0 ERROR0 / 64 scored | **0** |
+
+**未跑**:全量分批 pytest 门(305 文件)——判定面零改动,不拿 11-13 早间
+交付轮的 305/305 顶账。**四档测量时 perf 臂未启用**(逐档日志均
+`UNBUDGETED`),enforcement 由上面两路独立验证,没有拿「基线跑」冒充
+「门禁生效」。全量 194 精度门本轮已随 full 两档实跑,不属未跑项。

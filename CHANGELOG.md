@@ -16,6 +16,24 @@
 
 ## [Unreleased]
 
+### Added
+- **Phase 387 / strict gate 新增墙钟预算维度(性能漂移门禁)**:
+  `benchmark/perf_budget.py` 为四档固定 slice 组合保存**实测**基线与推导上限
+  (`ceiling = round_up_to_5(baseline × MARGIN)`,MARGIN=2 只抓数量级漂移);
+  `benchmark/runner.py` 的 `--strict-gate` 在质量判级之外单独打印性能判级,
+  超预算返回非零,两个门各自出结论。**未测量的组合**(rotated quick slice、
+  CI 周轮切片、未测 case 数、非默认并发度)**一律明说 UNBUDGETED,不冒充
+  性能通过**;占位条目(未填 baseline)不会被当成 ceiling 0 去误判。基线
+  来自本机四档真实 strict-gate 运行,artifacts 逐份入库,数字与归属记
+  OPTIMIZATION §8.18;守卫逐份重读 artifact、复算 ceiling,并用源码断言
+  钉住 runner 的调用点与失败返回。测量可复现:
+  `C:/Python39/python.exe dev/phase387_measure.py --force --date <YYYYMMDD>`
+  (串行、可续跑、红产物不得晋级基线,TEMP 重定向到工作区外)。
+  **边界**:预算锚定本机、不套 CI;skip 数仍只由质量门报,性能门只判墙钟;
+  判定层、CLI 契约、MCP/REST 契约零改动。守卫
+  `tests/test_phase387_perf_budget.py`(11 例)、变异对照
+  `dev/phase387_mutations.py`。
+
 ## [2.0.1] - 2026-11-13
 
 > 承接 Phase 386(验证器分类缺口修复)。按「只修缺陷/补齐既有能力走 patch」定级;无破坏性变更。验收数字见本节末「验收(交付轮)」。

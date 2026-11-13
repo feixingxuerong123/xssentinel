@@ -36,6 +36,11 @@ DEFAULT_MAX_TRANSFORMS = 12
 
 sys.path.insert(0, str(_HERE))
 from server import run_server, DEFAULT_PORT  # noqa: E402
+# Phase 387: wall-clock budgets for fixed slice compositions.  Lives next to
+# the runner as its own module so the guard tests and this enforcement call
+# share one definition (the "same contract not handwritten twice" rule).
+sys.path.insert(0, str(_PROJECT_ROOT))
+from benchmark import perf_budget  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -874,6 +879,36 @@ def print_summary(result: BenchmarkResult):
 # CLI
 # ---------------------------------------------------------------------------
 
+def _perf_gate_line(result: BenchmarkResult, quick: bool,
+                    quick_offset: int,
+                    concurrency: int = 1) -> tuple[bool, str]:
+    """One line of truth for the strict gate's wall-clock dimension (387).
+
+    The ceiling, its margin and its provenance live in ``benchmark.perf_budget``;
+    this runner only asks the table and prints what it says.  A composition
+    that was never measured is *stated*, never silently treated as a pass --
+    the same "zero is not green" rule the quality gate uses for skipped cases.
+    Kept as a function (not inline in ``main``) so the guard can probe the
+    real entry point instead of a hand-copied replica.
+    """
+    mode = "quick" if quick else "full"
+    # A full run has no rotation: --quick-offset only changes the quick slice.
+    offset = quick_offset if quick else 0
+    budget = perf_budget.budget_for(
+        mode, result.engine, result.total_cases, offset, concurrency)
+    if budget is None:
+        return True, (
+            f"[~] Performance budget: UNBUDGETED "
+            f"({mode}/{result.engine}, {result.total_cases} cases, "
+            f"offset {offset}, concurrency {concurrency}) -- this run makes "
+            f"NO performance claim; {result.total_time_s:.1f}s recorded")
+    ok, detail = perf_budget.evaluate_perf_budget(
+        budget, result.total_time_s)
+    tag = ("[+] Performance budget PASSED" if ok
+           else "[!] Performance budget FAILED")
+    return ok, f"{tag}: {detail}"
+
+
 def main():
     import argparse
     ap = argparse.ArgumentParser(description="XSSentinel Accuracy Benchmark Runner")
@@ -935,6 +970,13 @@ def main():
     # actually runs at (both engines score FP0/FN0/ERROR0 on the 64-case
     # slice), which is the only version of this gate that can fail.
     if args.strict_gate:
+        # Phase 387: the wall-clock dimension is judged here, from the same
+        # table the guards read.  Quality and performance print separate
+        # verdicts; a red on either returns 1.  Skip counts stay with the
+        # quality gate -- the perf budget judges wall clock only.
+        perf_ok, perf_line = _perf_gate_line(
+            result, args.quick, args.quick_offset, args.concurrency)
+        print(perf_line)
         errored = [c["case_id"] for c in result.cases if c["verdict"] == "ERROR"]
         skipped = sum(1 for c in result.cases if c["verdict"] == "SKIP")
         problems = []
@@ -958,6 +1000,8 @@ def main():
             return 1
         print(f"[+] Strict quality gate PASSED: FP0 FN0 ERROR0 over "
               f"{result.tp + result.tn} scored cases ({skipped} SKIP)")
+        if not perf_ok:
+            return 1
         return 0
 
     if result.fpr > 0.20 or result.recall < 0.50:
