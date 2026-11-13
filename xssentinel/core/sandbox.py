@@ -237,6 +237,20 @@ AUTO_FIRING_EVENTS = {
 }
 
 
+#: (element, handler) pairs measured NOT to execute in Chromium 148
+#: (Phase 389, 2026-11-13).  ``<marquee onstart=...>`` is a legacy IE
+#: behaviour: Chromium never dispatches the marquee ``start`` event, on parse
+#: or on a trusted click.  Evidence:
+#: benchmark/results/phase388_primitive_matrix_20261113.json -- 72 arms,
+#: 8 of the 9 polyglot executors fire in a real browser, this one never does
+#: while the engine verifier confirmed it (a verifier-only false positive).
+#: Deliberately a PAIR, not a handler-name blacklist: Phase 362 measured
+#: ``onstart`` as a live ATTRIBUTE on XSSMaze eventhandler/level5, where
+#: angle-bracket stripping leaves the handler on the host element rather
+#: than on a <marquee>.  A global ban would delete that real detection.
+INERT_HANDLER_PAIRS = frozenset({("marquee", "onstart")})
+
+
 #: SMIL timing events.  These were listed as auto-firing on `{'*'}` while
 #: `judge` simultaneously demanded user interaction -- and both halves were
 #: wrong: a SMIL timeline belongs to the animation element, not to any element.
@@ -514,6 +528,13 @@ def _handler_state(el: Node, attr: str, sink: str = "parser",
     """
     ev = attr.lower()
     name = el.name.lower()
+    # Measured no-exec pairs are settled FIRST: the generic tail below calls
+    # any unrecognised handler "activation" (one click away), which is exactly
+    # the over-claim this pair disproves.  "inert" lets the Phase 169 veto
+    # retract the verifier's event_handler confirmation for this shape.
+    if (name, ev) in INERT_HANDLER_PAIRS:
+        return "inert", (f"{name}.{ev} is measured no-exec in Chromium: "
+                         "the legacy marquee start event is never dispatched")
     # SMIL and CSS-animation events gate on the element and its own attributes,
     # not on the namespace, so they are settled before the foreign check --
     # `<animate>` is always in the SVG namespace, and the old blanket "not

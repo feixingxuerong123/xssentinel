@@ -189,7 +189,8 @@ _EXEC_PRIMITIVES: list[tuple[str, str]] = [
     ("<details open ontoggle=alert('{msg}')>", "details ontoggle -- fires on parse when open"),
     ("<video src=x onerror=alert('{msg}')>", "video onerror -- media element sink"),
     ("<audio src=x onerror=alert('{msg}')>", "audio onerror -- media element sink"),
-    ("<marquee onstart=alert('{msg}')>", "marquee onstart -- legacy but still fires"),
+    ("<marquee onstart=alert('{msg}')>",
+     "marquee onstart -- legacy IE event; Chromium 148 no-exec (Phase 389)"),
     ("<svg><animate onbegin=alert('{msg}') attributeName=x dur=1s>",
      "SVG animate onbegin -- SMIL event sink"),
 ]

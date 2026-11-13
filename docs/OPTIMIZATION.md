@@ -1790,3 +1790,78 @@ inconclusive;④ 随机量具要么固定 token、要么枚举全空间,否则�
 **未跑**:全量 194 两档与全量分批 pytest 门 —— 判定层零改动,不拿
 11-13 早间 / Phase 387 的数字顶账;quick 两档是本轮自己的运行,同时
 顺带证明 Phase 387 的性能门在非基线跑上仍正常判绿。
+
+### 8.20 处置记录(2026-11-13 五续):Phase 389——只修 `marquee/onstart` 这一格
+
+**起点**:§8.19 把上一版的「L7 画像降档」推翻,并把真实缺陷收窄为
+`<marquee onstart=...>` —— 9 个 polyglot 执行原语里唯一「验证器确认、
+Chromium 148 不执行」的形状。本轮修这一格,不扩面。
+
+**根因(两处认知各差一步,合起来才漏)**:
+1. `verifier._verify_semantic_impl` 的第 2 步只看属性名:任何
+   `attr.startswith("on")` 且 token 在 value 里就 `confirmed=True`
+   (除 CSP 与 UTF-7 门),**不看元素、不看事件是否真会派发**;
+2. `sandbox._handler_state` 对没进任何测量表的 handler 落到通用 tail
+   → `"activation"`(「一次点击就执行」),`judge` 把它折成
+   `Verdict("live", activation=True)`,而 Phase 169 的 **veto 只认
+   `inert`** ⇒ 确认收不回来。实测修复前:
+   `judge=<live, activation=True, "marquee.onstart requires user interaction">`
+   —— 这句「requires user interaction」本身就是没量过的猜测。
+
+**修法(在事实表里修,不给验证器加豁免名单)**:
+`sandbox.py` 新增 `INERT_HANDLER_PAIRS = {("marquee","onstart")}`,
+`_handler_state` 在一切门类之前对该组合返回 `inert`,veto 随即把
+`event_handler` 确认收回(`detail="sandbox: ..."`,`sandbox_state=inert`)。
+**是元素 × 属性的 pair,不是 handler 名黑名单**:Phase 362 在 XSSMaze
+eventhandler/level5 量过,尖括号被剥离后 `onstart` 落在**宿主元素**上
+(不是 `<marquee>`)是活的;全局禁 `onstart` 会删掉一条真检出。守卫里
+`<div marquee onstart=...>` 明确断言仍确认,就是钉住这条边界。
+`polyglot.py` 那句「legacy but still fires」注释按浏览器事实改正,
+**语料集合一个形状都不删** —— 删形状会动覆盖率与 stride 路由,而修复
+根本不需要动它(验证器拒了,L7 自然不发射)。
+
+**同一量具的前后对照(不是重写一份数字)**:给
+`dev/phase388_primitive_matrix.py` 加 `--out`,用**完全相同**的 9 原语
+× 2 sink × 4 esc = 72 臂重测,产物
+`benchmark/results/phase389_primitive_matrix_20261113.json`;388 的带日期
+事实表保留不覆盖。
+
+| 轮次 | true_detection | verifier_only | marquee 的 verifier | marquee 的 browser | controls_valid |
+|---|---|---|---|---|---|
+| 388(修复前) | 8 | **1** | True | False | True |
+| 389(修复后) | 8 | **0** | **False** | False | True |
+
+逐形状比对两表:**浏览器事实一位都没变**,只有 marquee 的 verifier 从
+True 翻成 False —— 改的是判定,不是靶场。单元级对照另外钉住 8 个活
+形状仍 `confirmed=True`、Phase 362 属性形状仍确认、沙箱保真度与
+gate 守卫合计 20 例全绿。
+
+**纪律**:「`on*` 属性名 == 可执行」与「未识别 handler == 一次点击就活」
+都是**照属性名/照猜测报**,不是照浏览器事实报;修在沙箱的测量表里,
+让既有 veto 生效,而不是在验证器里加一条 `if attr == "onstart"` 的
+特判(那会把 Phase 362 一起误伤)。`<div onstart>` 之类本轮**没量过**的
+形状按「没量过不进门禁」保持原状,列为后续测量项。
+
+**边界**:不动语料集合、不动 stride、不动 CLI/MCP/REST 契约;判定语义
+变更 ⇒ 按纪律跑全量 194 两档 + quick 两档 + 对照矩阵,数字见下。
+
+**验收(本轮自己的运行,带跳过数,2026-11-13 深夜)**:
+
+| 门禁 | 结果 | skip |
+|---|---|---|
+| 同一量具矩阵重测(72 臂) | `verifier_only` **1 → 0**、`true_detection` 8 → 8、浏览器事实逐形状不变 | — |
+| 新守卫 `tests/test_phase389_marquee_inert.py` | **6 passed / 0 failed** | **0** |
+| 变异对照 `dev/phase389_mutations.py` | **6/6**(baseline 绿 → 具名 node 红 → 字节还原绿) | — |
+| 沙箱保真度 / gate 守卫 | **20 passed / 0 failed** | **0** |
+| 邻接组(18 文件,含 386/387/388/389 守卫) | **265 passed / 0 failed**,40.85s | **0** |
+| ruff 全仓 E/F/W | `All checks passed` | — |
+| quick 64 `--strict-gate` sync(18961) | **172.1s vs ceiling 330s → PASSED**;FP0 FN0 ERROR0,64 scored | **0** |
+| quick 64 `--strict-gate` async(18962) | **183.2s vs ceiling 350s → PASSED**;63 scored | **1** |
+| **full 194 `--strict-gate` sync(18963)** | **418.9s vs ceiling 795s → PASSED;FP0 FN0 ERROR0,194 scored** | **0** |
+| **full 194 `--strict-gate` async(18964)** | **427.5s vs ceiling 840s → PASSED;FP0 FN0 ERROR0,182 scored** | **12** |
+
+全量 194 两档 **FP0 / FN0 / ERROR0** 是本轮的关键结论:收紧一格
+`event_handler` 确认没有制造任何漏报;Phase 362 的 XSSMaze 形状与 8 个
+活原语都在全量矩阵里保住。四档同时验证 Phase 387 的墙钟预算在新判定树
+上仍判绿。全量分批 pytest 门(305 文件)**本轮未跑**,如实记账,不拿
+早间交付轮数字顶账。

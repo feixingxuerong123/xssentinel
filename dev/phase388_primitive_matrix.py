@@ -18,6 +18,7 @@ Usage:
 """
 from __future__ import annotations
 
+import argparse
 import hashlib
 import importlib.util
 import json
@@ -113,6 +114,14 @@ def _browser(browser, port, html):
 
 
 def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__)
+    # Phase 389 reuses the SAME measuring instrument after the verifier fix.
+    # Keep each round's artifact: the 388 fact table is a dated historical
+    # record and must not be overwritten by a later measurement.
+    ap.add_argument("--out", default=str(OUT),
+                    help="fact-table artifact (default: the 388 baseline)")
+    args = ap.parse_args()
+    out = Path(args.out)
     base = _start_bench()
     session = requests.Session()
     session.trust_env = False
@@ -185,13 +194,14 @@ def main() -> int:
         },
         "rows": rows,
     }
-    OUT.write_text(json.dumps(artifact, indent=2, ensure_ascii=False),
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(artifact, indent=2, ensure_ascii=False),
                    encoding="utf-8")
     print(f"\ncontrols_valid={controls_valid} "
           f"true_detection={len(live)} verifier_only={len(verifier_only)}")
     for prim in verifier_only:
         print(f"  verifier-only: {prim}")
-    print(f"wrote {OUT}")
+    print(f"wrote {out}")
     return 0
 
 

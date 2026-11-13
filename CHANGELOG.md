@@ -33,6 +33,21 @@
   全量 194,**本轮不改判定层**。裁定流程固化为
   `dev/fn_net_adjudicate.py`(finding 自己的载荷 + 同源渲染 + 浏览器 +
   对照臂,候选 ≠ 判定),守卫 `tests/test_phase388_primitive_matrix.py`。
+- **Phase 389 / `<marquee onstart>` 不再被确认(判定层修复)**:
+  Phase 388 的确定性矩阵量出 9 个 polyglot 执行原语里 8 个是真阳性、仅
+  `<marquee onstart=...>` 是「验证器确认、Chromium 148 不执行」的
+  verifier-only 假阳。`sandbox.py` 新增 `INERT_HANDLER_PAIRS`
+  (**元素 × 属性**,不是 handler 名黑名单 —— Phase 362 在 XSSMaze
+  eventhandler/level5 量过 `onstart` 作为宿主元素属性是活的),
+  `_handler_state` 对该组合返回 `inert`,由 Phase 169 的 veto 收回
+  `event_handler` 确认。`polyglot.py` 的「legacy but still fires」注释按
+  浏览器事实改正,**语料集合不变**(不删形状,不动覆盖 / stride)。
+  同一量具重测 `phase389_primitive_matrix_20261113.json`:
+  `verifier_only` **1 → 0**、`true_detection` 8 不变、
+  `controls_valid=True`;沙箱保真度 20 例绿。守卫
+  `tests/test_phase389_marquee_inert.py`、变异 `dev/phase389_mutations.py`。
+  判定语义变更 ⇒ 全量 194 两档 + quick 两档 + 对照矩阵,数字统一记
+  OPTIMIZATION §8.20。
 
 ### Added
 - **Phase 387 / strict gate 新增墙钟预算维度(性能漂移门禁)**:
