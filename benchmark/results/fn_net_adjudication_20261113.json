@@ -1,0 +1,127 @@
+{
+  "meta": {
+    "net_artifact": "fn_net_20261113.json",
+    "generated": "2026-11-13 21:39:21",
+    "method": "finding-own-payload / same-fixture re-render / engine verifier / real Chromium dialog / raw+html+encode_angles controls",
+    "token": "xssv_adjud388",
+    "controls": [
+      "raw",
+      "html",
+      "encode_angles"
+    ],
+    "engine": "sync"
+  },
+  "summary": {
+    "candidates": 2,
+    "inconclusive": 1,
+    "true_detection": 1
+  },
+  "candidates": [
+    {
+      "ctx": "script_dq",
+      "esc": "encode_quotes",
+      "sink": "none",
+      "net_finding_types": [
+        "polyglot_reflection"
+      ],
+      "findings": [
+        {
+          "type": "polyglot_reflection",
+          "severity": "medium",
+          "payload": "\">\"</script></style>-->><marquee onstart=alert('xss_poly_39f2c4f4')>",
+          "marked": "\">\"</script></style>-->><marquee onstart=alert('xssv_adjud388')>",
+          "arms": {
+            "encode_quotes": {
+              "verifier_confirmed": true,
+              "verifier_context": "event_handler",
+              "verifier_detail": "token reflected in onstart handler",
+              "browser_dialog": false,
+              "dialog_message": "",
+              "html_sha256": "4da3f0083497d46f"
+            },
+            "raw": {
+              "verifier_confirmed": true,
+              "verifier_context": "event_handler",
+              "verifier_detail": "token reflected in onstart handler",
+              "browser_dialog": false,
+              "dialog_message": "",
+              "html_sha256": "b72ec62d38aec8ec"
+            },
+            "html": {
+              "verifier_confirmed": false,
+              "verifier_context": "script_string_dq",
+              "verifier_detail": "token reflected in context 'script_string_dq' (escaped / non-executable)",
+              "browser_dialog": false,
+              "dialog_message": "",
+              "html_sha256": "7ac56074ad6f2b0b"
+            },
+            "encode_angles": {
+              "verifier_confirmed": false,
+              "verifier_context": "script_string_dq",
+              "verifier_detail": "token reflected in context 'script_string_dq' (escaped / non-executable)",
+              "browser_dialog": false,
+              "dialog_message": "",
+              "html_sha256": "5caf19295d393a38"
+            }
+          },
+          "controls_valid": false,
+          "verdict": "inconclusive"
+        }
+      ],
+      "verdict": "inconclusive"
+    },
+    {
+      "ctx": "script_dq",
+      "esc": "encode_quotes",
+      "sink": "dom",
+      "net_finding_types": [
+        "polyglot_reflection"
+      ],
+      "findings": [
+        {
+          "type": "polyglot_reflection",
+          "severity": "medium",
+          "payload": "\">\"</script></style>-->><video src=x onerror=alert('xss_poly_baa36d7e')>",
+          "marked": "\">\"</script></style>-->><video src=x onerror=alert('xssv_adjud388')>",
+          "arms": {
+            "encode_quotes": {
+              "verifier_confirmed": true,
+              "verifier_context": "event_handler",
+              "verifier_detail": "token reflected in onerror handler",
+              "browser_dialog": true,
+              "dialog_message": "xssv_adjud388",
+              "html_sha256": "b24f90e20d949486"
+            },
+            "raw": {
+              "verifier_confirmed": true,
+              "verifier_context": "event_handler",
+              "verifier_detail": "token reflected in onerror handler",
+              "browser_dialog": true,
+              "dialog_message": "xssv_adjud388",
+              "html_sha256": "a83c907f110cb477"
+            },
+            "html": {
+              "verifier_confirmed": false,
+              "verifier_context": "script_string_dq",
+              "verifier_detail": "token reflected in context 'script_string_dq' (escaped / non-executable)",
+              "browser_dialog": false,
+              "dialog_message": "",
+              "html_sha256": "0d067a3176631fed"
+            },
+            "encode_angles": {
+              "verifier_confirmed": false,
+              "verifier_context": "script_string_dq",
+              "verifier_detail": "token reflected in context 'script_string_dq' (escaped / non-executable)",
+              "browser_dialog": false,
+              "dialog_message": "",
+              "html_sha256": "53b42fa59962ef2a"
+            }
+          },
+          "controls_valid": true,
+          "verdict": "true_detection"
+        }
+      ],
+      "verdict": "true_detection"
+    }
+  ]
+}

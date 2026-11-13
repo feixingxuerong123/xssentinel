@@ -1632,6 +1632,10 @@ minor ⇒ 1.5.0;无破坏性变更,legacy MCP 帧与 CLI 契约逐字节不变�
   故为行为性分歧 = sync 侧潜在挖矿 FN。修复需对照矩阵级工程,列为下轮
   候选;官方 strict 口径四档全绿不受影响。
 
+> **2026-11-13 晚更正(见 §8.19)**:上面「2 个真 FP / L7 转义画像降档」
+> 的结论已被 finding 自己载荷的复判定与确定性形状矩阵**推翻**;带日期的
+> 原文保留不改,以 §8.19 与 CHANGELOG `[Unreleased]` 勘误为准。
+
 ### 8.18 处置记录(2026-11-13 三续):Phase 387——给 strict gate 补墙钟维度
 
 **起点是工作区里的一处半截改动,不是文档待办**:2.0.1 提交后工作区残留
@@ -1713,3 +1717,76 @@ quick sync 产物移到 `_local_archive/` 留档,不覆盖正式证据。**测�
 交付轮的 305/305 顶账。**四档测量时 perf 臂未启用**(逐档日志均
 `UNBUDGETED`),enforcement 由上面两路独立验证,没有拿「基线跑」冒充
 「门禁生效」。全量 194 精度门本轮已随 full 两档实跑,不属未跑项。
+
+### 8.19 处置记录(2026-11-13 四续):Phase 388——推翻「2 个真 FP」,把「候选 ≠ 判定」固化成工具
+
+**起点是上一轮自己写下的错误结论**:§8.17 把 fn_net 的两个 FP 候选
+(script_dq + encode_quotes,报 `polyglot_reflection`)记为「浏览器证伪的
+真 FP」,并给出修复方向「L7 polyglot 层在转义画像下降档」。本轮按
+「候选 ≠ 判定」复判,**结论反转**:那是两个真阳性,按该方向修会制造 FN。
+
+**第一次复判(探针)**:`dev/_p387_fp_probe.py` 按 Phase 256 方法,用
+finding **自己的载荷**在同一 `(ctx, esc, sink)` 渲染下回渲,同时问引擎
+验证器与真 Chromium dialog,并配 `raw` 正对照 / `html` 与
+`encode_angles` 负对照。两个候选在 `encode_quotes` 下均
+`verifier_confirmed=True` 且 `dialog_fired=True`(message 就是打进去的
+token),而 `html` / `encode_angles` 全静。⇒ 与 §8.17 相反。§8.17 的
+「浏览器证伪」来自 `dev/_p334_browser_oracle.py` 里**手写的近似形状**:
+`&lt;/script&gt;` 在 script rawtext 里根本不解码(不会闭合脚本),另一个
+裸闭合字符串的引号拼接有 bug —— 是伪影,不是 finding 的载荷。
+
+**量具不稳定的发现**:`build_multi_stage_polyglot` 的执行原语由
+`sum(ord(c) for c in token) % len(_EXEC_PRIMITIVES)` 挑选,token 随机
+⇒ **单次扫描报出的 payload 每次不同**。正式裁定工具
+`dev/fn_net_adjudicate.py` 的一次运行恰好选中 `<marquee onstart=...>`:
+验证器确认、真 Chromium 不弹,连 `raw` 正对照也不弹 ⇒
+`controls_valid=False → inconclusive`。这条 inconclusive 被如实留在产物
+里(`benchmark/results/fn_net_adjudication_20261113.json`),没有硬凑结论
+——**对照组不能省**,否则「浏览器整体没工作」会被误读成「payload 死了」。
+
+**确定性矩阵(本轮的定性依据)**:`dev/phase388_primitive_matrix.py`
+枚举产品 `polyglot._EXEC_PRIMITIVES` 的 9 个原语,逐个让产品自己的
+`build_multi_stage_polyglot` 生成载荷(breakout 前缀也来自产品函数,
+**零手写形状**),经真实 `/fuzz/render` 的 `ctx=script_dq` 渲染,
+9 形状 × 2 sink × 4 esc = **72 臂**,每臂记录验证器判定、真实 Chromium
+dialog 与 HTML 摘要。产物
+`benchmark/results/phase388_primitive_matrix_20261113.json`。
+
+| 结果(encode_quotes,两个 sink 均一致) | 数量 | 形状 |
+|---|---|---|
+| verifier 与浏览器**一致确认** ⇒ 真阳性 | **8** | svg/onload、img/onerror、body/onload、input/onfocus、details/ontoggle、video/onerror、audio/onerror、svg animate/onbegin |
+| verifier 确认、浏览器拒绝 ⇒ 真 FP | **1** | `<marquee onstart=...>` |
+
+`raw` 有 fired、`html` / `encode_angles` 全静 ⇒ `controls_valid=True`。
+⇒ **按画像给 L7 降档会压掉 8 个真阳性**;真实缺口收窄为
+`marquee onstart` 单条原语(语料时基陈旧 / 验证器事件表过宽)。修它属于
+判定语义变更,按纪律**独立成轮 + 对照矩阵 + 全量 194**,本轮**不改判定层**。
+
+**五条纪律沉淀(全是这一轮踩出来的)**:① 网的 FP 臂只试 top-3 语料,
+「验证器拒绝 + 扫描器报」只是候选,必须用 finding 自己的载荷回渲回验;
+② oracle 不许手写「听起来相近」的形状,载荷与页面都要来自真实入口;
+③ 正/负对照臂是裁定有效性的前提,`controls_valid=False` 只能
+inconclusive;④ 随机量具要么固定 token、要么枚举全空间,否则结论不可
+复现;⑤ 带日期的历史结论不改写,用 `[Unreleased]` 勘误 + 原文旁注纠正
+(守卫同时钉住「勘误存在」与「2.0.1 原文仍在」)。
+
+**边界与下轮**:本轮零判定层改动 ⇒ 不跑全量 194(不拿 11-13 早间数字
+顶账),只跑守卫 / 变异 / 邻接组 / ruff 与 quick 两档 strict gate 作回归;
+下轮候选更新为「`marquee onstart` 单形状的验证器/语料修复」,而不再是
+「L7 画像降档」。parity 2/194 存量分歧与 PyPI Trusted Publisher 不变。
+
+**验收(本轮自己的运行,带跳过数,2026-11-13 晚)**:
+
+| 门禁 | 结果 | skip |
+|---|---|---|
+| 确定性矩阵(72 臂,9 形状 × 2 sink × 4 esc) | `controls_valid=True`,8 真阳性 / 1 verifier-only | — |
+| 新守卫 `tests/test_phase388_primitive_matrix.py` | **7 passed / 0 failed** | **0** |
+| 变异对照 `dev/phase388_mutations.py` | **7/7**(baseline 绿 → 具名 node 红 → 字节还原绿) | — |
+| 邻接组(15 文件,含 386/387/388 守卫) | **239 passed / 0 failed**,41.93s | **0** |
+| ruff 全仓 E/F/W | `All checks passed` | — |
+| quick 64 `--strict-gate` sync(18957) | **169.4s vs ceiling 330s → PASSED**;FP0 FN0 ERROR0,64 scored | **0** |
+| quick 64 `--strict-gate` async(18958) | **179.2s vs ceiling 350s → PASSED**;FP0 FN0 ERROR0,63 scored | **1** |
+
+**未跑**:全量 194 两档与全量分批 pytest 门 —— 判定层零改动,不拿
+11-13 早间 / Phase 387 的数字顶账;quick 两档是本轮自己的运行,同时
+顺带证明 Phase 387 的性能门在非基线跑上仍正常判绿。

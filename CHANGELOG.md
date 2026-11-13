@@ -16,6 +16,24 @@
 
 ## [Unreleased]
 
+### Fixed
+- **勘误(2026-11-13,Phase 388):推翻 [2.0.1] 的「fn_net 2 个真 FP /
+  L7 转义画像降档」结论**。用 finding **自己的载荷**在**同一
+  (ctx, esc, sink) 渲染**下回渲 + 真 Chromium dialog 复判定,并枚举产品
+  `_EXEC_PRIMITIVES` 的 9 个形状做确定性矩阵
+  (`benchmark/results/phase388_primitive_matrix_20261113.json`、
+  `dev/phase388_primitive_matrix.py`):`script_dq + encode_quotes` 下
+  **8/9 形状 verifier 与浏览器一致确认(真阳性)**,只有
+  `<marquee onstart=...>` 是 verifier 确认而浏览器不执行(真 FP,
+  语料时基陈旧 / 验证器事件表过宽)。`raw` 正对照 fired、`html` 与
+  `encode_angles` 负对照全部不 fired ⇒ oracle 不空转。⇒ **按画像给 L7
+  降档会压掉 8 个真阳性、制造 FN,该修复方向作废**;[2.0.1] 与
+  OPTIMIZATION §8.17 的带日期原文保留不改,以本条勘误为准。真实缺陷
+  收窄为 `marquee onstart` 单条形状,判定层修复需独立成轮 + 对照矩阵 +
+  全量 194,**本轮不改判定层**。裁定流程固化为
+  `dev/fn_net_adjudicate.py`(finding 自己的载荷 + 同源渲染 + 浏览器 +
+  对照臂,候选 ≠ 判定),守卫 `tests/test_phase388_primitive_matrix.py`。
+
 ### Added
 - **Phase 387 / strict gate 新增墙钟预算维度(性能漂移门禁)**:
   `benchmark/perf_budget.py` 为四档固定 slice 组合保存**实测**基线与推导上限
