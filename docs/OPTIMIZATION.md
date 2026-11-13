@@ -1586,3 +1586,48 @@ minor ⇒ 1.5.0;无破坏性变更,legacy MCP 帧与 CLI 契约逐字节不变�
   「验收(交付轮)」,本节不复制。
 - **外部待办(归属者)**:PyPI Trusted Publisher 未配置(GitHub 仓库设置,
   本机无法代配);v1.4.2/1.4.3/1.4.4/1.5.0 历史发布无 tag,已于本轮补齐。
+
+### 8.17 处置记录(2026-11-13 续):优化测试轮——Phase 386 与三个遗留项的实测关闭
+
+归属者指令「全方面优化测试直到完美交付」。按「测量先行」逐项复核文档里
+仍开放的优化项,结果:一项真修复(386)、三项以实测关闭、一项新候选记账。
+
+- **Phase 386(真修复,已发 2.0.1)**:重跑 §2.1.5 的窗口审计时量出
+  `<svg><a xlink:href=javascript:...>` 被分类器误判 `html_attribute_dq`,
+  而 sandbox 的 `JS_URI_ACTIVATION` 早已按测量建模 `("a", "xlink:href")`
+  (真实点击执行;Chromium oracle 本轮复测一致)——「同一契约手写两遍」
+  族再次现身,这次是 context.py 与 sandbox.py 对同一 sink 的认知分裂。
+  修复后 svg_context 该槽从引擎不可确认转为激活类活槽。守卫 5 例
+  (含 HTML/SVG twin 逐字一致断言)、变异 1/1、全量分批门 305/305、
+  四档 strict gate 全绿。oracle 产物见 dev/_p334_browser_oracle.py
+  (gitignore)。
+- **§2.1.5 / Phase 334 死槽处置项:关闭(以测量,非施工)**。引擎忠实口径
+  (verify 传 response_headers——引擎恒传头,原审计不传是 Phase 334 自己
+  记过的伪影来源)重测 + 逐候选浏览器 oracle:① html_comment 的 `--!>`
+  候选转 live(伪影);② svg_context 候选转 interaction(386 修复);
+  ③ url_href 家族的 `java&#x09;script:`(2 条)与 `data:text/html;base64`
+  为**真惰性向量**(Chromium 148 实测点击不执行——Phase 192 语料的时基
+  陈旧活例),但**全部候选替换形状同样不执行**(html `a href=javascript:`
+  的 trusted click 亦不弹,与 Phase 168 记录一致——激活门类是工程折中,
+  oracle 口径不可确认)⇒ 「就地换活」不可行,按 Phase 333 先例维持原状
+  (不可达/激活类槽位,删除会动 stride 路由,零收益)。审计工具已修正为
+  引擎忠实口径(verdict-based interaction + 传头)。
+- **§6 Phase 251 遗留(UTF-7 href 分歧):关闭**。fn_net 全量重测
+  (benchmark/results/fn_net_20261113.json):covered=146 /
+  **fn_candidates=0** / neutralised=52——UTF-7 `javascript:` href 形状
+  不再出现在网上(被 Phase 362 charset 门与 331/333 候选轮吸收)。
+- **§1.1 lint 剩余缺口(benchmark/dev/range3/range4):过期关闭**。
+  `ruff check benchmark/ dev/ range3/ range4/` = All checks passed。
+- **新候选(实测记账,未修)**:fn_net 新测 2 个 FP 候选——
+  script_dq+encode_quotes 页上报 `polyglot_reflection`(medium/model-only),
+  浏览器 oracle 证伪(裸 `</script><svg/onload>` 在真 Chromium 不弹,
+  与同页型 comment 形状对照成立)⇒ 真 FP。修复候选:L7 polyglot 层在
+  引号转义画像下的降档/抑制;属判定面语义扩展,**不与本轮 386 混做**,
+  独立成轮并配对照矩阵 + 全量复测。
+- **parity 全矩阵门的存量分歧(如实记账)**:`XSSENTINEL_PARITY_FULL=1`
+  (opt-in,自 Phase 222 后未跑)实测 2/194 分歧——`pos-sri-01`(async 多
+  `dom_dynamic` high)、`pos-pmmine-01`(async 有挖矿 `reflected` 而 sync
+  空)。A/B(stash 386)定谳**非本轮引入**;量具入口是 222 修过的正确形态
+  (sync scan_target),参数对称(两侧 advanced_layers 均默认 True),
+  故为行为性分歧 = sync 侧潜在挖矿 FN。修复需对照矩阵级工程,列为下轮
+  候选;官方 strict 口径四档全绿不受影响。

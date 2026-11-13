@@ -284,7 +284,17 @@ def _attribute_context(segment: str) -> dict | None:
         # CSS context: expression()/url(javascript:) sinks (legacy IE etc.)
         return {"context": "css_context", "index": -1,
                 "inside_tag": True, "tag": "attr", "attr": name}
-    if name in ("href", "src"):
+    if name in ("href", "src") or name == "xlink:href":
+        # Phase 386: `xlink:href` joins its HTML twin.  The sandbox has
+        # modelled ("a", "xlink:href") as a measured activation-gated sink
+        # since the SVG-namespace probe (no execution on load, execution on
+        # a trusted click, with and without xmlns:xlink), and the Chromium
+        # oracle re-confirmed it on 2026-11-13 -- but THIS classifier still
+        # filed the reflection point as html_attribute_dq, so the verifier
+        # refused a shape the browser executes and the engine's own corpus
+        # carried it as a dead slot.  Execution semantics stay with the
+        # verifier's element+attribute tables (JS_URI_EXECUTES / ACTIVATION
+        # / INERT); this branch only decides "this is a URL context".
         if "javascript:" in val_l:
             return {"context": "url_javascript", "index": -1,
                     "inside_tag": True, "tag": "attr", "attr": name}

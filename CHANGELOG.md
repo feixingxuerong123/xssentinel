@@ -16,6 +16,60 @@
 
 ## [Unreleased]
 
+## [2.0.1] - 2026-11-13
+
+> 承接 Phase 386(验证器分类缺口修复)。按「只修缺陷/补齐既有能力走 patch」定级;无破坏性变更。验收数字见本节末「验收(交付轮)」。
+
+### Fixed
+- **Phase 386 / SVG anchor 的 `xlink:href` 并入 URL 上下文(验证器分类缺口)**:
+  重跑 Phase 334 窗口审计时量出——`<svg><a xlink:href=javascript:...>` 被
+  上下文分类器误判为 `html_attribute_dq`("escaped / non-executable"),而
+  sandbox 层自 SVG 命名空间探针起就按**已测量的激活门 sink** 建模
+  (`JS_URI_ACTIVATION` 含 `("a", "xlink:href")`:载入不执行、真实点击执行、
+  与 `xmlns:xlink` 声明无关),Chromium oracle 2026-11-13 复测一致(真实
+  点击弹窗)。同一 sink 两处认知不一致 ⇒ 分类器现在把 `xlink:href` 与
+  `href` 同类处理(执行语义仍由验证器的元素+属性表裁决,非 anchor 的
+  `xlink:href` 形状全部保持不确认——假阳防护钉在守卫里)。svg_context 的
+  该槽从引擎不可确认的死槽转为激活类活槽。守卫
+  `tests/test_phase386_svg_link_context.py`(5 例,含 HTML/SVG twin 逐字
+  一致断言与 img/src 基线不变断言),变异对照 `dev/phase386_mutations.py`
+  1/1。**同一测量轮的其余结论**(全部有 oracle/探针实证,记 OPTIMIZATION
+  §8.17):① Phase 334 死槽处置项关闭——引擎忠实口径(传响应头)重测 +
+  浏览器 oracle 定谳,可达窗口内不存在「可换成活向量」的死槽,html_comment
+  的 `--!>` 候选确认为审计工具不传头的伪影(引擎路径活);② Phase 251 的
+  UTF-7 href 遗留分歧实测关闭(FN 网 fn_candidates=0);③ §1.1 的
+  benchmark/dev/range lint 缺口实测过期(四目录全绿);④ fn_net 新测出
+  2 个 FP 候选(script_dq+encode_quotes 页的 `polyglot_reflection`,浏览器
+  证伪为真 FP)——L7 polyglot 层转义画像降档列为下轮候选,本轮不与
+  386 混做。
+
+### 验收(交付轮,2026-11-13,终树自跑)
+
+> 树:交付终树(本轮改动全部落地后);与本发布提交的唯一差异是本节数字文本。
+> 口径照 1.5.0 交付轮:重活串行、`env -u PYTHONPATH` 干净环境、`TEMP`/`TMP`
+> 指向工作区外 scratch、批量门加 `PYTEST_ADDOPTS` 关 pytest tmp 清理
+> (`dev/gate_run_scratch.py` / `dev/batched_gate_scratch.py`)。
+> 绿一律连 skip 数一起报;零永远不是通过。
+
+| 门禁 | 结果 | skip |
+|---|---|---|
+| ruff 全仓 E/F/W | `All checks passed` | — |
+| 新守卫 383/384/385/386 | 13 + 4 + 5 + 5 passed / 0 failed | **0** |
+| 邻接组(context/verifier/sandbox/dom,6 文件) | **54 passed / 0 failed** | 0 |
+| quick 64 `--strict-gate` sync(18931) | **64 scored**,FP0 FN0 ERROR0,exit 0 | **0 SKIP** |
+| quick 64 `--strict-gate` async(18932) | **63 scored**,FP0 FN0 ERROR0,exit 0 | **1 SKIP** |
+| full 194 `--strict-gate` sync(18941) | **194 scored**,FP0 FN0 ERROR0,exit 0 | **0 SKIP** |
+| full 194 `--strict-gate` async(18942) | **182 scored**,FP0 FN0 ERROR0,exit 0 | **12 SKIP**(manifest 声明 sync-only) |
+| 全量分批门禁 `--jobs 4` | **305/305 文件绿,501s,failures 0**,exit 0 | **13 例 / 6 文件**(2 个整文件零贡献) |
+| 打包冒烟(`uv build --wheel`) | wheel `2.0.1`;`data/` 仅 8 个语料文件;解压 import / `-V` = `xssentinel 2.0.1` | — |
+
+**如实记账(更高标准门的存量分歧,非本轮回归)**:parity 全矩阵门
+(`XSSENTINEL_PARITY_FULL=1`,自 Phase 222 后未再跑过的 opt-in 门)实测
+194 例中 2 例双引擎分歧——`pos-sri-01`(async 多 `dom_dynamic` high)、
+`pos-pmmine-01`(async 有 `reflected high` 而 sync 挖矿为空)。**A/B 定谳非
+Phase 386 引入**(stash 修复后两棵树分歧逐位相同);官方 strict 口径四档
+全绿不受影响。归因与修复列为下轮候选(sync 挖矿 FN 需对照矩阵级工程)。
+
 ## [2.0.0] - 2026-11-13
 
 > 承接 Phase 383–385:唯一遗留 P0(MCP 授权边界,§8.1-1)清零、凭据回显

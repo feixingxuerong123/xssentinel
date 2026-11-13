@@ -56,6 +56,20 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
 
 ## 当前状态(2026-11-13)
 
+- **2.0.1(2026-11-13,patch,优化测试轮)**:承接 Phase 386——重跑
+  Phase 334 窗口审计量出 `<svg><a xlink:href=javascript:...>` 被分类器误判
+  `html_attribute_dq`,而 sandbox 的 `JS_URI_ACTIVATION` 早已按测量建模该
+  sink(Chromium oracle 真实点击复测弹窗)⇒ 分类器把 `xlink:href` 并入
+  URL 上下文(执行语义仍在验证器元素+属性表;非 anchor 的 xlink 形状
+  假阳防护钉守卫)。svg_context 该死槽转激活类活槽。守卫 5 例 + 变异 1/1 +
+  邻接组 54 绿 + 四档 strict gate 全绿 + 全量分批门 **305/305**(skip 13 例
+  /6 文件,2 整文件零贡献)。同一测量轮以实测关闭三个遗留:Phase 334 死槽
+  处置(引擎忠实口径重测 + oracle:无可换活向量,html_comment 候选为审计
+  伪影)、Phase 251 UTF-7 href 遗留(fn_net fn_candidates=0)、§1.1 lint
+  缺口(四目录全绿)。新记账:fn_net 的 2 个 polyglot FP 候选(浏览器证伪,
+  L7 降档列下轮候选)、parity 全矩阵 opt-in 门 2/194 存量分歧(A/B 定谳非
+  386 引入,sync 挖矿 FN 归因列下轮)。逐项见 OPTIMIZATION §8.17 与
+  CHANGELOG [2.0.1] 验收节。
 - **2.0.0(2026-11-13,major,交付轮)**:唯一遗留 P0 清零 + P2 评估收口。
   **#1 授权范围默认策略已由归属者拍板为 TOFU(首用钉定)** 并落地
   (Phase 383,`feat(mcp):` 提交):operator 启动时以 `--allow-host` /
