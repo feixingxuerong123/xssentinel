@@ -56,6 +56,19 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
 
 ## 当前状态(2026-11-13)
 
+- **2.1.0(2026-11-13,minor,交付轮)**:承接 Phase 387–389。按「新增能力走
+  minor」定级(strict gate 新增墙钟预算维度),无破坏性变更。**387**:四档
+  实测基线 + 推导 ceiling + 未测量组合一律 UNBUDGETED,守卫/变异/源码断言
+  齐全。**388**:推翻 2.0.1 记下的「fn_net 2 个真 FP / L7 降档」——用
+  finding 自己载荷 + 真 Chromium 的 72 臂矩阵证明 8/9 形状是真阳性,按
+  原方案修会制造 FN;带日期原文用 `[Unreleased]` 勘误 + §8.17 旁注纠正,
+  不改写历史。**389**:把唯一 verifier-only 的 `marquee/onstart` 在沙箱
+  事实表标 `inert`,让既有 veto 收回确认;元素 × 属性 pair(不误伤
+  Phase 362),语料集合不动;同量具重测 `verifier_only` 1→0、
+  `true_detection` 8→8,全量 194 两档 FP0/FN0/ERROR0。逐项见
+  OPTIMIZATION §8.18–8.20 与 CHANGELOG [2.1.0] 验收节。**仍开放**:parity
+  全矩阵 opt-in 门 2/194 存量分歧、`<div onstart>` 等未测形状、PyPI
+  Trusted Publisher(归属者外部待办)。
 - **2.0.1(2026-11-13,patch,优化测试轮)**:承接 Phase 386——重跑
   Phase 334 窗口审计量出 `<svg><a xlink:href=javascript:...>` 被分类器误判
   `html_attribute_dq`,而 sandbox 的 `JS_URI_ACTIVATION` 早已按测量建模该

@@ -16,6 +16,13 @@
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-11-13
+
+> 承接 Phase 387–389。按「新增能力走 minor」定级:strict gate 新增墙钟预算
+> 维度(性能门)是新增能力,即使同一版另含一处判定层修复(389)与一处文档
+> 勘误(388);无破坏性变更,单靶工作流、CLI、MCP/REST 契约不变。验收数字
+> 见本节末「验收(交付轮)」。
+
 ### Fixed
 - **勘误(2026-11-13,Phase 388):推翻 [2.0.1] 的「fn_net 2 个真 FP /
   L7 转义画像降档」结论**。用 finding **自己的载荷**在**同一
@@ -66,6 +73,36 @@
   判定层、CLI 契约、MCP/REST 契约零改动。守卫
   `tests/test_phase387_perf_budget.py`(11 例)、变异对照
   `dev/phase387_mutations.py`。
+
+### 验收(交付轮,2026-11-13,终树自跑)
+
+> 树:交付终树(本轮改动全部落地后);与本发布提交的唯一差异是本节数字文本。
+> 口径:重活串行、`env -u PYTHONPATH` 干净环境、`TEMP`/`TMP` 指向工作区外
+> scratch、全量分批门加 `PYTEST_ADDOPTS` 关 pytest tmp 清理。绿一律连 skip
+> 数一起报;零永远不是通过。
+
+| 门禁 | 结果 | skip |
+|---|---|---|
+| ruff 全仓 E/F/W | `All checks passed` | — |
+| 文档 / 切片 / 版本守卫 | **19 passed / 0 failed** | **0** |
+| 新守卫 387/388/389 | **24 passed / 0 failed** | **0** |
+| 沙箱保真度 + gate | **20 passed / 0 failed** | **0** |
+| 邻接组(18 文件) | **265 passed / 0 failed**,40.85s | **0** |
+| 全量分批门 `--jobs 4` | **308/308 文件绿**,1666s,failures none | **66 例 / 13 文件**(2 整文件零贡献) |
+| quick 64 `--strict-gate` sync(18971) | **175.9s vs ceiling 330s → PASSED**;FP0 FN0 ERROR0,64 scored | **0** |
+| quick 64 `--strict-gate` async(18972) | **180.8s vs ceiling 350s → PASSED**;63 scored | **1** |
+| full 194 `--strict-gate` sync(18973) | **405.5s vs ceiling 795s → PASSED**;194 scored | **0** |
+| full 194 `--strict-gate` async(18974,首跑) | 574.7s;质量门 **FN=1: pos-dom-03**(环境,见下) | 12 |
+| full 194 `--strict-gate` async(18975,重跑) | **616.8s vs ceiling 840s → PASSED**;FP0 FN0 ERROR0,182 scored | **12** |
+| 打包冒烟 | wheel `2.1.0`(1,054,158 B);`data/` 仅 8 个语料文件;解压 wheel 后 import / `-V` = `xssentinel 2.1.0` | — |
+
+**红项归因(A/B,如实记账)**:full/async 首跑的 `pos-dom-03` 是**环境噪声,
+非本版回归**。证据:① 同树单点复测 5/5 TP(3.86–4.33s,requests=28,
+finding=1);② 首跑该用例 25.5s 无 finding、日志 2 次
+`WinError 10054`、同轮全量分批门 1666s(历史 501s)⇒ loopback 劣化;
+③ 判定面源码自 389 提交 `943c674` 起逐字节未变(`git diff` 只有
+`__init__.py` 的版本字符串);④ 同树重跑 FP0/FN0/ERROR0。首跑不当绿记,
+数字与重跑一并保留。
 
 ## [2.0.1] - 2026-11-13
 
