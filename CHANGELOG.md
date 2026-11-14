@@ -180,6 +180,81 @@
   (366.1s)——全部 FP0/FN0/ERROR0、性能预算全 PASSED;全量分批门
   **files 317 / failures 0 / 513s**;ruff 全仓零基线。
 
+### Fixed(2026-11-15,Phase 396,NodeGoat 存储流——零请求静默退出归零)
+
+- **勘误:推翻 Phase 395 记账 (c) 的推测**。395 记「auto fetch 零请求
+  静默退出(`_send` 未抛、seq 不增),怀疑 `_send` 内部在响应后到返回
+  之间的某处失败,待查」。真实 CLI 入口打点(`dev/_p396_stored_trace.py`,
+  与 392 runner 同一组参数)证明 **`_send` 根本没被调用**:stored pass 确实
+  被调用(`pages_enter=1 / auto_enter=1`),页面抓取那次 `from_cache=true`、
+  `hit_delta=1`,`tally.attempted` 不增。带日期的 395 原文保留不改,
+  以本条与 `benchmark/results/phase396_stored_flow_20261115.md` 为准。
+- **根因链**:L8_cookie canary 用 `Cookie:` 头覆盖会话是一次合法弹回
+  (395 记账 (b) 的设计行为,不改),其 **7208 字节登录页 200 响应**被
+  `Requester.get()` 以「URL 唯一 key」写进 LRU ⇒ `scan_stored_auto()` 的
+  页面抓取用默认 `cache_get=True` 命中脏缓存 ⇒ `discover_write_faces` 只
+  看到登录表单(`_AUTO_SKIP_FORM`)⇒ `faces=0 / ran=0`,整段静默退出。
+  同场 `scan_stored` 的 view GET 都显式 `cache_get=False`,拿到的是 8598
+  字节正确认证页 —— **会话没死,是缓存给了错页面**。`Requester.get()`
+  的 docstring 与 Phase 176c 早已警告缓存看不到 jar 状态,stored 路径
+  唯独这一处漏了(「同一契约手写两遍」家族)。
+- **Fixed(唯一产品改动)**:`scanner_stored_auto.py` 页面 GET 改为
+  `self.req.get(page_url, cache_get=False)`,与 `scanner_stored.py` 所有
+  view GET 一致。不改判定层 / 语料 / CLI / MCP / REST / canary / 预算;
+  代价是每个 auto 页面多发 1 个 GET(`max_pages` 上限 3)。async 侧经
+  `_AsyncScannerShim` 复用同一 Mixin,其 `_get_sync_requester()` 返回的
+  是真实 `Requester`,kwarg 有效。
+- **同一量具四臂复测(真实 NodeGoat 20506)**:baseline 7208 登录页 /
+  faces 0 / `scan_stored` 0 / **3 findings**;探针 `fix` 臂(只模拟
+  `cache_get=False`)8598 认证页 / faces 1 / **4 findings**;**真实产品
+  改动后 `after` 臂 8630 认证页 / faces 1 / `scan_stored` 1 /
+  4 findings,层集合多出 `stored`** —— 认证页存储型 XSS 端到端打通,
+  不是探针副本造出来的效果。事实表是 FACT TABLE ONLY,不与 XSSMaze /
+  194 矩阵任何数字并列。
+- **395 记账 (a) 在 CLI 入口未复现**:`--max-requests 12` 臂里
+  `pages_enter=1 / auto_enter=1 / scan_stored_calls=2`,stored pass 没有
+  被跳过;47 次 `BudgetExhausted` 都被各层内部消化,异常未冒泡到
+  `scan_target` 置 `stopped=True`。附带观察(记账不修):`Budget.spend`
+  先 `total += 1` 再抛,`total` 涨到 59 而 `max_total=12`。**本轮不改
+  预算语义、不动 `not stopped`;MCP/API 层 wall-clock cancel 那条路径
+  没有复现,保持观察项,不宣称已修。**
+- **未做 / 边界**:缓存污染本身没修(canary 登录页仍会进 LRU),只修
+  stored 路径的读取契约;其它 bare-URL 读取者理论上仍可能拿到陈旧
+  页面,194 矩阵与全量分批门全绿但无针对这一面的独立测量,列观察项。
+  本轮多次覆写 NodeGoat `profile` 并触发 stored 写入,状态已披露。
+- 守卫 `tests/test_phase396_stored_auto_fresh_fetch.py` **4 例**(脏缓存
+  下仍发现真实 write face,含「同一 Requester 在认证态下默认 GET 仍返
+  回登录页」的不空转对照;干净缓存路径;显式 `page_text` 不发请求;
+  调用点源码契约):真实 `Requester` + 真实 loopback server + 真实
+  `CoverageTracker`,只 stub `scan_stored`(否则会打完整载荷阶梯)。
+  变异 `dev/phase396_mutations.py` **1/1**(baseline 绿 / mutated 红 /
+  restored 绿,字节级还原)。邻接回归 stored + requester + cookie canary
+  **59 passed / 3 skipped**。
+- **终树电池(2026-11-15 自跑)**:quick strict sync **64 scored / 0 SKIP**
+  (161.6s)、async **63 scored / 1 SKIP**(166.4s);full 194 sync
+  **194 scored / 0 SKIP**(374.6s)、async **182 scored / 12 SKIP**
+  (370.2s)——全部 **FP0/FN0/ERROR0**、性能预算全 PASSED;range3
+  **TP17/FP0/TN7/FN0/SKIP2/ERR0 exit 0**、range4
+  **TP2/FP0/TN2/FN0/ERR0 exit 0**;ruff 全仓零基线。
+- **全量分批门(如实记口径)**:首轮 `files 318 / failures 30`,30 个红日志
+  的 pytest stdout 全为 `[100%]` 通过、stderr 仅
+  `SAFE_DELETE_BULK_CONFIRM_REQUIRED`(同一个 turn 连跑 5 个门耗尽
+  safe-delete 每 turn 50 次配额,叠加 `--jobs 4` 共享 tmp root 的
+  garbage-dir 删除)⇒ 环境守卫假红,非产品回归。按 `run_all_batched.py`
+  的 resume 契约(归档 tmp root + `--jobs 1`)单独顺序重跑这 31 个文件:
+  **RC=0 / 0 failures / 1 skipped(test_passive_mitm.py)/ 258s**;
+  其余 287 文件首轮已绿 ⇒ **318/318 覆盖、0 真失败**。不是一次跑绿,
+  口径写在这里,不合并成「files 318 / failures 0」。
+- **parity 全矩阵门(`XSSENTINEL_PARITY_FULL=1`):红,不掩饰**。
+  `1 failed / 3 passed / 1 rerun`(358s),唯一分歧 `pos-sri-01`:
+  sync `[sri_missing_script medium]` / async `[dom_dynamic high,
+  sri_missing_script medium]` —— 即 Phase 390 勘误里明确记账为
+  「环境/时基相关、2.1.0 终树四臂不复现」的观察项,现复现。单 case
+  两臂对照(`dev/_p396_sri_probe.py`:`shipped_fix` vs 模拟旧缓存读取
+  `old_fetch`,证据 `phase396_sri_control_20261115.json`):两臂分歧
+  **逐位一致** ⇒ **不是 Phase 396 引入**,是 390–395 期间某轮使其复现;
+  **列独立一轮(Phase 397)**,本轮不修、不宣称已修。
+
 ## [2.1.0] - 2026-11-13
 
 > 承接 Phase 387–389。按「新增能力走 minor」定级:strict gate 新增墙钟预算

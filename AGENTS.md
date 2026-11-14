@@ -54,8 +54,21 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
 
 - 新增检测层必须**同时**注册 `coverage.LAYERS` 与 `layer_coverage` 矩阵(Phase 187/192 两次被门禁抓到的同一课)。
 
-## 当前状态(2026-11-14)
+## 当前状态(2026-11-15)
 
+- **[Unreleased] / Phase 396(2026-11-15,NodeGoat 存储流——零请求静默退出归零)**:
+  395 记账 (c) 的推测**推翻**:真实 CLI 入口打点证明 `_send` 从未被调用,
+  stored pass 确实跑了,是页面抓取 `cache_get=True` 命中**被污染的 GET LRU**
+  (L8_cookie canary 合法弹回的 7208 字节登录页 200 被按 URL 唯一 key 缓存)
+  ⇒ `discover_write_faces` 只见登录表单 ⇒ `faces=0 / ran=0`。修:该处改
+  `cache_get=False`,与 `scanner_stored.py` 所有 view GET 一致(同一契约手写
+  两遍家族漏掉的那一份)。**同一量具四臂**:baseline 3 findings→真实产品
+  改动后 4 findings,层集合多出 **`stored`**,认证页存储型 XSS 端到端打通。
+  395 记账 (a)(预算耗尽跳过 stored-auto)在 `--max-requests 12` 下**未复现**
+  (47 次 BudgetExhausted 被层内消化,异常没冒泡置 `stopped=True`),不动预算
+  语义、不宣称已修。守卫 4 例 + 变异 1/1 + 邻接 59p/3s;事实表
+  `benchmark/results/phase396_stored_flow_20261115.md`。终树电池数字与
+  **两个红门的如实交代**见 CHANGELOG Phase 396 验收节。
 - **[Unreleased] / Phase 395(2026-11-15,parser 收口轮——最后一行漏报归零)**:
   394 留下的唯一语料漏报(polyglot 级联嵌套)根因实锤:**`<!-->` /
   `<!--->` 是 WHATWG 13.2.5.6 的空注释立即闭合**(abrupt-closing-of-

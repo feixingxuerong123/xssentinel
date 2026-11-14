@@ -2241,3 +2241,56 @@ NO ECHO)——AGENTS「下一步是评估 8–11」一段为 2026-11-06 的带�
 **验收(本轮自己的运行)**:守卫 4 例 + 变异 1/1;sandbox 套件
 (fidelity/gate/393/394)**34 passed**;r5 数字如上;终树电池数字记
 CHANGELOG Phase 395。
+
+### 8.27 处置记录(2026-11-15):Phase 396——§8.26 记的第三个机制定谳并修掉
+
+**起点**:§8.26 把 NodeGoat 存储流的第三个机制 (c) 记成「auto fetch 偶发
+零请求静默退出(`_send` 未抛、seq 不增——`_send` 内部在响应后到返回之间
+的某处失败,待查)」。**该推测不成立**。`dev/_p396_stored_trace.py` 打的是
+真实 CLI 入口(`xssentinel.__main__.main`,与 392 runner 同参数),逐层打点
+显示 stored pass **确实被调用**(`pages_enter=1 / auto_enter=1`),页面抓取
+那次 `from_cache=true` / `hit_delta=1` / `tally.attempted` 不增 ⇒ **`_send`
+根本没进**。395 的归因是「打点看不到 `_send`」造成的误判,不是 `_send`
+内部失败。带日期原文保留不改,以本节与
+`benchmark/results/phase396_stored_flow_20261115.md` 为准。
+
+**根因链**:(b) 的 L8_cookie canary 用 `Cookie:` 覆盖会话是合法弹回,其
+7208 字节登录页 200 响应被 `Requester.get()` 按 URL 唯一 key 写进 LRU;
+`scan_stored_auto()` 页面抓取默认 `cache_get=True` 命中脏缓存 ⇒ 只发现
+登录表单(`_AUTO_SKIP_FORM`)⇒ `faces=0 / ran=0`。同场 `scan_stored` 的
+view GET 显式 `cache_get=False`,拿到 8598 字节正确认证页 ⇒ **会话没死**。
+`Requester.get()` docstring 与 Phase 176c 早就警告缓存看不到 jar 状态,
+stored 路径唯独这一处漏了。
+
+**Fixed(唯一产品改动)**:`scanner_stored_auto.py` 页面 GET 改
+`cache_get=False`。不改判定层/语料/CLI/canary/预算;代价每 auto 页面
+多发 1 个 GET。async 侧 shim 经 `_get_sync_requester()` 拿到真实
+`Requester`,kwarg 有效。**同一量具四臂**:baseline 3 findings →
+探针 fix 臂 4 → **真实产品改动后 `after` 臂 4 findings(层集合多
+`stored`)**,`scan_stored` 1 次,faces 1 ⇒ 端到端打通。
+
+**(a) 未复现,不修**:`--max-requests 12` 臂 `pages_enter=1 /
+auto_enter=1 / scan_stored_calls=2`,stored pass 没被跳过;47 次
+`BudgetExhausted` 被各层内部消化,异常未冒泡到 `scan_target` 置
+`stopped=True`。附带观察(记账):`Budget.spend` 先 `total += 1` 再抛,
+`total` 涨到 59 而 `max_total=12`。本轮不动预算语义、不动 `not stopped`;
+MCP/API 层 wall-clock cancel 那条路径没有复现,保持观察项。
+
+**边界**:缓存污染本身没修(canary 登录页仍会进 LRU),只修 stored 路径的
+读取契约;其它 bare-URL 读取者理论上仍可能拿陈旧页面,194 矩阵与分批门
+全绿但无针对这一面的独立测量,列观察项。NodeGoat `profile` 被多次覆写
+并触发 stored 写入,状态已披露;本表 FACT TABLE ONLY,不与 XSSMaze /
+194 矩阵并列。
+
+**验收(本轮自己的运行)**:守卫
+`test_phase396_stored_auto_fresh_fetch.py` 4 例(含默认 GET 仍返回登录页
+的不空转对照)+ 变异 `dev/phase396_mutations.py` **1/1**;stored +
+requester + cookie canary 邻接 **59 passed / 3 skipped**;quick/full
+strict 双引擎、range3/range4、ruff 数字见 CHANGELOG Phase 396 验收节。
+**两个红门如实交代**:① 全量分批门同 turn 连跑触发 safe-delete 守卫假红
+(pytest stdout 全 100% 通过、stderr 仅 `SAFE_DELETE_BULK_CONFIRM_REQUIRED`),
+单独顺序重跑结果见验收节;② parity 全矩阵门 **1 failed = `pos-sri-01`**
+(async 多 `dom_dynamic high`),单 case 两臂对照(`shipped_fix` vs
+模拟旧缓存读取 `old_fetch`)分歧**逐位一致** ⇒ **不是 396 引入**,是
+Phase 390 已记账的环境/时基观察项在 390–395 之后复现,**列独立一轮
+(Phase 397)**,不混入本轮、不宣称已修。

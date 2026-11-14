@@ -1,0 +1,608 @@
+{
+  "base": "http://127.0.0.1:20506",
+  "mode": "budget",
+  "rc": 0,
+  "seconds": 3.4,
+  "counts": {
+    "send_calls": 12,
+    "get_calls": 16,
+    "budget_exhausted": 47,
+    "get_cache_hits": 4,
+    "pages_enter": 1,
+    "auto_enter": 1,
+    "scan_stored_calls": 2
+  },
+  "findings": 3,
+  "layers": [
+    "dom",
+    "svg_xss_svg_script",
+    "trusted_types_no_policy"
+  ],
+  "auto_trace": [
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 13,
+      "max": 12
+    },
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 14,
+      "max": 12
+    },
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 15,
+      "max": 12
+    },
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 16,
+      "max": 12
+    },
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 17,
+      "max": 12
+    },
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 18,
+      "max": 12
+    },
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 19,
+      "max": 12
+    },
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 20,
+      "max": 12
+    },
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 21,
+      "max": 12
+    },
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 22,
+      "max": 12
+    },
+    {
+      "kind": "pages_enter",
+      "max_pages": 1
+    },
+    {
+      "kind": "auto_enter",
+      "url": "http://127.0.0.1:20506/profile",
+      "page_text_given": false
+    },
+    {
+      "kind": "discover",
+      "bytes": 8630,
+      "has_form": true,
+      "login_page": false,
+      "faces": 1,
+      "actions": [
+        "http://127.0.0.1:20506/profile"
+      ]
+    },
+    {
+      "kind": "scan_stored",
+      "inject": "http://127.0.0.1:20506/profile",
+      "param": "firstName"
+    },
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 23,
+      "max": 12
+    },
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 24,
+      "max": 12
+    },
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 25,
+      "max": 12
+    },
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 26,
+      "max": 12
+    },
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 27,
+      "max": 12
+    },
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 28,
+      "max": 12
+    },
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 29,
+      "max": 12
+    },
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 30,
+      "max": 12
+    },
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 31,
+      "max": 12
+    },
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 32,
+      "max": 12
+    },
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 33,
+      "max": 12
+    },
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 34,
+      "max": 12
+    },
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 35,
+      "max": 12
+    },
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 36,
+      "max": 12
+    },
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 37,
+      "max": 12
+    },
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 38,
+      "max": 12
+    },
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 39,
+      "max": 12
+    },
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 40,
+      "max": 12
+    },
+    {
+      "kind": "scan_stored",
+      "inject": "http://127.0.0.1:20506/profile",
+      "param": "lastName"
+    },
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 41,
+      "max": 12
+    },
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 42,
+      "max": 12
+    },
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 43,
+      "max": 12
+    },
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 44,
+      "max": 12
+    },
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 45,
+      "max": 12
+    },
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 46,
+      "max": 12
+    },
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 47,
+      "max": 12
+    },
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 48,
+      "max": 12
+    },
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 49,
+      "max": 12
+    },
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 50,
+      "max": 12
+    },
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 51,
+      "max": 12
+    },
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 52,
+      "max": 12
+    },
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 53,
+      "max": 12
+    },
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 54,
+      "max": 12
+    },
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 55,
+      "max": 12
+    },
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 56,
+      "max": 12
+    },
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 57,
+      "max": 12
+    },
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 58,
+      "max": 12
+    },
+    {
+      "kind": "auto_exit",
+      "url": "http://127.0.0.1:20506/profile",
+      "ran": 2
+    },
+    {
+      "kind": "pages_exit",
+      "ran": 2
+    },
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 59,
+      "max": 12
+    }
+  ],
+  "stored_get_rows": [
+    {
+      "kind": "get",
+      "url": "http://127.0.0.1:20506/profile",
+      "cache_get": true,
+      "from_cache": false,
+      "hit_delta": 0,
+      "status": 200,
+      "bytes": 8630,
+      "has_form": true,
+      "login_page": false,
+      "profile_page": true
+    },
+    {
+      "kind": "get",
+      "url": "http://127.0.0.1:20506/profile",
+      "cache_get": true,
+      "from_cache": false,
+      "hit_delta": 0,
+      "status": 200,
+      "bytes": 8630,
+      "has_form": true,
+      "login_page": false,
+      "profile_page": true
+    },
+    {
+      "kind": "get",
+      "url": "http://127.0.0.1:20506/profile",
+      "cache_get": true,
+      "from_cache": false,
+      "hit_delta": 0,
+      "status": 200,
+      "bytes": 8630,
+      "has_form": true,
+      "login_page": false,
+      "profile_page": true
+    },
+    {
+      "kind": "get",
+      "url": "http://127.0.0.1:20506/profile",
+      "cache_get": true,
+      "from_cache": false,
+      "hit_delta": 0,
+      "status": 200,
+      "bytes": 8630,
+      "has_form": true,
+      "login_page": false,
+      "profile_page": true
+    },
+    {
+      "kind": "get",
+      "url": "http://127.0.0.1:20506/profile",
+      "cache_get": true,
+      "from_cache": false,
+      "hit_delta": 0,
+      "status": 200,
+      "bytes": 8630,
+      "has_form": true,
+      "login_page": false,
+      "profile_page": true
+    },
+    {
+      "kind": "get",
+      "url": "http://127.0.0.1:20506/profile",
+      "cache_get": true,
+      "from_cache": false,
+      "hit_delta": 0,
+      "status": 200,
+      "bytes": 8630,
+      "has_form": true,
+      "login_page": false,
+      "profile_page": true
+    },
+    {
+      "kind": "get",
+      "url": "http://127.0.0.1:20506/profile",
+      "cache_get": true,
+      "from_cache": false,
+      "hit_delta": 0,
+      "status": 200,
+      "bytes": 8630,
+      "has_form": true,
+      "login_page": false,
+      "profile_page": true
+    },
+    {
+      "kind": "get",
+      "url": "http://127.0.0.1:20506/profile",
+      "cache_get": true,
+      "from_cache": false,
+      "hit_delta": 0,
+      "status": 200,
+      "bytes": 8630,
+      "has_form": true,
+      "login_page": false,
+      "profile_page": true
+    },
+    {
+      "kind": "get",
+      "url": "http://127.0.0.1:20506/profile",
+      "cache_get": true,
+      "from_cache": true,
+      "hit_delta": 1,
+      "status": 200,
+      "bytes": 8630,
+      "has_form": true,
+      "login_page": false,
+      "profile_page": true
+    },
+    {
+      "kind": "get",
+      "url": "http://127.0.0.1:20506/profile",
+      "cache_get": true,
+      "from_cache": true,
+      "hit_delta": 1,
+      "status": 200,
+      "bytes": 8630,
+      "has_form": true,
+      "login_page": false,
+      "profile_page": true
+    },
+    {
+      "kind": "get",
+      "url": "http://127.0.0.1:20506/profile",
+      "cache_get": true,
+      "from_cache": true,
+      "hit_delta": 1,
+      "status": 200,
+      "bytes": 8630,
+      "has_form": true,
+      "login_page": false,
+      "profile_page": true
+    },
+    {
+      "kind": "get",
+      "url": "http://127.0.0.1:20506/profile",
+      "cache_get": true,
+      "from_cache": true,
+      "hit_delta": 1,
+      "status": 200,
+      "bytes": 8630,
+      "has_form": true,
+      "login_page": false,
+      "profile_page": true
+    }
+  ],
+  "trace_tail": [
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 42,
+      "max": 12
+    },
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 43,
+      "max": 12
+    },
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 44,
+      "max": 12
+    },
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 45,
+      "max": 12
+    },
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 46,
+      "max": 12
+    },
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 47,
+      "max": 12
+    },
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 48,
+      "max": 12
+    },
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 49,
+      "max": 12
+    },
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 50,
+      "max": 12
+    },
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 51,
+      "max": 12
+    },
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 52,
+      "max": 12
+    },
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 53,
+      "max": 12
+    },
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 54,
+      "max": 12
+    },
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 55,
+      "max": 12
+    },
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 56,
+      "max": 12
+    },
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 57,
+      "max": 12
+    },
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 58,
+      "max": 12
+    },
+    {
+      "kind": "auto_exit",
+      "url": "http://127.0.0.1:20506/profile",
+      "ran": 2
+    },
+    {
+      "kind": "pages_exit",
+      "ran": 2
+    },
+    {
+      "kind": "budget",
+      "event": "BudgetExhausted",
+      "total": 59,
+      "max": 12
+    }
+  ]
+}

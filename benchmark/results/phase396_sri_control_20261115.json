@@ -1,0 +1,56 @@
+[
+  {
+    "label": "shipped_fix",
+    "sync": {
+      "pos-sri-01": [
+        [
+          "sri_missing_script",
+          "medium",
+          "high"
+        ]
+      ]
+    },
+    "async": {
+      "pos-sri-01": [
+        [
+          "dom_dynamic",
+          "high",
+          "high"
+        ],
+        [
+          "sri_missing_script",
+          "medium",
+          "high"
+        ]
+      ]
+    },
+    "divergent": true
+  },
+  {
+    "label": "old_fetch",
+    "sync": {
+      "pos-sri-01": [
+        [
+          "sri_missing_script",
+          "medium",
+          "high"
+        ]
+      ]
+    },
+    "async": {
+      "pos-sri-01": [
+        [
+          "dom_dynamic",
+          "high",
+          "high"
+        ],
+        [
+          "sri_missing_script",
+          "medium",
+          "high"
+        ]
+      ]
+    },
+    "divergent": true
+  }
+]

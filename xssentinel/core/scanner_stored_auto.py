@@ -38,7 +38,17 @@ class StoredAutoMixin:
             return 0
         try:
             if page_text is None:
-                resp = self.req.get(page_url)
+                # Phase 396: this GET MUST bypass the LRU.  Requester.get()
+                # keys its cache on the URL alone and cannot see jar/header
+                # state (see its docstring); measured on OWASP NodeGoat, an
+                # L8_cookie canary request legitimately bounced to /login and
+                # its 200 response was cached under the bare /profile URL.
+                # The stored pass then read that cached LOGIN page, found only
+                # a login form (skipped by _AUTO_SKIP_FORM) and silently ran
+                # zero writes -- with _send never called at all.  Every stored
+                # viewer GET already passes cache_get=False; this fetch was
+                # the one that did not.
+                resp = self.req.get(page_url, cache_get=False)
                 self._bump()
                 page_text = getattr(resp, "text", "") or ""
                 page_url = (getattr(resp, "url", "") or page_url)

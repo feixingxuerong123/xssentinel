@@ -1,0 +1,357 @@
+{
+  "base": "http://127.0.0.1:20506",
+  "mode": "fix",
+  "rc": 0,
+  "seconds": 3.5,
+  "counts": {
+    "send_calls": 41,
+    "get_calls": 42,
+    "get_cache_hits": 3,
+    "pages_enter": 1,
+    "auto_enter": 1,
+    "fix_force_fresh": 1,
+    "scan_stored_calls": 1
+  },
+  "findings": 4,
+  "layers": [
+    "dom",
+    "stored",
+    "svg_xss_svg_script",
+    "trusted_types_no_policy"
+  ],
+  "auto_trace": [
+    {
+      "kind": "pages_enter",
+      "max_pages": 1
+    },
+    {
+      "kind": "auto_enter",
+      "url": "http://127.0.0.1:20506/profile",
+      "page_text_given": false
+    },
+    {
+      "kind": "discover",
+      "bytes": 8598,
+      "has_form": true,
+      "login_page": false,
+      "faces": 1,
+      "actions": [
+        "http://127.0.0.1:20506/profile"
+      ]
+    },
+    {
+      "kind": "scan_stored",
+      "inject": "http://127.0.0.1:20506/profile",
+      "param": "firstName"
+    },
+    {
+      "kind": "auto_exit",
+      "url": "http://127.0.0.1:20506/profile",
+      "ran": 1
+    },
+    {
+      "kind": "pages_exit",
+      "ran": 1
+    }
+  ],
+  "stored_get_rows": [
+    {
+      "kind": "get",
+      "url": "http://127.0.0.1:20506/profile",
+      "cache_get": true,
+      "from_cache": false,
+      "hit_delta": 0,
+      "status": 200,
+      "bytes": 8598,
+      "has_form": true,
+      "login_page": false,
+      "profile_page": true
+    },
+    {
+      "kind": "get",
+      "url": "http://127.0.0.1:20506/profile",
+      "cache_get": true,
+      "from_cache": true,
+      "hit_delta": 1,
+      "status": 200,
+      "bytes": 8598,
+      "has_form": true,
+      "login_page": false,
+      "profile_page": true
+    },
+    {
+      "kind": "get",
+      "url": "http://127.0.0.1:20506/profile",
+      "cache_get": true,
+      "from_cache": false,
+      "hit_delta": 0,
+      "status": 200,
+      "bytes": 8598,
+      "has_form": true,
+      "login_page": false,
+      "profile_page": true
+    },
+    {
+      "kind": "get",
+      "url": "http://127.0.0.1:20506/profile",
+      "cache_get": true,
+      "from_cache": true,
+      "hit_delta": 1,
+      "status": 200,
+      "bytes": 8598,
+      "has_form": true,
+      "login_page": false,
+      "profile_page": true
+    },
+    {
+      "kind": "get",
+      "url": "http://127.0.0.1:20506/profile",
+      "cache_get": true,
+      "from_cache": true,
+      "hit_delta": 1,
+      "status": 200,
+      "bytes": 8598,
+      "has_form": true,
+      "login_page": false,
+      "profile_page": true
+    },
+    {
+      "kind": "get",
+      "url": "http://127.0.0.1:20506/profile",
+      "cache_get": true,
+      "from_cache": false,
+      "hit_delta": 0,
+      "status": 200,
+      "bytes": 8598,
+      "has_form": true,
+      "login_page": false,
+      "profile_page": true
+    },
+    {
+      "kind": "get",
+      "url": "http://127.0.0.1:20506/profile",
+      "cache_get": true,
+      "from_cache": false,
+      "hit_delta": 0,
+      "status": 200,
+      "bytes": 7208,
+      "has_form": true,
+      "login_page": true,
+      "profile_page": false
+    },
+    {
+      "kind": "get",
+      "url": "http://127.0.0.1:20506/profile/%3Csvg%2Fonload%3Dalert%28%27xserr_8c9228%27%29%3E",
+      "cache_get": true,
+      "from_cache": false,
+      "hit_delta": 0,
+      "status": 404,
+      "bytes": 197,
+      "has_form": false,
+      "login_page": false,
+      "profile_page": false
+    },
+    {
+      "kind": "get",
+      "url": "http://127.0.0.1:20506/profile",
+      "cache_get": false,
+      "from_cache": false,
+      "hit_delta": 0,
+      "status": 200,
+      "bytes": 8598,
+      "has_form": true,
+      "login_page": false,
+      "profile_page": true
+    },
+    {
+      "kind": "get",
+      "url": "http://127.0.0.1:20506/profile",
+      "cache_get": false,
+      "from_cache": false,
+      "hit_delta": 0,
+      "status": 200,
+      "bytes": 8598,
+      "has_form": true,
+      "login_page": false,
+      "profile_page": true
+    },
+    {
+      "kind": "get",
+      "url": "http://127.0.0.1:20506/profile",
+      "cache_get": false,
+      "from_cache": false,
+      "hit_delta": 0,
+      "status": 200,
+      "bytes": 8630,
+      "has_form": true,
+      "login_page": false,
+      "profile_page": true
+    },
+    {
+      "kind": "get",
+      "url": "http://127.0.0.1:20506/profile",
+      "cache_get": false,
+      "from_cache": false,
+      "hit_delta": 0,
+      "status": 200,
+      "bytes": 8630,
+      "has_form": true,
+      "login_page": false,
+      "profile_page": true
+    }
+  ],
+  "trace_tail": [
+    {
+      "kind": "get",
+      "url": "http://127.0.0.1:20506/profile/%3Csvg%2Fonload%3Dalert%28%27xserr_8c9228%27%29%3E",
+      "cache_get": true,
+      "from_cache": false,
+      "hit_delta": 0,
+      "status": 404,
+      "bytes": 197,
+      "has_form": false,
+      "login_page": false,
+      "profile_page": false
+    },
+    {
+      "kind": "send",
+      "method": "GET",
+      "url": "http://127.0.0.1:20506/__xssentinel_err__/%3Csvg%2Fonload%3Dalert%28%27xserr_8c9228%27%29%3E"
+    },
+    {
+      "kind": "get",
+      "url": "http://127.0.0.1:20506/__xssentinel_err__/%3Csvg%2Fonload%3Dalert%28%27xserr_8c9228%27%29%3E",
+      "cache_get": true,
+      "from_cache": false,
+      "hit_delta": 0,
+      "status": 404,
+      "bytes": 208,
+      "has_form": false,
+      "login_page": false,
+      "profile_page": false
+    },
+    {
+      "kind": "pages_enter",
+      "max_pages": 1
+    },
+    {
+      "kind": "auto_enter",
+      "url": "http://127.0.0.1:20506/profile",
+      "page_text_given": false
+    },
+    {
+      "kind": "send",
+      "method": "GET",
+      "url": "http://127.0.0.1:20506/profile"
+    },
+    {
+      "kind": "get",
+      "url": "http://127.0.0.1:20506/profile",
+      "cache_get": false,
+      "from_cache": false,
+      "hit_delta": 0,
+      "status": 200,
+      "bytes": 8598,
+      "has_form": true,
+      "login_page": false,
+      "profile_page": true
+    },
+    {
+      "kind": "discover",
+      "bytes": 8598,
+      "has_form": true,
+      "login_page": false,
+      "faces": 1,
+      "actions": [
+        "http://127.0.0.1:20506/profile"
+      ]
+    },
+    {
+      "kind": "scan_stored",
+      "inject": "http://127.0.0.1:20506/profile",
+      "param": "firstName"
+    },
+    {
+      "kind": "send",
+      "method": "GET",
+      "url": "http://127.0.0.1:20506/profile"
+    },
+    {
+      "kind": "get",
+      "url": "http://127.0.0.1:20506/profile",
+      "cache_get": false,
+      "from_cache": false,
+      "hit_delta": 0,
+      "status": 200,
+      "bytes": 8598,
+      "has_form": true,
+      "login_page": false,
+      "profile_page": true
+    },
+    {
+      "kind": "send",
+      "method": "GET",
+      "url": "http://127.0.0.1:20506/research"
+    },
+    {
+      "kind": "get",
+      "url": "http://127.0.0.1:20506/research",
+      "cache_get": false,
+      "from_cache": false,
+      "hit_delta": 0,
+      "status": 200,
+      "bytes": 6151,
+      "has_form": true,
+      "login_page": false,
+      "profile_page": false
+    },
+    {
+      "kind": "send",
+      "method": "POST",
+      "url": "http://127.0.0.1:20506/profile"
+    },
+    {
+      "kind": "send",
+      "method": "GET",
+      "url": "http://127.0.0.1:20506/profile"
+    },
+    {
+      "kind": "get",
+      "url": "http://127.0.0.1:20506/profile",
+      "cache_get": false,
+      "from_cache": false,
+      "hit_delta": 0,
+      "status": 200,
+      "bytes": 8630,
+      "has_form": true,
+      "login_page": false,
+      "profile_page": true
+    },
+    {
+      "kind": "auto_exit",
+      "url": "http://127.0.0.1:20506/profile",
+      "ran": 1
+    },
+    {
+      "kind": "pages_exit",
+      "ran": 1
+    },
+    {
+      "kind": "send",
+      "method": "GET",
+      "url": "http://127.0.0.1:20506/profile"
+    },
+    {
+      "kind": "get",
+      "url": "http://127.0.0.1:20506/profile",
+      "cache_get": false,
+      "from_cache": false,
+      "hit_delta": 0,
+      "status": 200,
+      "bytes": 8630,
+      "has_form": true,
+      "login_page": false,
+      "profile_page": true
+    }
+  ]
+}
