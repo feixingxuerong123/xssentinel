@@ -326,6 +326,11 @@ FOCUSABLE_CONTROLS = frozenset({
     "input", "button", "select", "textarea", "a", "area", "summary",
     "details", "dialog", "audio", "video", "object", "embed", "label",
     "legend", "option", "optgroup", "slot",
+    # Phase 393 corpus, measured: `"autofocus/onfocus=alert(1)//` landing
+    # autofocus + onfocus on the HOST IFRAME (after a srcdoc="" quote
+    # breakout the rest of the tag text becomes the iframe's own attributes)
+    # fired in Chromium.  <frame> is deliberately absent -- unmeasured.
+    "iframe",
 })
 
 
@@ -576,8 +581,15 @@ def _handler_state(el: Node, attr: str, sink: str = "parser",
             return "inert", (f"{name}.{ev} is present but {src_attr} is absent, "
                              f"so nothing is fetched and no error fires")
         if src == "":
-            return "inert", (f"{name}.{ev} has an empty {src_attr}: no load is "
-                             f"attempted, so no error fires")
+            # Phase 393 re-measurement (Phase 392 external corpus): a
+            # valueless/empty src RESOLVES against the document URL, the fetch
+            # is attempted, the decode fails and error fires -- measured both
+            # for <audio src/onerror=...> and <img src/onerror=...>.  The old
+            # "no load is attempted" model here was an inference, not a
+            # measurement, and it vetoed live payloads.
+            return "live", (f"{name}.{ev} fires: an empty {src_attr} still "
+                            f"resolves against the document URL, the fetch "
+                            f"fails and error fires (measured)")
         return "live", f"{name}.{ev} fires when the {src_attr} resource fails"
     if ev == "onload":
         resource_load = name in ("img", "iframe", "frame", "link", "script",
@@ -601,8 +613,14 @@ def _handler_state(el: Node, attr: str, sink: str = "parser",
         # `tabindex=1 autofocus`, so restricting this list to form controls was a
         # false negative waiting for the first `<div tabindex=1 autofocus
         # onfocus=...>` payload (a staple) to come through.
-        attrs = dict(el.attrs)
-        focusable = name in FOCUSABLE_CONTROLS or "tabindex" in attrs
+        # Phase 393 (external corpus, measured): `contenteditable` also makes
+        # an element focusable — `<K/contentEditable/autoFocus/OnFocus=...>`
+        # fired in Chromium while this branch read it inert.  Attribute names
+        # are case-insensitive in HTML, and the corpus polyglot's camelCase
+        # `autoFocus`/`contentEditable` slipped past a case-sensitive dict.
+        attrs = {k.lower(): v for k, v in el.attrs}
+        focusable = (name in FOCUSABLE_CONTROLS or "tabindex" in attrs
+                     or "contenteditable" in attrs)
         if not focusable:
             return "inert", (f"{name}.onfocus cannot fire: no tabindex and "
                              f"{name} is not a focusable control")
@@ -637,11 +655,25 @@ def _handler_state(el: Node, attr: str, sink: str = "parser",
                                   f"<audio> loading events were")
         src = (el.get("src") or "").strip()
         if not src:
-            # Nothing is fetched, so the load never starts and no load event can
-            # fire.  Measured in all six contexts: `<audio oncanplay=CODE>` with
-            # no src is dead, and so is `src=""`.
-            return "inert", (f"audio.{ev} has no src: nothing loads, so no load "
-                             f"event fires (measured)")
+            # Phase 393: a <source> child starts a load even without a src
+            # attribute -- measured: <audio onloadstart=CODE><source> fired
+            # loadstart (Phase 392 corpus row the old no-src rule mis-vetoed).
+            has_source_child = any(c.kind == "element"
+                                   and c.name.lower() == "source"
+                                   for c in el.children)
+            if not has_source_child:
+                # Nothing is fetched, so the load never starts and no load
+                # event can fire.  Measured in all six contexts: `<audio
+                # oncanplay=CODE>` with no src is dead, and so is `src=""`.
+                return "inert", (f"audio.{ev} has no src and no <source> "
+                                 f"child: nothing loads, so no load event "
+                                 f"fires (measured)")
+            if ev == "onloadstart":
+                return "live", ("audio.onloadstart fires as soon as the load "
+                                "begins; the <source> child starts one "
+                                "(measured)")
+            return "unknown", (f"audio.{ev} with a <source> child needs the "
+                               f"source to load and decode; needs the browser")
         if ev == "onloadstart":
             # `loadstart` is the one event that does not care what happens next:
             # measured live both with a decodable data: URI *and* with a src that
@@ -812,10 +844,18 @@ def _in_template(el: Node) -> bool:
     `<template>` created inside `<svg>` is an SVG element that happens to be
     spelled that way -- it has no content document, and a `<script>` under it is
     a plain SVG script the parser runs.  Measured: `<svg><style><template>
-    <script>CODE` executes, `<template><script>CODE` does not."""
+    <script>CODE` executes, `<template><script>CODE` does not.
+
+    Phase 393 exception, measured: `<template shadowrootmode=open>` is a
+    DECLARATIVE SHADOW ROOT -- its content is rendered, and
+    `<slot onslotchange=...>` inside it fired.  The nearest template ancestor
+    decides: one carrying shadowrootmode renders its content; a plain one
+    does not."""
     p = el.parent
     while p is not None:
         if p.kind == "element" and p.name == "template" and p.ns == "html":
+            if p.has_attr("shadowrootmode"):
+                return False
             return True
         p = p.parent
     return False
@@ -1034,6 +1074,15 @@ def _script_candidate(el: Node, body: str, token: str, sink: str,
         return {"node": "script[template]", "state": "inert",
                 "why": "script inside <template> content never executes", "el": el}
     if el.get("src"):
+        if not token:
+            # Phase 393: token-less attribution limit -- the remote script
+            # runs, but whether the reflected bytes are this script's source
+            # cannot be told without a token.
+            return {"node": "script[src][no-token]", "state": "unknown",
+                    "why": "token-less judgment: a parser-created script with "
+                           "a src executes its remote code, but attributing "
+                           "that to the reflected bytes needs a token; needs "
+                           "the browser", "el": el}
         return {"node": "script[src]",
                 "state": "live" if sink == "parser" else "inert",
                 "why": "external script fetched by the parser; an innerHTML-"
@@ -1055,7 +1104,22 @@ def _script_candidate(el: Node, body: str, token: str, sink: str,
                        "reflected into a script block without breaking out of "
                        "it is a syntax error, and nothing in the block runs",
                 "el": el}
-    pos = js_state_at(body, token) if token else "code"
+    if not token:
+        # Phase 393: token-less attribution limit, measured on the Phase 392
+        # external corpus (x97/x19 families).  A compiling script body runs,
+        # but whether the reflected bytes sit at code position, inside a
+        # string literal, or inside a call argument cannot be told without a
+        # token: `var a = "<vector>"` and `alert("<vector>")` are both valid
+        # JS, and `alert(document.head.childNodes[3].text)` is a code-position
+        # call whose argument throws before the dialog.  Deferring is the
+        # honest answer; the engine always passes a marker token, so this
+        # branch is reachable only from direct calls.
+        return {"node": "script[no-token]", "state": "unknown",
+                "why": "token-less judgment: the script body is valid JS and "
+                       "runs, but whether the reflected bytes are code or "
+                       "data cannot be attributed without a token; needs the "
+                       "browser", "el": el}
+    pos = js_state_at(body, token)
     if pos == "code":
         return {"node": "script", "state": "live",
                 "why": "<script> body reached by the parser, token at code "

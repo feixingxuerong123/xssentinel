@@ -1,0 +1,192 @@
+{
+  "meta": {
+    "generated": "2026-11-14 04:33:19",
+    "date": "2026-11-14",
+    "tree": "2.1.0 + Phase 390 harness correction",
+    "method": "element x handler shape; product verifier + sandbox judge + real Chromium dialog; one shared alert token",
+    "token": "xss_p391_xssv_p391",
+    "elements": [
+      "marquee",
+      "div",
+      "span",
+      "p",
+      "section",
+      "a",
+      "img",
+      "svg",
+      "table",
+      "input"
+    ],
+    "controls_valid": true
+  },
+  "summary": {
+    "arms": 15,
+    "controls_valid": true,
+    "verifier_only": [
+      "<a onstart>",
+      "<div marquee onstart>",
+      "<div onstart + dispatch start>",
+      "<div onstart>",
+      "<img onstart>",
+      "<input onstart>",
+      "<p onstart>",
+      "<section onstart>",
+      "<span onstart>",
+      "<svg onstart>",
+      "<table onstart>"
+    ],
+    "live": []
+  },
+  "rows": [
+    {
+      "shape": "<marquee onstart>",
+      "html": "<!doctype html><html><body><marquee onstart=\"alert('xss_p391_xssv_p391')\">x</marquee></body></html>",
+      "html_sha256": "88326675ec80e6b8",
+      "verifier_confirmed": false,
+      "verifier_detail": "sandbox: every token-bearing sink is inert: marquee[onstart] marquee.onstart is measured no-exec in Chromium: the legacy marquee start event is never dispatched",
+      "sandbox_state": "inert",
+      "browser_dialog": false,
+      "dialog_message": ""
+    },
+    {
+      "shape": "<div onstart>",
+      "html": "<!doctype html><html><body><div onstart=\"alert('xss_p391_xssv_p391')\">x</div></body></html>",
+      "html_sha256": "3a765e3f33b67255",
+      "verifier_confirmed": true,
+      "verifier_detail": "token reflected in onstart handler",
+      "sandbox_state": "live",
+      "browser_dialog": false,
+      "dialog_message": ""
+    },
+    {
+      "shape": "<span onstart>",
+      "html": "<!doctype html><html><body><span onstart=\"alert('xss_p391_xssv_p391')\">x</span></body></html>",
+      "html_sha256": "01c5d39b0e8e0fa1",
+      "verifier_confirmed": true,
+      "verifier_detail": "token reflected in onstart handler",
+      "sandbox_state": "live",
+      "browser_dialog": false,
+      "dialog_message": ""
+    },
+    {
+      "shape": "<p onstart>",
+      "html": "<!doctype html><html><body><p onstart=\"alert('xss_p391_xssv_p391')\">x</p></body></html>",
+      "html_sha256": "545b5b7ca1060fd6",
+      "verifier_confirmed": true,
+      "verifier_detail": "token reflected in onstart handler",
+      "sandbox_state": "live",
+      "browser_dialog": false,
+      "dialog_message": ""
+    },
+    {
+      "shape": "<section onstart>",
+      "html": "<!doctype html><html><body><section onstart=\"alert('xss_p391_xssv_p391')\">x</section></body></html>",
+      "html_sha256": "8d7eabccedcfb0a2",
+      "verifier_confirmed": true,
+      "verifier_detail": "token reflected in onstart handler",
+      "sandbox_state": "live",
+      "browser_dialog": false,
+      "dialog_message": ""
+    },
+    {
+      "shape": "<a onstart>",
+      "html": "<!doctype html><html><body><a onstart=\"alert('xss_p391_xssv_p391')\">x</a></body></html>",
+      "html_sha256": "99da82ddf4d84b21",
+      "verifier_confirmed": true,
+      "verifier_detail": "token reflected in onstart handler",
+      "sandbox_state": "live",
+      "browser_dialog": false,
+      "dialog_message": ""
+    },
+    {
+      "shape": "<img onstart>",
+      "html": "<!doctype html><html><body><img onstart=\"alert('xss_p391_xssv_p391')\">x</body></html>",
+      "html_sha256": "5066c4cbb6ff4da6",
+      "verifier_confirmed": true,
+      "verifier_detail": "token reflected in onstart handler",
+      "sandbox_state": "live",
+      "browser_dialog": false,
+      "dialog_message": ""
+    },
+    {
+      "shape": "<svg onstart>",
+      "html": "<!doctype html><html><body><svg onstart=\"alert('xss_p391_xssv_p391')\">x</svg></body></html>",
+      "html_sha256": "cc4cd71f64b37df3",
+      "verifier_confirmed": true,
+      "verifier_detail": "token reflected in onstart handler",
+      "sandbox_state": "unknown",
+      "browser_dialog": false,
+      "dialog_message": ""
+    },
+    {
+      "shape": "<table onstart>",
+      "html": "<!doctype html><html><body><table onstart=\"alert('xss_p391_xssv_p391')\">x</table></body></html>",
+      "html_sha256": "4cf5c05952afe63e",
+      "verifier_confirmed": true,
+      "verifier_detail": "token reflected in onstart handler",
+      "sandbox_state": "live",
+      "browser_dialog": false,
+      "dialog_message": ""
+    },
+    {
+      "shape": "<input onstart>",
+      "html": "<!doctype html><html><body><input onstart=\"alert('xss_p391_xssv_p391')\">x</body></html>",
+      "html_sha256": "7ea57056abcd14ef",
+      "verifier_confirmed": true,
+      "verifier_detail": "token reflected in onstart handler",
+      "sandbox_state": "live",
+      "browser_dialog": false,
+      "dialog_message": ""
+    },
+    {
+      "shape": "<div marquee onstart>",
+      "html": "<!doctype html><html><body><div marquee onstart=\"alert('xss_p391_xssv_p391')\">x</div></body></html>",
+      "html_sha256": "7d0d6ff38b6f8460",
+      "verifier_confirmed": true,
+      "verifier_detail": "token reflected in onstart handler",
+      "sandbox_state": "live",
+      "browser_dialog": false,
+      "dialog_message": ""
+    },
+    {
+      "shape": "<div onstart + dispatch start>",
+      "html": "<!doctype html><html><body><div id=\"t\" onstart=\"alert('xss_p391_xssv_p391')\">x</div><script>document.getElementById(\"t\").dispatchEvent(new Event(\"start\"));</script></body></html>",
+      "html_sha256": "812f86c77d0136ef",
+      "verifier_confirmed": true,
+      "verifier_detail": "token reflected in onstart handler",
+      "sandbox_state": "live",
+      "browser_dialog": false,
+      "dialog_message": ""
+    },
+    {
+      "shape": "<marquee onstart + start()>",
+      "html": "<!doctype html><html><body><marquee id=\"t\" onstart=\"alert('xss_p391_xssv_p391')\">x</marquee><script>document.getElementById(\"t\").start();</script></body></html>",
+      "html_sha256": "67c3185a8433e80b",
+      "verifier_confirmed": false,
+      "verifier_detail": "sandbox: every token-bearing sink is inert: marquee[onstart] marquee.onstart is measured no-exec in Chromium: the legacy marquee start event is never dispatched",
+      "sandbox_state": "inert",
+      "browser_dialog": false,
+      "dialog_message": ""
+    },
+    {
+      "shape": "control_positive_onerror",
+      "html": "<!doctype html><html><body><img src=x onerror=\"alert('xss_p391_xssv_p391')\"></body></html>",
+      "html_sha256": "26eedabbe594e576",
+      "verifier_confirmed": true,
+      "verifier_detail": "token reflected in onerror handler",
+      "sandbox_state": "live",
+      "browser_dialog": true,
+      "dialog_message": "xss_p391_xssv_p391"
+    },
+    {
+      "shape": "control_negative_onclick",
+      "html": "<!doctype html><html><body><div onclick=\"alert('xss_p391_xssv_p391')\">x</div></body></html>",
+      "html_sha256": "9c935242f4d47b3f",
+      "verifier_confirmed": true,
+      "verifier_detail": "token reflected in onclick handler",
+      "sandbox_state": "live",
+      "browser_dialog": false,
+      "dialog_message": ""
+    }
+  ]
+}

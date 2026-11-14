@@ -972,6 +972,22 @@ class _Parser:
 
             if nxt == "!":
                 if s[self.i:self.i + 4] == "<!--":
+                    # Phase 395: `<!-->` and `<!--->` are EMPTY, CLOSED
+                    # comments (abrupt-closing-of-empty-comment, WHATWG
+                    # 13.2.5.6).  The old rule only knew `-->`/`--!>` endings,
+                    # so `<!-->` read as unterminated and swallowed the whole
+                    # remainder -- the Phase 392 corpus polyglot
+                    # (`/*<!--></Style/...<K/contentEditable/autoFocus/
+                    # OnFocus=...>`, oracle dialog while the sandbox answered
+                    # inert) hides exactly here.
+                    if s[self.i + 4:self.i + 5] == ">":
+                        self.current().append(_comment(""))
+                        self.i += 5
+                        continue
+                    if s[self.i + 4:self.i + 6] == "->":
+                        self.current().append(_comment(""))
+                        self.i += 6
+                        continue
                     # Phase 300: `--!>` ends a comment too (comment-end-bang
                     # state, WHATWG 13.2.5.43).  Recognising only `-->` left
                     # `<!--` + `--!><svg/onload=...>` as one comment, so the
@@ -1062,17 +1078,32 @@ class _Parser:
                 continue
 
             if not nxt.isalpha():
-                # `<?php`, a bare `<`, `< 3`: text or a bogus comment.
-                k = s.find(">", self.i)
-                if k < 0:
-                    self.add_text(s[self.i:], decode=not self.in_foreign())
-                    return Doc(self.root, self.notes)
-                if nxt in ("?", "!"):
+                if nxt == "?":
+                    # `<?` opens a BOGUS COMMENT up to the next `>`
+                    # (WHATWG 13.2.5.1 tag-open state).
+                    k = s.find(">", self.i)
+                    if k < 0:
+                        self.current().append(_comment(s[self.i + 1:]))
+                        return Doc(self.root, self.notes)
                     self.current().append(_comment(s[self.i + 1:k]))
-                else:
-                    self.current().append(Node("text", s[self.i:k + 1]
-                                               .replace("\x00", "\ufffd")))
-                self.i = k + 1
+                    self.i = k + 1
+                    continue
+                if nxt == "":
+                    self.add_text("<", decode=not self.in_foreign())
+                    self.i = n
+                    continue
+                # WHATWG 13.2.5.1 tag-open state: `<` followed by anything
+                # that is not `!` / `/` / `?` / an ASCII letter is the
+                # invalid-first-character-of-tag-name error -- emit `<` as a
+                # character token and RECONSUME in the data state.  The old
+                # rule swallowed everything up to the next `>`, which turned
+                # `<<SCRIPT>alert(...)` into one text node while Chromium
+                # parsed a live <SCRIPT> out of the very same bytes (measured
+                # dialog, Phase 392 corpus), and lost `<3<svg onload=...>`
+                # the same way.
+                self.add_text("<", decode=not self.in_foreign())
+                self.i += 1
+                continue
                 continue
 
             tok, j = self.read_tag(self.i + 1)

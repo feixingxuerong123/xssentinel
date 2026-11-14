@@ -31,6 +31,19 @@ Cost note: the full slice takes ~15-20 min (measured 586s sync / 419s async),
 so it is NOT run on every pytest invocation.  It is the gate that backs the
 claim "the two engines agree everywhere the matrix looks", and it is the
 one to run after touching detection logic on either side.
+
+Phase 390 (2026-11-14): the two divergences recorded on 2026-11-13 were
+re-measured with a four-arm probe (dev/phase390_parity_probe.py).  Both were
+attributed to the harness, not to the engines: this file handed BOTH engines
+a synthetic ``q=probe`` even for cases whose manifest declares NO visible
+parameter.  Phase 353's adaptive mining gate in sync reads that params dict
+and skips hidden-parameter discovery on endpoints that look like they already
+have an input surface; async has no such gate and still mined.  The real
+benchmark runner (_build_target_url) sends no params for those cases.  With
+the runner's shape (or either documented env escape hatch) both engines
+agree on pos-pmmine-01, and pos-sri-01's dom_dynamic split does not
+reproduce on the 2.1.0 tree at all.  Both engines now receive
+_gate_params(case) -- identical harness input, zero product change.
 """
 from __future__ import annotations
 
@@ -88,6 +101,23 @@ def _target(base: str, case: dict):
                                 or "xssentinel_bench_probe"}
 
 
+def _gate_params(case: dict) -> dict:
+    """Mirror the benchmark runner's real input shape, on BOTH engines.
+
+    A manifest case with an empty ``param`` has no visible parameter; the
+    runner leaves the query out entirely.  Inventing ``q=probe`` here made
+    sync's Phase-353 adaptive mining gate treat the endpoint as already
+    having an input surface while async mined regardless -- the
+    pos-pmmine-01 fake divergence measured in Phase 390.  Cases that DO
+    declare a parameter keep the historical probe dict byte-for-byte, so
+    the other 184 cases are untouched by this correction.
+    """
+    param = case.get("param", "q")
+    if not param:
+        return {}
+    return {param: "probe"}
+
+
 def _run_sync(base: str, cases: list[dict]) -> dict:
     """scan_target(), not scan_endpoint(): mining lives in scan_target, and
     entering sync at the other entry point is what produced the fake
@@ -97,11 +127,11 @@ def _run_sync(base: str, cases: list[dict]) -> dict:
 
     out = {}
     for c in cases:
-        url, param, method, data = _target(base, c)
+        url, _, method, data = _target(base, c)
         sc = Scanner(requester=Requester(timeout=8), dom_engine="off",
                      verbose=False, **BUDGETS)
         try:
-            sc.scan_target(url, method, {param: "probe"}, data,
+            sc.scan_target(url, method, _gate_params(c), data,
                            oob_collect=False)
             out[c["id"]] = _norm(sc.findings)
         except Exception as e:
@@ -113,14 +143,14 @@ def _run_async(base: str, cases: list[dict]) -> dict:
     from xssentinel.core.async_scanner import AsyncScanner
 
     async def _one(c):
-        url, param, method, data = _target(base, c)
+        url, _, method, data = _target(base, c)
         asc = AsyncScanner(max_concurrent=4, per_host_delay=0, jitter=0,
                            timeout=8, dom_engine="off", advanced_layers=True,
                            **BUDGETS)
         got = []
         try:
             async for f in asc.scan(url, method=method,
-                                    params={param: "probe"},
+                                    params=_gate_params(c),
                                     data=data or None):
                 got.append(f.data if hasattr(f, "data") else dict(f))
             return _norm(got)

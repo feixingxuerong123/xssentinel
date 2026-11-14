@@ -1,0 +1,192 @@
+{
+  "tree": "2.1.0 final tree (44403a3)",
+  "date": "2026-11-14",
+  "budgets": {
+    "max_payloads": 14,
+    "max_transforms": 12
+  },
+  "arms": {
+    "gate_shape": {
+      "pos-sri-01": {
+        "url": "http://127.0.0.1:32575/r/sri01?q=xssentinel_bench_probe",
+        "params": {
+          "q": "probe"
+        },
+        "sync": [
+          [
+            "sri_missing_script",
+            "medium",
+            "high"
+          ]
+        ],
+        "async": [
+          [
+            "sri_missing_script",
+            "medium",
+            "high"
+          ]
+        ],
+        "agree": true,
+        "sync_s": 1.09,
+        "async_s": 0.68
+      },
+      "pos-pmmine-01": {
+        "url": "http://127.0.0.1:32575/r/pm01",
+        "params": {
+          "q": "probe"
+        },
+        "sync": [],
+        "async": [
+          [
+            "reflected",
+            "high",
+            "high"
+          ]
+        ],
+        "agree": false,
+        "sync_s": 0.06,
+        "async_s": 0.31
+      }
+    },
+    "runner_shape": {
+      "pos-sri-01": {
+        "url": "http://127.0.0.1:32575/r/sri01?q=xssentinel_bench_probe",
+        "params": {},
+        "sync": [
+          [
+            "sri_missing_script",
+            "medium",
+            "high"
+          ]
+        ],
+        "async": [
+          [
+            "sri_missing_script",
+            "medium",
+            "high"
+          ]
+        ],
+        "agree": true,
+        "sync_s": 0.08,
+        "async_s": 0.08
+      },
+      "pos-pmmine-01": {
+        "url": "http://127.0.0.1:32575/r/pm01",
+        "params": {},
+        "sync": [
+          [
+            "reflected",
+            "high",
+            "high"
+          ]
+        ],
+        "async": [
+          [
+            "reflected",
+            "high",
+            "high"
+          ]
+        ],
+        "agree": true,
+        "sync_s": 0.11,
+        "async_s": 0.09
+      }
+    },
+    "adaptive_off": {
+      "pos-sri-01": {
+        "url": "http://127.0.0.1:32575/r/sri01?q=xssentinel_bench_probe",
+        "params": {
+          "q": "probe"
+        },
+        "sync": [
+          [
+            "sri_missing_script",
+            "medium",
+            "high"
+          ]
+        ],
+        "async": [
+          [
+            "sri_missing_script",
+            "medium",
+            "high"
+          ]
+        ],
+        "agree": true,
+        "sync_s": 0.07,
+        "async_s": 0.33
+      },
+      "pos-pmmine-01": {
+        "url": "http://127.0.0.1:32575/r/pm01",
+        "params": {
+          "q": "probe"
+        },
+        "sync": [
+          [
+            "reflected",
+            "high",
+            "high"
+          ]
+        ],
+        "async": [
+          [
+            "reflected",
+            "high",
+            "high"
+          ]
+        ],
+        "agree": true,
+        "sync_s": 0.1,
+        "async_s": 0.33
+      }
+    },
+    "budget_v2_off": {
+      "pos-sri-01": {
+        "url": "http://127.0.0.1:32575/r/sri01?q=xssentinel_bench_probe",
+        "params": {
+          "q": "probe"
+        },
+        "sync": [
+          [
+            "sri_missing_script",
+            "medium",
+            "high"
+          ]
+        ],
+        "async": [
+          [
+            "sri_missing_script",
+            "medium",
+            "high"
+          ]
+        ],
+        "agree": true,
+        "sync_s": 0.26,
+        "async_s": 0.43
+      },
+      "pos-pmmine-01": {
+        "url": "http://127.0.0.1:32575/r/pm01",
+        "params": {
+          "q": "probe"
+        },
+        "sync": [
+          [
+            "reflected",
+            "high",
+            "high"
+          ]
+        ],
+        "async": [
+          [
+            "reflected",
+            "high",
+            "high"
+          ]
+        ],
+        "agree": true,
+        "sync_s": 0.28,
+        "async_s": 0.46
+      }
+    }
+  }
+}

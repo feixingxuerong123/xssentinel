@@ -302,6 +302,17 @@ class Requester:
             self.session.headers.update(headers)
         if cookies:
             self.session.cookies.update(cookies)
+        # Phase 394: operator-supplied cookies ARE the session.  Probe
+        # responses that Set-Cookie a same-name value (an anonymous session
+        # id) silently replaced it -- measured on NodeGoat (Phase 392): the
+        # jar ended up with two connect.sid values, the anonymous one won,
+        # and the whole scan degraded to the login page while every number
+        # still looked like "0 findings is fine".  `_send` re-asserts these
+        # after every response.  Clones built later from
+        # ``cookies=dict(self.session.cookies)`` pin whatever the parent jar
+        # held at clone time -- pollution that already happened stays, so
+        # clone before probing (the engine does).
+        self._pinned_cookies = list(self.session.cookies)
         if proxy:
             self.session.proxies.update({"http": proxy, "https": proxy})
         # Phase 51: egress rotation (--proxy-list) and per-request header
@@ -494,6 +505,32 @@ class Requester:
             return None
         return self.proxy_pool.as_kwargs()
 
+    def _reassert_pinned_cookies(self) -> None:
+        """Restore operator-supplied cookies after a response.
+
+        A probe response that carries Set-Cookie for a name the operator
+        pinned (``-b``) drops a fresh anonymous value into the jar; on the
+        next request the fresh value wins and the authenticated session is
+        gone WITHOUT any error anywhere (measured, Phase 392 NodeGoat).
+        Drop every same-name entry whose value differs, then re-add the
+        pinned one if it vanished.  A deliberate re-login writes through a
+        fresh Requester, so this never fights the auth flow.
+        """
+        if not self._pinned_cookies:
+            return
+        jar = self.session.cookies
+        for pinned in self._pinned_cookies:
+            for stale in [c for c in jar
+                          if c.name == pinned.name
+                          and c.value != pinned.value]:
+                try:
+                    jar.clear(stale.domain, stale.path, stale.name)
+                except KeyError:
+                    pass
+            if not any(c.name == pinned.name and c.value == pinned.value
+                       for c in jar):
+                jar.set_cookie(pinned)
+
     def _send(self, method: str, url: str, **kw) -> requests.Response:
         """session.request() with stealth extras and dead-proxy failover.
 
@@ -518,7 +555,7 @@ class Requester:
         self.tally.attempted += 1
         try:
             try:
-                return self._bound(self.session.request(method, url,
+                resp = self._bound(self.session.request(method, url,
                                                         timeout=self.timeout,
                                                         **kw))
             except (requests.exceptions.ProxyError,
@@ -531,7 +568,7 @@ class Requester:
                 if not alt or alt == bad:
                     raise
                 kw["proxies"] = alt
-                return self._bound(self.session.request(method, url,
+                resp = self._bound(self.session.request(method, url,
                                                         timeout=self.timeout,
                                                         **kw))
         except Exception as exc:
@@ -541,8 +578,8 @@ class Requester:
             # failover that succeeds is not a failure, so the tally is taken from
             # the outer scope that only a final raise reaches.
             #
-            # Phase 347: the tally also keeps WHY (class + first message), so
-            # the incomplete-scan summary can say it instead of only counting.
+            # Phase 347: the tally also keeps WHY (class + first message), so the
+            # incomplete-scan summary can say it instead of only counting.
             self.tally.note_failure(exc)
             # Phase 208: a request that raised is also a breaker failure.
             # Recorded here, after the failover retry is exhausted, so a
@@ -550,6 +587,10 @@ class Requester:
             # real outage.
             self._post_record_failure()
             raise
+        # Phase 394: a probe response's Set-Cookie must not silently replace
+        # the operator's session (see __init__ / _reassert_pinned_cookies).
+        self._reassert_pinned_cookies()
+        return resp
 
     def get(self, url: str, params: dict | None = None,
             cache_get: bool = True,

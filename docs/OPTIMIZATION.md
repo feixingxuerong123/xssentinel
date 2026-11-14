@@ -1865,3 +1865,379 @@ gate 守卫合计 20 例全绿。
 活原语都在全量矩阵里保住。四档同时验证 Phase 387 的墙钟预算在新判定树
 上仍判绿。全量分批 pytest 门(305 文件)**本轮未跑**,如实记账,不拿
 早间交付轮数字顶账。
+
+### 8.21 处置记录(2026-11-14):Phase 390——parity 2/194 分歧定谳为量具缺陷
+
+**起点**:2.0.1 / 2.1.0 的带日期记账把 `XSSENTINEL_PARITY_FULL=1`
+(opt-in)量出的 2/194 分歧定性为「行为性分歧 = sync 侧潜在挖矿 FN」,并
+以 A/B 排除 386 引入。本轮不继承这个定性,先问一个更便宜的问题:
+**量具给两侧的输入真的是真实入口的形状吗?** 这与 Phase 222 的教训同族
+——那次 `pos-pmmine-01` 的「sync 空 / async 有」是量具一侧用
+`scan_endpoint()`、另一侧用 `scan()` 造成的假分歧。
+
+**方法(四臂,同 URL / 同预算 / 同入口)**:`dev/phase390_parity_probe.py`
+复用 parity 门自己的 `Scanner.scan_target()` 与 `AsyncScanner.scan()`、
+14/12 预算、`dom_engine="off"`、`_build_target_url`,只改变「已知参数」
+字典与两个文档化 env 逃生舱:
+
+| 臂 | 传给双引擎的 params | 环境变量 |
+|---|---|---|
+| `gate_shape` | `{"q": "probe"}`(门的原样) | 默认 |
+| `runner_shape` | `{}`(runner 对 `param=""` 用例的真实形状) | 默认 |
+| `adaptive_off` | `{"q": "probe"}` | `XSS_ADAPTIVE_MINING=0` |
+| `budget_v2_off` | `{"q": "probe"}` | `XSS_BUDGET_V2=0` |
+
+产物 `benchmark/results/phase390_parity_probe_20261114.json`,两例各跑
+双引擎、逐臂记 `sync` / `async` / `agree`:
+
+| 臂 | `pos-pmmine-01` | `pos-sri-01` |
+|---|---|---|
+| `gate_shape` | sync `[]` / async `reflected high high` ⇒ **分歧** | 两侧同 `sri_missing_script medium high` ⇒ 一致 |
+| `runner_shape` | 两侧同 `reflected high high` ⇒ 一致 | 一致 |
+| `adaptive_off` | 两侧同 `reflected high high` ⇒ 一致 | 一致 |
+| `budget_v2_off` | 两侧同 `reflected high high` ⇒ 一致 | 一致 |
+
+**定谳**:① `pos-pmmine-01` 是**量具缺陷**,不是产品 FN。`scanner.py`
+Phase 353 的自适应挖矿门 `_mine_ok = (not ep_params and not ep_data) or ...`
+把门自己塞的 `q=probe` 读成「端点已有可见输入面」⇒ sync 跳过隐藏参数
+挖掘;async 的对应门只看 `advanced_layers and not fragment`,仍挖矿。
+`benchmark/runner.py::_build_target_url` 对 `param=""` 的用例根本不加查询
+串,真实扫描不会触发这个分支。三臂换回真实形状 / 打开逃生舱后逐位一致,
+与「sync 潜在 FN」相反。② `pos-sri-01` 的 `dom_dynamic high` 在 2.1.0
+终树、门自己的 `dom_engine="off"` 配置下**四臂都不复现**;关掉
+`XSS_BUDGET_V2`(sync 侧 `_browser_pointless` 门)也不复现。⇒ 不宣称已
+修、不编造归因,记账为环境 / 时基相关观察项;若将来在别的树上复现,
+按需单独测量 async 与 sync 的 DOM 预算门对称性。
+
+**修法(只动量具)**:`tests/test_parity_full_matrix.py` 新增
+`_gate_params(case)`——manifest 声明无可见参数(实测 10 例:
+`pos-dom-01/03/04/05/06`、`pos-pmmine-01`、`neg-pmmine-01`、
+`pos-cssi-01`、`neg-cssi-01/02`)返回 `{}`,其余 184 例保持历史的
+`{param: "probe"}` 逐字节不变;两个 runner 都从**这一个函数**取参数,
+不再各自内联字典。**产品代码零改动**:判定层、层注册、语料集合、
+CLI / MCP / REST 契约都不碰。
+
+**纪律**:探针调的是 parity 门自己的真实入口,不是「听起来合理」的替身;
+每臂两侧同 URL / 同参数 / 同预算,只动一个维度;守卫
+`tests/test_phase390_parity_harness_shape.py` 调真实 `_gate_params` 逐例
+断言(空集合与 184 例集合都非空、名单与 manifest 比对,防止「集合可增删
+无告警」)、AST 断言两个 runner 都调同一函数且**匹配数 > 0**(Phase 222
+假绿的形状)、并逐臂重读事实表(含 BEFORE 臂必须仍分歧);变异对照
+`dev/phase390_mutations.py` 跑 baseline 绿 → 具名 node 红 → 字节还原绿。
+带日期的 2.0.1 / 2.1.0 / §8.17 原文保留不改,以 CHANGELOG
+`[Unreleased]` 勘误为准。
+
+**边界**:本轮修的是 opt-in 门的量具,不是官方 strict 口径;改了 10 个
+用例的 harness 输入形状 ⇒ 必须重跑全量 194 门,不能拿 11-13 的数字顶账。
+判定层、层注册、语料集合、CLI / MCP / REST 契约零改动,故未重跑四档
+strict gate 与全量分批 pytest 门——如实记账,不拿交付轮数字顶账。
+
+**验收(本轮自己的运行,2026-11-14,终树自跑,绿一律带跳过数)**:
+
+| 门禁 | 结果 | skip |
+|---|---|---|
+| 四臂探针(2 例 × 4 臂 × 双引擎,同一 URL / 预算 / 入口) | `gate_shape` 1 分歧、其余三臂 0 分歧;事实表逐臂入库 | — |
+| 新守卫 `tests/test_phase390_parity_harness_shape.py` | **5 passed / 0 failed** | **0** |
+| 变异对照 `dev/phase390_mutations.py` | **7/7**(baseline 绿 → 具名 node 红 → 字节还原绿) | — |
+| 全量 `XSSENTINEL_PARITY_FULL=1` 门 | **1 passed / 0 failed**,123.07s;194 例中 **182 例可比**(12 例 manifest 标单边),**0 分歧** | **0** |
+| 邻接组(parity / 389 / 388 / 文档数字 / 切片守卫,6 文件) | **40 passed / 0 failed**,3.19s | **1**(未开 opt-in 的全量门那条) |
+| ruff 全仓 E/F/W | `All checks passed` | — |
+
+注:全量门本轮 123.07s,远快于 Phase 222 记的 586s/419s;不把这个差异
+解释成性能改善——两轮的挖矿门状态不同(Phase 353 之后多数端点跳过挖
+矿),量具输入也不同,**不可比的墙钟数不做比较**。
+
+### 8.22 处置记录(2026-11-14 续):Phase 391——把 389 留下的未测形状量出来
+
+**起点**:§8.20 收尾写「`<div onstart>` 之类本轮**没量过**的形状按
+『没量过不进门禁』保持原状,列为后续测量项」;389 的守卫还明确钉住
+`<div marquee onstart>` 必须仍 `confirmed=True`,理由是 Phase 362 在
+XSSMaze eventhandler/level5 量过这个「尖括号被剥离、onstart 落在宿主
+元素上」的形状是活的。本轮只做那次测量,**不预设结论、不改判定层**。
+
+**方法**:`dev/phase391_onstart_shapes.py`,15 臂同一 `alert(TOKEN)`,只改
+宿主元素与属性形状;每臂同时记产品 verifier、sandbox judge 和真
+Chromium 148 的 dialog。对照先立、不成立就 ABORT 不写结论:
+`<img src=x onerror=...>` 必须 fired、`<div onclick=...>`(无点击)必须不
+fired、389 的 `("marquee","onstart")` 基线必须不 fired。两个机制臂把
+「属性名存在」与「事件真的派发」分开:主动
+`dispatchEvent(new Event("start"))` 与 `marquee.start()`。
+产物 `benchmark/results/phase391_onstart_shapes_20261114.json`。
+
+| 形状 | verifier | browser dialog |
+|---|---|---|
+| `<marquee onstart>`(389 基线) | False(`sandbox: inert`) | False |
+| 9 个非 marquee 元素 × `onstart`(div/span/p/section/a/img/svg/table/input) | **True** | **False** |
+| `<div marquee onstart>`(Phase 362 属性形状) | **True** | **False** |
+| `<div onstart> + dispatchEvent("start")` | **True** | **False** |
+| `<marquee onstart> + start()` | False | False |
+| 正对照 `onerror` / 负对照 `onclick` | True / True | **True / False** |
+
+`controls_valid=True`,`verifier_only=11`、`live=0`。两个机制臂说明
+`onstart` 不是 Chromium 识别的事件处理器内容属性:**照属性名报「可执行」
+在裸 HTML 条件下不成立**,连显式派发 `start` 也救不回来。
+
+**证据冲突未定谳(本轮最重要的诚实边界)**:Phase 362 的「live」来自
+XSSMaze eventhandler/level5 的**真实页面上下文**——那里有页面脚本、有
+挑战自己的判定口径,而本轮是裸 HTML、无外部脚本、无事件派发。两种
+证据口径不同,不能拿一张裸页表去否定靶场记录,也不能拿靶场记录继续给
+裸页形状背书。⇒ **本轮不改 `INERT_HANDLER_PAIRS`、不动语料集合、不动
+389 的边界断言**;只把「事实表 + 本轮不改判定层」这个决定钉进守卫。
+若将来要在判定层动手,必须先在 XSSMaze level5 页面里用浏览器 oracle
+复测该形状的弹窗事实,并说明官方记分是「引擎确认」还是「浏览器执行」,
+再决定是扩 pair 还是撤回 Phase 362 的定性——独立成轮,配对照矩阵与
+全量 194。
+
+**纪律**:形状来自脚本自己的 `ELEMENTS` 常量(守卫用 AST 与事实表逐项
+比对,不是手写名单),对照不成立即 ABORT;守卫逐臂重读事实表、
+`arms == len(rows)`、`verifier_only` 集合与逐行事实同源,并断言本轮
+`INERT_HANDLER_PAIRS` 未变、`<div marquee onstart>` 经**真实 verifier**
+仍确认——防止有人把这张表当成「全禁 onstart」的修复令直接落地。
+变异对照 `dev/phase391_mutations.py` 覆盖事实表位、集合、产品边界与
+文档锚点。
+
+**边界**:结论只覆盖 Chromium 148 / 裸 HTML / 所列 15 臂;不改写 388、
+389、362 任何带日期原文;不重跑四档 strict gate 与全量分批门(判定层
+零改动,不拿交付轮数字顶账)。
+
+### 8.23 处置记录(2026-11-14 三续):Phase 392——外部开源测试语料全方位接入
+
+**起点**:§8.13/§8.14 之后外部效度清单(§7/`external_validity_20261108.md`)
+仍是「第三方语料 + 自建目标」这一档;本轮把「别的项目写的测试」直接拿来
+测本项目,分三路测量,**产品代码零改动**。
+
+**语料获取与同源发现**:PortSwigger 2026 cheat sheet(直抓,1.85MB)、
+SecLists 六个 XSS 表、PayloadsAllTheThings 四份、OWASP Filter Evasion、
+html5sec/Mario,全部经 ghfast 镜像落 `dev/_external_corpus/`(gitignore,
+证据里记 sha256_12)。实测 **h5sc/vectors.txt 与 SecLists
+XSS-Vectors-Mario.txt 是同一捆绑**——只采一份,报告注明,不重复计数。
+去重后 **202 个唯一向量**;全量调查表(含 WebGoat/WAVSEP/Firing Range
+因 Java 8 出局、Mutillidae/bWAPP 因无 PHP 出局、vulhub/crAPI 因 Docker
+封锁出局、NodeGoat/DVNA 评估)记在证据 MD。
+
+**M1:分类器保真度(旗舰)**——向量 × 12 反射上下文(8 raw + 4 escaped
+孪生;script_dq 孪生因「JS 字符串转义不中和 </script> breakout」在重算
+时退出),页内只含向量本身;oracle = 真 Chromium load 态对话框
+(2635 页 / 1146s,外域请求一律 abort 保证确定性);被测 =
+`judge(page, token="", sink="parser")`——引擎 verify gate 的同一个入口
+(verifier.py:733),token="" 的理由:外部向量自带 dialog callee,烤页
+无其他内容。控制页(6 已知执行 + 3 良性)不健全即 ABORT。**首轮跑完后
+自我纠正两处测量口径**(classify 拆 `activation_inert`;script_dq 退出
+escaped 孪生)——原始测量行(oracle/sandbox/activation)不变,方向是其
+纯函数,`--recompute` 重算,弃用的 202 行原文留档 `recompute_discarded`。
+
+重算后数字:**oracle-exec 族 123 页——agree_live 104、missed 16
+(understatement 13.0%)、unknown 3;oracle-inert 族 2067 页——agree_inert
+1917、overstated 134(6.5%)、unknown 16;activation_inert 234 单列;
+oracle/sandbox error 双 0**。可行动差距(全部有逐行证据,修要独立成轮):
+① script 体无编译检查即判 live(x97,最大 over-statement 族——handler
+有 compiles 检查,script 体没有);② srcdoc 属性值坏引号下仍按整文档
+判 live(x19);③ audio 的 error/loadstart 事件未建模(missed);
+④ 声明式 Shadow DOM(`shadowrootmode=open`)+ slot onslotchange 被当
+template inert(missed);⑤ 可选链 `alert?.(1)` 解析(missed)。
+
+**M2:上下文孪生页端到端 + 同台事实表**——孪生页按 q 参数反射进
+12 个上下文;**安全孪生必须是 context-correct 防御**:首轮 naive
+html.escape 的 href 孪生被引擎报 high,归因是**引擎对、孪生错**——属性
+实体在 URL 解析前解码,HTML 转义不中和 javascript: URI(367/369 同课),
+修为 scheme 校验(`safe_reflect`,守卫源码级钉住)。终测:**vuln 孪生
+8/8 reflected/high,安全孪生 4/4 干净**;nuclei 8/8 检出且安全孪生 0
+误报(0.4s/例),dalfox 0 检出(8 vuln 中 2 例 45s 超时)。工具行
+FACT TABLE ONLY(Phase 380 规则),带 rc。
+
+**M3:OWASP NodeGoat(真实第三方应用)**——官方 zip + 官方种子
+(artifacts/db-reset.js),mongod 4.4 本机起(无 Docker/WSL);答案键 =
+官方源码引用(server.js:135-137 autoescape:false、profile.html 渲染点、
+profile.js 错误路径与 FIXME、memos.html marked)× Chromium 逐条定谳,
+7 形状 = **5 exec / 1 inert(marked sanitize:true 对该 payload 实测
+剥净)/ 1 activation(load 态 inert 符合预期)**,控制页干净。引擎带
+`-b` 会话扫描的实测事实:**requester jar 被探针收到的 Set-Cookie 污染出
+两条 connect.sid,发出去的是匿名那条,整场扫的是登录页**——认证静默
+丢失家族的实锤;dalfox/nuclei 带 cookie 事实行全 0。运行期向靶场写入
+1 条 memo(应用无删除端点)+ 多次 profile 覆写,runner 内披露。
+
+**两个 CLI 缺陷候选(本轮只记账,修复独立成轮)**:
+① `--batch -o FILE`:rc=0、无文件、无 stdout JSONL——静默无输出,
+与 Phase 359 的 `-o` 通道契约相悖,单目标 `-o FILE` 正常;
+② 上述 cookie jar 污染(`-b` 会话在扫描中被 Set-Cookie 顶掉,
+Phase 355 的 canary 排 Cookie 是相邻先例)。
+
+**验收(本轮自己的运行)**:守卫 24 例全绿 0 skip
+(`tests/test_phase392_external_corpus.py` 15 +
+`tests/test_phase392_nodegoat.py` 9);变异对照
+`dev/phase392_mutations.py` **8/8**(其中三例先暴露「变异打数据定义、
+守卫看冻结证据」的盲区,改为源码级钉子后全过);ruff 全仓零基线;
+M1 oracle 控制页健全性在运行内断言(不健全即 rc=3 不发布)。
+**边界**:oracle 只看 load 态对话框(交互型与无对话框执行记 inert,
+是 ground truth 的局限);NodeGoat population 只有 7 形状;**不与
+XSSMaze / 194 矩阵 / bWAPP / Juice Shop 任何数字并列**,XSSMaze 仍是
+唯一 F1 来源。
+
+### 8.24 处置记录(2026-11-14 四续):Phase 393——把 §8.23 量出的差距修进判定层
+
+**起点**:§8.23 的 M1 表(understatement 13.0% / overstatement 6.5%)。
+本轮按「测量 → 修 → 同一量具复测」落地,判定层改动集中在
+`xssentinel/core/sandbox.py`,五处,每处带测量出处。
+
+**先仲裁再修(本轮最重要的自我纠正)**:§8.23 记录的 5 个可行动差距里有
+两类事后被裁决推翻——裁决探针(`dev/_p393_adjudicate.py`,真 Chromium
+逐形状复测)证明 `<svg onload>` 未引号属性、autofocus、`animate onend`
+等"过判"族**在浏览器里确实执行**:是 §8.23 的 r1 oracle(共享 context
+的分块并发)自身有**假 inert 偏置**(仲裁 169 争议行,14 行 inert→exec,
+19 行 exec 复现)。⇒ oracle 升级(每页独立 context + context 级对话框
+捕获 + `about:` 放行,`run_external_corpus.py`),全量重跑 r2
+(2433 页 / 1003s;r1 证据保留 `_r1` 备份,r1→r2 差 = oracle 变量)。
+r2 复测后真正成立的 sandbox 缺口收敛为四类,全部有逐行证据:
+
+1. **token-less script 归属缺口**(r1 的 x97/x19 家族):`judge(token="")`
+   下任何可编译 script 体被判 "code position → live",而
+   `var a = "<payload>"` 与 `alert(payload)` 都是合法 JS,srcdoc 里
+   `alert(document.head.childNodes[3].text)` 更是 code-position 调用、
+   参数先抛 TypeError 根本没弹窗。修:token 缺失时 script[src] 与
+   script 体一律 **unknown**(defer 是 sandbox 自己的哲学;引擎恒带
+   marker token,verifier.py:734,此分支只有直接调用可达)。
+2. **空 src 的 onerror**:旧规则 "empty src: no load is attempted" 是
+   推断不是测量——实测 `<audio src/onerror=...>`、`<img src/onerror=...>`
+   都弹窗(空 src 解析到文档 URL,fetch 失败 → error)。修:src 属性
+   **存在但空值** → live;src 属性**缺席** → 保持 inert(旧规则对缺席
+   是测对的)。
+3. **`<source>` 子元素**:旧 "no src: nothing loads" 忽略了 source 子
+   元素——实测 `<audio onloadstart=...><source>` 弹窗。修:有 source
+   子元素时 onloadstart → live,家族其余事件 → unknown。
+4. **声明式 Shadow DOM**:`<template shadowrootmode=open>` 的内容会被
+   渲染(实测 `<slot onslotchange=...>` 弹窗),不再按 template 死区
+   处理;普通 template 保持死区。
+5. **contenteditable 可聚焦 + 属性名大小写折叠**(resandbox 复测时量出):
+   `<K/contentEditable/autoFocus/OnFocus=...>` 在浏览器弹窗,旧代码
+   `attrs` 字典不折叠大小写、可聚焦判定不含 contenteditable——修后
+   polyglot 残余 6 行 missed 全部翻转 live。
+
+**同一量具复测(r2 → r3,`--resandbox`:oracle 列保持 r2,sandbox 列用
+修复后 judge 重算;`_r2`/`_r3` 备份保留)**:
+
+| 方向 | r2(修复前) | r3(修复 1–4) | 终版(含修复 5) |
+|---|---|---|---|
+| agree_live | 122 | 85 | 91 |
+| missed | 18 | 9 | **3** |
+| overstated | 123 | 7 | **7** |
+| activation_inert | 227 | 227 | 227 |
+| agree_inert | 1915 | 1907 | 1907 |
+| unknown_on_exec / _inert | 5 / 14 | 51 / 138 | 51 / 138 |
+| understatement_rate | 12.4% | 6.2% | **2.1%** |
+| overstatement_rate | 6.0% | 0.34% | **0.34%** |
+
+**修复 5(resandbox 复测时量出并当场补修)**:polyglot 残余 missed 的
+根因是可聚焦判定——`<K/contentEditable/autoFocus/OnFocus=...>` 里
+`contenteditable` 使任意元素可聚焦且 HTML 属性名大小写不敏感,旧代码
+的 `attrs` 字典没折叠大小写,`autoFocus` 驼峰直接漏判。修后 6 行
+polyglot 全部翻转 live(agree_live 85→91,missed 9→3)。
+
+过判 123→7(-94%)、漏报 18→3(-83%),其余走 unknown 诚实延迟(+124)。
+残余 7 过判 = 「handler 执行但不弹窗」(fetch/eval 型、`alert` 裸引用型——
+sandbox 的 live 语义是 handler 可执行,对话框 oracle 口径更窄)与 srcdoc
+引号续接解析分歧;残余 3 漏报 = **解析器级 gap**(`<<SCRIPT>alert(...)`,
+`srcdoc=""` 后属性续接到宿主 iframe,以及 1 行 srcdoc 引号变体)——已实测
+引擎 CLI 在去重页上 0 findings(烤页不在反射驱动检出面上),
+归因与修复列为下一 parser 轮,本轮不动解析器。
+
+**验收(本轮自己的运行)**:Phase 393 守卫
+`tests/test_phase393_sandbox_attribution.py` 7 例(新行为 5 + 旧行为
+回归钉 2,token 嵌入 handler 的 engine 忠实形态);变异对照
+`dev/phase393_mutations.py` **5/5**;sandbox 邻接回归组 8 文件
+**69 passed / 3 skipped**;行为契约靶场 range3
+**TP17/FP0/TN7/FN0/SKIP2/ERR0 exit 0**、range4 **TP2/FP0/TN2/FN0/ERR0
+exit 0**;quick strict 双引擎 sync **64 scored / 0 SKIP**、async
+**63 scored / 1 SKIP**(FP0/FN0/ERROR0,性能预算 147.8s/153.5s 均
+PASSED)。**环境新事实**:Windows 排除段已覆盖 **18923–19822 连续区间**
+(Hyper-V 动态保留),本仓传统的 18931/18932 门禁端口与多个 18xxx 端口
+全部 10013——本轮 runner/oracle 改默认 port 0 动态分配,range4 用
+`XS_RANGE4_PORT=20504` 段外端口;终树门禁数字见 CHANGELOG。
+**边界**:残余 7/9 行不动解析器;oracle 的 load 态对话框口径不变;
+r1 的假 inert 偏置只影响本轮测量,不回溯改写 §8.23 带日期原文(以本节
+与 `_r1/_r2` 备份为准)。
+
+### 8.25 处置记录(2026-11-15):Phase 394——验证驱动综合优化轮(三流)
+
+**流①勘误(候选①撤销)**:§8.23 记的 CLI 缺陷候选①「`--batch -o FILE`
+rc=0 且无文件无 stdout(静默无输出)」**不成立**。干净实验实测:带扩展名
+的 `-o` 走 Phase 88 的「Report path **or directory** for --batch」设计——
+每目标报告写入 FILE 的**父目录**(`dev/_p394_batchout/` 实验留下
+`http_127.0.0.1_PORT_a/b.json` 两个产物为证);392 轮只检查了 FILE 本身,
+后来当"残渣"删掉的 `http_127.0.0.1_18946_*.json` 就是那些报告。
+`tests/test_phase394_cli_batch_output.py` 把该契约钉住,防止下一个读者
+重推同样的错误结论——候选②(cookie jar 污染)是真的,见流②。
+
+**流②Fixed(`-b` 会话静默丢失,392 候选②)**:`Requester.__init__` 快照
+构造期 cookie(`-b` 通道),`_send`——两引擎唯一的 `session.request`
+收口——每响应后回 assert:同名字段的异值条目清掉、pin 值消失则补回。
+边界以测试钉死:未 pin 的 jar 照常采纳新 Set-Cookie(不能变成「忽略一切
+Set-Cookie」);刻意重登录走全新 Requester,不与 auth 流打架。真实入口
+测试:本地 server /probe 下发匿名新值 → /protected 只认原值,断言第二跳
+请求头里是原值而非探针新值。
+
+**流③Fixed(sandbox 分词器 + 可聚焦)**:① invalid-first-character
+恢复——WHATWG 13.2.5.1 规定 `<` 后非 `!`/`/`/`?`/字母时只吐 `<` 文本并
+**重新消费**;旧规则吞到下一个 `>`,把 `<<SCRIPT>alert(...)`(392 语料行,
+oracle 弹窗)与 `<3<svg onload=...>` 整段变文本。修后 tokened 引擎路径
+判 live(token 是 alert 族调用的参数),token-less 判 unknown(393 语义)。
+② 宿主 iframe 加入 `FOCUSABLE_CONTROLS`(srcdoc="" 引号 breakout 后
+`autofocus/onfocus` 落在 iframe 上,实测弹窗;`<frame>` 未测量,故意
+不加)。
+
+**同一量具复测(r4 = `--resandbox`,oracle 不动;r3fix5 备份保留)**:
+missed 3→**1**(understatement 2.1%→**0.69%**)、overstatement 保持
+**0.34%**(7 行:handler 执行但不弹窗 + srcdoc 引号分歧,已知边界)。
+最后一行漏报 = polyglot 级联嵌套(`</Style/</Script/…<K/…OnFocus=
+/*${/*/;{/**/(alert)(1)}//>…`),引擎 CLI 在去重页 0 findings(烤页不在
+反射驱动检出面上),列为下一 parser 轮唯一残余——本轮不动。
+
+**验收(本轮自己的运行)**:三流守卫
+`test_phase394_sandbox_tokenizer.py` 7 + `test_phase394_auth_cookie_
+stickiness.py` 2 + `test_phase394_cli_batch_output.py` 1 = **10 例**;
+变异 `dev/phase394_mutations.py` **3/3**(其中 iframe 变异第一版锚点
+没盖住 `"iframe",` 行——行为没真变守卫就绿,正是「变异必须真改行为」
+的活例,修正锚点后全过);sandbox 套件(fidelity/gate/393/394)
+**34 passed**;requester 邻接回归(cache_owner/circuit_breaker/
+transport_canary)**29 passed**;终树电池数字记 CHANGELOG Phase 394。
+
+### 8.26 处置记录(2026-11-15):Phase 395——最后一行漏报归零 + NodeGoat 存储流调查
+
+**Fixed:空注释立即闭合(WHATWG 13.2.5.6)**。394 终版的唯一语料漏报
+(polyglot 级联嵌套)根因实锤:`/*<!-->…` 里 `<!-->` 是
+abrupt-closing-of-empty-comment——`<!--` 后紧跟 `>` 即闭合(空注释),
+`<!--->` 同理;旧规则只认 `-->`/`--!>`,把 `<!-->` 读成未终结注释并吞掉
+全部余量,`<K/contentEditable/autoFocus/OnFocus=…>` 在解析树里根本
+不存在(最小复现:reason=「unterminated comment swallowed the
+remainder」)。修:`<!-->` 与 `<!--->` 立即闭合;`<!--x` 未终结语义不变
+(带 note → judge 走 unknown 诚实延迟,该 note 规则本身是既有测量)。
+
+**同一量具复测(r5 = `--resandbox`,oracle 不动;r4 备份保留)**:
+missed 1→**0**(understatement 2.1%→**0.0%**)、overstatement 保持
+**0.34%**(7 行 handler-执行-但-无-对话框——sandbox 的 live 语义是
+handler 可执行,对话框 oracle 口径更窄,口径边界非缺陷)、unknown 190
+诚实延迟、双 error 0。**分类器在 202 向量 × 12 上下文上与 Chromium
+对话框 oracle 完全对齐**。守卫 `tests/test_phase395_empty_comment.py`
+4 例(空注释闭合 / `<!--->` 变体 / 未终结吞尾→unknown 回归钉 / 惰性
+内容 inert)+ 变异 `dev/phase395_mutations.py` **1/1**。
+
+**NodeGoat 存储流调查(记账,不修——独立一轮)**:394 cookie 粘性修复
+后,端到端会话存活已验证(jar 单条 connect.sid 且为 pin 值、主扫描认证
+成功——静态层看到的都是真实 profile 内容)。但存储检测仍未触发,逐请求
+打点(40+ 行)定位三个**独立**机制:
+(a) 预算耗尽 → `stopped=True` → stored-auto 整段被跳过(间歇复现);
+(b) L8_cookie canary 用 canary 值覆盖会话 cookie 测反射 → 该请求合法弹回
+  一次(设计行为;394 回 assert 在其后恢复 pin,#36 GET /profile → 200
+  证明会话没死);
+(c) auto fetch 偶发**零请求**静默退出(`_send` 未抛、seq 不增——`_send`
+  内部在响应后到返回之间的某处失败,待查)。
+三者交织成 stored-auto × 预算 × 认证的交互网,修复需要自己的门禁轮。
+影响面:仅认证页存储自动发现;烤页/反射路径不受影响。
+
+**§8 项 8–11 复核**:全部已在 Phase 383–385 收口(#8 run_id/elapsed_ms
+已做、#9 评估为不做、#10 随 instructions 评估、#11 凭据回显审计
+NO ECHO)——AGENTS「下一步是评估 8–11」一段为 2026-11-06 的带日期
+记账,无新工作。
+
+**验收(本轮自己的运行)**:守卫 4 例 + 变异 1/1;sandbox 套件
+(fidelity/gate/393/394)**34 passed**;r5 数字如上;终树电池数字记
+CHANGELOG Phase 395。

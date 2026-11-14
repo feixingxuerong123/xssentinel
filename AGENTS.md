@@ -54,8 +54,127 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
 
 - 新增检测层必须**同时**注册 `coverage.LAYERS` 与 `layer_coverage` 矩阵(Phase 187/192 两次被门禁抓到的同一课)。
 
-## 当前状态(2026-11-13)
+## 当前状态(2026-11-14)
 
+- **[Unreleased] / Phase 395(2026-11-15,parser 收口轮——最后一行漏报归零)**:
+  394 留下的唯一语料漏报(polyglot 级联嵌套)根因实锤:**`<!-->` /
+  `<!--->` 是 WHATWG 13.2.5.6 的空注释立即闭合**(abrupt-closing-of-
+  empty-comment),旧规则只认 `-->`/`--!>` 结尾,把 `/*<!-->…` 之后的
+  全部余量当未终结注释吞掉——`<K/contentEditable/autoFocus/OnFocus=…>`
+  在解析树里根本不存在。修:`<!-->`(i+=5)与 `<!--->`(i+=6)立即闭合,
+  `<!--x` 未终结语义不变(带 note → judge 走 unknown 诚实延迟)。
+  **同一量具复测(r5)**:missed 1→**0**(understatement 2.1%→**0.0%**),
+  overstatement 0.34%(7 行 handler-执行-但-无-对话框,口径边界非缺陷)
+  ——**分类器在 202 向量 × 12 上下文上与 Chromium 对话框 oracle 完全
+  对齐**,unknown 190 为诚实延迟。守卫 `test_phase395_empty_comment.py`
+  4 例 + 变异 1/1。**NodeGoat 存储流调查(记账,不修)**:394 cookie
+  粘性修复后端到端会话存活已验证(jar 单值 pin、主扫描认证成功),但
+  存储检测仍未触发——trace 定位三个独立机制:(a) 预算耗尽时 stored-auto
+  整段被跳过(间歇),(b) L8_cookie canary 合法弹回一次(设计行为,394
+  回 assert 已恢复),(c) auto fetch 零请求静默退出(`_send` 未抛,
+  逐请求打点 40 行在案)——stored-auto × 预算 × 认证交互网,**独立
+  一轮**。§8 项 8–11 复核:已在 Phase 383–385 全部收口(#8 已做、#9
+  评估为不做、#11 NO ECHO),无新工作。环境:NodeGoat 门禁端口随排除段
+  漂移(18946 今日 10013 → 改 20506),run_nodegoat 内部烤页服务改
+  port 0。终树电池数字见 CHANGELOG Phase 395。
+- **[Unreleased] / Phase 394(2026-11-15,验证驱动综合优化轮——三流)**:
+  承接 392/393 的验证结果,一次收口。**①勘误**:392 的 CLI 缺陷候选
+  「`--batch -o FILE` 静默无输出」**撤销**——干净实验实测为 Phase 88
+  设计行为("Report path **or directory** for --batch":带扩展名时每目标
+  报告写入 FILE 父目录,392 轮当"残渣"删掉的 `http_127.0.0.1_18946_*.json`
+  就是那些报告,当时只检查了 FILE 本身);契约由
+  `test_phase394_cli_batch_output.py` 钉住。**②Fixed:`-b` 会话被探针
+  Set-Cookie 静默顶掉**(候选②):`Requester` 构造时快照操作者 cookie,
+  `_send`(两引擎唯一请求收口)每响应后回 assert;未 pin 的 jar 照常
+  采纳新 Set-Cookie(回归钉),刻意重登录走全新 Requester 不打架。
+  **③Fixed:sandbox 分词器 invalid-first-character 恢复**(WHATWG
+  13.2.5.1,`<<SCRIPT>` 语料行 oracle 弹窗而 sandbox 报 inert 的根因):
+  `<` 后非字母非 `?` 只吐 `<` 文本并重新消费;宿主 iframe 加入可聚焦
+  集合(srcdoc 引号 breakout 后 autofocus/onfocus 落在 iframe 上,实测
+  弹窗;`<frame>` 未测量故意不加)。**同一量具复测(r4)**:missed 3→**1**
+  (understatement 2.1%→**0.69%**)、overstatement 保持 **0.34%**;
+  最后一行漏报 = polyglot 级联嵌套,列下一 parser 轮唯一残余。验收:
+  三流守卫 10 例 + 变异 3/3 + sandbox 套件 34 passed + requester 邻接
+  29 passed + 终树电池(range3/range4 + quick/full strict 双引擎 +
+  全量分批门)数字见 CHANGELOG Phase 394 验收节。
+- **[Unreleased] / Phase 393(2026-11-14,判定修复轮,sandbox.py 五处)**:
+  承接 392 量出的差距,按「测量 → 修 → 同一量具复测」落地。**先仲裁再修**:
+  裁决探针证明 392 记录的"过判"族(svg onload 未引号属性/autofocus/
+  animate onend)在浏览器里确实执行 ⇒ 392 的 r1 oracle(共享 context
+  分块并发)自身有假 inert 偏置(169 争议行 14 行 inert→exec)⇒ oracle
+  升级(每页独立 context + context 级对话框 + about: 放行)并全量重跑
+  r2(2433 页 / 1003s;r1/r2/r3 备份,oracle 变量与 sandbox 变量分开
+  归因)。真正成立的五类缺口全修:① token-less script 归属缺口 →
+  **unknown**(defer;引擎恒带 token 不受影响,verifier.py:734);
+  ② 空 src 的 onerror → live(旧"no load attempted"是推断,实测
+  `<audio src/onerror>`/`<img src/onerror>` 都弹窗;src **缺席**保持
+  inert);③ `<source>` 子元素启动 load → onloadstart live;④
+  `<template shadowrootmode=open>` 是声明式 shadow root,内容不再按
+  死区;⑤ contenteditable 使任意元素可聚焦 + 属性名大小写折叠(旧
+  attrs 字典漏驼峰)。**同一量具复测(r3 = `--resandbox`,oracle 不动)**:
+  overstatement 6.0%→**0.34%**(123→7)、understatement 12.4%→**2.1%**
+  (18→3),其余走 unknown 诚实延迟(+124)。残余 7 过判 = handler 执行
+  但无对话框(fetch/eval 型)+ srcdoc 引号解析分歧;残余 3 漏报 =
+  解析器级 gap(`<<SCRIPT>`、srcdoc 属性续接等)——引擎 CLI 在去重页
+  0 findings(烤页不在检出面上),**解析器不动,修复列下一 parser 轮**。
+  验收:Phase 393 守卫 7 例 + 变异 5/5 + sandbox 邻接回归 69p/3s +
+  range3/range4 行为契约 exit 0 + quick strict 双引擎全绿(sync 64
+  scored 0 SKIP / async 63 scored 1 SKIP,FP0/FN0/ERROR0)。**环境新
+  事实**:Windows 排除段已覆盖 18923–19822 连续区间(Hyper-V),传统
+  门禁端口 18931/18932 与多数 18xxx 全 10013 ⇒ runner/oracle 默认改
+  port 0 动态分配,range4 走 `XS_RANGE4_PORT=20504`;终树门禁(full 194
+  双引擎 + 全量分批门)见 CHANGELOG Phase 393 验收节。
+- **[Unreleased] / Phase 392(2026-11-14,外部测试语料轮,产品代码零改动)**:
+  应「全方面找别的开源项目的测试来测本项目」——把五个第三方语料
+  (PortSwigger 2026 cheat sheet、SecLists 六个 XSS 表、PayloadsAllTheThings
+  四份、OWASP Filter Evasion、html5sec/Mario)的 **202 个唯一向量**逐条投进
+  反射上下文,M1 用引擎 verify gate 的同一个 `judge(page, token="",
+  sink="parser")` 分类,再拿真 Chromium load 态对话框逐页定谳(oracle
+  1146s / 2635 页,控制页健全性不过就 ABORT 不发布);重算后
+  **understatement 13.0%(16/123)、overstatement 6.5%(134/2067)、
+  activation_inert 234 单列**(href-javascript: 的 load 态 inert 是诚实
+  语义)。可行动差距已量出:script 体无编译检查即判 live(x97,最大
+  over-statement 族)、srcdoc 整文档解析(x19)、audio error/loadstart
+  事件、声明式 Shadow DOM slot onslotchange、可选链 `alert?.(1)`
+  (本条差距清单的归因随后被 Phase 393 仲裁修正:最大过判族实为
+  token-less 归属缺口 + r1 oracle 假 inert,见上条)。
+  M2 上下文孪生页端到端:**vuln 8/8 high 检出、context-correct 安全孪生
+  4/4 干净**(naive 转义 href 孪生被报 high 是引擎对、孪生错——HTML 转义
+  不中和 javascript: URI,与 367/369 同课);同台事实表:nuclei 8/8 检出
+  且安全孪生 0 误报(0.4s/例)、dalfox 0 检出(2 例 45s 超时)。M3 接入
+  **OWASP NodeGoat**(官方 zip+官方种子,本机无 Docker/WSL/Java11+/PHP
+  下唯一可跑的真实第三方应用):官方源码答案键 + oracle 定谳 7 形状
+  (5 exec / 1 inert=marked sanitize 实测 / 1 activation),引擎带
+  `-b` 会话实际扫的是登录页(**探针 Set-Cookie 污染 jar 顶掉操作者会话**,
+  认证静默丢失家族),dalfox/nuclei 事实行全 0。**两个 CLI 缺陷候选**
+  已实测记录:`--batch -o FILE` rc=0 且无文件无 stdout(静默无输出)、
+  上述 cookie jar 污染;本轮只记账不修(修要走自己的门禁轮)。
+  (候选①随后被 Phase 394 **撤销**:实测为 Phase 88 设计行为——每目标
+  文件写入 FILE 父目录,当时只检查了 FILE 本身;候选②由 Phase 394 修复,
+  见上条。)
+  h5sc/vectors.txt 与 SecLists XSS-Vectors-Mario.txt 实测同一捆绑,
+  只采一份不重复计数。证据 `benchmark/results/phase392_external_corpus_20261114.{json,md}`、
+  `phase392_nodegoat_20261114.{json,md}`;守卫 `tests/test_phase392_external_corpus.py`
+  + `test_phase392_nodegoat.py` 共 **24 例**,变异 `dev/phase392_mutations.py`
+  **8/8**(其中三例先暴露守卫盲区:改数据定义不影响冻结证据,改为源码级
+  钉子后全过);首轮测量代码两处自我纠正(classify 拆 activation_inert、
+  script_dq 退出 escaped 孪生)以 `--recompute` 重算完成,原始测量行未变、
+  弃用行留档 `recompute_discarded`。**不与 XSSMaze/194 矩阵/bWAPP/Juice
+  Shop 任何数字并列**;nodegoat 运行期向靶场写入 1 条 memo + profile 覆写
+  (runner 内已披露)。
+- **[Unreleased] / Phase 390(2026-11-14,勘误轮)**:把 2.0.1 / 2.1.0 记下的
+  parity 全矩阵 2/194「行为性分歧 / sync 侧潜在挖矿 FN」用四臂测量定谳为
+  **量具缺陷**——opt-in 门给 manifest 声明无可见参数的用例塞了合成
+  `q=probe`,触发 sync 的 Phase 353 自适应挖矿门而 async 无此门;换成
+  runner 的真实形状(`params={}`)或任一文档化 env 逃生舱,双引擎逐位一致。
+  另一例 `pos-sri-01` 的 `dom_dynamic high` 在 2.1.0 终树四臂**不复现**,
+  不宣称已修、留作环境/时基相关观察项。只改 opt-in 量具
+  (`tests/test_parity_full_matrix.py` 的 `_gate_params`,10 例受影响、
+  184 例逐字节不变),**产品代码零改动**;守卫 + 变异 + 全量 194 复测数字
+  见 OPTIMIZATION §8.21 与 CHANGELOG `[Unreleased]` 勘误。带日期的
+  2.0.1 / 2.1.0 / §8.17 原文保留不改。**仍开放**:`pos-sri-01` 是否在别的
+  树/环境复现(观察项)、`<div onstart>` 等未测形状、PyPI Trusted
+  Publisher(归属者外部待办)。
 - **2.1.0(2026-11-13,minor,交付轮)**:承接 Phase 387–389。按「新增能力走
   minor」定级(strict gate 新增墙钟预算维度),无破坏性变更。**387**:四档
   实测基线 + 推导 ceiling + 未测量组合一律 UNBUDGETED,守卫/变异/源码断言

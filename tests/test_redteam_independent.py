@@ -45,7 +45,9 @@ import pytest  # noqa: E402  (Phase 321: the measured 267s shape needs an
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-PORT = 18991
+# 18991 landed inside the Hyper-V excluded range 18923-19822
+# (measured WinError 10013 across the whole block, Phase 393)
+PORT = 19992
 
 HIGH_MED = ("high", "medium", "critical")
 

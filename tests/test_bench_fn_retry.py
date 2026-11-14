@@ -25,7 +25,9 @@ sys.path.insert(0, _HERE)
 def _load_runner(tmp_path, scripts):
     """Load run_benchmark_batched with a fake evaluate_case + 1 case."""
     out = str(tmp_path / "out.json")
-    sys.argv = ["x", out, "1", "18999", "sync", "14", "12", "90"]
+    # 18999 landed inside the Hyper-V excluded range 18923-19822
+    # (measured WinError 10013 across the whole block, Phase 393)
+    sys.argv = ["x", out, "1", "19991", "sync", "14", "12", "90"]
     spec = importlib.util.spec_from_file_location(
         "rbb_test", os.path.join(_HERE, "benchmark",
                                  "run_benchmark_batched.py"))
