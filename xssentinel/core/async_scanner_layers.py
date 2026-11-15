@@ -306,6 +306,14 @@ class AsyncDetectionLayersMixin:
     def _resolve_dom_engine(self):
         """Phase 65: mirror the sync _resolve_dom_engine for L6 parity."""
         de = self.dom_engine
+        # Phase 397: 'off' must disable the real-browser DOM layer.  It is a
+        # documented MCP value and AsyncScanner's default; without this branch
+        # an 'off' scan still launched Chromium whenever Playwright was
+        # importable, which made async emit dom_dynamic/high on pos-sri-01
+        # while sync stayed on the static-only verdict.  The shim's stored
+        # round-trip delegates here too, so one definition covers both.
+        if de == "off":
+            return None
         if de == "static":
             return None
         if de == "auto" and not dom_engine_mod.DynamicDomAnalyzer.available():

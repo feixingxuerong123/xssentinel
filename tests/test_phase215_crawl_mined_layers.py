@@ -146,8 +146,12 @@ needs_browser = pytest.mark.skipif(
 
 async def _scan(base: str):
     from xssentinel.core.async_scanner import AsyncScanner
+    # Phase 397: 'off' now really disables the browser.  AsyncScanner's
+    # default is 'off'; these assertions measure DOM-layer delivery, so the
+    # engine must be requested explicitly (matching the sync arm's
+    # use_headless=True / crawl_engine="auto").  Not an assertion loosening.
     asc = AsyncScanner(crawl=True, crawl_depth=1, max_payloads=8,
-                       advanced_layers=True)
+                       advanced_layers=True, dom_engine="auto")
     out = []
     async for f in asc.scan(base + "/"):
         out.append(f.data if hasattr(f, "data") else f)

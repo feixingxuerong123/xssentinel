@@ -1,0 +1,245 @@
+[
+  {
+    "arm": "current",
+    "package": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\xssentinel_p397_arms\\current\\xssentinel\\__init__.py",
+    "sync": {
+      "pos-sri-01": [
+        [
+          "sri_missing_script",
+          "medium",
+          "high"
+        ]
+      ]
+    },
+    "async": {
+      "pos-sri-01": [
+        [
+          "dom_dynamic",
+          "high",
+          "high"
+        ],
+        [
+          "sri_missing_script",
+          "medium",
+          "high"
+        ]
+      ]
+    },
+    "divergent": true,
+    "replaced": []
+  },
+  {
+    "arm": "all_210",
+    "package": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\xssentinel_p397_arms\\all_210\\xssentinel\\__init__.py",
+    "sync": {
+      "pos-sri-01": [
+        [
+          "sri_missing_script",
+          "medium",
+          "high"
+        ]
+      ]
+    },
+    "async": {
+      "pos-sri-01": [
+        [
+          "dom_dynamic",
+          "high",
+          "high"
+        ],
+        [
+          "sri_missing_script",
+          "medium",
+          "high"
+        ]
+      ]
+    },
+    "divergent": true,
+    "replaced": [
+      "requester.py",
+      "sandbox.py",
+      "sandbox_parser.py",
+      "scanner_stored_auto.py"
+    ]
+  },
+  {
+    "arm": "old_sandbox_pair",
+    "package": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\xssentinel_p397_arms\\old_sandbox_pair\\xssentinel\\__init__.py",
+    "sync": {
+      "pos-sri-01": [
+        [
+          "sri_missing_script",
+          "medium",
+          "high"
+        ]
+      ]
+    },
+    "async": {
+      "pos-sri-01": [
+        [
+          "dom_dynamic",
+          "high",
+          "high"
+        ],
+        [
+          "sri_missing_script",
+          "medium",
+          "high"
+        ]
+      ]
+    },
+    "divergent": true,
+    "replaced": [
+      "sandbox.py",
+      "sandbox_parser.py"
+    ]
+  },
+  {
+    "arm": "old_sandbox",
+    "package": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\xssentinel_p397_arms\\old_sandbox\\xssentinel\\__init__.py",
+    "sync": {
+      "pos-sri-01": [
+        [
+          "sri_missing_script",
+          "medium",
+          "high"
+        ]
+      ]
+    },
+    "async": {
+      "pos-sri-01": [
+        [
+          "dom_dynamic",
+          "high",
+          "high"
+        ],
+        [
+          "sri_missing_script",
+          "medium",
+          "high"
+        ]
+      ]
+    },
+    "divergent": true,
+    "replaced": [
+      "sandbox.py"
+    ]
+  },
+  {
+    "arm": "old_parser",
+    "package": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\xssentinel_p397_arms\\old_parser\\xssentinel\\__init__.py",
+    "sync": {
+      "pos-sri-01": [
+        [
+          "sri_missing_script",
+          "medium",
+          "high"
+        ]
+      ]
+    },
+    "async": {
+      "pos-sri-01": [
+        [
+          "dom_dynamic",
+          "high",
+          "high"
+        ],
+        [
+          "sri_missing_script",
+          "medium",
+          "high"
+        ]
+      ]
+    },
+    "divergent": true,
+    "replaced": [
+      "sandbox_parser.py"
+    ]
+  },
+  {
+    "arm": "old_requester",
+    "package": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\xssentinel_p397_arms\\old_requester\\xssentinel\\__init__.py",
+    "sync": {
+      "pos-sri-01": [
+        [
+          "sri_missing_script",
+          "medium",
+          "high"
+        ]
+      ]
+    },
+    "async": {
+      "pos-sri-01": [
+        [
+          "dom_dynamic",
+          "high",
+          "high"
+        ],
+        [
+          "sri_missing_script",
+          "medium",
+          "high"
+        ]
+      ]
+    },
+    "divergent": true,
+    "replaced": [
+      "requester.py"
+    ]
+  },
+  {
+    "arm": "old_stored_auto",
+    "package": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\xssentinel_p397_arms\\old_stored_auto\\xssentinel\\__init__.py",
+    "sync": {
+      "pos-sri-01": [
+        [
+          "sri_missing_script",
+          "medium",
+          "high"
+        ]
+      ]
+    },
+    "async": {
+      "pos-sri-01": [
+        [
+          "dom_dynamic",
+          "high",
+          "high"
+        ],
+        [
+          "sri_missing_script",
+          "medium",
+          "high"
+        ]
+      ]
+    },
+    "divergent": true,
+    "replaced": [
+      "scanner_stored_auto.py"
+    ]
+  },
+  {
+    "arm": "off_fixed",
+    "package": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\xssentinel_p397_arms\\off_fixed\\xssentinel\\__init__.py",
+    "sync": {
+      "pos-sri-01": [
+        [
+          "sri_missing_script",
+          "medium",
+          "high"
+        ]
+      ]
+    },
+    "async": {
+      "pos-sri-01": [
+        [
+          "sri_missing_script",
+          "medium",
+          "high"
+        ]
+      ]
+    },
+    "divergent": false,
+    "replaced": []
+  }
+]

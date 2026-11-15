@@ -155,8 +155,11 @@ def _collect(engine: str, url: str) -> list:
     from xssentinel.core.async_scanner import AsyncScanner
 
     async def go():
+        # Phase 397: AsyncScanner defaults to dom_engine='off', which now
+        # genuinely skips the browser.  The sync arm above requests the
+        # headless DOM layer explicitly; parity requires the same here.
         asc = AsyncScanner(crawl=True, crawl_depth=1, max_payloads=8,
-                           advanced_layers=True)
+                           advanced_layers=True, dom_engine="auto")
         out = []
         async for f in asc.scan(url + "/"):
             out.append(f.data if hasattr(f, "data") else f)

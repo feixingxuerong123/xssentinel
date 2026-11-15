@@ -56,6 +56,46 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
 
 ## 当前状态(2026-11-15)
 
+- **[Unreleased] / Phase 397(2026-11-15,`dom_engine="off"` 契约修复——parity 红门归零)**:
+  396 留下的第二个红门(parity 全矩阵 `pos-sri-01`)定谳并关闭,**同时推翻
+  396「390–395 期间某轮使其复现 / 环境时基观察项」的定性**。8 臂同量具
+  对照(`benchmark/results/phase397_bisect_20261115.json`):把 2.1.0 以来
+  改过的 4 个产品文件**全部**还原仍分歧且逐位一致,只有两侧补 `off` 分支
+  的 `off_fixed` 臂收敛 ⇒ 与版本无关。根因是**公开契约从未实现**:MCP
+  input schema 白纸黑字写 `"off" disables the DOM layer`,`AsyncScanner`
+  默认就是 `off`,而 sync / async 两份手写 `_resolve_dom_engine()` 只处理
+  `static`/`auto`,`off` 直接落到 `DynamicDomAnalyzer` 构造 ⇒ operator
+  说「不要浏览器」,只要 Playwright 可导入照样跑真 Chromium;sync 侧被
+  Phase 353 `_browser_pointless` 门掩盖、async 无此门(390 已记账的
+  设计),一侧暴露 —— 同一族「同一契约手写两遍」。390 测到「不复现」
+  是那次浏览器构造失败被 `except Exception` 吞掉(`available()` 只查
+  `find_spec`),时基成分来自这里,但触发开关是可修契约而非不可控噪声。
+  修:两侧各补 `if de == "off": return None`(不改默认值、不改 CLI/MCP
+  默认 `auto`、不改 353 门 / 判定层 / 语料 / 预算 / CLI 契约)。
+  **行为面勘误(全量门实测)**:`AsyncScanner` 默认就是 `off`,隐式路径
+  同样受影响,不是初稿写的「只在显式 `off` 时」;产品 CLI/MCP/REST
+  显式 `auto`、`evidence_shape_sweep` 显式 `static` 不受影响,full
+  194 双引擎验证 `auto` 路径不变。守卫 6 例(哨兵 analyzer 把「是否
+  构造浏览器」与本机 Chromium 可用性解耦;第 6 例源码级钉住三个 DOM
+  交付守卫的 async 构造点必须显式 `auto`)+ 变异 2/2
+  + 邻接 65 passed / 0 skipped;事实表
+  `benchmark/results/phase397_dom_engine_off_20261115.md`。**两处刻度自
+  纠正**:事实表曾引用不存在的 `phase397_sri_control_*.json` ⇒ 改注为
+  396 带日期的 `phase396_sri_control_20261115.json`,不冒充本轮产物;
+  守卫 docstring 的「7 arms」⇒ 7/8 臂(第 8 臂 `off_fixed` 收敛)。
+  **全量分批门首轮 315/319 / RC=4 / skip 13 例 6 文件**:3 个红是
+  **真回归**(`test_phase215` / `test_phase209` / `test_phase214` 的
+  async 臂直接构造 `AsyncScanner` 用默认 `off` 却断言 `dom_dynamic`),
+  A/B 三臂(红→绿→红、字节还原)定谳 **FIX-CAUSED**,修法只给三个
+  测试构造点补 `dom_engine="auto"` 与 sync 臂对齐、复跑 14p/0s;
+  第 4 个红是 `PYTHONPATH` shim 的 `sitecustomize` 权限错误污染 CLI
+  stderr 断言,清空后单文件 34p/0s。**仍开放**:CLI `--dom-engine`
+  choices 无 `off` 而 MCP schema 有(同一契约两处声明的既有漂移),
+  本轮不扩 CLI 面。**修后全量门重跑 319/319 文件绿 / 470s /
+  0 失败 / skip 13 例 6 文件(2 整文件零贡献)**,与首轮 315/319
+  一起报;四档 strict gate、parity 门转绿与**环境事件**见
+  CHANGELOG Phase 397 验收节。带日期的 396 / 390 原文保留不改,
+  以本条与 Phase 397 勘误为准。
 - **[Unreleased] / Phase 396(2026-11-15,NodeGoat 存储流——零请求静默退出归零)**:
   395 记账 (c) 的推测**推翻**:真实 CLI 入口打点证明 `_send` 从未被调用,
   stored pass 确实跑了,是页面抓取 `cache_get=True` 命中**被污染的 GET LRU**

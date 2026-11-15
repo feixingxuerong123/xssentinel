@@ -327,6 +327,16 @@ class Scanner(StoredBlindMixin, StoredAutoMixin, AdvancedLayerMixin,
         de = self._dom_mode
         if isinstance(de, dom_engine.DynamicDomAnalyzer):
             return de
+        # Phase 397: 'off' is a PUBLIC contract value (MCP input schema
+        # documents "off disables the DOM layer"; AsyncScanner's own default
+        # is 'off').  Both engines used to fall through and build a real
+        # browser analyzer anyway -- so an operator who asked for no browser
+        # got one whenever Playwright happened to be installed.  Measured as
+        # the pos-sri-01 parity divergence: async emitted dom_dynamic/high
+        # while sync's Phase-353 browser-pointless gate masked the same
+        # violation.  Keep the two resolvers symmetric.
+        if de == "off":
+            return None
         if de == "static":
             return None
         # 'auto': only if Playwright is importable; 'playwright': force (will

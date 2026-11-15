@@ -255,6 +255,127 @@
   **逐位一致** ⇒ **不是 Phase 396 引入**,是 390–395 期间某轮使其复现;
   **列独立一轮(Phase 397)**,本轮不修、不宣称已修。
 
+### Fixed(2026-11-15,Phase 397,`dom_engine="off"` 契约修复——parity 红门归零)
+
+- **勘误:推翻 Phase 396 对 `pos-sri-01` 分歧的定性**。396 把 parity
+  全矩阵门的红记成「不是 396 引入,是 390 已记账的环境/时基观察项在
+  390–395 之后复现」。8 臂同量具对照
+  (`benchmark/results/phase397_bisect_20261115.json`)推翻这句:
+  `current`、把 2.1.0 以来改过的 **4 个产品文件全部还原**的
+  `all_210`、以及 4 个文件各自单独还原的 5 臂 —— 共 **7 臂分歧逐位
+  一致**,只有第 8 臂 `off_fixed`(不改版本,只给两侧补 `off` 分支)
+  收敛 ⇒ 与版本无关,与 `dom_engine="off"` 的语义有关。每臂在工作区
+  外的影子包里替换指定文件并用**新子进程**跑同一个 `pos-sri-01`,
+  避免进程内 import 缓存说谎;`benchmark/server.py`、`manifest.json`、
+  `adapters.py`、`tests/conftest.py` 从 2.1.0 (`44403a3`) 到 HEAD
+  逐字节未变。**带日期的 396 / OPTIMIZATION §8.27 / 390 原文保留
+  不改**,以本条与事实表
+  `benchmark/results/phase397_dom_engine_off_20261115.md` 为准。
+- **根因:公开契约从未实现**。`api/mcp_server.py` 的 input schema 把
+  `off` 列进 `dom_engine` enum 并写明「'off' disables the DOM layer」,
+  `AsyncScanner` 默认值本身就是 `off`;而 sync / async 两份手写的
+  `_resolve_dom_engine()` 只处理 `static` 与 `auto`,`off` 直接落到
+  `DynamicDomAnalyzer(...)` 构造 ⇒ operator 明确要求不要浏览器,只要
+  Playwright 可导入就启动真 Chromium。sync 侧被 Phase 353 的
+  `_browser_pointless` 门(外部脚本页且无静态 hint 时跳过浏览器)
+  挡住,async 侧按 390 已记账的设计没有这个门 ⇒ 同一个错误一侧被
+  性能门掩盖、另一侧暴露。**390 测到「不复现」的原因**:那次
+  `DynamicDomAnalyzer` 构造失败被 `except Exception: return None`
+  吞掉,`available()` 只查 `find_spec("playwright")`,「可导入」与
+  「这次能启动」是两件事 —— 时基成分在这里,但**触发开关是可修
+  契约,不是不可控噪声**。
+- **Fixed(唯一产品改动,共 18 行)**:`scanner.py` 与
+  `async_scanner_layers.py` 的 `_resolve_dom_engine()` 各补
+  `if de == "off": return None`;shim 的 stored 往返委托同一个 async
+  解析器,一处定义覆盖两条路径。**不改** `AsyncScanner` 默认值、
+  CLI/MCP 默认值(都显式传 `auto`)、Phase 353 门、判定层 / 语料 /
+  预算 / CLI 契约。**行为面勘误(全量门实测)**:变化覆盖**所有**
+  `off` 路径,包含 `AsyncScanner` 默认 `off` 的隐式路径,不是初稿
+  写的「只发生在显式要求 `off` 时」—— 详见验收节。产品 CLI 两处
+  构造显式 `dom_engine=...(auto)`、MCP/REST 显式 `auto`、
+  `benchmark/evidence_shape_sweep.py` 显式 `static`,均不受影响;
+  full 194 双引擎门禁验证 `auto` 路径不变。
+- **同一量具复测**:修复前的 8 臂对照只有 `off_fixed` 收敛;补丁落盘
+  后,**真产品代码**单 case 复测(`dev/_p397_sri_one.py`,`package`
+  指向工作区真包)`divergent=false`,sync / async 逐位一致
+  `[sri_missing_script, medium, high]`;不拿影子包探针臂冒充产品
+  改动。
+- **396 的两个红门**:① 全量分批门的 safe-delete 假红已在 396 按
+  resume 契约顺序重跑覆盖(318/318 覆盖、0 真失败,口径不合并成
+  「一次跑绿」);② **parity 全矩阵门本轮转绿** ——
+  `XSSENTINEL_PARITY_FULL=1` **4 passed / 0 skipped / 71.49s /
+  RC 0**,对比 396 的 `1 failed / 3 passed / 1 rerun`(358s)。
+  opt-in 确实打开:未打开时该用例会 skip 成 `3 passed / 1 skipped`,
+  日志形状可证伪。修复后不再启动 Chromium,同一门墙钟
+  358s → 71.49s 是根因的独立佐证。
+- **未做 / 边界**:CLI `--dom-engine` 的 choices 是
+  `auto/playwright/static`,**没有 `off`**,而 MCP input schema 有 ——
+  同一契约两处声明的既有漂移,本轮不扩 CLI 面,列观察项。
+  缓存污染(396 边界)、预算语义、`Budget.spend` 计数与 MCP 层
+  wall-clock cancel 路径均不在本轮范围,保持既有记账。
+- **验收(本轮自己的运行,引用带跳过数)**:守卫
+  `tests/test_phase397_dom_engine_off.py` **6 passed / 0 skipped**
+  (0.72s,哨兵 analyzer 把「是否构造浏览器引擎」与本机 Chromium
+  可用性解耦;第 6 例源码级钉住三个 DOM 交付守卫的 async 构造点
+  必须显式 `dom_engine="auto"`,防本轮真回归回潮);变异
+  `dev/phase397_mutations.py` **2/2**(分别删
+  sync / async 的 `off` 分支,baseline 绿 → mutated 红 → restored
+  全守卫绿,字节级还原);邻接 12 文件(11 个显式 `off` +
+  `test_async_dom_live.py` 显式 `auto`)**65 passed / 0 skipped /
+  44.01s**;range3 **TP17/FP0/TN7/FN0/SKIP2/ERR0 exit 0**、
+  range4 双引擎 **TP2/FP0/TN2/FN0/ERR0 exit 0**
+  (`XS_RANGE4_PORT=20504`);四档 strict gate(本树同日产物,
+  `dev/_p397_gate_all.txt` RC 均 0):quick sync **64 scored /
+  0 SKIP**(156.7s)、quick async **63 scored / 1 SKIP**(156.8s)、
+  full sync **194 scored / 0 SKIP**(357.0s)、full async
+  **182 scored / 12 SKIP**(360.8s)—— 全部 FP0/FN0/ERROR0、
+  性能预算全 PASSED;ruff 全仓零基线;文档刻度与架构守卫
+  **28 passed**。
+- **全量分批门(如实记口径,不把总数当判据)**:首轮
+  `dev/batched_gate_scratch.py --jobs 4 --quiet`、日志重定向到工作区外,
+  **315/319 文件绿 / 489s / RC=4**,skip **13 例 / 6 文件(2 个整文件
+  零贡献)**。4 个红逐个查日志:3 个真回归 + 1 个环境形态。
+  - **真回归**:`test_phase215_crawl_mined_layers.py`(2 例)/
+    `test_phase209_spa_route_delivery.py`(1 例)/
+    `test_phase214_crawl_page_layers.py`(1 例),async 臂
+    `dom_dynamic=[]` —— 三者直接构造 `AsyncScanner` **不传**
+    `dom_engine`,用默认 `off`,却断言浏览器执行结果,此前一直靠
+    「off 被忽略」通过。A/B 三臂(`dev/_p397_ab_dom.py`)baseline
+    `4 failed / 10 passed`(54.8s)→ 删两侧 `off` 分支(修复前)
+    `14 passed`(105.7s)→ restored `4 failed / 10 passed`(54.4s),
+    字节级还原 ⇒ **FIX-CAUSED**,按真回归处置。修法只改测试口径:
+    三个构造点补 `dom_engine="auto"`,与 sync 臂的
+    `use_headless=True` 对齐,不改判定层 / 产品代码 / 断言强度;
+    复跑 **14 passed / 0 skipped / 105.56s**,ruff 三文件零基线。
+  - **环境形态**:`test_phase360_cli_compat.py` 的 `--version`/`-V`
+    断言 `stderr == b""`,被 `PYTHONPATH` 里 WorkBuddy shim 的
+    `sitecustomize.py` 权限错误(`PermissionError [Errno 13]`)污染;
+    清空 `PYTHONPATH` 单文件复跑 **34 passed / 0 skipped / 39.57s**,
+    且清空后依赖靶场 server 的 `test_async_polyglot_classification.py`
+    **3 passed** ⇒ 不是靠关掉依赖换来的绿。
+  - **修后重跑(终树)**:`dev/_p397_batched_gate_r2.txt`,清空
+    `PYTHONPATH` 消除 shim 噪音后 **319/319 文件绿 / 470s /
+    failures 0 / RC 0**,skip **13 例 / 6 文件(2 个整文件零贡献)**。
+    首轮 315/319 与重跑 319/319 **两个口径一起报**,不合并成
+    「一次跑绿」;引用绿必须同时带 skip 数。重跑启动后只追加了
+    第 6 例源码守卫与文档编辑,产品代码与三个回归守卫在启动前
+    已定稿;最终树上该守卫单独复跑 **6 passed / 0 skipped**、
+    文档守卫 **19 passed**、变异 **2/2**、ruff 全仓零基线。
+- **环境事件(本轮,如实记账)**:`benchmark/server.py`(tracked,
+  2704 行)在 pytest 收集期被外部进程删除,报
+  `OSError [Errno 9] Bad file descriptor` —— 与 AGENTS.md 已记录
+  三次的同形事件一致,来源仍未确认。按既定办法 `git checkout --`
+  恢复,恢复后仍在读取瞬间被删,加只读属性(`attrib +R`)后导入与
+  全部门禁稳定通过。这是**本机环境处置**,不改产品/测试代码、
+  不进门禁判据。`dev/_p397_gate_all.txt` 当时停在
+  `=== 7 range4 ===` 无结果,后续门禁由本轮补齐。
+- **刻度自纠正两处**:事实表初版引用不存在的
+  `phase397_sri_control_20261115.json` ⇒ 改注为 **396 带日期**的
+  `phase396_sri_control_20261115.json`(`shipped_fix` / `old_fetch`
+  两臂),不冒充本轮产物;守卫 docstring 的「7 arms」⇒ 7/8 臂
+  (第 8 臂 `off_fixed` 收敛)。事实表另补「归属说明」,明确 8 臂
+  对照是修复落盘**之前**构造、`current` 臂是未修代码。
+
 ## [2.1.0] - 2026-11-13
 
 > 承接 Phase 387–389。按「新增能力走 minor」定级:strict gate 新增墙钟预算

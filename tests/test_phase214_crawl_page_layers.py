@@ -151,8 +151,11 @@ def _collect(engine: str, base: str) -> list:
     from xssentinel.core.async_scanner import AsyncScanner
 
     async def go():
+        # Phase 397: 'off' now disables the browser for real.  AsyncScanner's
+        # default would silently drop the DOM layer these assertions measure;
+        # request it explicitly, as the sync arm does via use_headless=True.
         asc = AsyncScanner(crawl=True, crawl_depth=1, max_payloads=8,
-                           advanced_layers=True)
+                           advanced_layers=True, dom_engine="auto")
         out = []
         async for f in asc.scan(base + "/"):
             out.append(f.data if hasattr(f, "data") else f)
