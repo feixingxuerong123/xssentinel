@@ -478,12 +478,21 @@
 - 邻接 API/MCP 组(`test_p27_api` / `test_phase196_api_gate` /
   `test_api_ai_report` / `test_mcp_server`)**138 passed / 7 skipped**;
   ruff 全仓零基线(`All checks passed!`)。
-- **未取到数字(如实记)**:quick strict gate 本轮两次尝试均因本机
-  benchmark 吞吐严重劣化(满 CPU、quick 64 例跑满 7 分钟无结果,
-  历史同机约 143s)未产出报告,故**不引用任何 gate 数字**;import 计时
-  0.62s 无循环、端口无残留,确认慢在扫描吞吐而非本轮改动。本轮只改
-  REST 边界校验,未触及判定层 / 语料 / 预算 / core 扫描路径,
-  Phase 398 四档 strict gate(FP0/FN0)对本轮产品代码仍成立。
+- **quick 双引擎 strict gate(本树同日重跑)**:`benchmark/results/
+  phase399_quick_{sync,async}_20261117.json` —— sync
+  **36 TP/0 FP/28 TN/0 FN/0 ERROR**(64 scored / 0 SKIP,159.3s,
+  性能预算 330s PASSED)、async **36/0/27/0/0**(63 scored / 1 SKIP,
+  164.9s,预算 350s PASSED),两者 F1 1.0、strict 门 PASSED。
+- **全量双引擎未单独重跑(如实记)**:本轮只改 REST 边界校验,未触及
+  判定层 / 语料 / 预算 / core 扫描路径,Phase 398 full 双引擎
+  (sync 113/0/81/0、async 107/0/75/0,FP0/FN0)对本轮产品代码仍成立;
+  不拿 398 的数字冒充 399 本轮全量运行。
+- **环境事件(不改产品/测试代码)**:首次跑 quick 时 TEMP 指向 system
+  temp,扫描子进程报告写入 `Permission denied` 后 runner 反复重试,
+  表现为「满 CPU、7 分钟无结果」。将 TEMP/TMP 指到
+  `C:/Users/Administrator/.cache/xssentinel/tmp` 后即恢复正常(159s,
+  与历史同机 143s 同量级)。根因是本机临时目录权限,非本轮改动;
+  同一量具未改,只修环境即拿到上述数字。
 
 ## [2.1.0] - 2026-11-13
 

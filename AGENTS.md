@@ -67,8 +67,13 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
   字面量重声明 + REST/MCP 逐位一致)+ 变异 baseline 绿→2 红→还原绿
   + 邻接 138p/7s + ruff 零基线。**版本**:BREAKING + minor 2.2.0
   (operator 裁决;注意与 Phase 383 走 major 的先例有意偏离,依据影响面
-  为零)。**未取到 gate 数字**(本机 benchmark 吞吐劣化,如实标注不引用)。
-  事实表 `benchmark/results/phase399_rest_dom_engine_20261117.json`,
+  为零)。**quick 双引擎 strict gate 本树重跑全绿**:sync
+  36/0/28/0(0 SKIP)、async 36/0/27/0(1 SKIP),FP0/FN0/ERROR0、
+  性能预算 PASSED;全量未单独重跑(只改 REST 边界,398 full 仍成立,
+  不冒充 399 全量)。环境事件:TEMP 指 system temp 时扫描子进程报告
+  写入被拒致反复重试「满 CPU 无结果」,TEMP/TMP 指到
+  `.cache/xssentinel/tmp` 即恢复(159s)。事实表
+  `benchmark/results/phase399_rest_dom_engine_20261117.json`,
   详见 CHANGELOG `[2.2.0]` 与 OPTIMIZATION §8.30。
 - **[Unreleased] / Phase 398(2026-11-15,CLI `--dom-engine off` 契约对齐——N 处声明收口)**:
   承接 397 明确留下的观察项(§8.28「本轮不扩 CLI 面」)。**先量再修**:
