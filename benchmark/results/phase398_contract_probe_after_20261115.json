@@ -1,0 +1,108 @@
+{
+  "phase": 398,
+  "probe": "dom_engine contract across CLI / MCP / REST / core / docs",
+  "values_tested": [
+    "auto",
+    "playwright",
+    "static",
+    "off",
+    "bogus"
+  ],
+  "cli": {
+    "choices": [
+      "auto",
+      "playwright",
+      "static",
+      "off"
+    ],
+    "default": "auto",
+    "auto": {
+      "accepted": true,
+      "note": "auto",
+      "stderr_tail": ""
+    },
+    "playwright": {
+      "accepted": true,
+      "note": "playwright",
+      "stderr_tail": ""
+    },
+    "static": {
+      "accepted": true,
+      "note": "static",
+      "stderr_tail": ""
+    },
+    "off": {
+      "accepted": true,
+      "note": "off",
+      "stderr_tail": ""
+    },
+    "bogus": {
+      "accepted": false,
+      "note": "SystemExit(2)",
+      "stderr_tail": "-mitm-ca PEM] [--sqli-check] [--check-outdated-js]\nxssentinel: error: argument --dom-engine: invalid choice: 'bogus' (choose from auto, playwright, static, off)"
+    }
+  },
+  "mcp": {
+    "enum": [
+      "auto",
+      "playwright",
+      "static",
+      "off"
+    ],
+    "default": "auto",
+    "description": "DOM-XSS engine. 'auto' (default) runs it with a static fallback when Playwright is unavailable; 'off' disables the DOM layer. This is independent of 'headless', which only confirms findings in a real browser."
+  },
+  "rest": {
+    "auto": {
+      "status": 202,
+      "dom_engine_reached_scanner": "auto",
+      "worker_started": true
+    },
+    "playwright": {
+      "status": 202,
+      "dom_engine_reached_scanner": "playwright",
+      "worker_started": true
+    },
+    "static": {
+      "status": 202,
+      "dom_engine_reached_scanner": "static",
+      "worker_started": true
+    },
+    "off": {
+      "status": 202,
+      "dom_engine_reached_scanner": "off",
+      "worker_started": true
+    },
+    "bogus": {
+      "status": 202,
+      "dom_engine_reached_scanner": "bogus",
+      "worker_started": true
+    }
+  },
+  "core": {
+    "auto": {
+      "sync": "sentinel",
+      "async": "sentinel"
+    },
+    "playwright": {
+      "sync": "sentinel",
+      "async": "sentinel"
+    },
+    "static": {
+      "sync": "none",
+      "async": "none"
+    },
+    "off": {
+      "sync": "none",
+      "async": "none"
+    },
+    "bogus": {
+      "sync": "sentinel",
+      "async": "sentinel"
+    }
+  },
+  "docs": {
+    "README.md_429": "`--dom-engine {auto,playwright,static}`",
+    "README.en.md": "mentions dom_engine=auto default only"
+  }
+}

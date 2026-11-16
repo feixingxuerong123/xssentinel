@@ -373,6 +373,8 @@ python -m xssentinel -u "https://example.com/search?q=test" --dom-engine auto
 python -m xssentinel -u "https://example.com/search?q=test" --dom-engine playwright
 # 仅用静态启发式（不启动浏览器，最快）
 python -m xssentinel -u "https://example.com/search?q=test" --dom-engine static
+# 完全关闭 DOM 层（不启动浏览器，也不跑静态 DOM 启发式）
+python -m xssentinel -u "https://example.com/search?q=test" --dom-engine off
 
 # 多格式报告（-f 支持 html,json,csv,sarif,junit,markdown,burp,nuclei）
 python -m xssentinel -u "https://example.com/search?q=test" -f json -o report.json
@@ -426,7 +428,7 @@ python -m xssentinel -u "https://example.com" --check-outdated-js
 exit 3 而不是回退 sync——报告顶层恒带 `engine` 与 `engine_fallback_reason`）、
 `--oob {self,interactsh}`（盲打自动确认模式）、
 `--oob-timeout`（等待回调秒数，默认 12）、
-`--dom-engine {auto,playwright,static}`（DOM-XSS 引擎：auto=有 playwright 用真浏览器确认、否则静态；playwright=强制真浏览器；static=仅静态启发式，默认 auto）、
+`--dom-engine {auto,playwright,static,off}`（DOM-XSS 引擎：auto=有 playwright 用真浏览器确认、否则静态；playwright=强制真浏览器；static=仅静态启发式；off=完全关闭 DOM 层，默认 auto）、
 `--stored-inject` / `--stored-view` / `--stored-param`（存储型扫描；sync 默认开存储注入点自动发现，`--no-stored-auto` 关闭，显式 `--stored-inject` 时自动让位）、
 `-o/--output`、`-f/--format {html,json,csv,sarif,junit,markdown,burp,nuclei}`（burp=Burp XML、nuclei=每 finding 一个可运行模板目录）、
 `--upload-field`（上传 filename XSS，见上）、

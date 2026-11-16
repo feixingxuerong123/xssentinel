@@ -2378,3 +2378,75 @@ Phase 397 勘误为准。
 **仍开放(观察项)**:CLI `--dom-engine` 的 choices 是
 `auto/playwright/static`,**没有 `off`**,而 MCP input schema 有 ——
 同一契约两处声明的既有漂移。本轮不扩 CLI 面,不与本修复混做。
+> **2026-11-15 结案**:此观察项已由 §8.29 / Phase 398 关闭。带日期
+> 原文保留不改。
+
+### 8.29 处置记录(2026-11-15):Phase 398——§8.28 的 CLI 漂移关闭
+
+**起点**:§8.28 末尾明确「本轮不扩 CLI 面,不与本修复混做」,把
+`--dom-engine` 缺 `off` 列成观察项。本节独立成轮关闭它。
+
+**先量再修(产品零改动的测量轮)**:`dev/_p398_contract_probe.py`
+用**真实入口**量 5 个值 × 5 个面 —— CLI `build_parser("scan")`
+的真实 argparse action、MCP 的真实 `_TOOL_SCAN_SCHEMA`、REST 的
+真实 `_handle_create_scan`(替身 ctx 只回答 handler 会发出的
+`create`/`start`,`start` 不跑 worker、无网络,`mark_completed`
+一旦被调用即 ABORT —— 按 Phase 201 续二量过替身保真度)、
+两侧真实 `_resolve_dom_engine()`(哨兵 analyzer 把「是否构造
+浏览器」与本机 Chromium 解耦)、中英 README。事实表
+`benchmark/results/phase398_dom_engine_contract_20261115.md`。
+结果:`off` 被 CLI `invalid choice` 拒(rc=2)、MCP 接受、两侧
+解析器返回 `None`;中文 README 只列 `{auto,playwright,static}`。
+
+**量出的一处记账外问题**:REST `api/server.py:557` 对
+`dom_engine` **无值域校验**,`bogus` 也 202 直通 `Scanner`,
+在两侧解析器里落到 `DynamicDomAnalyzer` 构造 ⇒ **静默启动真
+Chromium**,与 Phase 397 修掉的「`off` 被忽略」同形。收紧它等于
+改 API 接受域(会拒绝今天被接受的请求),按「改契约要自己的
+兼容性与门禁轮」**列独立一轮**,不与 CLI 面混做。
+
+**Fixed(唯一产品改动)**:`xssentinel/__main__.py` 的
+`--dom-engine` choices 补 `off`,help 文案与 MCP schema 描述对齐;
+`README.md` 花括号值列表补 `off` 并加示例,`README.en.md` Quick
+start 加 `--dom-engine off`。**不改**默认值(仍 `auto`)、判定层 /
+语料 / 预算 / REST 契约 / 其它 CLI 参数;只增一个合法值、不动
+现有参数语义 ⇒ 按 CHANGELOG「版本策略」属新增能力,非
+`BREAKING:`。
+
+**同一量具复测**:探针加 `P398_OUT` 另存
+`phase398_contract_probe_after_20261115.json`,**不覆写**修复前
+证据。CLI `off` 从 `SystemExit(2)` → `accepted=true`,`bogus`
+仍拒,`default` 仍 `auto`;MCP enum / REST 五个 202 臂 / core
+十个解析结果**逐位不变** —— 量具能看到本轮没碰的面没变,才说明
+不是替身造出来的绿。真实 CLI 子进程:`--dom-engine off
+--version` rc=0、`bogus` rc=2、`--help` 显示四值。
+
+**「清单分散在 N 处」的守卫(Phase 207 三条规则)**:
+`tests/test_phase398_dom_engine_contract.py` **6 passed /
+0 skipped**。从真实 parser / MCP schema / README 花括号列表读值域,
+断言三处集合相等且都含 `off`、集合增删即红(`len==4`)、默认值
+同为 `auto`;再断言真实 `parse_args` 接受**每个**声明值并拒绝
+`bogus`;哨兵下两侧解析器对**每个**声明值的结果逐位一致;
+两处用户可见描述都解释 `off`;英文 README 已同步。判据收窄到
+「两边都认」,**不引入豁免名单**,也不接受手抄的常量表。
+变异 `dev/phase398_mutations.py` **4/4**:分别从 CLI choices /
+MCP enum / 中文 README / 英文 README 删掉 `off`,各自 baseline 绿
+→ mutated 红 → restored 全守卫绿,字节级还原(文本模式读写在本机
+保持 CRLF,已用 blob 哈希核过)。
+
+**刻度边界**:`README.en.md` **故意不列全量值域**,避免制造第五处
+声明;守卫只钉「`off` 用法已同步」。将来若真加第五个值,守卫的
+`len==4` 与 `_EXPECTED` 键集会同时红,强制四处声明 + 事实表一起
+更新 —— 这正是把「集合本身可增删无告警」这条失效形状堵住。
+
+**验收(本轮自己的运行)**:守卫 6 passed / 0 skipped、变异
+4/4、同量具复测如上;四档 strict gate(range3/range4 之外的
+quick/full × sync/async)、range4 双引擎与 ruff 数字见 CHANGELOG
+Phase 398 验收节(引用绿必须同时带 skip 数)。**本轮未跑**:
+range3、邻接组、pytest 全量分批门 —— 改动面只有 CLI choices 与
+两份 README,不碰判定层/语料/预算/REST,397 全量门 319/319 绿
+对当前产品代码仍成立;不虚报、不拿旧证据顶本轮。
+
+**仍开放(新观察项)**:REST `dom_engine` 值域校验(独立一轮);
+Phase 396 的缓存污染、预算语义与 397 的 `_browser_pointless`
+sync-only 设计保持既有记账。

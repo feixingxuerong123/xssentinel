@@ -56,6 +56,35 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
 
 ## 当前状态(2026-11-15)
 
+- **[Unreleased] / Phase 398(2026-11-15,CLI `--dom-engine off` 契约对齐——N 处声明收口)**:
+  承接 397 明确留下的观察项(§8.28「本轮不扩 CLI 面」)。**先量再修**:
+  `dev/_p398_contract_probe.py` 用真实入口量 5 值 × 5 面(CLI
+  `build_parser` 的真实 action、MCP 真实 schema、REST 真实
+  `_handle_create_scan` + 只回答 `create`/`start` 的替身、两侧真实
+  `_resolve_dom_engine()` 哨兵、中英 README),事实表
+  `benchmark/results/phase398_dom_engine_contract_20261115.md`。
+  **`off` 被 CLI 以 `invalid choice` 拒(rc=2)而 MCP 接受**;中文
+  README 只列三个值。**量出记账外的一处**:REST 对 `dom_engine`
+  无值域校验,`bogus` 也 202 直通 `Scanner` 并静默构造真 Chromium
+  (与 397 修掉的「off 被忽略」同形)——收紧会拒绝今天被接受的
+  请求,**列独立一轮,本轮不修**。修:`__main__.py` choices 补
+  `off` + help 对齐 MCP 描述,中英 README 同步用法;**不改默认值
+  `auto` / 判定层 / 语料 / 预算 / REST 契约 / 其它 CLI 参数**,
+  只增合法值 ⇒ 新增能力非 BREAKING。**同一量具复测**(另存
+  `...after...` 不覆写修复前证据):`off` 从拒 → 接受、`bogus`
+  仍拒、default 不变,MCP/REST/core 逐位不变,真实 CLI 子进程
+  rc=0 / rc=2 / `--help` 显示四值。守卫
+  `tests/test_phase398_dom_engine_contract.py` **6 例**(从真实
+  parser / MCP schema / README 花括号读值域断言三处集合相等、
+  集合增删即红、真实 `parse_args` 接受每个声明值、两侧解析器对
+  每个值逐位一致、两处描述都解释 off、英文同步;「两边都认」
+  不引入豁免名单)+ 变异 `dev/phase398_mutations.py` **4/4**
+  (CLI/MCP/中英 README 各删 off,baseline 绿→mutated 红→
+  restored 绿,字节还原)。`README.en.md` 故意不列全量值域以避免
+  第五处声明。**仍开放**:REST `dom_engine` 值域校验(独立轮)。
+  四档 strict gate / range4 / ruff 数字见 CHANGELOG Phase 398 验收节;
+  range3/邻接组/全量分批门本轮未跑(只改 CLI choices 与 README,
+  不碰判定层/语料/预算/REST),理由与口径同见该节。
 - **[Unreleased] / Phase 397(2026-11-15,`dom_engine="off"` 契约修复——parity 红门归零)**:
   396 留下的第二个红门(parity 全矩阵 `pos-sri-01`)定谳并关闭,**同时推翻
   396「390–395 期间某轮使其复现 / 环境时基观察项」的定性**。8 臂同量具

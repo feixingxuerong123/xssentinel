@@ -520,8 +520,13 @@ def build_parser(mode: str = "scan"):
     g_det.add_argument("--headless", action="store_true",
                        help="Real-browser confirmation (needs playwright)")
     g_det.add_argument("--dom-engine", dest="dom_engine",
-                       choices=["auto", "playwright", "static"], default="auto",
-                       help="DOM-XSS engine mode")
+                       choices=["auto", "playwright", "static", "off"],
+                       default="auto",
+                       help=("DOM-XSS engine mode: auto (default) uses a real "
+                             "browser with static fallback, playwright forces "
+                             "it, static is heuristics only, off disables the "
+                             "DOM layer entirely (same value the MCP tool "
+                             "schema accepts)"))
     g_det.add_argument("--skip-param", default=None, metavar="A,B,C",
                        help="Comma-separated parameter names to skip"
                             " entirely (case-insensitive; DalFox parity):"

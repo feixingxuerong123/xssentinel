@@ -254,6 +254,9 @@ python -m xssentinel -u "https://example.com" -c --checkpoint cp.json --resume
 # Real-browser confirmation (needs playwright)
 python -m xssentinel -u "https://example.com/search?q=test" --headless
 
+# Disable the DOM layer entirely (no browser, no static DOM heuristics)
+python -m xssentinel -u "https://example.com/search?q=test" --dom-engine off
+
 # Report formats (`-f`: html,json,csv,sarif,junit,markdown,burp,nuclei)
 python -m xssentinel -u "https://example.com/search?q=test" -f sarif -o report.sarif
 
