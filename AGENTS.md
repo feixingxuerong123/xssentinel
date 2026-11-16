@@ -54,8 +54,22 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
 
 - 新增检测层必须**同时**注册 `coverage.LAYERS` 与 `layer_coverage` 矩阵(Phase 187/192 两次被门禁抓到的同一课)。
 
-## 当前状态(2026-11-15)
+## 当前状态(2026-11-17)
 
+- **[2.2.0] / Phase 399(2026-11-17,REST `dom_engine` 值域校验——BREAKING)**:
+  闭合 §8.28/§8.29 连续两轮记下的「REST 对 `dom_engine` 无值域校验,
+  `bogus` 202 直通并静默构造真 Chromium」(与 397「off 被忽略」同族)。
+  **先量再修**:同一量具 12 臂调真实 `_handle_create_scan`,修复前基线
+  沿用 Phase 398 带日期快照(本轮不伪造基线)。修法:值域从 MCP
+  `_TOOL_SCAN_SCHEMA` enum 读取(lazy import 避循环,**不在 REST 手抄
+  第五份**),大小写不敏感归一复刻 MCP `_check_type`,非法值 400
+  `invalid_request` 不再到 Scanner。守卫 6 例(含 AST 断言 REST 无
+  字面量重声明 + REST/MCP 逐位一致)+ 变异 baseline 绿→2 红→还原绿
+  + 邻接 138p/7s + ruff 零基线。**版本**:BREAKING + minor 2.2.0
+  (operator 裁决;注意与 Phase 383 走 major 的先例有意偏离,依据影响面
+  为零)。**未取到 gate 数字**(本机 benchmark 吞吐劣化,如实标注不引用)。
+  事实表 `benchmark/results/phase399_rest_dom_engine_20261117.json`,
+  详见 CHANGELOG `[2.2.0]` 与 OPTIMIZATION §8.30。
 - **[Unreleased] / Phase 398(2026-11-15,CLI `--dom-engine off` 契约对齐——N 处声明收口)**:
   承接 397 明确留下的观察项(§8.28「本轮不扩 CLI 面」)。**先量再修**:
   `dev/_p398_contract_probe.py` 用真实入口量 5 值 × 5 面(CLI

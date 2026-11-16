@@ -438,6 +438,53 @@
   Phase 396 的缓存污染 / 预算语义、397 的 `_browser_pointless`
   sync-only 设计均不在本轮范围。
 
+## [2.2.0] - 2026-11-17
+
+### BREAKING——Phase 399: REST `dom_engine` 值域校验(API 接受域收紧)
+
+- **改了什么**:`POST /api/v1/scans` 的 `dom_engine` 字段此前**无任何
+  值域校验**,任意字符串(如 `bogus`)都返回 202 并直通 `Scanner`,
+  最终静默构造真 `DynamicDomAnalyzer` —— 与 Phase 397 修掉的
+  「`off` 被忽略」同一族(公开契约未在边界强制)。本轮起:值域从
+  MCP input schema 的 enum 读取(唯一权威源,不在 REST 手抄第五份),
+  大小写不敏感归一(与 MCP `_check_type` 逐位一致),**非法值返回
+  400 `invalid_request`**,不再到达 Scanner / 不再起浏览器。
+- **破坏性影响**:今天依赖「非法值被静默接受」的外部 REST 客户端
+  会开始收到 400。代码库内零非法值调用点,实际下游代价为零。
+  合法四值 `auto/playwright/static/off` 与缺省 `auto` 语义不变。
+- **版本口径**:按 operator 裁决标 `BREAKING:` 并走 minor = 2.2.0。
+  **注意与先例的偏差**:历史唯一 BREAKING(Phase 383)落在 2.0.0
+  major,与本轮 minor 不同 —— 此处为有意偏离,依据是本轮收紧的
+  实际影响面为零;若后续要求严格遵循「破坏性变更走 major」策略,
+  应改发 3.0.0。
+
+### Fixed——同轮其余(均属 Unreleased 已有记账,随本版发布)
+
+- Phase 390–398 的勘误与修复(外部语料 oracle 升级、sandbox 五处、
+  cookie 粘性、空注释闭合、NodeGoat 存储流、`dom_engine="off"`
+  契约、CLI 四处声明收口)随本版一并发布,详见上方 Unreleased 各条。
+
+### Phase 399 验收(本轮自己的运行,引用带跳过数)
+
+- 守卫 `tests/test_phase399_rest_dom_engine_validation.py` **6 passed /
+  0 skipped**;变异 `dev/phase399_mutations.py` baseline 绿 → 去掉校验
+  **2 条红** → 字节还原绿(hash 一致),判据非空转。
+- 同量具 `dev/_p399_rest_dom_engine_probe.py` 12 臂
+  (`benchmark/results/phase399_rest_dom_engine_20261117.json`):四值
+  202 原样、`AUTO/Playwright/OFF/StAtIc` 归一为小写、`bogus/on/""/123/
+  None` 全部 400 且 `reached_scanner=null`/`worker_started=false`、
+  缺省 `auto` 不变。修复前基线沿用 Phase 398 带日期快照的 REST 臂
+  (`bogus` 202 直通),不伪造本轮基线。
+- 邻接 API/MCP 组(`test_p27_api` / `test_phase196_api_gate` /
+  `test_api_ai_report` / `test_mcp_server`)**138 passed / 7 skipped**;
+  ruff 全仓零基线(`All checks passed!`)。
+- **未取到数字(如实记)**:quick strict gate 本轮两次尝试均因本机
+  benchmark 吞吐严重劣化(满 CPU、quick 64 例跑满 7 分钟无结果,
+  历史同机约 143s)未产出报告,故**不引用任何 gate 数字**;import 计时
+  0.62s 无循环、端口无残留,确认慢在扫描吞吐而非本轮改动。本轮只改
+  REST 边界校验,未触及判定层 / 语料 / 预算 / core 扫描路径,
+  Phase 398 四档 strict gate(FP0/FN0)对本轮产品代码仍成立。
+
 ## [2.1.0] - 2026-11-13
 
 > 承接 Phase 387–389。按「新增能力走 minor」定级:strict gate 新增墙钟预算

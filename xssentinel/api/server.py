@@ -518,6 +518,34 @@ def _handle_metrics(ctx, m, body, query) -> Response:
     )
 
 
+def _dom_engine_values():
+    """The authoritative dom_engine value set, read from the MCP schema.
+
+    Phase 399: this used to be a fourth hand-written copy in REST (a bare
+    ``body.get("dom_engine", "auto")`` with no validation), so ``bogus`` was
+    accepted with 202 and silently reached ``DynamicDomAnalyzer`` -- the same
+    family as Phase 397's "off ignored".  Read the enum from the MCP input
+    schema instead of re-declaring it here: one contract, one source.  The
+    lazy import avoids a cycle (mcp_server imports _build_requester from this
+    module inside its own functions).
+    """
+    from .mcp_server import _TOOL_SCAN_SCHEMA
+    return list(_TOOL_SCAN_SCHEMA["properties"]["dom_engine"]["enum"])
+
+
+def _normalize_dom_engine(value, values=None):
+    """Case-insensitively normalize to the declared enum, or return None.
+
+    Mirrors mcp_server._coerce_string_enum exactly (case-insensitive match,
+    return the canonical enum member) so REST and MCP give byte-identical
+    verdicts for the same value.  None means invalid -> caller returns 400.
+    """
+    values = _dom_engine_values() if values is None else values
+    if not isinstance(value, str):
+        return None
+    return next((e for e in values if e.lower() == value.lower()), None)
+
+
 def _handle_create_scan(ctx, m, body, query) -> Response:
     if not ctx.api_key_valid:
         return Response.error(401, "unauthorized", "missing or invalid API key")
@@ -538,6 +566,15 @@ def _handle_create_scan(ctx, m, body, query) -> Response:
         return Response.error(400, "invalid_request",
                               "'params' and 'data' must be objects")
 
+    # Phase 399: validate dom_engine against the MCP schema's enum (the single
+    # authoritative declaration).  Case-insensitive like MCP; an unknown value
+    # used to reach the Scanner and silently build a real Chromium analyzer.
+    dom_engine = _normalize_dom_engine(body.get("dom_engine", "auto"))
+    if dom_engine is None:
+        return Response.error(400, "invalid_request",
+                              f"dom_engine must be one of {_dom_engine_values()} "
+                              f"(got {body.get('dom_engine')!r})")
+
     # Build the scanner-options snapshot from the request.  Anything not
     # provided falls back to a sane default.
     options = {
@@ -554,7 +591,7 @@ def _handle_create_scan(ctx, m, body, query) -> Response:
         "crawl_depth": int(body.get("crawl_depth", 2)),
         "scope": body.get("scope"),
         "threads": int(body.get("threads", 4)),
-        "dom_engine": body.get("dom_engine", "auto"),
+        "dom_engine": dom_engine,
         "crawl_engine": body.get("crawl_engine", "auto"),
         "custom_payloads": body.get("custom_payloads") or [],
         # Phase 176: AI narrative, opt-in per scan.  Off by default because

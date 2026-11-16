@@ -1,0 +1,71 @@
+{
+  "values_source": "MCP schema enum",
+  "values": [
+    "auto",
+    "playwright",
+    "static",
+    "off"
+  ],
+  "cases": {
+    "'auto'": {
+      "status": 202,
+      "reached_scanner": "auto",
+      "worker_started": true
+    },
+    "'playwright'": {
+      "status": 202,
+      "reached_scanner": "playwright",
+      "worker_started": true
+    },
+    "'static'": {
+      "status": 202,
+      "reached_scanner": "static",
+      "worker_started": true
+    },
+    "'off'": {
+      "status": 202,
+      "reached_scanner": "off",
+      "worker_started": true
+    },
+    "'AUTO'": {
+      "status": 202,
+      "reached_scanner": "auto",
+      "worker_started": true
+    },
+    "'Playwright'": {
+      "status": 202,
+      "reached_scanner": "playwright",
+      "worker_started": true
+    },
+    "'OFF'": {
+      "status": 202,
+      "reached_scanner": "off",
+      "worker_started": true
+    },
+    "'bogus'": {
+      "status": 400,
+      "reached_scanner": null,
+      "worker_started": false
+    },
+    "'on'": {
+      "status": 400,
+      "reached_scanner": null,
+      "worker_started": false
+    },
+    "''": {
+      "status": 400,
+      "reached_scanner": null,
+      "worker_started": false
+    },
+    "123": {
+      "status": 400,
+      "reached_scanner": null,
+      "worker_started": false
+    },
+    "None": {
+      "status": 400,
+      "reached_scanner": null,
+      "worker_started": false
+    }
+  }
+}

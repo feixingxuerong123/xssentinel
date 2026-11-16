@@ -2450,3 +2450,42 @@ range3、邻接组、pytest 全量分批门 —— 改动面只有 CLI choices �
 **仍开放(新观察项)**:REST `dom_engine` 值域校验(独立一轮);
 Phase 396 的缓存污染、预算语义与 397 的 `_browser_pointless`
 sync-only 设计保持既有记账。
+> **2026-11-17 结案**:此观察项已由 §8.30 / Phase 399 关闭(REST 从
+> MCP schema 读权威值域,非法值 400)。带日期原文保留不改。
+
+### 8.30 处置记录(2026-11-17):Phase 399——REST `dom_engine` 值域校验
+
+**起点**:§8.28/§8.29 连续两轮记下「REST 对 `dom_engine` 无值域校验,
+`bogus` 也 202 直通并静默构造真 Chromium,与 397 的『off 被忽略』
+同形」,但因改 API 接受域属契约收紧,独立列轮。本轮关闭。
+
+**先量再修**:`dev/_p399_rest_dom_engine_probe.py` 用真实
+`_handle_create_scan`(替身 ctx 只回答 `create`/`start`,`mark_completed`
+一调用即 ABORT,按 Phase 201 续二量过保真度)量 12 个值:修复前
+基线沿用 Phase 398 的 `phase398_contract_probe_after_20261115.json`
+REST 臂 —— 四值 + `bogus` **全部 202 直通**,`bogus` 到达 Scanner。
+全代码库零非法值调用点 ⇒ 收紧的实际代价为零。
+
+**契约权威与改法**:CLI choices 与 MCP enum 都是
+`auto/playwright/static/off`(398 已钉);MCP 运行时 `_check_type`
+对 enum 做**大小写不敏感归一 + 非法值拒绝**。REST 修法复刻此语义,
+且**从 `_TOOL_SCAN_SCHEMA` 的 enum 读值域**(lazy import 避免循环),
+不在 REST 里手抄第五份声明 —— 否则又踩「同一契约手写 N 遍」。
+非法值 → 400 `invalid_request`(与 REST 既有 method/fmt 校验同风格);
+合法值大小写归一为规范小写。
+
+**量具复测**(`benchmark/results/phase399_rest_dom_engine_20261117.json`):
+四值 202 原样到达、大小写变体归一、非法值与非字符串全部 400 且
+**未到达 Scanner / 未起 worker**、缺省值 `auto` 不变。
+
+**守卫** `tests/test_phase399_rest_dom_engine_validation.py` **6 例**
+(值域来自 MCP schema 且 REST 无字面量重声明 —— AST 检查函数体排除
+docstring、四值原样接受、大小写归一、非法值 400 前置拒绝、缺省 auto、
+REST 与 MCP 对同值逐位一致)+ 变异 `dev/phase399_mutations.py`
+**1 态×三跑**(baseline 绿 → 去掉校验 2 条红 → 字节还原绿)。
+邻接 API/MCP 组 138 passed / 7 skipped;ruff 全仓零基线。
+
+**版本**:BREAKING(收紧 API 接受域),按用户裁决走 minor = 2.2.0。
+
+**验收数字**:见 CHANGELOG `[2.2.0]` Phase 399 验收节(引用绿带 skip
+数;未跑的门如实标注)。
