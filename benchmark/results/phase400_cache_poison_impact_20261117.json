@@ -1,0 +1,49 @@
+{
+  "question": "which bare-GET readers eat a poisoned LRU login page",
+  "target": "self-contained loopback (no NodeGoat needed)",
+  "rows": [
+    {
+      "shape": "poison write (anonymous bare GET)",
+      "result": "LOGIN(stale)",
+      "from_cache": false,
+      "note": "writes LOGIN into LRU"
+    },
+    {
+      "shape": "bare GET (scanner.py:670, advanced_layers.py:65/83, content_layers.py:301, scanner_crawl.py, scanner_layers.py, second_order.py)",
+      "result": "LOGIN(stale)",
+      "from_cache": true,
+      "note": ""
+    },
+    {
+      "shape": "params GET (sqli.py baseline) -- params non-empty skips cache",
+      "result": "AUTH(fresh)",
+      "from_cache": false,
+      "note": ""
+    },
+    {
+      "shape": "headers GET (transport_layers canary) -- headers skip cache",
+      "result": "AUTH(fresh)",
+      "from_cache": false,
+      "note": ""
+    },
+    {
+      "shape": "explicit cache_get=False (stored_auto.py:51, stored.py, verify_fix.py -- the Phase 396 fix)",
+      "result": "AUTH(fresh)",
+      "from_cache": false,
+      "note": ""
+    },
+    {
+      "shape": "CONTROL fresh authenticated bare GET",
+      "result": "AUTH(fresh)",
+      "from_cache": false,
+      "note": "no poison -> must be AUTH"
+    }
+  ],
+  "summary": {
+    "bare_get_poisoned": "LOGIN(stale)",
+    "stale_eaters": [
+      "bare GET (scanner.py:670, advanced_layers.py:65/83, content_layers.py:301, scanner_crawl.py, scanner_layers.py, second_order.py)"
+    ],
+    "control": "AUTH(fresh)"
+  }
+}

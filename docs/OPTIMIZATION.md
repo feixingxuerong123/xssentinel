@@ -2489,3 +2489,50 @@ REST 与 MCP 对同值逐位一致)+ 变异 `dev/phase399_mutations.py`
 
 **验收数字**:见 CHANGELOG `[2.2.0]` Phase 399 验收节(引用绿带 skip
 数;未跑的门如实标注)。
+
+### 8.31 处置记录(2026-11-17):Phase 400——GET LRU 缓存写/读条件不对称(污染源头)
+
+**起点**:§8.26 Phase 396 记下的观察项「缓存污染本身没修,只修了
+stored 路径的读取契约;其它 bare-URL 读取者理论上仍可能拿陈旧页,
+列观察项而非已解决」。本轮把它从「理论风险」定谳为**具体代码缺陷**
+并修源头,不再逐个修读者。
+
+**先量再修(四步,每步有事实表 `benchmark/results/phase400_*_20261117.json`)**:
+① 静态盘点产品 14 处 GET 调用点——4 处已显式 `cache_get=False`,
+10 处裸 GET 用默认(advanced_layers / crawler / scanner_layers /
+second_order / client_layers / transport_layers / cli / sqli),后者暴露
+在脏页前。② 自包含 loopback 量具(`dev/_p400_cache_poison_impact.py`,
+真实 Requester):脏页进 LRU 后,裸 GET 读到 LOGIN(stale),params / headers /
+`cache_get=False` 三种形状与干净控制组均读 AUTH(fresh)。③ 忠实复现
+L8_cookie 序列的探针(`dev/_p400_poison_source_live.py`):pinned cookie 的
+真实 Requester 发 `headers=` canary 弹回 LOGIN 后,jar 只剩 good(Phase 394
+pin 恢复生效、会话是好的),但紧接着的裸 GET 仍拿到 **LOGIN 且
+`from_cache=true`**;dump 缓存证实 canary 那次就把 LOGIN 写进了 LRU。
+④ 变异对照坐实根因:monkeypatch 给写条件补 `not headers` → canary 不写
+缓存 → 裸 GET 拿 AUTH。
+
+**根因**:`Requester.get()` 缓存**读**条件含 `not headers`(requester.py:609),
+**写**条件漏了 `not headers`(原 628-629)。带 headers 的 canary / error /
+redirect 探针按契约跳过读缓存,却把响应**写进**裸 URL 的 LRU;应用把 canary
+弹回登录页时,登录页成了该 URL 的缓存条目,之后所有默认 `cache_get=True`
+的裸 GET 静默读到它——即使操作员会话完好。与 Phase 396 修的 reader 侧
+(`scan_stored_auto` → `cache_get=False`)是同一问题的不同面;本轮修**源头**,
+一处改动保护所有读者,Phase 396 的读者侧修复保留作纵深防御。
+**同一契约手写两遍**家族(new):读/写两个条件各自手写,写漏了一半。
+
+**影响面仅 sync**:GET LRU 是 sync `Requester` 特有;async 引擎用 aiohttp
+session,无此缓存(`async_scanner*.py` grep `_cache|cache_get|cache_hits` 零命中)。
+async gate 通过是回归确认,不是修复验证。
+
+**修法边界**:唯一产品改动 = requester.py 缓存写条件补 `and not headers`;
+不改判定层/语料/CLI/MCP/REST/pin 恢复/canary/Phase 396 修复。代价:带
+headers 的 GET 不再填 LRU,后续同 URL 裸 GET 多发 1 次真实请求(此类调用
+是少数 canary/error 探针,且本就不该污染缓存)。
+
+**验收**:守卫 `tests/test_phase400_cache_write_headers.py` 4 例(修前
+2 failed/2 passed,修后 4 passed;含「裸 GET 仍写缓存」「读条件未变」两条
+回归钉防守卫空转)+ 变异 `dev/phase400_mutations.py` baseline 绿→删
+`not headers` 红→字节还原绿 + 邻接组 10 passed + ruff 零基线;quick
+strict 双引擎 sync 64 scored/0 SKIP、async 63 scored/1 SKIP 均 FP0/FN0/
+ERROR0、性能预算 PASSED;全量 192 sync 194 scored/0 SKIP、FP0/FN0/ERROR0、
+416.3s vs ceiling 795s。数字均为本轮运行。

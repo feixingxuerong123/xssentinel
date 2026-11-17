@@ -16,6 +16,34 @@
 
 ## [Unreleased]
 
+### Fixed(2026-11-17,Phase 400):GET 缓存写条件漏 `not headers` —— 认证页被 canary 污染的源头
+
+承接 Phase 396 观察项。定谳为具体缺陷: `Requester.get()` 的 GET 缓存**读**条件含
+`not headers`(requester.py:609),**写**条件漏了(原 628-629)。带 headers 的
+L8_cookie / header canary、error/redirect 探针按契约跳过读缓存,却把响应写进
+裸 URL 的 LRU;canary 被应用弹回登录页时,登录页成为该 URL 缓存条目,之后所有
+默认 `cache_get=True` 的裸 GET(advanced_layers / crawler / stored 等)静默读到
+登录页——即使操作员会话完好(Phase 394 pin 恢复把 jar 维持正确)。Phase 396
+只修了一个读者(`scan_stored_auto`),本轮修**源头**,一处保护所有读者。
+**同一契约手写两遍**家族:读/写条件各自手写,写漏一半。
+
+**先量后修**:四步事实表 `benchmark/results/phase400_*_20261117.json`——
+静态盘点 14 处 GET 调用点;自包含 loopback 量具证脏页只毒裸 GET;忠实 canary
+序列探针证污染源存活(会话 good、裸 GET 仍读 LOGIN 且 `from_cache=true`);
+变异对照补 `not headers` → 污染消失。**影响面仅 sync**(async 用 aiohttp,无此 LRU)。
+
+**改动**:唯一产品改动 = requester.py 缓存写条件补 `and not headers`,与读条件对称。
+不改判定层/语料/契约/pin/canary;Phase 396 读者侧修复保留作纵深防御。
+
+**验收**:守卫 `tests/test_phase400_cache_write_headers.py` 4 例(修前 2 red/
+2 green,修后 4 green)+ 变异 baseline 绿→红→字节还原绿 + 邻接组 10 passed
++ ruff 零基线;quick strict 双引擎 sync 64 scored/0 SKIP、async 63 scored/
+1 SKIP 均 FP0/FN0/ERROR0(性能预算 PASSED,async 无此缓存仅作回归);
+全量 192 sync(`--strict-gate`,20512):**194 scored / 0 SKIP**,FP0/FN0/ERROR0,
+性能 416.3s vs ceiling 795s(baseline 397.1s @2026-11-13,margin 2.0x)。
+事实表与论证见 `benchmark/results/phase400_cache_write_headers_20261117.md`、
+OPTIMIZATION §8.31。
+
 ### 勘误与处置(2026-11-14,Phase 390)
 
 - **推翻 [2.0.1] / [2.1.0] 记下的「parity 全矩阵 2/194 行为性分歧 /

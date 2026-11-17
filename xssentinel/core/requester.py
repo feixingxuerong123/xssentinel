@@ -624,9 +624,17 @@ class Requester:
         resp = self._send("GET", url, params=params,
                           headers=self._stealth_headers(headers))
         self._post_record(resp)
-        # Cache store: only successful (2xx/3xx) bare-URL GETs.
+        # Cache store: only successful (2xx/3xx) bare-URL GETs.  Phase 400:
+        # the WRITE condition must mirror the READ condition above -- a
+        # header-varying request (canary, error/redirect probe) changes the
+        # request semantics, so its response must not poison the bare-URL LRU.
+        # Before this fix the write omitted ``not headers``: an L8_cookie
+        # canary bounced to /login wrote that login page under the bare URL,
+        # and every later bare GET (advanced layers / crawler / stored)
+        # silently read the stale login page despite an intact operator
+        # session (measured: benchmark/results/phase400_*_20261117.json).
         if cache_get and self._cache_size > 0 and not params \
-                and 200 <= resp.status_code < 400:
+                and not headers and 200 <= resp.status_code < 400:
             with self._cache_lock:
                 self._cache[url] = resp
                 if len(self._cache) > self._cache_size:

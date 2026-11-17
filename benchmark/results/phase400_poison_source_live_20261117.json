@@ -1,0 +1,18 @@
+{
+  "question": "is GET-LRU poison source live after Phase 394 pin-reassert?",
+  "steps": [
+    {
+      "step": "canary headers=Cookie evil",
+      "result": "LOGIN"
+    },
+    {
+      "step": "bare GET after canary",
+      "result": "LOGIN",
+      "from_cache": true
+    }
+  ],
+  "cookies_after_canary": [
+    "connect.sid=good"
+  ],
+  "verdict": "LOGIN"
+}
