@@ -2536,3 +2536,53 @@ headers 的 GET 不再填 LRU,后续同 URL 裸 GET 多发 1 次真实请求(此
 strict 双引擎 sync 64 scored/0 SKIP、async 63 scored/1 SKIP 均 FP0/FN0/
 ERROR0、性能预算 PASSED;全量 192 sync 194 scored/0 SKIP、FP0/FN0/ERROR0、
 416.3s vs ceiling 795s。数字均为本轮运行。
+
+### 8.32 处置记录(2026-11-18):Phase 401——Phase 391 `onstart`「证据冲突未定谳」定谳为假冲突
+
+**起点**:§8.22 Phase 391 把 11 个「verifier 确认但裸 HTML 不执行」的
+onstart 形状挂成「证据冲突未定谳」——理由是 Phase 362 在 XSSMaze
+eventhandler/level5 量过 `<div marquee onstart>` 是「live」,来自「有页面
+脚本、有挑战自己判定口径」的真实页面上下文,与裸 HTML 口径不同,不能
+互否,故不改判定层。**本轮把这条挂了 4 个 Phase 的悬案定谳**。
+
+**先取证再定谳(事实表 `benchmark/results/phase401_*_20261118.json`)**:
+
+1. **拿到靶场真源码**:`git clone hahwul/xssmaze`(走全局 ghfast insteadOf,
+   绕开本机 GitHub 超时),`git fetch --unshallow` 取全历史,定位
+   commit 2976f2e。`event_handler.cr` 的 level5 逻辑自 c7a0a83 起
+   **一字未变**(git diff 核实:只有元数据与 sought/seeked 的无关改动,
+   页面模板相同)。快照固化在 `phase401_xssmaze_level5_source_snapshot_20261118.json`。
+2. **推翻 Phase 391 的前提**:level5 真页面是纯服务端拼接
+   `<div #{query}>Event Handler Test :: #{query}</div>`,query 只过
+   `strip_angles`(去尖括号)与 handler denylist;**没有 `<script>`、
+   没有事件派发、没有挑战自己的打分脚本**。所谓「真实页面上下文有脚本、
+   口径不同」是错的——真页面就是裸 HTML,Phase 391 的裸 HTML 测量与
+   level5 是**同一口径**,可以直接互证。
+3. **推翻「靶场说 live」的证据**:Phase 362 那条 `marquee onstart=alert(...)`
+   finding 的 `evidence_class=browser-unavailable`、`headless=None`、
+   detail 明写「no browser replay available; execution unverified」。
+   它从不是浏览器确认的执行,只是「token 反射进 onstart handler」的
+   未验证反射判定。不存在可与 Phase 391 冲突的「靶场 live 证据」。
+4. **有效对照的浏览器复测**:第一版探针用纯 load 态 oracle,正对照
+   (level5 官方答案 `ononmouseovermouseover`→`onmouseover`,需 hover)
+   不弹 ⇒ `controls_valid=False`,**按 Phase 388 纪律丢弃该结论、不裁定**。
+   改用 XSSMaze client-benchmark 的 load+hover 口径重测:官方答案 hover
+   弹窗=True、负对照 inert、三个 onstart 形状(marquee/div/嵌套绕过)
+   全部 browser_dialog=False 而 verifier 仍 confirmed=True,
+   `controls_valid=True`。
+
+**定谳**:Phase 391 的「证据冲突」由两个错误构造——误读 Phase 362 的
+证据等级(未验证反射当浏览器执行)、误判 level5 页面性质(纯静态当带脚本)。
+真页面上 onstart 确系「verifier 过判、浏览器不执行」,与 Phase 391 裸 HTML
+结论一致,**没有冲突**。
+
+**影响面与边界(重要)**:本轮**不改判定层**。`INERT_HANDLER_PAIRS` 仍是
+`{("marquee","onstart")}`,Phase 389 的 `<div marquee onstart>` 仍 confirmed。
+定谳 ≠ 修复:扩 pair 覆盖其余 11 形状属判定语义变更,若要做须**独立成轮
++ 对照矩阵 + 全量 192**,本轮不擅自改变既有扫描行为(Phase 391 的 guard
+亦钉死此边界)。**带日期的 §8.22 原文保留不改**,以本节为准。
+
+**验收**:守卫 `tests/test_phase401_onstart_adjudication.py` 5 例(有效对照
++ 定谳结论 / 真页面无脚本 / Phase 362 证据等级 + 交叉核对历史 artifact /
+onstart 浏览器 inert 而 verifier 确认 / 本轮未改判定层);变异、门禁数字见
+CHANGELOG Phase 401 验收节。

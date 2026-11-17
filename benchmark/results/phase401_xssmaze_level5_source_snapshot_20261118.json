@@ -1,0 +1,28 @@
+{
+  "record": "XSSMaze eventhandler/level5 source snapshot used by Phase 401 adjudication",
+  "date": "2026-11-18",
+  "repo": "https://github.com/hahwul/xssmaze",
+  "commit": "2976f2e7f4f025c044a32b7fa7e80929f3719a15",
+  "file": "src/mazes/event_handler.cr",
+  "fetch": "git clone (ghfast mirror via global url.insteadOf); git fetch --unshallow",
+  "level5_logic_unchanged_since": "c7a0a83 (git diff verified: only metadata/sought-vs-seeked edits, build_html page template identical)",
+  "build_html_crystal": "def self.build_html(query : String) : String\n    query = Filters.strip_angles(query)\n    \"<div #{query}>Event Handler Test :: #{query}</div>\"\n  end",
+  "strip_angles_crystal": "def self.strip_angles(str : String) : String\n    str.gsub(\"<\", \"\").gsub(\">\", \"\")\n  end",
+  "strip_angles_source_file": "src/filters.cr",
+  "level5_route": "maze_get \"/eventhandler/level5/\" do |env|\n  query = EventHandlerHelper.sanitize(env.params.query.fetch(\"query\", \"\"), 5)\n  EventHandlerHelper.build_html(query)\nend",
+  "facts": {
+    "page_has_script": false,
+    "page_is": "pure static <div {query}>Event Handler Test :: {query}</div>, no <script>, no event dispatch",
+    "onstart_in_denylist": false,
+    "official_level5_answer": "x ononmouseovermouseover=alert(1) x (relies on hover, i.e. client-benchmark interaction, NOT load-state)",
+    "implication": "Phase 391's premise that level5 has its own scripts/scoring is false; the real page is bare HTML, so its bare-HTML browser result and the level5 page are the SAME口径"
+  },
+  "phase362_evidence": {
+    "finding_payload": "marquee onstart=alert('xssv_97f9ef15')",
+    "evidence_class": "browser-unavailable",
+    "headless": null,
+    "detail": "token reflected in onstart handler | no browser replay available; execution unverified",
+    "source": "dev/_xssmaze/_p362b_post/eventhandler-level5.json (2026-11-06)",
+    "implication": "Phase 362 never claimed browser-executed live; it was an unverified reflection finding. There is no 'target says live' evidence to conflict with Phase 391."
+  }
+}

