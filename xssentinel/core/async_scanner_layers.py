@@ -1621,7 +1621,8 @@ class AsyncDetectionLayersMixin:
     async def _build_probe_candidates(self, session, url, method, param,
                                       params, data, is_body, context,
                                       marker, marker_escaped,
-                                      _extra_contexts):
+                                      _extra_contexts, *,
+                                      marker_absent: bool = False):
         """Phase 211 round 2: stages B2-B5 of _probe_param, moved verbatim.
 
         Corpus sampling (Phase 43) -> reflection profile + generative
@@ -1649,7 +1650,14 @@ class AsyncDetectionLayersMixin:
         # them -- a small probe set that still catches double-encoding
         # bugs and attribute-context escapes without burning 168 requests
         # on a param that is almost certainly safe.
-        cand_budget = 3 if marker_escaped else self.max_payloads
+        # Phase 407: an absent marker has no reflection to confirm against.
+        # Narrow ONLY the corpus budget here -- deliberately NOT marker_escaped,
+        # which gates sandwich/generative, quote probe, transform cap and
+        # concat-stamp downstream (folding absence into it regressed reflected
+        # positives).  Keeps a minimal probe set so payload-only reflection
+        # can still be caught; sync skips this ladder entirely.
+        cand_budget = (3 if (marker_escaped or marker_absent)
+                       else self.max_payloads)
         try:
             tagged = await asyncio.to_thread(
                 payloads_mod.cross_context_candidates_tagged, context,

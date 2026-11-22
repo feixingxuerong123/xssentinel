@@ -992,6 +992,22 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
         except Exception:
             return
         reflected_marker = ctx.find_reflected_marker(text, marker)
+        # Phase 407 (sync parity, scanner.py:756): an endpoint that HTML-
+        # entity-encodes only the marker's leading characters shows no plain
+        # reflection.  Re-check the ALREADY-CAPTURED text for that shape --
+        # zero extra requests.  Sync restores reflected_marker and continues
+        # down the reflected path; async previously fell into the marker-less
+        # branch (silent FN on XSSMaze encodingedge/level4).
+        if reflected_marker is None:
+            _prefix_hit = ctx.find_prefix_encoded_marker(text, marker)
+            if _prefix_hit is not None:
+                reflected_marker, _prefix_pad = _prefix_hit
+        # Phase 407: marker_absent is a SEPARATE signal from marker_escaped.
+        # marker_escaped is a multi-stage master switch (sandwich/generative,
+        # quote probe, transform cap, concat-stamp, tail fallbacks); folding
+        # absence into it regressed reflected positives in the first attempt.
+        # Here absence ONLY narrows the corpus candidate budget.
+        marker_absent = reflected_marker is None
         if reflected_marker is None:
             # Phase 178c (sync parity): a container param whose endpoint
             # echoes only the DECODED value never reflects a plain marker
@@ -1093,7 +1109,8 @@ class AsyncScanner(AsyncHeadlessVerifyMixin, AsyncDetectionLayersMixin,
         cands, marker_escaped, prof, families = (
             await self._build_probe_candidates(
                 session, url, method, param, params, data, is_body, context,
-                marker, marker_escaped, _extra_contexts))
+                marker, marker_escaped, _extra_contexts,
+                marker_absent=marker_absent))
 
 
         # Phase 211 round 3: the variant loop, the concat-stamp retry and the
