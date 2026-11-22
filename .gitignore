@@ -69,6 +69,17 @@ tests/_pytest_tmp/
 
 # benchmark 运行临时文件
 benchmark/results/tmp*.json
+# 真实靶场会话凭据（Phase 402）：dvwa_live_probe.py 曾把 PHPSESSID 明文写进
+# benchmark/results/，这些文件从未入库但也没有 gitignore 保护。凭据只应在
+# 本机靶场使用，绝不进版本库；现有的两份带日期文件保留在磁盘上供当前会话
+# 复验，但被此规则挡在 git 之外。
+benchmark/results/*_cookie*.txt
+# LLM 运行期状态与含密钥的本地 provider 配置（2026-11-23 交付收口）：
+# llm_state.json 是进程本地失败计数（同 xssentinel/data/llm_state.json 性质）；
+# llm_local_glm53_20261119.json 含真实 API key，只留本机。DVWA AI 报告证据里
+# 的 key 已是产品自身脱敏形式（sk-369***f3cb），可入库；完整密钥配置绝不入库。
+benchmark/results/llm_state.json
+benchmark/results/llm_local_glm53_20261119.json
 # 被 kill 的运行遗留的 tmp 文件归档区（Phase 255 起人工清理时移入）
 benchmark/results/_stale/
 .coverage*

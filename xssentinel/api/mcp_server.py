@@ -1624,12 +1624,20 @@ def run_profile_tool(args: dict, cancel_event=None, emit=None) -> dict:
 
 
 def _abs_http_url(args: dict):
-    """Validate args["url"] as absolute http(s); (url, None) or (None, err)."""
+    """Validate args["url"] as absolute http(s); (url, None) or (None, err).
+
+    The scheme is an explicit allowlist, not just "non-empty": every caller
+    of this helper eventually hands the URL to either ``requests`` or
+    ``verify_headless``'s ``page.goto``. Playwright will happily navigate a
+    ``file://`` / ``gopher://`` URL, so a caller that skips the HTTP probe
+    (or a future one) could read local files or probe non-HTTP services.
+    Only http/https are in the tool contract.
+    """
     url = (args.get("url") or "").strip()
     if not url:
         return None, "url is required"
     p = urlparse(url)
-    if not p.scheme or not p.netloc:
+    if p.scheme.lower() not in ("http", "https") or not p.netloc:
         return None, f"not an absolute http(s) URL: {url}"
     return url, None
 
@@ -1715,7 +1723,8 @@ def run_verify_tool(args: dict, cancel_event=None, emit=None) -> dict:
     if args.get("headless"):
         hv = verifier.verify_headless(
             base_url, method, send_params, send_data,
-            dict(args.get("headers") or {}), token)
+            dict(args.get("headers") or {}), token,
+            cookies=dict(args.get("cookies") or {}))
         headless_out = {"available": bool(hv.get("available")),
                         "confirmed": bool(hv.get("confirmed"))}
         if headless_out["available"]:
@@ -1905,6 +1914,7 @@ def run_propose_tool(args: dict, _pool=None, cancel_event=None,
             count=int(args.get("count", 5)),
             headless=bool(args.get("headless", False)),
             headers=args.get("headers") or {},
+            cookies=args.get("cookies") or {},
             # Phase 366: generation timeout is config-driven; this tool used
             # to inherit a hard-coded 60s and reported slow-but-working local
             # models as "pool exhausted".

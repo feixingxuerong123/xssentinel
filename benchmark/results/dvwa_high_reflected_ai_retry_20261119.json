@@ -1,0 +1,496 @@
+{
+  "tool": "XSSentinel",
+  "target": "http://127.0.0.1:8080/vulnerabilities/xss_r/?name=xssprobe",
+  "generated": "2026-11-19 01:12:33",
+  "requests": 42,
+  "requests_attempted": 41,
+  "requests_failed": 0,
+  "request_failure_reasons": [],
+  "responses_truncated": 0,
+  "scan_status": "completed",
+  "scope_dropped": [],
+  "scope_dropped_count": 0,
+  "waf": null,
+  "crawl_engine": null,
+  "crawl_fallback_reason": null,
+  "crawl_stats": {},
+  "engine": "sync",
+  "engine_fallback_reason": null,
+  "findings": [
+    {
+      "url": "http://127.0.0.1:8080/vulnerabilities/xss_r/",
+      "method": "GET",
+      "param": "name",
+      "type": "reflected",
+      "context": "html_element",
+      "payload": "<img/src=\"x\"/onerror=alert('xssv_b50ff8e0')//>",
+      "transform": [],
+      "severity": "high",
+      "confidence": "high",
+      "detail": "token reflected in context 'event_handler' | no browser replay available; execution unverified",
+      "evidence_class": "browser-unavailable",
+      "param_in": "query",
+      "headless": null,
+      "proof": {
+        "status": 200,
+        "method": "GET",
+        "param": "name",
+        "payload": "<img/src=\"x\"/onerror=alert('xssv_b50ff8e0')//>",
+        "snippet": "it\">\r \t\t\t</p> \r \t\t</form>\r \t\t<pre>Hello <img/src=\"x\"/onerror=alert('xssv_b50ff8e0')//></pre>\r \t</div>\r \r \t<h2>More Information</h2>\r \t<ul>\r \t\t<li><a href=\"https"
+      },
+      "reflected_meta": "raw=\"\"'><>()=/;`\"",
+      "poc": {
+        "curl": "curl -i 'http://127.0.0.1:8080/vulnerabilities/xss_r/?name=%3Cimg%2Fsrc%3D%22x%22%2Fonerror%3Dalert%28%27xssv_b50ff8e0%27%29%2F%2F%3E'",
+        "url": "http://127.0.0.1:8080/vulnerabilities/xss_r/?name=%3Cimg%2Fsrc%3D%22x%22%2Fonerror%3Dalert%28%27xssv_b50ff8e0%27%29%2F%2F%3E",
+        "html": "<html><body>\n<!-- payload rides the QUERY (position shift): a form would put it back in the body the WAF inspects -->\n<script>window.location.href=\"http://127.0.0.1:8080/vulnerabilities/xss_r/?name=%3Cimg%2Fsrc%3D%22x%22%2Fonerror%3Dalert%28%27xssv_b50ff8e0%27%29%2F%2F%3E\";</script>\n</body></html>"
+      },
+      "cvss_score": 5.3,
+      "cvss_severity": "medium",
+      "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:U/C:L/I:L/A:N",
+      "replay": {
+        "curl": "curl -s -k 'http://127.0.0.1:8080/vulnerabilities/xss_r/?name=%3Cimg%2Fsrc%3D%22x%22%2Fonerror%3Dalert%28%27xssv_b50ff8e0%27%29%2F%2F%3E'",
+        "browser_url": "http://127.0.0.1:8080/vulnerabilities/xss_r/?name=%3Cimg%2Fsrc%3D%22x%22%2Fonerror%3Dalert%28%27xssv_b50ff8e0%27%29%2F%2F%3E",
+        "html_poc": "<!DOCTYPE html>\n<html>\n<head><title>XSS PoC</title></head>\n<body>\n<p>Click the link to trigger the XSS:</p>\n<a href=\"http://127.0.0.1:8080/vulnerabilities/xss_r/?name=%3Cimg%2Fsrc%3D%22x%22%2Fonerror%3Dalert%28%27xssv_b50ff8e0%27%29%2F%2F%3E\">Trigger XSS</a>\n<script>setTimeout(function(){window.location='http://127.0.0.1:8080/vulnerabilities/xss_r/?name=%3Cimg%2Fsrc%3D%22x%22%2Fonerror%3Dalert%28%27xssv_b50ff8e0%27%29%2F%2F%3E';}, 500);</script>\n</body>\n</html>"
+      },
+      "poc_verified": true,
+      "poc_verify": {
+        "verified": true,
+        "status": "verified",
+        "detail": "payload still executes: token reflected in context 'event_handler'",
+        "context": "event_handler",
+        "checked_at": "2026-11-19T01:12:33",
+        "note": "replayed with the scan session; the exported PoC omits credentials (pass --poc-include-auth to include them)"
+      }
+    }
+  ],
+  "coverage": {
+    "generated": "2026-11-19T01:13:25",
+    "totals": {
+      "endpoints": 3,
+      "parameters": 1,
+      "reflected": 1,
+      "confirmed": 1,
+      "requests": 37,
+      "findings": 1,
+      "payloads_dispatched": 1,
+      "payload_classes": [
+        "html_element"
+      ],
+      "endpoints_no_response": []
+    },
+    "layer_coverage": {
+      "L1_reflected": 1,
+      "L2_waf_evade": 0,
+      "L3_dom_static": 1,
+      "L4_stored": 0,
+      "L4_stored_dom": 0,
+      "L4_second_order": 0,
+      "L5_blind_oob": 0,
+      "L6_dom_dynamic": 1,
+      "L7_mutation": 1,
+      "L7_dom_clobber": 1,
+      "L7_template": 1,
+      "L7_polyglot": 0,
+      "L7_jsonp": 1,
+      "L7_csp": 1,
+      "L7_time_based": 0,
+      "L8_postmessage": 1,
+      "L8_prototype": 1,
+      "L8_service_worker": 1,
+      "L8_web_worker": 1,
+      "L8_open_redirect": 1,
+      "L8_framework": 1,
+      "L8_header": 1,
+      "L8_path": 1,
+      "L8_cookie": 1,
+      "L8_error_page": 1,
+      "L8_markdown": 1,
+      "L9_param_miner": 1,
+      "L9_js_miner": 0,
+      "L9_form_miner": 0,
+      "L7_csp_nonce": 1,
+      "L7_csp_gadget": 0,
+      "L2_hpp": 0,
+      "L7_css_injection": 1,
+      "L7_dangling_markup": 1,
+      "L7_import_map": 1,
+      "L7_sanitizer_bypass": 1,
+      "L7_sri_bypass": 1,
+      "L7_svg_xss": 1,
+      "L8_cookie_tossing": 1,
+      "L8_graphql": 1,
+      "L8_trusted_types": 1,
+      "L8_websocket": 1,
+      "L1_csp_gate": 0,
+      "L1_pre_encoded": 0,
+      "L1_reflection_profile": 1,
+      "L1_marker_forms": 0,
+      "L2_position_shift": 0,
+      "L7_cors": 1,
+      "L7_nonce_bypass": 0,
+      "L7_xsleak": 0,
+      "L8_request": 0,
+      "L9_scenario": 0,
+      "L9_upload_filename": 0,
+      "L1_srcdoc_entity": 0,
+      "L1_js_callback": 0,
+      "L1_param_name": 0
+    },
+    "layer_failed": {
+      "L1_reflected": 0,
+      "L2_waf_evade": 0,
+      "L3_dom_static": 0,
+      "L4_stored": 0,
+      "L4_stored_dom": 0,
+      "L4_second_order": 0,
+      "L5_blind_oob": 0,
+      "L6_dom_dynamic": 0,
+      "L7_mutation": 0,
+      "L7_dom_clobber": 0,
+      "L7_template": 0,
+      "L7_polyglot": 0,
+      "L7_jsonp": 0,
+      "L7_csp": 0,
+      "L7_time_based": 0,
+      "L8_postmessage": 0,
+      "L8_prototype": 0,
+      "L8_service_worker": 0,
+      "L8_web_worker": 0,
+      "L8_open_redirect": 0,
+      "L8_framework": 0,
+      "L8_header": 0,
+      "L8_path": 0,
+      "L8_cookie": 0,
+      "L8_error_page": 0,
+      "L8_markdown": 0,
+      "L9_param_miner": 0,
+      "L9_js_miner": 0,
+      "L9_form_miner": 0,
+      "L7_csp_nonce": 0,
+      "L7_csp_gadget": 0,
+      "L2_hpp": 0,
+      "L7_css_injection": 0,
+      "L7_dangling_markup": 0,
+      "L7_import_map": 0,
+      "L7_sanitizer_bypass": 0,
+      "L7_sri_bypass": 0,
+      "L7_svg_xss": 0,
+      "L8_cookie_tossing": 0,
+      "L8_graphql": 0,
+      "L8_trusted_types": 0,
+      "L8_websocket": 0,
+      "L1_csp_gate": 0,
+      "L1_pre_encoded": 0,
+      "L1_reflection_profile": 0,
+      "L1_marker_forms": 0,
+      "L2_position_shift": 0,
+      "L7_cors": 0,
+      "L7_nonce_bypass": 0,
+      "L7_xsleak": 0,
+      "L8_request": 0,
+      "L9_scenario": 0,
+      "L9_upload_filename": 0,
+      "L1_srcdoc_entity": 0,
+      "L1_js_callback": 0,
+      "L1_param_name": 0
+    },
+    "layer_missing": {
+      "L1_reflected": 2,
+      "L2_waf_evade": 3,
+      "L3_dom_static": 2,
+      "L4_stored": 3,
+      "L4_stored_dom": 3,
+      "L4_second_order": 3,
+      "L5_blind_oob": 3,
+      "L6_dom_dynamic": 2,
+      "L7_mutation": 2,
+      "L7_dom_clobber": 2,
+      "L7_template": 2,
+      "L7_polyglot": 3,
+      "L7_jsonp": 2,
+      "L7_csp": 2,
+      "L7_time_based": 3,
+      "L8_postmessage": 2,
+      "L8_prototype": 2,
+      "L8_service_worker": 2,
+      "L8_web_worker": 2,
+      "L8_open_redirect": 2,
+      "L8_framework": 2,
+      "L8_header": 2,
+      "L8_path": 2,
+      "L8_cookie": 2,
+      "L8_error_page": 2,
+      "L8_markdown": 2,
+      "L9_param_miner": 2,
+      "L9_js_miner": 3,
+      "L9_form_miner": 3,
+      "L7_csp_nonce": 2,
+      "L7_csp_gadget": 3,
+      "L2_hpp": 3,
+      "L7_css_injection": 2,
+      "L7_dangling_markup": 2,
+      "L7_import_map": 2,
+      "L7_sanitizer_bypass": 2,
+      "L7_sri_bypass": 2,
+      "L7_svg_xss": 2,
+      "L8_cookie_tossing": 2,
+      "L8_graphql": 2,
+      "L8_trusted_types": 2,
+      "L8_websocket": 2,
+      "L1_csp_gate": 3,
+      "L1_pre_encoded": 3,
+      "L1_reflection_profile": 2,
+      "L1_marker_forms": 3,
+      "L2_position_shift": 3,
+      "L7_cors": 2,
+      "L7_nonce_bypass": 3,
+      "L7_xsleak": 3,
+      "L8_request": 3,
+      "L9_scenario": 3,
+      "L9_upload_filename": 3,
+      "L1_srcdoc_entity": 3,
+      "L1_js_callback": 3,
+      "L1_param_name": 3
+    },
+    "endpoints": [
+      {
+        "url": "http://127.0.0.1:8080/vulnerabilities/xss_r/",
+        "method": "GET",
+        "crawled": false,
+        "requests": 35,
+        "findings": 1,
+        "scan_started": "2026-11-19T01:12:24",
+        "scan_ended": "2026-11-19T01:12:32",
+        "layers": {
+          "L9_param_miner": {
+            "status": "ran",
+            "detail": "probing 1 known + hidden candidates",
+            "ts": "2026-11-19T01:12:24"
+          },
+          "L1_reflected": {
+            "status": "ran",
+            "detail": "probing param 'name'",
+            "ts": "2026-11-19T01:12:24"
+          },
+          "L1_reflection_profile": {
+            "status": "ran",
+            "detail": "reflection profile: kept=\"'><>()=/;`",
+            "ts": "2026-11-19T01:12:26"
+          },
+          "L7_mutation": {
+            "status": "ran",
+            "detail": "param='name'",
+            "ts": "2026-11-19T01:12:26"
+          },
+          "L7_dom_clobber": {
+            "status": "ran",
+            "detail": "param='name'",
+            "ts": "2026-11-19T01:12:26"
+          },
+          "L7_template": {
+            "status": "ran",
+            "detail": "param='name'",
+            "ts": "2026-11-19T01:12:26"
+          },
+          "L8_markdown": {
+            "status": "ran",
+            "detail": "param='name'",
+            "ts": "2026-11-19T01:12:26"
+          },
+          "L7_jsonp": {
+            "status": "ran",
+            "detail": "probed callback params",
+            "ts": "2026-11-19T01:12:26"
+          },
+          "L7_csp": {
+            "status": "ran",
+            "detail": "parsed CSP header",
+            "ts": "2026-11-19T01:12:31"
+          },
+          "L7_cors": {
+            "status": "ran",
+            "detail": "ACAO origin-reflection probe",
+            "ts": "2026-11-19T01:12:31"
+          },
+          "L8_postmessage": {
+            "status": "ran",
+            "detail": "static page analysis",
+            "ts": "2026-11-19T01:12:31"
+          },
+          "L8_prototype": {
+            "status": "ran",
+            "detail": "static page analysis",
+            "ts": "2026-11-19T01:12:31"
+          },
+          "L8_service_worker": {
+            "status": "ran",
+            "detail": "static page analysis",
+            "ts": "2026-11-19T01:12:31"
+          },
+          "L8_web_worker": {
+            "status": "ran",
+            "detail": "static page analysis",
+            "ts": "2026-11-19T01:12:31"
+          },
+          "L8_open_redirect": {
+            "status": "ran",
+            "detail": "static page analysis",
+            "ts": "2026-11-19T01:12:31"
+          },
+          "L8_framework": {
+            "status": "ran",
+            "detail": "static page analysis",
+            "ts": "2026-11-19T01:12:31"
+          },
+          "L8_graphql": {
+            "status": "ran",
+            "detail": "static page analysis + endpoint probe",
+            "ts": "2026-11-19T01:12:31"
+          },
+          "L8_websocket": {
+            "status": "ran",
+            "detail": "static page analysis",
+            "ts": "2026-11-19T01:12:31"
+          },
+          "L8_trusted_types": {
+            "status": "ran",
+            "detail": "static page analysis + CSP check",
+            "ts": "2026-11-19T01:12:31"
+          },
+          "L7_csp_nonce": {
+            "status": "ran",
+            "detail": "static nonce reuse analysis",
+            "ts": "2026-11-19T01:12:31"
+          },
+          "L8_cookie_tossing": {
+            "status": "ran",
+            "detail": "Set-Cookie + client-side tossing analysis",
+            "ts": "2026-11-19T01:12:31"
+          },
+          "L7_sri_bypass": {
+            "status": "ran",
+            "detail": "static SRI analysis",
+            "ts": "2026-11-19T01:12:31"
+          },
+          "L7_import_map": {
+            "status": "ran",
+            "detail": "static import-map analysis",
+            "ts": "2026-11-19T01:12:31"
+          },
+          "L7_sanitizer_bypass": {
+            "status": "ran",
+            "detail": "static sanitizer-bypass analysis",
+            "ts": "2026-11-19T01:12:31"
+          },
+          "L7_css_injection": {
+            "status": "ran",
+            "detail": "static CSSI analysis",
+            "ts": "2026-11-19T01:12:31"
+          },
+          "L7_dangling_markup": {
+            "status": "ran",
+            "detail": "static dangling-markup analysis",
+            "ts": "2026-11-19T01:12:31"
+          },
+          "L7_svg_xss": {
+            "status": "ran",
+            "detail": "static SVG-vector analysis",
+            "ts": "2026-11-19T01:12:31"
+          },
+          "L8_header": {
+            "status": "skipped",
+            "detail": "no header reflection in all-header canary",
+            "ts": "2026-11-19T01:12:31"
+          },
+          "L8_path": {
+            "status": "ran",
+            "detail": "probe URL path segment",
+            "ts": "2026-11-19T01:12:31"
+          },
+          "L8_cookie": {
+            "status": "skipped",
+            "detail": "no cookie reflection in all-name canary",
+            "ts": "2026-11-19T01:12:32"
+          },
+          "L8_error_page": {
+            "status": "ran",
+            "detail": "probe error-page reflection",
+            "ts": "2026-11-19T01:12:32"
+          }
+        },
+        "params": {
+          "name|query": {
+            "name": "name",
+            "in_body": false,
+            "reflected": true,
+            "context": "html_element",
+            "payloads_sent": 1,
+            "payload_classes": [
+              "html_element"
+            ],
+            "confirmed": true
+          }
+        }
+      },
+      {
+        "url": "http://127.0.0.1:8080/vulnerabilities/xss_r/?name=xssprobe",
+        "method": "GET",
+        "crawled": false,
+        "requests": 1,
+        "findings": 0,
+        "scan_started": null,
+        "scan_ended": null,
+        "layers": {
+          "L3_dom_static": {
+            "status": "ran",
+            "detail": "0 hint(s), 0 low suppressed",
+            "ts": "2026-11-19T01:12:26"
+          },
+          "L6_dom_dynamic": {
+            "status": "skipped",
+            "detail": "static model found no executable sink; page code is external-only",
+            "ts": "2026-11-19T01:12:26"
+          }
+        },
+        "params": {}
+      },
+      {
+        "url": "http://127.0.0.1:8080/vulnerabilities/xss_r/",
+        "method": "OPTIONS",
+        "crawled": false,
+        "requests": 1,
+        "findings": 0,
+        "scan_started": null,
+        "scan_ended": null,
+        "layers": {},
+        "params": {}
+      }
+    ]
+  },
+  "ai_report": {
+    "ok": true,
+    "used_llm": true,
+    "degraded": false,
+    "provider": "local",
+    "model": "glm-5.3-flash",
+    "failovers": 0,
+    "elapsed": 52.31,
+    "error": "",
+    "fact_warnings": [],
+    "finding_count": 1,
+    "attempts": [
+      {
+        "provider": "local",
+        "model": "glm-5.3-flash",
+        "key": "sk-369***f3cb",
+        "ok": true,
+        "kind": "ok",
+        "status": 200,
+        "elapsed": 52.3,
+        "detail": "## 执行摘要\n\n2026-11-19 01:12:33 对 `http://127.0.0.1:8080/vulnerabilities/xss_r/`（GET 参数 `name`）执行了自动化 XSS 扫描，共发送 42 个请求，未检测到 WAF。共发现 1 项缺陷：反射型 XSS 1 项，引擎评级为高危（High）、置信度 high。需注意该发现无浏览器回放，脚本实际执行未经验证；鉴于未部署 WAF 且输入直接进入 HTML 上下文，建议尽快人工验证并完成修复。\n\n## 风险评级\n\n| 严重度 | 数量 |\n|---|---|\n| 严重（Critical） | 0 |\n| 高危（High） | 1 |\n| 中危（Medium） | 0 |\n| 低危（Low） | 0 |\n| **合计** | **1** |\n\n## 漏洞详情\n\n### 1. [高危] 反射型 XSS — http://127.0.0.1:8080/vulnerabilities/xss_r/\n\n- **类型**：reflected（反射型）｜**严重度**：high（保持引擎原始评级）\n- **方法 / 参数**：GET / `name`\n- **注入上下文**：html_element（引擎 detail 中标注为 `event_handler`，见备注 3）\n- **CVSS**：5.3｜**置信度**：high｜**输入变换**：无（transform 为空，未检测到过滤或编码）\n\n- **成因**：GET 参数 `name` 的用户输入未经编码或过滤即被回显至响应 HTML 中，引擎在该反射点检测到载荷令牌于 `event_handler` 上下文中原样出现，未观察到任何变换处理。\n- **影响**：反射型 XSS（CWE-79）。攻击者可构造包含恶意脚本的链接诱导受害者点击，从而在受害者浏览器会话中执行脚本。需注意：本次扫描无浏览器回放，实际执行未经验证（引擎 detail 原文：\"no browser replay available; execution unverified\"），实际可利用性有待人工确认。\n- **复现**：使用测试载荷 `<img/src=\"x\"/onerror=alert('xssv_b50ff8e0')//>` 对参数 `name` 发起 GET 请求，PoC 命令（引擎提供）：\n\n  ```bash\n  curl -i 'http://127.0.0.1:8080/vulnerabilities/xss_r/?name=%3Cimg%2Fsrc%3D%22x%22%2Fonerror%3Dalert%28%27xssv_b50ff8e0%27%29%2F%2F%3E'\n  ```\n\n- **修复**（引擎建议）：在将用户输入反射进页面前先进行 HTML 编码；采用上下文相关的输出编码——元素正文使用 HTML 编码、属性值使用属性编码、script 块内字符串使用 JavaScript 编码（引擎建议原文在此处截断）。\n- **CWE**：CWE-79\n- **备注**：\n  1. **执行未验证**：引擎明确说明本次扫描无浏览器回放，脚本执行未经实际验证，建议在浏览器中人工复验 PoC 后再最终定级与处置。\n  2. **评级差异**：CVSS 得分 5.3 按 CVSS v3.1 处于中危区间，与引擎 high 评级存在差异；本报告保持引擎原始评级不变。\n  3. **上下文字段差异**：结构化字段 `context` 为 `html_element`，而 detail 文本标注为 `event_handler`；从载荷形态（img/onerror 事件向量）看更符合事件处理器上下文。本报告如实保留原始字段，不作改写。\n\n## 修复优先级建议\n\n1. **人工验证 PoC**：使用报告中提供的 curl 命令在真实浏览器环境中确认脚本是否实际执行，据此最终确认严重度并记录验证结果。\n2. **修复第 1 项发现**：对 `/vulnerabilities/xss_r/` 页面回显 `name` 参数（及其他用户输入）的位置实施上下文相关输出编码——元素正文 HTML 编码、属性值属性编码、script 块内字符串 JavaScript 编码，避免用户输入以原始形式进入事件处理器等危险上下文。\n3. **回归复测**：修复后使用相同载荷复测该端点，确认输出已被正确编码、载荷不再触发。\n4. **纵深防御与扩展排查**：考虑部署内容安全策略（CSP）作为补充防护；鉴于本次扫描仅覆盖该端点（共 42 个请求），建议对应用内其他将用户输入反射至 HTML 的接口开展同类检查。",
+        "forced": false
+      }
+    ],
+    "markdown": "> 本节由大模型（glm-5.3-flash）根据扫描器输出的客观结果撰写。所有漏洞类型、严重度、URL、参数与载荷均来自确定性检测引擎，模型不得新增或修改事实。\n> 撰写模型：local/glm-5.3-flash（切换 0 次）\n## 执行摘要\n\n2026-11-19 01:12:33 对 `http://127.0.0.1:8080/vulnerabilities/xss_r/`（GET 参数 `name`）执行了自动化 XSS 扫描，共发送 42 个请求，未检测到 WAF。共发现 1 项缺陷：反射型 XSS 1 项，引擎评级为高危（High）、置信度 high。需注意该发现无浏览器回放，脚本实际执行未经验证；鉴于未部署 WAF 且输入直接进入 HTML 上下文，建议尽快人工验证并完成修复。\n\n## 风险评级\n\n| 严重度 | 数量 |\n|---|---|\n| 严重（Critical） | 0 |\n| 高危（High） | 1 |\n| 中危（Medium） | 0 |\n| 低危（Low） | 0 |\n| **合计** | **1** |\n\n## 漏洞详情\n\n### 1. [高危] 反射型 XSS — http://127.0.0.1:8080/vulnerabilities/xss_r/\n\n- **类型**：reflected（反射型）｜**严重度**：high（保持引擎原始评级）\n- **方法 / 参数**：GET / `name`\n- **注入上下文**：html_element（引擎 detail 中标注为 `event_handler`，见备注 3）\n- **CVSS**：5.3｜**置信度**：high｜**输入变换**：无（transform 为空，未检测到过滤或编码）\n\n- **成因**：GET 参数 `name` 的用户输入未经编码或过滤即被回显至响应 HTML 中，引擎在该反射点检测到载荷令牌于 `event_handler` 上下文中原样出现，未观察到任何变换处理。\n- **影响**：反射型 XSS（CWE-79）。攻击者可构造包含恶意脚本的链接诱导受害者点击，从而在受害者浏览器会话中执行脚本。需注意：本次扫描无浏览器回放，实际执行未经验证（引擎 detail 原文：\"no browser replay available; execution unverified\"），实际可利用性有待人工确认。\n- **复现**：使用测试载荷 `<img/src=\"x\"/onerror=alert('xssv_b50ff8e0')//>` 对参数 `name` 发起 GET 请求，PoC 命令（引擎提供）：\n\n  ```bash\n  curl -i 'http://127.0.0.1:8080/vulnerabilities/xss_r/?name=%3Cimg%2Fsrc%3D%22x%22%2Fonerror%3Dalert%28%27xssv_b50ff8e0%27%29%2F%2F%3E'\n  ```\n\n- **修复**（引擎建议）：在将用户输入反射进页面前先进行 HTML 编码；采用上下文相关的输出编码——元素正文使用 HTML 编码、属性值使用属性编码、script 块内字符串使用 JavaScript 编码（引擎建议原文在此处截断）。\n- **CWE**：CWE-79\n- **备注**：\n  1. **执行未验证**：引擎明确说明本次扫描无浏览器回放，脚本执行未经实际验证，建议在浏览器中人工复验 PoC 后再最终定级与处置。\n  2. **评级差异**：CVSS 得分 5.3 按 CVSS v3.1 处于中危区间，与引擎 high 评级存在差异；本报告保持引擎原始评级不变。\n  3. **上下文字段差异**：结构化字段 `context` 为 `html_element`，而 detail 文本标注为 `event_handler`；从载荷形态（img/onerror 事件向量）看更符合事件处理器上下文。本报告如实保留原始字段，不作改写。\n\n## 修复优先级建议\n\n1. **人工验证 PoC**：使用报告中提供的 curl 命令在真实浏览器环境中确认脚本是否实际执行，据此最终确认严重度并记录验证结果。\n2. **修复第 1 项发现**：对 `/vulnerabilities/xss_r/` 页面回显 `name` 参数（及其他用户输入）的位置实施上下文相关输出编码——元素正文 HTML 编码、属性值属性编码、script 块内字符串 JavaScript 编码，避免用户输入以原始形式进入事件处理器等危险上下文。\n3. **回归复测**：修复后使用相同载荷复测该端点，确认输出已被正确编码、载荷不再触发。\n4. **纵深防御与扩展排查**：考虑部署内容安全策略（CSP）作为补充防护；鉴于本次扫描仅覆盖该端点（共 42 个请求），建议对应用内其他将用户输入反射至 HTML 的接口开展同类检查。\n"
+  }
+}

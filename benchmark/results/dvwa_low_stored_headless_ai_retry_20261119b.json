@@ -1,0 +1,413 @@
+{
+  "tool": "XSSentinel",
+  "target": "http://127.0.0.1:8080/vulnerabilities/xss_s/",
+  "generated": "2026-11-19 01:31:19",
+  "requests": 665,
+  "requests_attempted": 677,
+  "requests_failed": 0,
+  "request_failure_reasons": [],
+  "responses_truncated": 0,
+  "scan_status": "completed",
+  "scope_dropped": [],
+  "scope_dropped_count": 0,
+  "waf": null,
+  "crawl_engine": null,
+  "crawl_fallback_reason": null,
+  "crawl_stats": {},
+  "engine": "sync",
+  "engine_fallback_reason": null,
+  "findings": [],
+  "coverage": {
+    "generated": "2026-11-19T01:31:52",
+    "totals": {
+      "endpoints": 3,
+      "parameters": 0,
+      "reflected": 0,
+      "confirmed": 0,
+      "requests": 21,
+      "findings": 0,
+      "payloads_dispatched": 0,
+      "payload_classes": [],
+      "endpoints_no_response": [
+        "POST http://127.0.0.1:8080/vulnerabilities/xss_s/"
+      ]
+    },
+    "layer_coverage": {
+      "L1_reflected": 0,
+      "L2_waf_evade": 0,
+      "L3_dom_static": 1,
+      "L4_stored": 1,
+      "L4_stored_dom": 0,
+      "L4_second_order": 0,
+      "L5_blind_oob": 0,
+      "L6_dom_dynamic": 1,
+      "L7_mutation": 0,
+      "L7_dom_clobber": 0,
+      "L7_template": 0,
+      "L7_polyglot": 0,
+      "L7_jsonp": 1,
+      "L7_csp": 1,
+      "L7_time_based": 0,
+      "L8_postmessage": 1,
+      "L8_prototype": 1,
+      "L8_service_worker": 1,
+      "L8_web_worker": 1,
+      "L8_open_redirect": 1,
+      "L8_framework": 1,
+      "L8_header": 1,
+      "L8_path": 1,
+      "L8_cookie": 1,
+      "L8_error_page": 1,
+      "L8_markdown": 0,
+      "L9_param_miner": 1,
+      "L9_js_miner": 0,
+      "L9_form_miner": 0,
+      "L7_csp_nonce": 1,
+      "L7_csp_gadget": 0,
+      "L2_hpp": 0,
+      "L7_css_injection": 1,
+      "L7_dangling_markup": 1,
+      "L7_import_map": 1,
+      "L7_sanitizer_bypass": 1,
+      "L7_sri_bypass": 1,
+      "L7_svg_xss": 1,
+      "L8_cookie_tossing": 1,
+      "L8_graphql": 1,
+      "L8_trusted_types": 1,
+      "L8_websocket": 1,
+      "L1_csp_gate": 0,
+      "L1_pre_encoded": 0,
+      "L1_reflection_profile": 0,
+      "L1_marker_forms": 0,
+      "L2_position_shift": 0,
+      "L7_cors": 1,
+      "L7_nonce_bypass": 0,
+      "L7_xsleak": 0,
+      "L8_request": 0,
+      "L9_scenario": 0,
+      "L9_upload_filename": 0,
+      "L1_srcdoc_entity": 0,
+      "L1_js_callback": 0,
+      "L1_param_name": 0
+    },
+    "layer_failed": {
+      "L1_reflected": 0,
+      "L2_waf_evade": 0,
+      "L3_dom_static": 0,
+      "L4_stored": 0,
+      "L4_stored_dom": 0,
+      "L4_second_order": 0,
+      "L5_blind_oob": 0,
+      "L6_dom_dynamic": 0,
+      "L7_mutation": 0,
+      "L7_dom_clobber": 0,
+      "L7_template": 0,
+      "L7_polyglot": 0,
+      "L7_jsonp": 0,
+      "L7_csp": 0,
+      "L7_time_based": 0,
+      "L8_postmessage": 0,
+      "L8_prototype": 0,
+      "L8_service_worker": 0,
+      "L8_web_worker": 0,
+      "L8_open_redirect": 0,
+      "L8_framework": 0,
+      "L8_header": 0,
+      "L8_path": 0,
+      "L8_cookie": 0,
+      "L8_error_page": 0,
+      "L8_markdown": 0,
+      "L9_param_miner": 0,
+      "L9_js_miner": 0,
+      "L9_form_miner": 0,
+      "L7_csp_nonce": 0,
+      "L7_csp_gadget": 0,
+      "L2_hpp": 0,
+      "L7_css_injection": 0,
+      "L7_dangling_markup": 0,
+      "L7_import_map": 0,
+      "L7_sanitizer_bypass": 0,
+      "L7_sri_bypass": 0,
+      "L7_svg_xss": 0,
+      "L8_cookie_tossing": 0,
+      "L8_graphql": 0,
+      "L8_trusted_types": 0,
+      "L8_websocket": 0,
+      "L1_csp_gate": 0,
+      "L1_pre_encoded": 0,
+      "L1_reflection_profile": 0,
+      "L1_marker_forms": 0,
+      "L2_position_shift": 0,
+      "L7_cors": 0,
+      "L7_nonce_bypass": 0,
+      "L7_xsleak": 0,
+      "L8_request": 0,
+      "L9_scenario": 0,
+      "L9_upload_filename": 0,
+      "L1_srcdoc_entity": 0,
+      "L1_js_callback": 0,
+      "L1_param_name": 0
+    },
+    "layer_missing": {
+      "L1_reflected": 3,
+      "L2_waf_evade": 3,
+      "L3_dom_static": 2,
+      "L4_stored": 2,
+      "L4_stored_dom": 3,
+      "L4_second_order": 3,
+      "L5_blind_oob": 3,
+      "L6_dom_dynamic": 2,
+      "L7_mutation": 3,
+      "L7_dom_clobber": 3,
+      "L7_template": 3,
+      "L7_polyglot": 3,
+      "L7_jsonp": 2,
+      "L7_csp": 2,
+      "L7_time_based": 3,
+      "L8_postmessage": 2,
+      "L8_prototype": 2,
+      "L8_service_worker": 2,
+      "L8_web_worker": 2,
+      "L8_open_redirect": 2,
+      "L8_framework": 2,
+      "L8_header": 2,
+      "L8_path": 2,
+      "L8_cookie": 2,
+      "L8_error_page": 2,
+      "L8_markdown": 3,
+      "L9_param_miner": 2,
+      "L9_js_miner": 3,
+      "L9_form_miner": 3,
+      "L7_csp_nonce": 2,
+      "L7_csp_gadget": 3,
+      "L2_hpp": 3,
+      "L7_css_injection": 2,
+      "L7_dangling_markup": 2,
+      "L7_import_map": 2,
+      "L7_sanitizer_bypass": 2,
+      "L7_sri_bypass": 2,
+      "L7_svg_xss": 2,
+      "L8_cookie_tossing": 2,
+      "L8_graphql": 2,
+      "L8_trusted_types": 2,
+      "L8_websocket": 2,
+      "L1_csp_gate": 3,
+      "L1_pre_encoded": 3,
+      "L1_reflection_profile": 3,
+      "L1_marker_forms": 3,
+      "L2_position_shift": 3,
+      "L7_cors": 2,
+      "L7_nonce_bypass": 3,
+      "L7_xsleak": 3,
+      "L8_request": 3,
+      "L9_scenario": 3,
+      "L9_upload_filename": 3,
+      "L1_srcdoc_entity": 3,
+      "L1_js_callback": 3,
+      "L1_param_name": 3
+    },
+    "endpoints": [
+      {
+        "url": "http://127.0.0.1:8080/vulnerabilities/xss_s/",
+        "method": "GET",
+        "crawled": false,
+        "requests": 20,
+        "findings": 0,
+        "scan_started": "2026-11-19T01:30:43",
+        "scan_ended": "2026-11-19T01:30:44",
+        "layers": {
+          "L9_param_miner": {
+            "status": "ran",
+            "detail": "probing 0 known + hidden candidates",
+            "ts": "2026-11-19T01:30:43"
+          },
+          "L3_dom_static": {
+            "status": "ran",
+            "detail": "0 hint(s), 0 low suppressed",
+            "ts": "2026-11-19T01:30:44"
+          },
+          "L6_dom_dynamic": {
+            "status": "skipped",
+            "detail": "static model found no executable sink; page code is external-only",
+            "ts": "2026-11-19T01:30:44"
+          },
+          "L7_jsonp": {
+            "status": "skipped",
+            "detail": "no callback param / JS document evidence",
+            "ts": "2026-11-19T01:30:44"
+          },
+          "L7_csp": {
+            "status": "ran",
+            "detail": "parsed CSP header",
+            "ts": "2026-11-19T01:30:44"
+          },
+          "L7_cors": {
+            "status": "ran",
+            "detail": "ACAO origin-reflection probe",
+            "ts": "2026-11-19T01:30:44"
+          },
+          "L8_postmessage": {
+            "status": "ran",
+            "detail": "static page analysis",
+            "ts": "2026-11-19T01:30:44"
+          },
+          "L8_prototype": {
+            "status": "ran",
+            "detail": "static page analysis",
+            "ts": "2026-11-19T01:30:44"
+          },
+          "L8_service_worker": {
+            "status": "ran",
+            "detail": "static page analysis",
+            "ts": "2026-11-19T01:30:44"
+          },
+          "L8_web_worker": {
+            "status": "ran",
+            "detail": "static page analysis",
+            "ts": "2026-11-19T01:30:44"
+          },
+          "L8_open_redirect": {
+            "status": "ran",
+            "detail": "static page analysis",
+            "ts": "2026-11-19T01:30:44"
+          },
+          "L8_framework": {
+            "status": "ran",
+            "detail": "static page analysis",
+            "ts": "2026-11-19T01:30:44"
+          },
+          "L8_graphql": {
+            "status": "ran",
+            "detail": "static page analysis + endpoint probe",
+            "ts": "2026-11-19T01:30:44"
+          },
+          "L8_websocket": {
+            "status": "ran",
+            "detail": "static page analysis",
+            "ts": "2026-11-19T01:30:44"
+          },
+          "L8_trusted_types": {
+            "status": "ran",
+            "detail": "static page analysis + CSP check",
+            "ts": "2026-11-19T01:30:44"
+          },
+          "L7_csp_nonce": {
+            "status": "ran",
+            "detail": "static nonce reuse analysis",
+            "ts": "2026-11-19T01:30:44"
+          },
+          "L8_cookie_tossing": {
+            "status": "ran",
+            "detail": "Set-Cookie + client-side tossing analysis",
+            "ts": "2026-11-19T01:30:44"
+          },
+          "L7_sri_bypass": {
+            "status": "ran",
+            "detail": "static SRI analysis",
+            "ts": "2026-11-19T01:30:44"
+          },
+          "L7_import_map": {
+            "status": "ran",
+            "detail": "static import-map analysis",
+            "ts": "2026-11-19T01:30:44"
+          },
+          "L7_sanitizer_bypass": {
+            "status": "ran",
+            "detail": "static sanitizer-bypass analysis",
+            "ts": "2026-11-19T01:30:44"
+          },
+          "L7_css_injection": {
+            "status": "ran",
+            "detail": "static CSSI analysis",
+            "ts": "2026-11-19T01:30:44"
+          },
+          "L7_dangling_markup": {
+            "status": "ran",
+            "detail": "static dangling-markup analysis",
+            "ts": "2026-11-19T01:30:44"
+          },
+          "L7_svg_xss": {
+            "status": "ran",
+            "detail": "static SVG-vector analysis",
+            "ts": "2026-11-19T01:30:44"
+          },
+          "L8_header": {
+            "status": "skipped",
+            "detail": "no header reflection in all-header canary",
+            "ts": "2026-11-19T01:30:44"
+          },
+          "L8_path": {
+            "status": "ran",
+            "detail": "probe URL path segment",
+            "ts": "2026-11-19T01:30:44"
+          },
+          "L8_cookie": {
+            "status": "skipped",
+            "detail": "no cookie reflection in all-name canary",
+            "ts": "2026-11-19T01:30:44"
+          },
+          "L8_error_page": {
+            "status": "ran",
+            "detail": "probe error-page reflection",
+            "ts": "2026-11-19T01:30:44"
+          }
+        },
+        "params": {}
+      },
+      {
+        "url": "http://127.0.0.1:8080/vulnerabilities/xss_s/",
+        "method": "OPTIONS",
+        "crawled": false,
+        "requests": 1,
+        "findings": 0,
+        "scan_started": null,
+        "scan_ended": null,
+        "layers": {},
+        "params": {}
+      },
+      {
+        "url": "http://127.0.0.1:8080/vulnerabilities/xss_s/",
+        "method": "POST",
+        "crawled": false,
+        "requests": 0,
+        "findings": 0,
+        "scan_started": null,
+        "scan_ended": null,
+        "layers": {
+          "L4_stored": {
+            "status": "ran",
+            "detail": "inject->http://127.0.0.1:8080/vulnerabilities/xss_s/ param='mtxMessage'",
+            "ts": "2026-11-19T01:30:44"
+          }
+        },
+        "params": {}
+      }
+    ]
+  },
+  "ai_report": {
+    "ok": true,
+    "used_llm": true,
+    "degraded": false,
+    "provider": "local",
+    "model": "glm-5.3-flash",
+    "failovers": 0,
+    "elapsed": 33.28,
+    "error": "",
+    "fact_warnings": [],
+    "finding_count": 0,
+    "attempts": [
+      {
+        "provider": "local",
+        "model": "glm-5.3-flash",
+        "key": "sk-369***f3cb",
+        "ok": true,
+        "kind": "ok",
+        "status": 200,
+        "elapsed": 33.27,
+        "detail": "## 执行摘要\n本次自动化 XSS 扫描的目标为 `http://127.0.0.1:8080/vulnerabilities/xss_s/`，扫描于 2026-11-19 01:31:19 完成，共发起 665 次请求，过程中未检测到 WAF。扫描共报告 0 个缺陷，各严重度级别数量均为 0。基于本次结果，未发现可确认的 XSS 风险，整体风险判断为“本次扫描范围内未发现缺陷”；但该结论仅代表本次扫描所覆盖范围与用例的客观输出，不能等同于目标绝对安全。\n\n## 风险评级\n| 严重度 | 数量 |\n| --- | --- |\n| 严重 | 0 |\n| 高危 | 0 |\n| 中危 | 0 |\n| 低危 | 0 |\n| 信息 | 0 |\n| **合计** | **0** |\n\n## 漏洞详情\n本次扫描的发现列表为空，未报告任何 XSS 缺陷，因此无具体漏洞条目可列。该结果不应被解读为“目标不存在任何漏洞”，仅说明在本次扫描的范围内、引擎所执行的测试用例未触发可确认的 XSS 响应特征。\n\n## 修复优先级建议\n1. 本次扫描发现数为 0，无需针对扫描结果执行专项修复；建议将本次结果（含时间戳与请求数）归档为安全基线，供后续复扫对比。\n2. 目标未检测到 WAF，建议评估是否引入 WAF 或在应用层落实输入校验、输出编码与 CSP 等纵深防御措施，作为常规加固，而非针对已发现缺陷的响应。\n3. 建议扩大后续扫描覆盖面，包括其他端点、参数、请求方法以及已认证会话下的状态，降低单次扫描盲区导致的漏报风险。\n4. 建议建立定期复扫机制（例如随版本发布或周期性执行），持续跟踪目标的安全状态变化。",
+        "forced": false
+      }
+    ],
+    "markdown": "> 本节由大模型（glm-5.3-flash）根据扫描器输出的客观结果撰写。所有漏洞类型、严重度、URL、参数与载荷均来自确定性检测引擎，模型不得新增或修改事实。\n> 撰写模型：local/glm-5.3-flash（切换 0 次）\n## 执行摘要\n本次自动化 XSS 扫描的目标为 `http://127.0.0.1:8080/vulnerabilities/xss_s/`，扫描于 2026-11-19 01:31:19 完成，共发起 665 次请求，过程中未检测到 WAF。扫描共报告 0 个缺陷，各严重度级别数量均为 0。基于本次结果，未发现可确认的 XSS 风险，整体风险判断为“本次扫描范围内未发现缺陷”；但该结论仅代表本次扫描所覆盖范围与用例的客观输出，不能等同于目标绝对安全。\n\n## 风险评级\n| 严重度 | 数量 |\n| --- | --- |\n| 严重 | 0 |\n| 高危 | 0 |\n| 中危 | 0 |\n| 低危 | 0 |\n| 信息 | 0 |\n| **合计** | **0** |\n\n## 漏洞详情\n本次扫描的发现列表为空，未报告任何 XSS 缺陷，因此无具体漏洞条目可列。该结果不应被解读为“目标不存在任何漏洞”，仅说明在本次扫描的范围内、引擎所执行的测试用例未触发可确认的 XSS 响应特征。\n\n## 修复优先级建议\n1. 本次扫描发现数为 0，无需针对扫描结果执行专项修复；建议将本次结果（含时间戳与请求数）归档为安全基线，供后续复扫对比。\n2. 目标未检测到 WAF，建议评估是否引入 WAF 或在应用层落实输入校验、输出编码与 CSP 等纵深防御措施，作为常规加固，而非针对已发现缺陷的响应。\n3. 建议扩大后续扫描覆盖面，包括其他端点、参数、请求方法以及已认证会话下的状态，降低单次扫描盲区导致的漏报风险。\n4. 建议建立定期复扫机制（例如随版本发布或周期性执行），持续跟踪目标的安全状态变化。\n"
+  }
+}

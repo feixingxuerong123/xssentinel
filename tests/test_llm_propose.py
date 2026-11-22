@@ -203,6 +203,71 @@ class TestProposeAndVerify:
             propose_and_verify(_requester(raw_base), raw_base + "/", "q",
                                pool=_FakePool("I refuse to answer in JSON"))
 
+
+class TestEvidenceClassHonesty:
+    """Phase 403: grade through the ONE authority in findings.py.
+
+    The old `EVIDENCE_MODEL if confirmed else EVIDENCE_NO_BROWSER` split
+    asked only "was there any confirmation", so a finding confirmed by a
+    REAL Chromium dialog was labelled `model-only` -- the weakest tier.
+    """
+
+    @staticmethod
+    def _patch_judges(monkeypatch, semantic: bool, headless: dict | None):
+        from xssentinel.core import verifier
+        monkeypatch.setattr(
+            verifier, "verify_semantic",
+            lambda *a, **kw: {"confirmed": semantic, "detail": "patched"})
+        monkeypatch.setattr(
+            verifier, "verify_headless",
+            lambda *a, **kw: headless or {"available": True,
+                                          "confirmed": False,
+                                          "outcome": "not-fired",
+                                          "detail": "no dialog"})
+
+    def test_headless_fired_is_browser_executed(self, monkeypatch, raw_base):
+        self._patch_judges(monkeypatch, semantic=False, headless={
+            "available": True, "confirmed": True, "outcome": "fired",
+            "detail": "dialogs fired carrying the probe token"})
+        out = propose_and_verify(
+            _requester(raw_base), raw_base + "/", "q",
+            pool=_FakePool(_GOOD), headless=True)
+        r = out["results"][0]
+        assert r["confirmed"] is True
+        assert r["evidence_class"] == "browser-executed", r
+
+    def test_semantic_only_stays_model_only(self, monkeypatch, raw_base):
+        self._patch_judges(monkeypatch, semantic=True, headless=None)
+        out = propose_and_verify(
+            _requester(raw_base), raw_base + "/", "q",
+            pool=_FakePool(_GOOD), headless=False)
+        r = out["results"][0]
+        assert r["confirmed"] is True
+        assert r["evidence_class"] == "model-only", r
+
+    def test_no_confirmation_stays_unavailable(self, monkeypatch, raw_base):
+        self._patch_judges(monkeypatch, semantic=False, headless=None)
+        out = propose_and_verify(
+            _requester(raw_base), raw_base + "/", "q",
+            pool=_FakePool(_GOOD), headless=False)
+        r = out["results"][0]
+        assert r["confirmed"] is False
+        assert r["evidence_class"] == "browser-unavailable", r
+
+    def test_headless_refuted_is_not_labelled_model(self, monkeypatch,
+                                                     raw_base):
+        """A browser that ran and did NOT fire is a different statement
+        from 'no browser replayed it' -- _grade_evidence says refuted."""
+        self._patch_judges(monkeypatch, semantic=False, headless={
+            "available": True, "confirmed": False, "outcome": "not-fired",
+            "detail": "no dialog"})
+        out = propose_and_verify(
+            _requester(raw_base), raw_base + "/", "q",
+            pool=_FakePool(_GOOD), headless=True)
+        r = out["results"][0]
+        assert r["confirmed"] is False
+        assert r["evidence_class"] == "browser-refuted", r
+
     def test_prompt_carries_the_facts(self):
         msgs = build_messages("attr_double_quote", meta_chars='" < >',
                               waf="Cloudflare", count=3)

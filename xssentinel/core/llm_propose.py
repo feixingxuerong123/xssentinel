@@ -183,6 +183,7 @@ def propose_and_verify(requester, url: str, param: str, *,
                        waf: str = "", method: str = "GET",
                        count: int = 5, headless: bool = False,
                        headers: dict | None = None,
+                       cookies: dict | None = None,
                        llm_timeout: float | None = None,
                        pool=None, config_path: str | None = None) -> dict:
     """One propose -> filter -> replay -> verify cycle.
@@ -211,7 +212,7 @@ def propose_and_verify(requester, url: str, param: str, *,
             f"from the completion ({len(res.text or '')} chars)")
     passed, rejected = filter_candidates(raw)
 
-    from .findings import EVIDENCE_MODEL, EVIDENCE_NO_BROWSER
+    from .findings import _grade_evidence
     results = []
     for payload in passed[:_MAX_LIVE_VERIFY]:
         token = "xssp_" + secrets.token_hex(4)
@@ -237,22 +238,48 @@ def propose_and_verify(requester, url: str, param: str, *,
                             "detail": f"transport: {type(e).__name__}: {e}"})
             continue
         v = verifier.verify_semantic(text, token, response_headers=hdrs)
-        confirmed = bool(v.get("confirmed"))
+        semantic_confirmed = bool(v.get("confirmed"))
+        confirmed = semantic_confirmed
         headless_out = None
+        hv = None
         if headless and not confirmed:
             hv = verifier.verify_headless(
                 req_url, method, send_params, send_data,
-                dict(headers or {}), token)
+                dict(headers or {}), token,
+                cookies=dict(cookies or {}))
             headless_out = {"available": bool(hv.get("available")),
                             "confirmed": bool(hv.get("confirmed"))}
             if headless_out["available"] and headless_out["confirmed"]:
                 confirmed = True
+        # Phase 403: grade through the ONE authority, not a hand-written
+        # `model-only if confirmed else browser-unavailable` split.  The old
+        # split labelled a finding confirmed by a REAL browser (headless
+        # fired) as `model-only` -- the weakest tier -- because it only asked
+        # "was there any confirmation".  Now:
+        #   * browser-executed  -- headless really fired;
+        #   * model-only        -- Python HTML model judged it executable,
+        #                          no browser replay happened;
+        #   * browser-refuted / browser-error -- if a replay ran and spoke;
+        #   * browser-unavailable -- no replay, no model judgement.
+        # `model_judged=True` only when the model was the SOLE judge; passing
+        # it on a headless-confirmed row would erase observed execution.
+        if confirmed and hv is not None and headless_out["confirmed"]:
+            evidence_cls, _conf, _detail = _grade_evidence(
+                hv, "high", "", model_judged=False)
+        elif confirmed and semantic_confirmed:
+            evidence_cls, _conf, _detail = _grade_evidence(
+                None, "high", "", model_judged=True)
+        else:
+            # No confirmation.  If a replay ran, let _grade_evidence say
+            # refuted/error; otherwise honest "no browser replay available".
+            evidence_cls, _conf, _detail = _grade_evidence(
+                hv if hv is not None else None, "high", "",
+                model_judged=False)
         results.append({
             "payload": payload, "sent": True,
             "reflected": token in text,
             "confirmed": confirmed,
-            "evidence_class": (EVIDENCE_MODEL if confirmed
-                               else EVIDENCE_NO_BROWSER),
+            "evidence_class": evidence_cls,
             "semantic_detail": str(v.get("detail") or "")[:200],
             "headless": headless_out,
         })

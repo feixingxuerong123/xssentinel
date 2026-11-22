@@ -60,8 +60,10 @@ def scanner(monkeypatch):
     s.req = _Req()
     calls: list = []
 
-    def _fake_verify(url, method, params, data, headers, token, timeout=20):
-        calls.append({"url": url, "params": params, "token": token})
+    def _fake_verify(url, method, params, data, headers, token, timeout=20,
+                     cookies=None):
+        calls.append({"url": url, "params": params, "token": token,
+                      "cookies": cookies})
         return {"available": True, "confirmed": True, "outcome": "fired",
                 "detail": "dialog fired"}
 

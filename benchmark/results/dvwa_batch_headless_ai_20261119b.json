@@ -1,0 +1,99 @@
+[
+  {
+    "case": "low_reflected",
+    "level": "low",
+    "path": "/vulnerabilities/xss_r/?name=xssprobe",
+    "rc": 0,
+    "seconds": 77.3,
+    "findings": [
+      {
+        "type": "reflected",
+        "severity": "high",
+        "confidence": "high",
+        "evidence_class": "browser-executed",
+        "headless_available": true,
+        "headless_confirmed": true,
+        "headless_outcome": "fired",
+        "headless_detail": "dialogs fired carrying the probe token: ['xssv_8d81ca55']"
+      }
+    ],
+    "ai_ok": true,
+    "ai_used_llm": true,
+    "ai_degraded": false,
+    "ai_model": "glm-5.3-flash",
+    "ai_failovers": 0,
+    "ai_elapsed": 72.74,
+    "ai_chars": 1820,
+    "stderr_tail": ""
+  },
+  {
+    "case": "medium_reflected",
+    "level": "medium",
+    "path": "/vulnerabilities/xss_r/?name=xssprobe",
+    "rc": 0,
+    "seconds": 78.7,
+    "findings": [
+      {
+        "type": "reflected",
+        "severity": "high",
+        "confidence": "high",
+        "evidence_class": "browser-executed",
+        "headless_available": true,
+        "headless_confirmed": true,
+        "headless_outcome": "fired",
+        "headless_detail": "dialogs fired carrying the probe token: ['xssv_63dcfe11']"
+      }
+    ],
+    "ai_ok": true,
+    "ai_used_llm": true,
+    "ai_degraded": false,
+    "ai_model": "glm-5.3-flash",
+    "ai_failovers": 0,
+    "ai_elapsed": 74.25,
+    "ai_chars": 1670,
+    "stderr_tail": ""
+  },
+  {
+    "case": "high_reflected",
+    "level": "high",
+    "path": "/vulnerabilities/xss_r/?name=xssprobe",
+    "rc": 0,
+    "seconds": 67.1,
+    "findings": [
+      {
+        "type": "reflected",
+        "severity": "high",
+        "confidence": "high",
+        "evidence_class": "browser-executed",
+        "headless_available": true,
+        "headless_confirmed": true,
+        "headless_outcome": "fired",
+        "headless_detail": "dialogs fired carrying the probe token: ['xssv_ee1e17d9']"
+      }
+    ],
+    "ai_ok": true,
+    "ai_used_llm": true,
+    "ai_degraded": false,
+    "ai_model": "glm-5.3-flash",
+    "ai_failovers": 0,
+    "ai_elapsed": 62.45,
+    "ai_chars": 1473,
+    "stderr_tail": ""
+  },
+  {
+    "case": "low_stored",
+    "level": "low",
+    "path": "/vulnerabilities/xss_s/",
+    "rc": 0,
+    "seconds": 44.6,
+    "findings": [],
+    "ai_ok": false,
+    "ai_used_llm": false,
+    "ai_degraded": true,
+    "ai_model": "",
+    "ai_failovers": 0,
+    "ai_elapsed": 0.23,
+    "ai_chars": 98,
+    "stderr_tail": ""
+  }
+]

@@ -46,7 +46,8 @@ def _scanner(monkeypatch, findings, verifier=None, cap=1, **kw):
     calls = {"n": 0, "args": [], "max_concurrent": 0, "_live": 0}
     lock = threading.Lock()
 
-    def fake_verify(url, method, params, data, headers, token, timeout=20):
+    def fake_verify(url, method, params, data, headers, token, timeout=20,
+                    cookies=None):
         with lock:
             calls["n"] += 1
             calls["_live"] += 1
@@ -54,7 +55,8 @@ def _scanner(monkeypatch, findings, verifier=None, cap=1, **kw):
                                           calls["_live"])
             calls["args"].append({"url": url, "method": method,
                                   "params": params, "data": data,
-                                  "headers": headers, "token": token})
+                                  "headers": headers, "token": token,
+                                  "cookies": cookies})
         try:
             if isinstance(verifier, Exception):
                 raise verifier

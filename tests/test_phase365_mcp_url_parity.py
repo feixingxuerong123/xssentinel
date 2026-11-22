@@ -115,6 +115,73 @@ class TestQueryBearingUrl:
         assert json.loads(res["content"][0]["text"])["finding_count"] >= 1
 
 
+class TestUrlSchemeAllowlist:
+    """_abs_http_url is the shared gate for all 4 MCP tools (Phase 402).
+
+    It previously accepted any non-empty scheme: ``file://`` / ``gopher://``
+    / ``dict://`` passed and reached ``verify_headless``'s ``page.goto``,
+    which will navigate them. The docstring said http(s) but the code did
+    not enforce it -- a "contract written in prose, not in code" gap.
+    """
+
+    @pytest.mark.parametrize("url", [
+        "http://127.0.0.1/p", "https://example.test/p?q=1",
+        "HTTPS://example.test/p",  # scheme is case-insensitive (RFC 3986)
+    ])
+    def test_http_schemes_accepted(self, url):
+        assert mcp_server._abs_http_url({"url": url}) == (url, None)
+
+    @pytest.mark.parametrize("url", [
+        "file:///etc/passwd", "gopher://127.0.0.1:6379/_INFO",
+        "dict://127.0.0.1:2628/", "ftp://host/x", "javascript:alert(1)",
+        "data:text/html,<script>alert(1)</script>",
+        "FILE:///etc/passwd",
+    ])
+    def test_non_http_schemes_rejected(self, url):
+        out, err = mcp_server._abs_http_url({"url": url})
+        assert out is None
+        assert err and "http(s)" in err
+
+    @pytest.mark.parametrize("url", [
+        "", "   ", "/relative/path", "example.test", "//example.test/p",
+    ])
+    def test_missing_scheme_or_netloc_rejected(self, url):
+        out, err = mcp_server._abs_http_url({"url": url})
+        assert out is None and err
+
+    def test_all_url_tools_share_the_gate(self):
+        """Source lock: no tool may hand-roll URL validation again."""
+        import ast
+        import pathlib
+        root = pathlib.Path(__file__).resolve().parents[1]
+        tree = ast.parse(
+            (root / "xssentinel/api/mcp_server.py").read_text(encoding="utf-8"))
+        for fn_name in ("run_verify_tool", "run_param_mine_tool",
+                        "run_csp_analyze_tool", "run_propose_tool"):
+            fn = TestSingleDefinitionLock._function(tree, fn_name)
+            called = {n.func.id for n in ast.walk(fn)
+                      if isinstance(n, ast.Call)
+                      and isinstance(n.func, ast.Name)}
+            assert "_abs_http_url" in called, (
+                f"{fn_name} no longer uses the shared URL gate")
+
+    def test_verify_tool_rejects_file_scheme_without_network(self, monkeypatch):
+        """Behaviour-level: a bad scheme is refused before any probe runs."""
+        import xssentinel.api.server as server_mod
+        called = []
+
+        def boom(*a, **kw):
+            called.append(True)
+            raise AssertionError("must not issue a request for file://")
+
+        monkeypatch.setattr(server_mod, "_build_requester", boom)
+        res = mcp_server.run_verify_tool({
+            "url": "file:///etc/passwd", "param": "q",
+            "payload": "<script>alert(1)</script>"})
+        assert res.get("isError")
+        assert not called
+
+
 class TestSingleDefinitionLock:
     """The helper does not rot; the CALL SITES do (Phase 259/176u family).
 

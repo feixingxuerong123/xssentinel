@@ -1581,9 +1581,64 @@ def verify_token_in_browser(url: str, token: str | None = None,
                 pass
 
 
+def session_cookies(session) -> dict:
+    """Cookie pairs from a requests-style session, for the browser replay.
+    One definition so no scan path has to hand-roll the jar conversion.
+    """
+    jar = getattr(session, "cookies", None)
+    if jar is None:
+        return {}
+    if hasattr(jar, "get_dict"):
+        try:
+            return dict(jar.get_dict())
+        except Exception:
+            return {}
+    try:
+        return {str(c.name): str(c.value) for c in jar}
+    except (TypeError, AttributeError):
+        return {}
+
+
+def _browser_cookie_entries(cookies, headers, url: str) -> list[dict]:
+    """Build Playwright cookie entries from a requests jar/dict and/or a
+    ``Cookie`` header.  Phase 400: an authenticated page that the HTTP
+    probe could reach must not be replayed through a cookie-free browser.
+
+    ``set_extra_http_headers`` refuses a ``Cookie`` header, so callers also
+    use this to strip it before handing headers to Playwright.
+    """
+    from urllib.parse import urlparse
+
+    parsed = urlparse(url)
+    origin = "%s://%s" % (parsed.scheme or "http",
+                          parsed.netloc or "127.0.0.1")
+    out: dict[str, str] = {}
+    if cookies:
+        if isinstance(cookies, dict):
+            pairs = cookies.items()
+        else:
+            try:
+                pairs = [(c.name, c.value) for c in cookies]
+            except (TypeError, AttributeError):
+                pairs = []
+        for name, value in pairs:
+            if name is not None:
+                out[str(name)] = str(value)
+    for key, value in (headers or {}).items():
+        if str(key).lower() != "cookie" or not value:
+            continue
+        for part in str(value).split(";"):
+            if "=" in part:
+                name, val = part.split("=", 1)
+                if name.strip():
+                    out[name.strip()] = val.strip()
+    return [{"name": name, "value": value, "url": origin}
+            for name, value in out.items()]
+
+
 def verify_headless(url: str, method: str, params: dict | None,
                     data: dict | None, headers: dict | None,
-                    token: str, timeout: int = 20) -> dict:
+                    token: str, timeout: int = 20, cookies=None) -> dict:
     """Best-effort headless confirmation via Playwright. Returns status dict.
 
     For GET: encode params into the URL, set extra HTTP headers, then navigate.
@@ -1592,6 +1647,11 @@ def verify_headless(url: str, method: str, params: dict | None,
 
     Phase 38 (P1-6): reuses a thread-bound shared Chromium instead of
     launching a fresh browser for every confirmation (~1-2s saved each).
+
+    Phase 400: ``cookies`` (a requests jar, dict, or ``Cookie`` header in
+    ``headers``) is installed on a fresh browser context.  Without it an
+    authenticated reflection gets bounced to the login page and an honest
+    high finding is misgraded ``browser-refuted``.
     """
     try:
         from .dom_engine import get_shared_browser
@@ -1612,18 +1672,30 @@ def verify_headless(url: str, method: str, params: dict | None,
             dialog.dismiss()
 
         page.on("dialog", on_dialog)
-        if headers:
+        # Phase 400: the page needs the SAME session the HTTP probe had.
+        # A ``Cookie`` header cannot go through set_extra_http_headers
+        # (Playwright rejects it and drops the whole header set), so split
+        # it out and install it on the context instead.
+        browser_cookies = _browser_cookie_entries(cookies, headers, url)
+        if browser_cookies:
+            page.context.add_cookies(browser_cookies)
+        browser_headers = {k: v for k, v in (headers or {}).items()
+                           if str(k).lower() != "cookie"}
+        if browser_headers:
             try:
-                page.set_extra_http_headers(headers)
+                page.set_extra_http_headers(browser_headers)
             except Exception:
                 pass
         if method.upper() == "POST":
             # Fetch the POST response via the request API, then render the
             # body in the page so scripts execute and dialogs fire.
             try:
+                # Playwright's ``data=`` sends application/json by default;
+                # the HTTP probe rides a form POST for these findings.  Use
+                # ``form=`` so $_POST sees the same carrier (Phase 400).
                 resp = page.context.request.post(
-                    url, data=data or {}, params=params or {},
-                    headers=headers or {}, timeout=timeout * 1000)
+                    url, form=data or {}, params=params or {},
+                    headers=browser_headers, timeout=timeout * 1000)
                 body = resp.text() if hasattr(resp, "text") else ""
                 page.set_content(body, timeout=timeout * 1000)
             except Exception as e:
@@ -1665,15 +1737,20 @@ def verify_headless(url: str, method: str, params: dict | None,
         # Evidence screenshot: captures the executing page (dialogs are
         # dismissed by the handler, so this is the page state right after
         # execution).  Returned as base64 PNG so the HTML report can embed
-        # it self-contained.
+        # it self-contained.  Phase 402: ONLY on confirmation.  A
+        # not-fired replay is evidence AGAINST the finding -- report.py
+        # never renders its screenshot -- so capturing one there just
+        # inflates every finding JSON with an up-to-2MB base64 blob of a
+        # page that may carry session data (and is never shown).
         screenshot_b64 = None
-        try:
-            raw = page.screenshot(type="png")
-            if raw and len(raw) <= 2 * 1024 * 1024:   # 2 MB guard
-                import base64 as _b64
-                screenshot_b64 = _b64.b64encode(raw).decode("ascii")
-        except Exception:
-            screenshot_b64 = None
+        if confirmed:
+            try:
+                raw = page.screenshot(type="png")
+                if raw and len(raw) <= 2 * 1024 * 1024:   # 2 MB guard
+                    import base64 as _b64
+                    screenshot_b64 = _b64.b64encode(raw).decode("ascii")
+            except Exception:
+                screenshot_b64 = None
         if confirmed:
             detail = f"dialogs fired carrying the probe token: {token_hit}"
         elif fired:

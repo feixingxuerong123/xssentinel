@@ -1,0 +1,81 @@
+[
+  {
+    "case": "low_reflected",
+    "level": "low",
+    "path": "/vulnerabilities/xss_r/?name=xssprobe",
+    "rc": 0,
+    "seconds": 63.4,
+    "findings": [
+      [
+        "reflected",
+        "high"
+      ]
+    ],
+    "ai_ok": false,
+    "ai_used_llm": false,
+    "ai_degraded": true,
+    "ai_model": "",
+    "ai_failovers": 0,
+    "ai_elapsed": 60.02,
+    "ai_chars": 98,
+    "stderr_tail": ""
+  },
+  {
+    "case": "medium_reflected",
+    "level": "medium",
+    "path": "/vulnerabilities/xss_r/?name=xssprobe",
+    "rc": 0,
+    "seconds": 57.0,
+    "findings": [
+      [
+        "reflected",
+        "high"
+      ]
+    ],
+    "ai_ok": true,
+    "ai_used_llm": true,
+    "ai_degraded": false,
+    "ai_model": "glm-5.3-flash",
+    "ai_failovers": 0,
+    "ai_elapsed": 53.58,
+    "ai_chars": 1840,
+    "stderr_tail": ""
+  },
+  {
+    "case": "high_reflected",
+    "level": "high",
+    "path": "/vulnerabilities/xss_r/?name=xssprobe",
+    "rc": 0,
+    "seconds": 63.3,
+    "findings": [
+      [
+        "reflected",
+        "high"
+      ]
+    ],
+    "ai_ok": false,
+    "ai_used_llm": false,
+    "ai_degraded": true,
+    "ai_model": "",
+    "ai_failovers": 0,
+    "ai_elapsed": 60.02,
+    "ai_chars": 98,
+    "stderr_tail": ""
+  },
+  {
+    "case": "low_stored",
+    "level": "low",
+    "path": "/vulnerabilities/xss_s/",
+    "rc": 0,
+    "seconds": 77.6,
+    "findings": [],
+    "ai_ok": true,
+    "ai_used_llm": true,
+    "ai_degraded": false,
+    "ai_model": "glm-5.3-flash",
+    "ai_failovers": 0,
+    "ai_elapsed": 19.88,
+    "ai_chars": 604,
+    "stderr_tail": ""
+  }
+]

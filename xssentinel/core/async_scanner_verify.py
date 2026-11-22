@@ -30,6 +30,19 @@ class AsyncHeadlessVerifyMixin:
         h.update(dict(getattr(self, "auth_headers", None) or {}))
         return h
 
+    def _verify_cookies(self) -> dict:
+        """Same session identity as _verify_headers, but for cookies:
+        operator cookies plus the cookies established by form login.
+        Without this the browser replay hits the login wall instead of the
+        authed page the HTTP probe confirmed (Phase 400)."""
+        h = dict(getattr(self, "cookies", None) or {})
+        for c in (getattr(self, "auth_cookies", None) or []):
+            try:
+                h[str(c["name"])] = str(c.get("value") or "")
+            except (KeyError, TypeError):
+                continue
+        return h
+
     def _verify_pool(self):
         """Lazily create the dedicated verification executor.  getattr
         guards throughout: tests build this scanner with ``__new__`` to
@@ -103,7 +116,8 @@ class AsyncHeadlessVerifyMixin:
                     params=None if is_body else {param: payload},
                     data={param: payload} if is_body else None,
                     headers=self._verify_headers(),
-                    token=token))
+                    token=token,
+                    cookies=self._verify_cookies()))
         except Exception as e:
             _log.warning("headless verification failed for %s: %s",
                          url, e, exc_info=getattr(self, "verbose", False))

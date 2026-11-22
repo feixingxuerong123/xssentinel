@@ -1471,7 +1471,9 @@ class Scanner(StoredBlindMixin, StoredAutoMixin, AdvancedLayerMixin,
                         data=_probe["data"] if is_body else None,
                         headers=dict(getattr(getattr(req, "session", None),
                                              "headers", {}) or {}),
-                        token=_token)
+                        token=_token,
+                        cookies=verifier.session_cookies(
+                            getattr(req, "session", None)))
                 except Exception:
                     _headless = None
                 if not (_headless or {}).get("confirmed"):
@@ -2321,7 +2323,8 @@ class Scanner(StoredBlindMixin, StoredAutoMixin, AdvancedLayerMixin,
                     params=None if is_body else {param: payload},
                     data={param: payload} if is_body else None,
                     headers=dict(self.req.session.headers),
-                    token=token)
+                    token=token,
+                    cookies=verifier.session_cookies(self.req.session))
         severity, confidence = "high", "high"
         detail = verify["detail"]
         # Phase 32: content-type confidence downgrade (ZAP-style).  Markup
@@ -2444,7 +2447,8 @@ class Scanner(StoredBlindMixin, StoredAutoMixin, AdvancedLayerMixin,
                 params=None if is_body else {d.get("param") or "": payload},
                 data={d.get("param") or "": payload} if is_body else None,
                 headers=dict(self.req.session.headers),
-                token=token)
+                token=token,
+                cookies=verifier.session_cookies(self.req.session))
         except Exception as e:
             _log.warning("headless verification failed for %s: %s",
                          url, e, exc_info=self.verbose)

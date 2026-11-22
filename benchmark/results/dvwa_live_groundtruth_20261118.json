@@ -1,0 +1,184 @@
+[
+  {
+    "level": "low",
+    "carrier": "script",
+    "token": "t72d2d158",
+    "surface": "reflected:name",
+    "http_has_raw_payload": true,
+    "dialog_confirmed": true,
+    "dialogs": [
+      "t72d2d158"
+    ]
+  },
+  {
+    "level": "low",
+    "carrier": "script",
+    "token": "t72d2d158",
+    "surface": "stored:mtxMessage",
+    "http_has_raw_payload": true,
+    "dialog_confirmed": true,
+    "dialogs": [
+      "t72d2d158"
+    ]
+  },
+  {
+    "level": "low",
+    "carrier": "script",
+    "token": "t72d2d158",
+    "surface": "stored:txtName",
+    "http_has_raw_payload": true,
+    "dialog_confirmed": true,
+    "dialogs": [
+      "t72d2d158"
+    ]
+  },
+  {
+    "level": "low",
+    "carrier": "img",
+    "token": "t72d2d158",
+    "surface": "reflected:name",
+    "http_has_raw_payload": true,
+    "dialog_confirmed": true,
+    "dialogs": [
+      "t72d2d158"
+    ]
+  },
+  {
+    "level": "low",
+    "carrier": "img",
+    "token": "t72d2d158",
+    "surface": "stored:mtxMessage",
+    "http_has_raw_payload": true,
+    "dialog_confirmed": true,
+    "dialogs": [
+      "t72d2d158"
+    ]
+  },
+  {
+    "level": "low",
+    "carrier": "img",
+    "token": "t72d2d158",
+    "surface": "stored:txtName",
+    "http_has_raw_payload": true,
+    "dialog_confirmed": true,
+    "dialogs": [
+      "t72d2d158"
+    ]
+  },
+  {
+    "level": "medium",
+    "carrier": "script",
+    "token": "t81ae2c17",
+    "surface": "reflected:name",
+    "http_has_raw_payload": false,
+    "dialog_confirmed": false,
+    "dialogs": []
+  },
+  {
+    "level": "medium",
+    "carrier": "script",
+    "token": "t81ae2c17",
+    "surface": "stored:mtxMessage",
+    "http_has_raw_payload": false,
+    "dialog_confirmed": false,
+    "dialogs": []
+  },
+  {
+    "level": "medium",
+    "carrier": "script",
+    "token": "t81ae2c17",
+    "surface": "stored:txtName",
+    "http_has_raw_payload": false,
+    "dialog_confirmed": false,
+    "dialogs": []
+  },
+  {
+    "level": "medium",
+    "carrier": "img",
+    "token": "t81ae2c17",
+    "surface": "reflected:name",
+    "http_has_raw_payload": true,
+    "dialog_confirmed": true,
+    "dialogs": [
+      "t81ae2c17"
+    ]
+  },
+  {
+    "level": "medium",
+    "carrier": "img",
+    "token": "t81ae2c17",
+    "surface": "stored:mtxMessage",
+    "http_has_raw_payload": false,
+    "dialog_confirmed": false,
+    "dialogs": []
+  },
+  {
+    "level": "medium",
+    "carrier": "img",
+    "token": "t81ae2c17",
+    "surface": "stored:txtName",
+    "http_has_raw_payload": true,
+    "dialog_confirmed": true,
+    "dialogs": [
+      "t81ae2c17"
+    ]
+  },
+  {
+    "level": "high",
+    "carrier": "script",
+    "token": "tb58aec9c",
+    "surface": "reflected:name",
+    "http_has_raw_payload": false,
+    "dialog_confirmed": false,
+    "dialogs": []
+  },
+  {
+    "level": "high",
+    "carrier": "script",
+    "token": "tb58aec9c",
+    "surface": "stored:mtxMessage",
+    "http_has_raw_payload": false,
+    "dialog_confirmed": false,
+    "dialogs": []
+  },
+  {
+    "level": "high",
+    "carrier": "script",
+    "token": "tb58aec9c",
+    "surface": "stored:txtName",
+    "http_has_raw_payload": false,
+    "dialog_confirmed": false,
+    "dialogs": []
+  },
+  {
+    "level": "high",
+    "carrier": "img",
+    "token": "tb58aec9c",
+    "surface": "reflected:name",
+    "http_has_raw_payload": true,
+    "dialog_confirmed": true,
+    "dialogs": [
+      "tb58aec9c"
+    ]
+  },
+  {
+    "level": "high",
+    "carrier": "img",
+    "token": "tb58aec9c",
+    "surface": "stored:mtxMessage",
+    "http_has_raw_payload": false,
+    "dialog_confirmed": false,
+    "dialogs": []
+  },
+  {
+    "level": "high",
+    "carrier": "img",
+    "token": "tb58aec9c",
+    "surface": "stored:txtName",
+    "http_has_raw_payload": true,
+    "dialog_confirmed": true,
+    "dialogs": [
+      "tb58aec9c"
+    ]
+  }
+]
