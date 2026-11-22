@@ -2586,3 +2586,224 @@ eventhandler/level5 量过 `<div marquee onstart>` 是「live」,来自「有页
 + 定谳结论 / 真页面无脚本 / Phase 362 证据等级 + 交叉核对历史 artifact /
 onstart 浏览器 inert 而 verifier 确认 / 本轮未改判定层);变异、门禁数字见
 CHANGELOG Phase 401 验收节。
+
+### 8.33 处置记录(2026-11-19):Phase 402—— Phase 400 交付后代码审查的三项零争议收口
+
+Phase 400(headless 认证重放)双引擎全量门与变异 4/4 全绿后做了一轮代码审查,
+产出 10 个候选。按「判定语义 vs 零争议」分流,本轮只动后者三项(详见
+CHANGELOG `[Unreleased]` Phase 402):
+
+- **已修(3)**:MCP `_abs_http_url` 的 scheme 白名单(`file://` 等能过并进
+  `page.goto`);截图无条件采集塞进每个 finding(改只在 confirmed 时);
+  真实 `PHPSESSID` 明文落盘且未 ignore(改到系统临时目录 + `.gitignore`
+  兜底 + 不回显)。相邻批 99 passed,两条变异反证 PASS,判定层零改动。
+- **未采纳,独立成轮(3)**:cookie 身份三处手写导致 sync/async 不等价;
+  `llm_propose` 把仅 headless 确认的 finding 标成 `EVIDENCE_MODEL` 而非
+  `browser-executed`;`trusted_types_no_policy` 无条件 medium 噪音。
+  ⚠️ **后续更正以 §8.34 为准**:llm_propose 证据分级已于 Phase 403 修真;
+  async cookie 分歧经深挖定谳为 HTTP 栈架构差异(非可修的 adapter 漂移),
+  两者均不按本节原计划动全量门。trusted_types 见 §8.35 评估。
+- **核实无缺口(4)**:结构化错误 / finding 截断标记 / 工具 title+annotations
+  / 进度 total / 重试幂等(§8.6–8.15 已逐项落地);`page.close()` 生命周期;
+  runner 判词与零通过防护;凭据回显面(本轮 cookie 不回显又收紧一处)。
+
+**未做**:不重跑全量双引擎门——本轮判定语义零改动,照 Phase 401 先例不拿
+Phase 400 的旧数字顶账。cookie 文件只在磁盘保留 + ignore 拦截,未删除
+(活动会话,删除不可逆)。
+
+### 8.34 处置记录(2026-11-19 续):Phase 403——证据分级修真;async cookie 分歧定谳为架构差异,不改
+
+**Phase 403(已修,证据诚实性)**:`llm_propose.propose_and_verify` 原先手写
+`EVIDENCE_MODEL if confirmed else EVIDENCE_NO_BROWSER`,只问「有没有确认」,
+于是「真 Chromium 弹窗确认」被标成最弱的 `model-only`。改为统一走
+`findings._grade_evidence` 唯一权威:headless fired→`browser-executed`、
+语义模型独判→`model-only`、浏览器跑了没弹→`browser-refuted`、没跑→
+`browser-unavailable`。新增 `tests/test_llm_propose.py::TestEvidenceClassHonesty`
+4 例;变异反证 baseline 5→mutant 2 failed(headless fired/refuted 两条)→
+字节还原 5,`VERDICT: PASS`。相邻 `test_llm_propose` 21 passed。
+
+同轮核实子代理对 llm_propose 的第二条指控「HTTP probe 没带认证」**不成立**:
+MCP `run_propose_tool` 的 requester 经 `_make_requester(args,...)`→
+`_build_requester` 已把 headers/cookies 种进 session,HTTP 探针本就带身份;
+`headers=`/`cookies=` 入参是给 headless 重放用的。故不动 HTTP probe。
+
+**async cookie「不等价」定谳:架构差异,不是可修的 adapter 漂移(不改)**。
+§8.33 曾记「async 的 EgressCookieJar 在扫描中建立的 cookie 不进
+`_verify_cookies`」,深挖后更正:async 每次请求都 `async with
+aiohttp.ClientSession(**self._session_kwargs(url))` 新建并关闭 session
+(`async_scanner.py:614` / `async_scanner_layers.py:1093`),jar 本就不跨请求
+持久——「扫描中建立的 cookie」在 async 架构里从来不存在可复用的 live jar。
+sync 用 `session_cookies(live jar)` 能拿到,是因为 requests.Session 持久。
+这不是「同一契约手写两遍」的复发,而是两种 HTTP 栈的会话生命周期差异;
+要统一必须改 aiohttp session 生命周期(架构语义变更),且目前**没有活体
+证据**表明 async 因此在认证靶场漏报(DVWA 三档全用 sync 测,§DVWA 报告)。
+按「定谳≠修复 / 没量过的东西不进代码」纪律,本轮不改,列为**需先测量的
+独立轮**:前置条件是拿一个「表单登录后 Set-Cookie 才可见」的认证靶场做
+sync/async headless A/B,量出 async 真漏报再谈改 session 生命周期。
+`_verify_cookies()` 的 operator cookies + auth_cookies 合并保持原样。
+
+**验收**:Phase 403 相邻批 21 passed + 变异 PASS;判定层其余零改动。
+
+### 8.35 处置记录(2026-11-19 续):trusted_types_no_policy 评估——不改,判定契约问题需拍板
+
+子代理审查指控「`trusted_types_no_policy` 对任何有危险 sink 的页面无条件报
+medium」。核查后**部分成立、部分更正**:
+
+- **更正**:`trusted_types.py:552-573` 已有分级——若所有检测到的用户数据流
+  都过识别的 sanitizer,降 `low` 并注明「defense-in-depth, exploitability
+  not established」;只在没有可控源证据但也没过 sanitizer 时才 `medium`,
+  且 note 是条件句「if a sink receives user-controlled data...」。不是无条件
+  medium。
+- **成立的部分**:即便降到 `low`,它仍是一条 finding,而 benchmark 的零发现
+  门禁把「安全页面有任意 finding」算红。实证:`benchmark/server.py:1846-1852`
+  的 `_CLOBBER_SCRIPT` 注释明写 safe twin **故意不用 innerHTML/outerHTML/
+  document.write**,就为躲开 TT 层,否则会报 `no_policy`(medium) 把零发现
+  门禁搞红。这是「改被测物来让门禁过」的形态,与「测量先行」纪律相悖。
+- **为何不改**:真正要决定的是「无可控源证据的 TT  Defense-in-depth 提示
+  是否还算 finding」——这是 detection contract 变更,会改 benchmark 分母
+  (safe twin 是否该有 finding),必须连带 runner 判词、双引擎全量门重测,
+  且涉及一个产品判断:工具该不该把「缺深度防御」当安全发现。按 §8.22
+  「定谳≠修复」先例,本轮只记账不动判定层。
+- **待拍板选项**:① 保持现状(TT 提示算 finding,benchmark 继续用避开 sink
+  的 safe fixture);② 无可控源时降为 `info` 且不进 finding 计数(需给
+  runner 加白名单语义,注意别做成「按名单豁免」的假绿);③ 引入独立的
+  `hygiene` 通道与 XSS finding 分开呈现。三者都改报告契约,需仓库归属者
+  定方向后再独立成轮。
+
+**验收**:本节为评估记账,零代码改动;Phase 402/403 的 99+21 passed 与
+两条变异反证仍是本轮实际验收。
+
+### 8.36 竞品测试文件的三类接入(2026-11-20,Phase 404)——外部题考自己,事实表非分数
+
+出发点:此前外部效度只吃过社区通用语料(PortSwigger/SecLists/PATT/OWASP/h5sc,
+§8.23),**从没用过竞品自己发布的测试文件**。本轮把 6 家竞品源码
+(dalfox / XSStrike / nuclei-templates / w3af / XSSer / ZAP xssmaze)经 ghfast.top
+镜像落到 gitignored 的 `dev/_competitors_20261120/`,按资产形态分三类处置:
+
+- **A payload 库**(可落地实测):`dev/_p_comp_extract.py` 从 XSStrike `config.py`
+  的 `payloads`+`fuzzes` 元组、XSSer `vectors.py`(1450 项字典)、dalfox Rust
+  `src/payload/xss_*.rs` 模板、nuclei `dast/vulnerabilities/xss/*.yaml`
+  的 `http.payloads`+`headless.payloads` 提取 **1516 条向量**,每条带
+  `repo:path@sha12` 与占位符替换记录(`{JS}`→`alert(941)`、`PAYLOAD`→
+  `alert(931)`、`rand_int`→`951`)。nuclei 仅 2 条(多数 CSP-bypass 模板
+  依赖外部 CDN,oracle 路由屏蔽外连,不计入分母)——这是资产形态差异不是漏提。
+- **B 官方靶场用例**(记录不打分):XSStrike `test.html` 是 4 个 DOM sink
+  (document.write/eval/innerHTML),w3af `test_xss.py` 的 14 个 case 引用
+  外部 moth/WAVSEP 靶站,本机无靶场 → 无可内联 payload,记为 not-comparable
+  而非静默丢弃。
+- **C 单元测试代码**(只做契约对照,不能在我方执行):w3af `test_xss.py`
+  (398 行)、dalfox `src/**/tests.rs`、ZAP `PersistentXss*UnitTest.java`——
+  语言/框架不同,产出的是"竞品测自己"的契约,不转嫁成我方分数。
+
+**M1 保真度**(复用 Phase 392 真 Chromium oracle + sandbox.judge 装置,
+`dev/_p_comp_m1.py`):分层抽样 157 向量 × 12 上下文(8 raw + 4 转义孪生)
+= **1884 页**,控制页全绿。结果 `overstated=2 / inert 分母=1674 → 0.0012`,
+`missed=0`,`unknown_on_exec=45`(判定器诚实弃权,不算命中)。
+2 例 overstated 均来自 XSStrike 同一载荷
+`<iMg sRc=x:confirm`` oNlOad=eval(src)>`:真浏览器复验
+`naturalWidth=0`(无效 scheme `x:confirm``` 加载失败→走 onerror 而非 onload),
+sandbox 按"onload 属性存在"判 live 而实际无对话框。**定谳为判定层高估点,
+本轮不修**(改判定语义必跑全量 192/194 门,与"定谳≠修复"纪律一致),列观察项。
+
+**E2E 注入**(`dev/_p_comp_e2e.py`):同一批靶场/预算/切片(7 正 3 负),
+4 臂唯一差异是 `--custom-payloads` 来源。baseline 与 XSStrike 臂 7/7 检出、
+FP0;dalfox 与 XSSer 臂在 `neg-filter-01`(需绕过滤器的 vulnerable 例)各漏 1
+(6/7),FP 仍 0、ERR 0——**竞品载荷集单独作输入时覆盖不足**,这是能力边界的
+真实测量,不是竞品差也不是我方回归。ERR 单列不计 FN/TN。
+
+**账本纪律**:两份事实表(非分数)落
+`benchmark/results/competitor_{payloads,e2e}_20261120.{json,md}`,
+不与 194 矩阵/XSSMaze 并列;ground_truth 一律来自 manifest。
+守卫 `tests/test_phase404_competitor_corpus.py` 9 例(事实表无 score 键、
+provenance 完整、控制页 sanity、E2E 有 baseline 臂且预算与 gate 同源、
+错误单列),变异 `dev/_p_comp_mutations.py` **3/3**(注入 score 键 / 抹
+source / 翻控制页,均 baseline 绿→mutated 红→字节还原绿)。
+**唯一发现**:sandbox 对"事件属性存在但资源加载失败"的高估。
+> **2026-11-20 结案**:此观察项已由 §8.37 / Phase 405 修复并跑全量门,
+> 带日期的 §8.36 原文保留不改,以该节为准。
+
+### 8.37 处置记录(2026-11-20):Phase 405——资源加载失败时 onload 高估定谳并修掉
+
+**起点**:§8.36 量出 2 例 overstated(占 inert 分母 0.0012),同源载荷
+`<img src=x:confirm`` onload=eval(src)>`:sandbox 依 `_handler_state` 的
+`(resource_load, onload) -> live` 无条件判"资源加载时触发",但真浏览器
+`naturalWidth=0`、只走 onerror、无对话框。
+
+**先量再修**:`dev/_p405_src_probe2.py` 用真 Chromium 148 隔离 onload/onerror,
+9 种 src 形态 × 2 handler。结论:onload **只在资源真正加载成功时触发**
+(`data:image/svg+xml` 有效图 natW=300 → fired;无效 scheme `foo:bar` /
+`x:confirm``` / 相对 404 / 空 src 全部加载失败 → onload 不触发、onerror 触发)。
+证据 `benchmark/results/src_onload_probe2_20261120.json`。
+`src=x:confirm``` 是显式未知 scheme,浏览器在 fetch 前就拒绝——是**可静态确定**
+的必然失败,与"相对路径可能 200 也可能 404"不同。
+
+**修法(最小边界)**:`xssentinel/core/sandbox.py` 新增
+`LOADABLE_RESOURCE_SCHEMES`(http/https/data/blob/file/about/filesystem)与
+`_EXPLICIT_SCHEME_RE`;仅当资源元素 onload 的 src 带**显式且不可加载的
+scheme**时降级 inert。**不动** onerror 分支(`<img src=x onerror>` 失败正触发,
+仍 live)、不动相对/绝对/data/blob src(是否成功取决于服务器,保守留 live)、
+不动 iframe 无 src(about:blank 触发 load)、不动 `<svg onload>`(文档级事件)。
+炸弹半径经默认载荷普查:仅 1 条绕过 filter 的 data-svg 载荷相关,且仍 live。
+
+**验收**:守卫 `tests/test_phase405_onload_scheme.py` **14 passed**(3 组
+不可加载 scheme→inert / 5 组可加载或服务器相关→live / 3 组真 auto-firing
+不变 / onerror 分支不变 / 源码断言钉住降级分支与白名单 / 证据文件支持结论);
+变异 `dev/_p405_mutations.py` **3/3**(删降级分支 / 把 foo 加白名单 /
+改掉 scheme 正则,均 baseline 绿→mutated 红→字节还原绿)。
+**动判定语义按铁律跑全量 194 双引擎门**:sync TP113/FP0/TN81/FN0、0 SKIP、
+F1=1.0000、性能预算 PASSED(729.7s vs 795s ceiling);async 三轮质量门全绿
+(TP107/FP0/TN75/FN0、12 SKIP、F1=1.0000),干净端口 18990 全量重跑
+860.9s vs 840s ceiling 略超 2.5%(请求数 20564 vs sync 7915 ⇒ async 架构
+请求量高 2.6 倍,本机吞吐边界,非修复回归),详见 CHANGELOG Phase 405。
+竞品 M1 可复跑核对:原 2 例 overstated 的向量现判 inert(`--resandbox` 口径)。
+
+**同轮另两项(任务性质不同,记账)**:
+- **竞品测试固化**:入库 `benchmark/run_competitor_corpus.py`(extract/m1/e2e
+  三臂,--tree 归属必填或显式 UNOWNED,scratch 模块缺失时 fail-loud 给抓取
+  配方而非静默降级)+ 契约守卫 `tests/test_competitor_runner.py` 4 例。
+  M1 oracle 13 分钟是 opt-in,常驻的是已提交事实表 + 守卫测试。
+- **E2E 载荷缺口归因**(dalfox/XSSer 臂在 neg-filter-01 各漏 1):
+  baseline/XSStrike 7/7 已证明我方检测无缺口。定位成因——filter 剥掉
+  `<svg>` 后留下 `<a xlink:href=javascript:...>`,默认载荷正是靠这种
+  SVG+javascript: 变形绕过(5 条),而竞品载荷集没有该形态。
+  ⇒ **不改默认载荷**(补它不产生新信息),事实表如实记为"竞品载荷集覆盖
+  差异,非我方检测回归"。
+
+### 8.38 处置记录(2026-11-21):Phase 407——async 无反射 L1 穷举收敛 + 一次失败回滚
+
+**起点**:全量 async 20564 请求 vs sync 7915(2.6 倍)。逐 case 对比定位——
+marker 不反射的 case async 跑 ~245 请求、sync 只 ~18(sync 在
+`scanner.py:778 return # not reflected -> skip`);而这些 case 的检出 finding
+全来自专用 L7 层,L1 穷举零贡献。
+
+**第一次尝试(失败并回滚)**:把 `marker_absent` OR 进 `marker_escaped` 做收敛。
+单 case repro 立刻抓出 FN——pos-elem-01/neg-filter-01(反射正例)TP→FN、
+请求 35→28,x3 稳定。根因:`marker_escaped` 是 async 多阶段总开关
+(sandwich/generative、quote probe、transform cap 12→2、concat-stamp、尾部
+兜底),折叠 absence 一次性触发全部收敛。**四处改动完整回滚,git diff 为空。**
+另据源码核查推翻了"cand_budget 收敛导致 FN"的初判:pos-elem-01 的 marker
+逐字反射、marker_absent 应为 False,且检出 payload 就在候选前 3。
+
+**第二次尝试(落地)**:严格解耦——`marker_absent` 是独立信号,只把
+`_build_probe_candidates` 的 `cand_budget` 从 14 收敛到 3,绝不进任何
+`not marker_escaped` 门控;另补 sync 的 `find_prefix_encoded_marker` 零请求
+保底(修 XSSMaze encodingedge 潜在 FN)。repro 6 case:反射正例请求不变,
+无反射 case 245→~96 且检出不变。
+
+**验收**:守卫 `tests/test_phase407_marker_absent.py` 5 passed(行为+源码
+钉住解耦)+ 变异 3/3。分批 async 门 71/194 例,剔除 1 个环境伪影后 70 例
+干净 = 60 TP/8 TN/2 SKIP、零 FP/FN,≥200 请求从 51 例降为 0 例;sync 全量
+F1=1.0000。唯一 FN(pos-dom-02)经 repro x3 证明是 loopback 超时伪影。
+
+**边界**:分批门未跑满 194——本机 loopback 劣化使原 runner 重试机制把全量
+拖成 19 小时 hang;性能墙钟不可比,不宣称提速。事实表见
+`benchmark/results/phase407_async_convergence_20261121.md`。
+
+**方法论沉淀(强化既有纪律)**:
+1. 改检测路径前,先 `benchmark/repro_case.py` 跑"反射正例+绕过滤正例+无反射
+   负例"三件套——2 分钟抓 FN,远早于全量门。
+2. "一个信号是另一个的总开关吗"必须先读源码确认,再决定能否复用;否则
+   折叠信号会触发一串未预料的门控(本次 FN 的根因)。
+3. 长进程 gate 在此机 loopback 劣化下会被重试机制放大成 hang ⇒ 逐例落盘、
+   无重试放大的分批门(`dev/_p407_batch_gate.py`)是可靠替代,环境伪影单
+   case repro 定性、不冒充真回归。

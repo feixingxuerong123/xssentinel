@@ -14,6 +14,7 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
 | README 历史 Phase 叙事(基线演化、缺陷家族、自我纠正;2026-11-01 蒸馏出库) | `docs/archive/README_phase_log_to_20261101.md` |
 | Phase 350–357 轮次报告(345 之后的逐轮实测数字与归因) | `benchmark/results/round2..round5_*_20261103.md`、`zap_unavailable_20261103.md`;Phase 357 证据见 `benchmark/results/benchmark_full_{sync,async}_20261104.json`、`bwapp_matrix_pre_fix_20261103.md` 与提交 `f80af43` |
 | Phase 364–371 轮次报告(2026-11-07~08) | `benchmark/results/*_20261107.md`、`*_20261108.md`;外部效度证据分级与不可比项见 `external_validity_20261108.md` |
+| Phase 400–407 轮次记录(2026-11-17~21)与 2.2.1 交付收口 | `docs/OPTIMIZATION.md` §8.31–8.39、CHANGELOG `[2.2.0]`/`[2.2.1]`、`benchmark/results/*2026111{7,8,9}*`/`*2026112{0,1}*`、`docs/PHASE400_HANDOFF_20261118.md` |
 | 开发约定 / 回归靶场 / 架构约定 | `CONTRIBUTING.md` |
 | 门禁体系如何运作 / Mixin 隐式契约 | `docs/ARCHITECTURE.md` |
 | 优化 backlog(含明确不做清单) | `docs/OPTIMIZATION.md` |
@@ -54,8 +55,78 @@ XSS 漏洞自动化扫描器:双流水线架构(scanner Mixin 化 + advanced_lay
 
 - 新增检测层必须**同时**注册 `coverage.LAYERS` 与 `layer_coverage` 矩阵(Phase 187/192 两次被门禁抓到的同一课)。
 
-## 当前状态(2026-11-17)
+## 当前状态(2026-11-23)
 
+- **[2.2.1] / 交付收口轮(2026-11-23)**:把悬在未提交树上的 Phase 400–407
+  (11-17~21)按依赖闭包拆分入库,定版 **patch 2.2.1**(全部为缺陷修复/测量
+  工具,无产品契约破坏;404 竞品 runner 属 benchmark 工具非产品能力)。
+  收口动作:CHANGELOG 补 **400-headless** 条目(此前缺失)、390–398 明细
+  归档回 `[2.2.0]`(该节早已声明随版发布却留在 Unreleased);OPTIMIZATION
+  两个 §8.31/§8.32 重号顺移为 §8.33–8.38 并同步全部交叉引用;
+  **Phase 400 编号撞车**(GET 缓存写条件 `4339e8e` 与 headless 认证重放
+  两条独立流)如实记账、不追溯改名,以标题后缀与文件/提交为准。
+  凭据处置:`benchmark/results/llm_state.json`(运行期状态)与
+  `llm_local_glm53_20261119.json`(含真实 API key)进 .gitignore;
+  DVWA AI 报告证据中的 key 为产品自身脱敏形式(`sk-369***f3cb`)可入库,
+  16 份报告与脚本/交接文档逐一 grep 确认无完整密钥/PHPSESSID。
+  v2.2.0 补 tag(399 终树 `fddff54`),v2.2.1 打终树。**门禁数字见
+  CHANGELOG [2.2.1] 验收节与 OPTIMIZATION §8.39**。
+- **Phase 407(2026-11-21,async 无反射 L1 穷举收敛)**:全量 async 20564
+  请求 vs sync 7915(2.6×)定位到无反射参数 fall-through 满预算 ladder。
+  修法严格解耦:独立信号 `marker_absent` 只把 `_build_probe_candidates`
+  的 cand_budget 14→3,**绝不进 `marker_escaped` 总开关**(第一次折叠尝试
+  致反射正例 pos-elem-01/neg-filter-01 FN,单 case repro 2 分钟抓出、
+  完整回滚);另补 sync 的 `find_prefix_encoded_marker` 零请求保底。
+  无反射 case 245→~96 请求、检出不变,反射正例请求逐位不变。守卫 5 +
+  变异 3/3。**债**:async 分批全量门只跑 71/194(loopback 劣化,原 runner
+  重试放大成 19h hang),交付轮补跑;性能墙钟劣化期不可比不宣称提速。§8.38。
+- **Phase 405(2026-11-20,onload 资源加载失败高估修复)**:真 Chromium 148
+  探针证明 onload 只在资源真正加载成功时触发(无效 scheme/相对 404/空 src
+  全走 onerror)。sandbox 仅对资源元素 onload 的 src 带**显式不可加载
+  scheme** 降 inert;onerror/相对/绝对/data/blob/iframe 无 src/svg onload
+  一律不动。守卫 15 + 变异 3/3 + 全量 194 双引擎质量门绿(async 性能
+  860.9s/840s 超 2.5% 如实记——请求量 2.6× 是本机 async 吞吐边界非回归)。
+  竞品 M1 原 2 例 overstated 复测归零。§8.37。
+- **Phase 404(2026-11-20,竞品测试文件三类接入)**:6 家竞品源码按资产形态
+  分流——payload 库 1516 条带来源实测(M1 1884 页 missed 0 / overstated 2,
+  后者由 405 修)、官方靶用例记录不打分、单元测试只做契约对照不转嫁分数。
+  E2E 4 臂:baseline/XSStrike 7/7、dalfox/XSSer 6/7(竞品载荷集覆盖差异,
+  非我方检测回归)。事实表非分数,不与 194/XSSMaze 并列;runner
+  `benchmark/run_competitor_corpus.py` + 守卫入库。§8.36。
+- **Phase 403(2026-11-19,证据分级修真)**:`llm_propose` 改走
+  `findings._grade_evidence` 唯一权威——真浏览器弹窗确认不再被标最弱的
+  `model-only`。async cookie「不等价」定谳为 **aiohttp/requests 会话生命
+  周期架构差异**(async 每请求新建 session,jar 本就不跨请求),不是可修
+  adapter 漂移,不改;要改须先拿认证靶场 sync/async headless A/B 量出真
+  漏报。§8.34。
+- **Phase 402(2026-11-19,三项零争议收口)**:MCP `_abs_http_url` scheme
+  白名单(`file://`/`gopher://` 不再进 `page.goto`)、截图只在 confirmed
+  采集(反证路径不再白吞 2MB 含会话数据的图)、DVWA PHPSESSID 改写到系统
+  临时目录 + .gitignore 兜底 + 不回显。判定层零改动。§8.33。
+- **Phase 401(2026-11-18,onstart 悬案定谳)**:Phase 391「证据冲突」定谳为
+  **假冲突**——XSSMaze level5 真页面是纯静态 `<div #{query}>` 无脚本无派发
+  (拿真源码核实),Phase 362 那条 marquee onstart 是 `browser-unavailable`
+  从不是浏览器执行。有效对照(load+hover)复测:三个 onstart 形状浏览器
+  全不执行而 verifier 全确认。**定谳≠修复**:扩 `INERT_HANDLER_PAIRS`
+  覆盖其余 11 形状属判定语义变更,**仍开放**,须独立轮 + 对照矩阵 + 全量门。§8.32。
+- **Phase 400-headless(2026-11-18,认证重放注入会话 Cookie)**:
+  `verify_headless` 无 cookies 参数 + 调用方只传 headers( Cookie 在
+  `session.cookies` 不在 headers)⇒ 浏览器重放撞登录墙、诚实 high 被误判
+  `browser-refuted`。修:`session_cookies()` 唯一收口、`_browser_cookie_entries`
+  合并显式 cookies 与 Cookie header(拆 `;`、按 name 去重)、Cookie 剔除后
+  Authorization 存活、POST `data=`→`form=`;sync 3 点 / async / MCP
+  verify+propose / llm_propose 全链透传。DVWA high 真靶
+  browser-refuted→**browser-executed**;全量 194 双引擎绿(11-18)。
+  交接 `docs/PHASE400_HANDOFF_20261118.md`。
+- **Phase 400-cache(2026-11-17,`4339e8e` 已推送)**:`Requester.get()`
+  缓存**写**条件漏 `not headers`(读条件有)⇒ canary 被弹回登录页时把
+  LOGIN 写进裸 URL LRU,之后所有默认裸 GET 静默读脏页。修源头一处保护
+  所有读者(396 读者侧修复保留作纵深);仅 sync(async 无此 LRU)。§8.31。
+- **开放项(2026-11-23)**:① onstart 其余 11 形状判定修复(已量未修,
+  独立轮);② 默认模式是否开浏览器自证(handoff §6 P1,**需拍板**);
+  ③ `trusted_types_no_policy` 算不算 finding(§8.35 三选项,**需拍板**,
+  改报告契约连带 benchmark 分母);④ async cookie 架构差异(需先 A/B 测量);
+  ⑤ PyPI Trusted Publisher、wsl.exe 解封(XSSMaze 复测前提)——归属者外部待办。
 - **[2.2.0] / Phase 399(2026-11-17,REST `dom_engine` 值域校验——BREAKING)**:
   闭合 §8.28/§8.29 连续两轮记下的「REST 对 `dom_engine` 无值域校验,
   `bogus` 202 直通并静默构造真 Chromium」(与 397「off 被忽略」同族)。

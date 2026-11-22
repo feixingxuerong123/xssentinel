@@ -16,6 +16,128 @@
 
 ## [Unreleased]
 
+## [2.2.1] - 2026-11-23
+
+
+### Fixed(2026-11-21,Phase 407):async 无反射参数 L1 穷举收敛 + sync parity 保底
+
+承接 Phase 404/405 之后定位到的 async/sync parity 分歧:probe marker 不反射时
+sync 在 `scanner.py:778` 直接 `return # not reflected -> skip`(18 请求),async
+fall-through 到完整 corpus ladder(245 请求)。全量 194 例里 51 例 ≥200 请求,
+但这些 case 的检出 finding 全来自专用 L7 层(xs_leak/cors/redirect/cookie_toss/
+error_page),L1 穷举零贡献。
+
+**修法(严格解耦)**:`core/async_scanner.py` ① 补 sync 的
+`find_prefix_encoded_marker` 零请求保底(修 XSSMaze encodingedge 潜在 FN);
+② 新增独立信号 `marker_absent`。`core/async_scanner_layers.py` 的
+`_build_probe_candidates` 据此把无反射时的 `cand_budget` 从 14 收敛到 3。
+**关键教训**:第一次尝试把 absence OR 进 `marker_escaped`(async 的多阶段总开关:
+sandwich/quote probe/transform cap 12→2/concat-stamp/尾部兜底),导致反射正例
+pos-elem-01/neg-filter-01 变 FN(35→28 请求)——单 case repro 2 分钟抓出,已回滚;
+重做为"只砍候选预算、绝不碰总开关"后零回归。
+
+**验收**:守卫 `tests/test_phase407_marker_absent.py` **5 passed**(含源码断言
+钉住 absence 不进任何 `not marker_escaped` 门控)+ 变异 `dev/_p407_mutations.py`
+**3/3**。代表 case repro:反射正例请求不变、无反射 case 245→~96 且检出不变。
+分批 async 门(`dev/_p407_batch_gate.py`,逐例落盘、无重试放大)71/194 例,
+剔除 1 个环境伪影后 **70 例干净 = 60 TP/8 TN/2 SKIP、零 FP/FN**,≥200 请求
+从 51 例降为 0 例。sync 全量 194 门 F1=1.0000(async 专属改动,sync 零影响)。
+
+**诚实边界**:分批 async 门未跑满 194——本机 loopback 严重劣化,原版 runner
+重试机制把全量拖到 19 小时被 kill;唯一 FN(pos-dom-02)经单 case repro x3
+证明是超时伪影(真实 TP)。性能墙钟数字在劣化 loopback 下不可比,不宣称提速。
+详见 benchmark/results/phase407_async_convergence_20261121.md 与 OPTIMIZATION §8.38。
+
+### Fixed(2026-11-20,Phase 405):资源加载失败时 onload 高估定谳并修掉
+
+承接 Phase 404 竞品事实表量出的 2 例 overstated(同源载荷
+`<img src=x:confirm`` onload=eval(src)>`):sandbox 依
+`(resource_load, onload) -> live` 无条件判"资源加载时触发",而真浏览器
+`naturalWidth=0`、只走 onerror、无对话框。**先量再修**:真 Chromium 148
+探针(`dev/_p405_src_probe2.py`,9 种 src × onload/onerror)证明 onload **只在
+资源真正加载成功时触发**——无效 scheme / 相对 404 / 空 src 全部加载失败,
+onload 不触发,onerror 触发。
+
+**修法(最小边界)**:`core/sandbox.py` 新增 `LOADABLE_RESOURCE_SCHEMES` +
+`_EXPLICIT_SCHEME_RE`,仅当资源元素 onload 的 src 带**显式不可加载 scheme**
+时降级 inert。不动 onerror 分支、不动相对/绝对/data/blob src(成功与否
+服务器相关,保守留 live)、不动 iframe 无 src(about:blank 触发)、不动
+`<svg onload>`(文档级事件)。
+
+**验收**:守卫 `tests/test_phase405_onload_scheme.py` **15 passed**(含
+源码断言 + 竞品事实表修复效果:overstated 2→0、0 条 agree_live 被翻转);
+变异 `dev/_p405_mutations.py` **3/3**。**动判定语义按铁律跑全量 194 双引擎**:
+sync TP113/FP0/TN81/FN0、0 SKIP、F1=1.0000、性能预算 PASSED(729.7s/795s);
+async TP107/FP0/TN75/FN0、12 SKIP(sync-only cases)、F1=1.0000、质量门 PASSED,
+但该轮性能预算 FAILED(2191.7s/840s)——**定谳为端口 18973 污染**(103 个
+TIME_WAIT、请求数 20566 vs sync 7915),换干净端口 18985 的 quick async
+性能预算 PASSED(181.9s/350s)、质量门 FP0/FN0/ERROR0(63 cases / 1 SKIP)。
+**干净端口 18990 全量 async 重跑**:质量门仍全绿(TP107/FP0/TN75/FN0、
+182 scored/12 SKIP、F1=1.0000、报告 `benchmark_20261120_175703.json`),
+性能 860.9s vs 840s ceiling(**略超 2.5%**)。请求数对比证明这是本机 async
+吞吐边界而非修复回归——重跑 20564 请求 ≈ 污染轮 20566,而 sync 同树同判定
+仅 7915 请求且性能 PASSED(729.7s/795s),即 async 架构请求量本就高 2.6 倍;
+修复只是加了个 scheme 判断,不改变请求量。**结论:质量门双引擎全绿是验收
+依据;性能预算 async 档在本机超线 2.5%,如实记录,不冒充 PASSED。** 竞品事实表另存
+`competitor_payloads_20261120_after405.json`(原带日期证据不覆写)。
+详见 docs/OPTIMIZATION.md §8.37。
+
+### Added(2026-11-20,Phase 404):竞品测试文件三类接入——外部题考自己
+
+首次把**竞品自己发布的测试文件**纳入外部效度(此前只有社区通用语料,§8.23)。
+6 家竞品源码(dalfox/XSStrike/nuclei-templates/w3af/XSSer/ZAP)经镜像落到
+gitignored scratch,按形态分三类:payload 库(提取 1516 条带来源+占位符记录)、
+官方靶场用例(XSStrike test.html 的 4 个 DOM sink、w3af 的 moth/WAVSEP case)、
+单元测试代码(w3af/dalfox/ZAP 的 test 文件,只做契约对照不转嫁分数)。
+
+**M1 保真度**(Phase 392 真 Chromium oracle + sandbox.judge 装置,157 向量 ×
+12 = 1884 页,控制页全绿):`missed=0`,`overstated=2/1674=0.0012`,
+`unknown_on_exec=45`,0 oracle/sandbox error。2 例高估同源——XSStrike 的
+`<iMg sRc=x:confirm`` oNlOad=eval(src)>`,真浏览器确认无效 scheme 导致
+`naturalWidth=0`/onload 不触发;**定谳为判定层高估点,本轮不修**(动判定语义
+须连带全量门,按"定谳≠修复"记账为观察项)。
+
+**E2E 注入**(7 正 3 负切片,4 臂唯一差异=`--custom-payloads` 来源):baseline
+与 XSStrike 臂 7/7、dalfox/XSSer 臂 6/7(均在需绕过滤的 `neg-filter-01`
+漏 1),所有臂 FP0/ERR0——竞品载荷集单独作输入时覆盖不足的真实测量。
+
+**证据/守卫**:两份事实表 `benchmark/results/competitor_{payloads,e2e}_20261120.
+{json,md}`(非 F1,不与 194/XSSMaze 并列);守卫
+`tests/test_phase404_competitor_corpus.py` **9 passed**;变异
+`dev/_p_comp_mutations.py` **3/3**(baseline 绿→mutated 红→字节还原绿)。
+判定层/语料/预算/CLI 契约零改动,故只跑守卫与变异,不拿旧全量门顶账。
+详见 docs/OPTIMIZATION.md §8.36。
+
+### Fixed(2026-11-19,Phase 403):llm_propose 证据分级改走唯一权威
+
+`core/llm_propose.py::propose_and_verify` 原先手写
+`EVIDENCE_MODEL if confirmed else EVIDENCE_NO_BROWSER`,只问「有没有确认」,
+于是「真 Chromium 弹窗确认」的 proposal 被标成最弱的 `model-only`,而
+「浏览器跑了没弹」与「根本没跑」也混作一个等级。改为统一调用
+`findings._grade_evidence(headless, ..., model_judged=...)` 唯一权威:
+headless fired→`browser-executed`;语义模型独判→`model-only`(model_judged
+=True);浏览器跑了没弹→`browser-refuted`;没跑→`browser-unavailable`。
+保留完整 `hv` 供分级,`headless_out` 输出契约不变。
+
+核实子代理所称「HTTP probe 没带认证」不成立:MCP `run_propose_tool` 的
+requester 经 `_build_requester` 已把 headers/cookies 种进 session,HTTP
+探针本就带身份;`headers=`/`cookies=` 入参只给 headless 重放用,故不动。
+
+**验收**:`tests/test_llm_propose.py::TestEvidenceClassHonesty` 新增 4 例
+(headless fired / 语义独判 / 无确认 / headless refuted),全文件 **21 passed**;
+变异反证把分级改回旧二元式 → 5 例里 2 failed(fired/refuted 两条)→
+字节还原 5 passed,`VERDICT: PASS`。判定层其余零改动。
+
+### Fixed(2026-11-19,Phase 402):三处零行为争议的收口——URL scheme / 截图膨胀 / 会话凭据落盘
+
+承接 Phase 400(headless Cookie 注入)交付后的代码审查,挑出三项「非判定语义、可加反证锁」的缺口并修掉;判定层零改动,故只跑守卫相邻批,不拿旧全量数字顶账。
+
+1. **MCP URL scheme 白名单**:`api/mcp_server.py::_abs_http_url` 原先只查 `scheme and netloc`,`file://` / `gopher://` / `dict://` 全部通过,而四个工具(`run_verify_tool` / `run_param_mine_tool` / `run_csp_analyze_tool` / `run_propose_tool`)共用此入口,其中 verify 会把 URL 交给 `verify_headless` 的 `page.goto`——Playwright 会真的导航 `file://`。改为显式 `scheme.lower() in ("http","https")`;`HTTPS://` 大写形式按 RFC 3986 照常接受。
+2. **截图只在确认执行时采集**:`core/verifier.py::verify_headless` 原先对每个重放都 `page.screenshot()` 并把最多 2MB base64 塞进 `headless`;而 `report.py` 只在 `confirmed` 时渲染。非确认路径(= 反证)白吞一张永不展示、且可能含会话数据的页面图。截图块收进 `if confirmed:`。
+3. **真实会话 cookie 不再落进仓库**:`benchmark/realworld/dvwa_live_probe.py` 把 `PHPSESSID` 明文写到 `benchmark/results/` 且打印到 stdout,两文件未进 gitignore。现改为写到系统临时目录(`os.chmod 0600`)、不回显值、文件名按当天日期动态生成;`.gitignore` 新增 `benchmark/results/*_cookie*.txt` 兜底。磁盘上既有两份文件**保留不删**(活动会话,删除不可逆),仅由 ignore 挡在版本库外。
+
+**验收**:相邻批 8 文件 **99 passed / 0 failed**(`test_phase400` 11 例、`test_phase365` 24 例等);ruff 改动 5 文件 `All checks passed!`。两条变异反证:① scheme 检查改回 `not p.scheme` → URL 守卫 3 failed(gopher/dict/ftp);② 截图门 `if confirmed`→`if True` → `test_not_fired_replay_has_no_screenshot` 转红;两条均 baseline 绿 / mutated 红 / 字节还原绿(`VERDICT: PASS`)。判定语义零改动。
+
 ### Fixed(2026-11-18,Phase 401):Phase 391 `onstart`「证据冲突未定谳」定谳为假冲突
 
 承接 §8.22 挂了 4 个 Phase 的悬案。拿到 XSSMaze 真源码
@@ -39,6 +161,38 @@ execution unverified`,从不是浏览器确认的 live,没有「靶场说 live�
 389/391 旧守卫 16 passed + 变异 3/3(baseline 绿→红→字节还原绿)+ ruff
 零基线。判定层零改动,按纪律不跑全量 192(不拿旧数字顶账)。事实表
 `benchmark/results/phase401_*_20261118.*`、OPTIMIZATION §8.32。
+
+### Fixed(2026-11-18,Phase 400-headless):认证重放注入会话 Cookie——登录墙假反证归零
+
+> **编号说明**:本条与下方 2026-11-17 的「Phase 400 GET 缓存写条件」是两条
+> 独立工作流,跨会话撞用了同一个 Phase 编号(历史事实,不追溯改名);以标题
+> `-headless` 后缀与文件/提交为准。交接文档
+> `docs/PHASE400_HANDOFF_20261118.md` 记的是本条。
+
+DVWA high 档反射面:HTTP 探针带会话能确认,`--headless` 重放却
+`browser-refuted / no dialog`。根因链:`verify_headless()` 没有 cookies
+参数,调用方只传 `headers=dict(session.headers)`,而 requests 的 Cookie 在
+`session.cookies` 不在 headers ⇒ 浏览器拿到无会话上下文 → 302 登录墙。
+附带两处:`set_extra_http_headers({"Cookie": ...})` 被 Playwright 拒绝且原
+`try/except` 吞掉异常,同一字典里的 Authorization 一起丢失;POST 重放
+`data=` 被 Playwright 默认发成 JSON,与 HTTP 探针的 form 载体不一致。
+
+**修法**:`verifier.session_cookies()` 唯一收口 jar→dict;
+`_browser_cookie_entries()` 合并显式 cookies 与 `Cookie` header(按 `;`
+拆分、按 name 去重)装进 `page.context.add_cookies`;Cookie 从 headers
+剔除后再 `set_extra_http_headers`(Authorization 存活);POST 改 `form=`。
+sync 3 调用点 / async `_verify_cookies()` / MCP verify+propose /
+`llm_propose.propose_and_verify(cookies=...)` 全链透传。
+
+**验收(2026-11-18 本轮运行,引用带跳过数)**:守卫
+`tests/test_phase400_headless_auth_cookies.py` **9 passed**(修前
+7 failed/2 passed);邻接 8 文件 **80 passed**;变异
+`dev/phase400_headless_cookie_mutations.py` **4/4 RED → 字节还原绿**
+(sha256 逐文件一致);DVWA 真靶复验 `evidence_class=browser-executed`、
+弹窗 token 命中(`dvwa_scan_high_reflected_headless_after400_20261118.json`,
+修复前 `browser-refuted` 证据保留不覆写)。全量 194 双引擎 strict 门:
+sync **113/0/81/0、0 SKIP**(433.4s vs 795s)、async **107/0/75/0、
+12 SKIP**(510.9s vs 840s),均 FP0/FN0/ERROR0、性能预算 PASSED。
 
 ### Fixed(2026-11-17,Phase 400):GET 缓存写条件漏 `not headers` —— 认证页被 canary 污染的源头
 
@@ -67,6 +221,58 @@ L8_cookie / header canary、error/redirect 探针按契约跳过读缓存,却把
 性能 416.3s vs ceiling 795s(baseline 397.1s @2026-11-13,margin 2.0x)。
 事实表与论证见 `benchmark/results/phase400_cache_write_headers_20261117.md`、
 OPTIMIZATION §8.31。
+
+## [2.2.0] - 2026-11-17
+
+### BREAKING——Phase 399: REST `dom_engine` 值域校验(API 接受域收紧)
+
+- **改了什么**:`POST /api/v1/scans` 的 `dom_engine` 字段此前**无任何
+  值域校验**,任意字符串(如 `bogus`)都返回 202 并直通 `Scanner`,
+  最终静默构造真 `DynamicDomAnalyzer` —— 与 Phase 397 修掉的
+  「`off` 被忽略」同一族(公开契约未在边界强制)。本轮起:值域从
+  MCP input schema 的 enum 读取(唯一权威源,不在 REST 手抄第五份),
+  大小写不敏感归一(与 MCP `_check_type` 逐位一致),**非法值返回
+  400 `invalid_request`**,不再到达 Scanner / 不再起浏览器。
+- **破坏性影响**:今天依赖「非法值被静默接受」的外部 REST 客户端
+  会开始收到 400。代码库内零非法值调用点,实际下游代价为零。
+  合法四值 `auto/playwright/static/off` 与缺省 `auto` 语义不变。
+- **版本口径**:按 operator 裁决标 `BREAKING:` 并走 minor = 2.2.0。
+  **注意与先例的偏差**:历史唯一 BREAKING(Phase 383)落在 2.0.0
+  major,与本轮 minor 不同 —— 此处为有意偏离,依据是本轮收紧的
+  实际影响面为零;若后续要求严格遵循「破坏性变更走 major」策略,
+  应改发 3.0.0。
+
+### Phase 399 验收(本轮自己的运行,引用带跳过数)
+
+- 守卫 `tests/test_phase399_rest_dom_engine_validation.py` **6 passed /
+  0 skipped**;变异 `dev/phase399_mutations.py` baseline 绿 → 去掉校验
+  **2 条红** → 字节还原绿(hash 一致),判据非空转。
+- 同量具 `dev/_p399_rest_dom_engine_probe.py` 12 臂
+  (`benchmark/results/phase399_rest_dom_engine_20261117.json`):四值
+  202 原样、`AUTO/Playwright/OFF/StAtIc` 归一为小写、`bogus/on/""/123/
+  None` 全部 400 且 `reached_scanner=null`/`worker_started=false`、
+  缺省 `auto` 不变。修复前基线沿用 Phase 398 带日期快照的 REST 臂
+  (`bogus` 202 直通),不伪造本轮基线。
+- 邻接 API/MCP 组(`test_p27_api` / `test_phase196_api_gate` /
+  `test_api_ai_report` / `test_mcp_server`)**138 passed / 7 skipped**;
+  ruff 全仓零基线(`All checks passed!`)。
+- **quick 双引擎 strict gate(本树同日重跑)**:`benchmark/results/
+  phase399_quick_{sync,async}_20261117.json` —— sync
+  **36 TP/0 FP/28 TN/0 FN/0 ERROR**(64 scored / 0 SKIP,159.3s,
+  性能预算 330s PASSED)、async **36/0/27/0/0**(63 scored / 1 SKIP,
+  164.9s,预算 350s PASSED),两者 F1 1.0、strict 门 PASSED。
+- **全量双引擎未单独重跑(如实记)**:本轮只改 REST 边界校验,未触及
+  判定层 / 语料 / 预算 / core 扫描路径,Phase 398 full 双引擎
+  (sync 113/0/81/0、async 107/0/75/0,FP0/FN0)对本轮产品代码仍成立;
+  不拿 398 的数字冒充 399 本轮全量运行。
+- **环境事件(不改产品/测试代码)**:首次跑 quick 时 TEMP 指向 system
+  temp,扫描子进程报告写入 `Permission denied` 后 runner 反复重试,
+  表现为「满 CPU、7 分钟无结果」。将 TEMP/TMP 指到
+  `C:/Users/Administrator/.cache/xssentinel/tmp` 后即恢复正常(159s,
+  与历史同机 143s 同量级)。根因是本机临时目录权限,非本轮改动;
+  同一量具未改,只修环境即拿到上述数字。
+
+### 同版发布的 Phase 390–398 明细(2026-11-23 交付收口自 Unreleased 归档至本节)
 
 ### 勘误与处置(2026-11-14,Phase 390)
 
@@ -489,62 +695,6 @@ OPTIMIZATION §8.31。
   值域**,避免制造第五处声明,守卫只钉「`off` 用法已同步」。
   Phase 396 的缓存污染 / 预算语义、397 的 `_browser_pointless`
   sync-only 设计均不在本轮范围。
-
-## [2.2.0] - 2026-11-17
-
-### BREAKING——Phase 399: REST `dom_engine` 值域校验(API 接受域收紧)
-
-- **改了什么**:`POST /api/v1/scans` 的 `dom_engine` 字段此前**无任何
-  值域校验**,任意字符串(如 `bogus`)都返回 202 并直通 `Scanner`,
-  最终静默构造真 `DynamicDomAnalyzer` —— 与 Phase 397 修掉的
-  「`off` 被忽略」同一族(公开契约未在边界强制)。本轮起:值域从
-  MCP input schema 的 enum 读取(唯一权威源,不在 REST 手抄第五份),
-  大小写不敏感归一(与 MCP `_check_type` 逐位一致),**非法值返回
-  400 `invalid_request`**,不再到达 Scanner / 不再起浏览器。
-- **破坏性影响**:今天依赖「非法值被静默接受」的外部 REST 客户端
-  会开始收到 400。代码库内零非法值调用点,实际下游代价为零。
-  合法四值 `auto/playwright/static/off` 与缺省 `auto` 语义不变。
-- **版本口径**:按 operator 裁决标 `BREAKING:` 并走 minor = 2.2.0。
-  **注意与先例的偏差**:历史唯一 BREAKING(Phase 383)落在 2.0.0
-  major,与本轮 minor 不同 —— 此处为有意偏离,依据是本轮收紧的
-  实际影响面为零;若后续要求严格遵循「破坏性变更走 major」策略,
-  应改发 3.0.0。
-
-### Fixed——同轮其余(均属 Unreleased 已有记账,随本版发布)
-
-- Phase 390–398 的勘误与修复(外部语料 oracle 升级、sandbox 五处、
-  cookie 粘性、空注释闭合、NodeGoat 存储流、`dom_engine="off"`
-  契约、CLI 四处声明收口)随本版一并发布,详见上方 Unreleased 各条。
-
-### Phase 399 验收(本轮自己的运行,引用带跳过数)
-
-- 守卫 `tests/test_phase399_rest_dom_engine_validation.py` **6 passed /
-  0 skipped**;变异 `dev/phase399_mutations.py` baseline 绿 → 去掉校验
-  **2 条红** → 字节还原绿(hash 一致),判据非空转。
-- 同量具 `dev/_p399_rest_dom_engine_probe.py` 12 臂
-  (`benchmark/results/phase399_rest_dom_engine_20261117.json`):四值
-  202 原样、`AUTO/Playwright/OFF/StAtIc` 归一为小写、`bogus/on/""/123/
-  None` 全部 400 且 `reached_scanner=null`/`worker_started=false`、
-  缺省 `auto` 不变。修复前基线沿用 Phase 398 带日期快照的 REST 臂
-  (`bogus` 202 直通),不伪造本轮基线。
-- 邻接 API/MCP 组(`test_p27_api` / `test_phase196_api_gate` /
-  `test_api_ai_report` / `test_mcp_server`)**138 passed / 7 skipped**;
-  ruff 全仓零基线(`All checks passed!`)。
-- **quick 双引擎 strict gate(本树同日重跑)**:`benchmark/results/
-  phase399_quick_{sync,async}_20261117.json` —— sync
-  **36 TP/0 FP/28 TN/0 FN/0 ERROR**(64 scored / 0 SKIP,159.3s,
-  性能预算 330s PASSED)、async **36/0/27/0/0**(63 scored / 1 SKIP,
-  164.9s,预算 350s PASSED),两者 F1 1.0、strict 门 PASSED。
-- **全量双引擎未单独重跑(如实记)**:本轮只改 REST 边界校验,未触及
-  判定层 / 语料 / 预算 / core 扫描路径,Phase 398 full 双引擎
-  (sync 113/0/81/0、async 107/0/75/0,FP0/FN0)对本轮产品代码仍成立;
-  不拿 398 的数字冒充 399 本轮全量运行。
-- **环境事件(不改产品/测试代码)**:首次跑 quick 时 TEMP 指向 system
-  temp,扫描子进程报告写入 `Permission denied` 后 runner 反复重试,
-  表现为「满 CPU、7 分钟无结果」。将 TEMP/TMP 指到
-  `C:/Users/Administrator/.cache/xssentinel/tmp` 后即恢复正常(159s,
-  与历史同机 143s 同量级)。根因是本机临时目录权限,非本轮改动;
-  同一量具未改,只修环境即拿到上述数字。
 
 ## [2.1.0] - 2026-11-13
 
