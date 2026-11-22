@@ -1,0 +1,151 @@
+{
+  "phase": "405",
+  "purpose": "measure which on*/event fires per src shape in real Chromium",
+  "generated": "2026-11-20 15:03:40",
+  "browser": "playwright chromium (headless)",
+  "rows": [
+    {
+      "id": "rel_404",
+      "src": "x",
+      "events": [
+        "error"
+      ],
+      "natural_width": 0,
+      "complete": true,
+      "dialogs": [
+        "702"
+      ],
+      "note": ""
+    },
+    {
+      "id": "rel_empty",
+      "src": "",
+      "events": [
+        "error"
+      ],
+      "natural_width": 0,
+      "complete": true,
+      "dialogs": [
+        "702"
+      ],
+      "note": ""
+    },
+    {
+      "id": "abs_missing",
+      "src": "http://127.0.0.1:9/nope",
+      "events": [
+        "error"
+      ],
+      "natural_width": 0,
+      "complete": true,
+      "dialogs": [
+        "702"
+      ],
+      "note": ""
+    },
+    {
+      "id": "data_valid",
+      "src": "data:image/gif;base64,R0lGODlhAQABAAAAACw=",
+      "events": [
+        "error"
+      ],
+      "natural_width": 0,
+      "complete": true,
+      "dialogs": [
+        "702"
+      ],
+      "note": ""
+    },
+    {
+      "id": "data_bad",
+      "src": "data:image/gif;base64,notvalid",
+      "events": [
+        "error"
+      ],
+      "natural_width": 0,
+      "complete": true,
+      "dialogs": [
+        "702"
+      ],
+      "note": ""
+    },
+    {
+      "id": "unknown_scheme",
+      "src": "x:confirm``",
+      "events": [
+        "error"
+      ],
+      "natural_width": 0,
+      "complete": true,
+      "dialogs": [
+        "702"
+      ],
+      "note": ""
+    },
+    {
+      "id": "unknown_scheme_plain",
+      "src": "foo:bar",
+      "events": [
+        "error"
+      ],
+      "natural_width": 0,
+      "complete": true,
+      "dialogs": [
+        "702"
+      ],
+      "note": ""
+    },
+    {
+      "id": "js_scheme",
+      "src": "javascript:void(0)",
+      "events": [
+        "error"
+      ],
+      "natural_width": 0,
+      "complete": true,
+      "dialogs": [
+        "702"
+      ],
+      "note": ""
+    },
+    {
+      "id": "hash_only",
+      "src": "#frag",
+      "events": [
+        "error"
+      ],
+      "natural_width": 0,
+      "complete": true,
+      "dialogs": [
+        "702"
+      ],
+      "note": ""
+    },
+    {
+      "id": "slash_root",
+      "src": "/does-not-exist",
+      "events": [
+        "error"
+      ],
+      "natural_width": 0,
+      "complete": true,
+      "dialogs": [
+        "702"
+      ],
+      "note": ""
+    },
+    {
+      "id": "space_scheme",
+      "src": " x:y",
+      "events": [
+        "error"
+      ],
+      "natural_width": 0,
+      "complete": true,
+      "dialogs": [
+        "702"
+      ],
+      "note": ""
+    }
+  ]
+}

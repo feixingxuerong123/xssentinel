@@ -237,6 +237,20 @@ AUTO_FIRING_EVENTS = {
 }
 
 
+#: Schemes an image/media resource can actually be fetched from.  Phase 405
+#: (dev/_p405_src_probe2.py, real Chromium 148): `<img src=foo:bar onload=T>`
+#: never fires onload -- an explicit but unsupported scheme is rejected before
+#: any fetch, naturalWidth stays 0, and only onerror fires.  A relative path,
+#: absolute http(s), data: or blob: may or may not succeed (server-dependent),
+#: so the gate stays conservative for those; only a *known-unloadable scheme*
+#: is certain enough to downgrade onload to inert.  iframe with no src is
+#: excluded by the caller (about:blank fires load).
+LOADABLE_RESOURCE_SCHEMES = frozenset({
+    "http", "https", "data", "blob", "file", "about", "filesystem",
+})
+_EXPLICIT_SCHEME_RE = re.compile(r"^([a-zA-Z][a-zA-Z0-9+.-]*):")
+
+
 #: (element, handler) pairs measured NOT to execute in Chromium 148
 #: (Phase 389, 2026-11-13).  ``<marquee onstart=...>`` is a legacy IE
 #: behaviour: Chromium never dispatches the marquee ``start`` event, on parse
@@ -603,6 +617,26 @@ def _handler_state(el: Node, attr: str, sink: str = "parser",
             return "inert", (f"{name}.{ev} is a document-load event and does not "
                              f"re-fire for a node inserted via innerHTML")
         if resource_load:
+            # Phase 405: onload fires only when the resource LOADS.  An
+            # explicit but un-loadable scheme (`src=x:confirm``, `foo:bar`)
+            # is rejected by Chromium before any fetch -- measured
+            # naturalWidth=0 with no `load` event (dev/_p405_src_probe2.py),
+            # so the blanket "fires when the resource loads" over-claims.
+            # Downgrade ONLY this certain case; relative/abs/data/blob srcs
+            # stay live (their success is server-dependent and the gate is
+            # deliberately conservative there), matching the long-standing
+            # `<img src=x onerror=...>`-is-live contract.
+            src = el.get("src")
+            if src is not None:
+                scheme_match = _EXPLICIT_SCHEME_RE.match(normalize_uri(src))
+                if scheme_match and \
+                        scheme_match.group(1).lower() not in \
+                        LOADABLE_RESOURCE_SCHEMES:
+                    return "inert", (
+                        f"{name}.onload cannot fire: src scheme "
+                        f"{scheme_match.group(1)} is not loadable, so the "
+                        f"resource never loads and no load event fires "
+                        f"(measured Chromium 148)")
             return "live", f"{name}.{ev} fires when the resource loads"
         return "activation", f"{name}.{ev} may not fire on an injected node"
     if ev == "onfocus":

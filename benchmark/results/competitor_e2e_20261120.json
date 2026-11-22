@@ -1,0 +1,385 @@
+{
+  "phase": "404",
+  "tree": "3b2d105",
+  "generated": "2026-11-20 14:49:37",
+  "question": "Does injecting competitor payload catalogues via --custom-payloads change detection on a stratified reflection slice?",
+  "honesty_header": "事实表:竞品载荷是我方引擎的输入,不是竞品在跑;ground_truth 来自 manifest 不是扫描器;分层切片非全量,不据此声称 recall/F1;错误(超时/异常)单列,不计 FN/TN。",
+  "budgets": {
+    "max_payloads": 14,
+    "max_transforms": 12
+  },
+  "families": {
+    "baseline": {
+      "note": "default generator, no --custom-payloads",
+      "payload_file": null,
+      "summary": {
+        "tp": 7,
+        "fn": 0,
+        "fp": 0,
+        "tn": 3,
+        "err": 0
+      },
+      "cases": {
+        "pos-elem-01": {
+          "detected": true,
+          "findings": 1,
+          "error": null,
+          "seconds": 1.6,
+          "ground_truth": "vulnerable",
+          "context": "html_element"
+        },
+        "pos-script-03": {
+          "detected": true,
+          "findings": 1,
+          "error": null,
+          "seconds": 1.4,
+          "ground_truth": "vulnerable",
+          "context": "script_block"
+        },
+        "pos-attr-01": {
+          "detected": true,
+          "findings": 1,
+          "error": null,
+          "seconds": 1.4,
+          "ground_truth": "vulnerable",
+          "context": "html_attribute_dq"
+        },
+        "pos-embed-01": {
+          "detected": true,
+          "findings": 1,
+          "error": null,
+          "seconds": 1.4,
+          "ground_truth": "vulnerable",
+          "context": "html_element"
+        },
+        "pos-polyglot-01": {
+          "detected": true,
+          "findings": 1,
+          "error": null,
+          "seconds": 1.5,
+          "ground_truth": "vulnerable",
+          "context": "html_element"
+        },
+        "neg-rcdata-01": {
+          "detected": true,
+          "findings": 1,
+          "error": null,
+          "seconds": 1.4,
+          "ground_truth": "vulnerable",
+          "context": "html_element"
+        },
+        "neg-filter-01": {
+          "detected": true,
+          "findings": 1,
+          "error": null,
+          "seconds": 1.5,
+          "ground_truth": "vulnerable",
+          "context": "html_element"
+        },
+        "neg-escape-01": {
+          "detected": false,
+          "findings": 0,
+          "error": null,
+          "seconds": 1.4,
+          "ground_truth": "safe",
+          "context": "html_element"
+        },
+        "neg-escape-02": {
+          "detected": false,
+          "findings": 0,
+          "error": null,
+          "seconds": 1.5,
+          "ground_truth": "safe",
+          "context": "html_attribute_dq"
+        },
+        "neg-attr-01": {
+          "detected": false,
+          "findings": 0,
+          "error": null,
+          "seconds": 1.8,
+          "ground_truth": "safe",
+          "context": "html_attribute_dq"
+        }
+      }
+    },
+    "xsstrike": {
+      "note": "XSStrike core/config.py payloads+fuzzes (verbatim)",
+      "payload_file": "competitor_xsstrike.txt",
+      "summary": {
+        "tp": 7,
+        "fn": 0,
+        "fp": 0,
+        "tn": 3,
+        "err": 0
+      },
+      "cases": {
+        "pos-elem-01": {
+          "detected": true,
+          "findings": 1,
+          "error": null,
+          "seconds": 1.4,
+          "ground_truth": "vulnerable",
+          "context": "html_element"
+        },
+        "pos-script-03": {
+          "detected": true,
+          "findings": 1,
+          "error": null,
+          "seconds": 1.6,
+          "ground_truth": "vulnerable",
+          "context": "script_block"
+        },
+        "pos-attr-01": {
+          "detected": true,
+          "findings": 1,
+          "error": null,
+          "seconds": 1.4,
+          "ground_truth": "vulnerable",
+          "context": "html_attribute_dq"
+        },
+        "pos-embed-01": {
+          "detected": true,
+          "findings": 1,
+          "error": null,
+          "seconds": 1.4,
+          "ground_truth": "vulnerable",
+          "context": "html_element"
+        },
+        "pos-polyglot-01": {
+          "detected": true,
+          "findings": 1,
+          "error": null,
+          "seconds": 1.4,
+          "ground_truth": "vulnerable",
+          "context": "html_element"
+        },
+        "neg-rcdata-01": {
+          "detected": true,
+          "findings": 1,
+          "error": null,
+          "seconds": 1.5,
+          "ground_truth": "vulnerable",
+          "context": "html_element"
+        },
+        "neg-filter-01": {
+          "detected": true,
+          "findings": 1,
+          "error": null,
+          "seconds": 1.5,
+          "ground_truth": "vulnerable",
+          "context": "html_element"
+        },
+        "neg-escape-01": {
+          "detected": false,
+          "findings": 0,
+          "error": null,
+          "seconds": 1.5,
+          "ground_truth": "safe",
+          "context": "html_element"
+        },
+        "neg-escape-02": {
+          "detected": false,
+          "findings": 0,
+          "error": null,
+          "seconds": 1.4,
+          "ground_truth": "safe",
+          "context": "html_attribute_dq"
+        },
+        "neg-attr-01": {
+          "detected": false,
+          "findings": 0,
+          "error": null,
+          "seconds": 1.8,
+          "ground_truth": "safe",
+          "context": "html_attribute_dq"
+        }
+      }
+    },
+    "dalfox": {
+      "note": "dalfox xss_*.rs templates, {JS}->alert(941)",
+      "payload_file": "competitor_dalfox.txt",
+      "summary": {
+        "tp": 6,
+        "fn": 1,
+        "fp": 0,
+        "tn": 3,
+        "err": 0
+      },
+      "cases": {
+        "pos-elem-01": {
+          "detected": true,
+          "findings": 1,
+          "error": null,
+          "seconds": 1.3,
+          "ground_truth": "vulnerable",
+          "context": "html_element"
+        },
+        "pos-script-03": {
+          "detected": true,
+          "findings": 1,
+          "error": null,
+          "seconds": 1.7,
+          "ground_truth": "vulnerable",
+          "context": "script_block"
+        },
+        "pos-attr-01": {
+          "detected": true,
+          "findings": 1,
+          "error": null,
+          "seconds": 1.4,
+          "ground_truth": "vulnerable",
+          "context": "html_attribute_dq"
+        },
+        "pos-embed-01": {
+          "detected": true,
+          "findings": 1,
+          "error": null,
+          "seconds": 1.4,
+          "ground_truth": "vulnerable",
+          "context": "html_element"
+        },
+        "pos-polyglot-01": {
+          "detected": true,
+          "findings": 1,
+          "error": null,
+          "seconds": 1.3,
+          "ground_truth": "vulnerable",
+          "context": "html_element"
+        },
+        "neg-rcdata-01": {
+          "detected": true,
+          "findings": 1,
+          "error": null,
+          "seconds": 1.5,
+          "ground_truth": "vulnerable",
+          "context": "html_element"
+        },
+        "neg-filter-01": {
+          "detected": false,
+          "findings": 0,
+          "error": null,
+          "seconds": 1.6,
+          "ground_truth": "vulnerable",
+          "context": "html_element"
+        },
+        "neg-escape-01": {
+          "detected": false,
+          "findings": 0,
+          "error": null,
+          "seconds": 1.4,
+          "ground_truth": "safe",
+          "context": "html_element"
+        },
+        "neg-escape-02": {
+          "detected": false,
+          "findings": 0,
+          "error": null,
+          "seconds": 1.4,
+          "ground_truth": "safe",
+          "context": "html_attribute_dq"
+        },
+        "neg-attr-01": {
+          "detected": false,
+          "findings": 0,
+          "error": null,
+          "seconds": 1.8,
+          "ground_truth": "safe",
+          "context": "html_attribute_dq"
+        }
+      }
+    },
+    "xsser": {
+      "note": "XSSer vectors.py, PAYLOAD->alert(931); mostly legacy IE",
+      "payload_file": "competitor_xsser.txt",
+      "summary": {
+        "tp": 6,
+        "fn": 1,
+        "fp": 0,
+        "tn": 3,
+        "err": 0
+      },
+      "cases": {
+        "pos-elem-01": {
+          "detected": true,
+          "findings": 1,
+          "error": null,
+          "seconds": 1.4,
+          "ground_truth": "vulnerable",
+          "context": "html_element"
+        },
+        "pos-script-03": {
+          "detected": true,
+          "findings": 1,
+          "error": null,
+          "seconds": 1.7,
+          "ground_truth": "vulnerable",
+          "context": "script_block"
+        },
+        "pos-attr-01": {
+          "detected": true,
+          "findings": 1,
+          "error": null,
+          "seconds": 1.4,
+          "ground_truth": "vulnerable",
+          "context": "html_attribute_dq"
+        },
+        "pos-embed-01": {
+          "detected": true,
+          "findings": 1,
+          "error": null,
+          "seconds": 1.5,
+          "ground_truth": "vulnerable",
+          "context": "html_element"
+        },
+        "pos-polyglot-01": {
+          "detected": true,
+          "findings": 1,
+          "error": null,
+          "seconds": 1.4,
+          "ground_truth": "vulnerable",
+          "context": "html_element"
+        },
+        "neg-rcdata-01": {
+          "detected": true,
+          "findings": 1,
+          "error": null,
+          "seconds": 1.4,
+          "ground_truth": "vulnerable",
+          "context": "html_element"
+        },
+        "neg-filter-01": {
+          "detected": false,
+          "findings": 0,
+          "error": null,
+          "seconds": 1.6,
+          "ground_truth": "vulnerable",
+          "context": "html_element"
+        },
+        "neg-escape-01": {
+          "detected": false,
+          "findings": 0,
+          "error": null,
+          "seconds": 1.5,
+          "ground_truth": "safe",
+          "context": "html_element"
+        },
+        "neg-escape-02": {
+          "detected": false,
+          "findings": 0,
+          "error": null,
+          "seconds": 1.4,
+          "ground_truth": "safe",
+          "context": "html_attribute_dq"
+        },
+        "neg-attr-01": {
+          "detected": false,
+          "findings": 0,
+          "error": null,
+          "seconds": 1.9,
+          "ground_truth": "safe",
+          "context": "html_attribute_dq"
+        }
+      }
+    }
+  }
+}

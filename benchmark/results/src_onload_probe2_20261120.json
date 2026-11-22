@@ -1,0 +1,169 @@
+{
+  "phase": "405",
+  "purpose": "isolate onload/onerror firing per src shape over real local HTTP",
+  "generated": "2026-11-20 15:04:04",
+  "rows": [
+    {
+      "handler": "onload",
+      "id": "rel_404",
+      "src": "x",
+      "fired": [],
+      "natural_width": 0,
+      "note": ""
+    },
+    {
+      "handler": "onload",
+      "id": "rel_empty",
+      "src": "",
+      "fired": [],
+      "natural_width": 0,
+      "note": ""
+    },
+    {
+      "handler": "onload",
+      "id": "abs_missing",
+      "src": "http://127.0.0.1:9/nope",
+      "fired": [],
+      "natural_width": 0,
+      "note": ""
+    },
+    {
+      "handler": "onload",
+      "id": "data_valid_gif",
+      "src": "data:image/gif;base64,R0lGODlhAQABAAAAACw=",
+      "fired": [],
+      "natural_width": 0,
+      "note": ""
+    },
+    {
+      "handler": "onload",
+      "id": "data_valid_svg",
+      "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciLz4=",
+      "fired": [
+        "onload"
+      ],
+      "natural_width": 300,
+      "note": ""
+    },
+    {
+      "handler": "onload",
+      "id": "unknown_scheme",
+      "src": "x:confirm``",
+      "fired": [],
+      "natural_width": 0,
+      "note": ""
+    },
+    {
+      "handler": "onload",
+      "id": "unknown_plain",
+      "src": "foo:bar",
+      "fired": [],
+      "natural_width": 0,
+      "note": ""
+    },
+    {
+      "handler": "onload",
+      "id": "hash_only",
+      "src": "#frag",
+      "fired": [],
+      "natural_width": 0,
+      "note": ""
+    },
+    {
+      "handler": "onload",
+      "id": "slash_root",
+      "src": "/does-not-exist",
+      "fired": [],
+      "natural_width": 0,
+      "note": ""
+    },
+    {
+      "handler": "onerror",
+      "id": "rel_404",
+      "src": "x",
+      "fired": [
+        "onerror"
+      ],
+      "natural_width": 0,
+      "note": ""
+    },
+    {
+      "handler": "onerror",
+      "id": "rel_empty",
+      "src": "",
+      "fired": [
+        "onerror"
+      ],
+      "natural_width": 0,
+      "note": ""
+    },
+    {
+      "handler": "onerror",
+      "id": "abs_missing",
+      "src": "http://127.0.0.1:9/nope",
+      "fired": [
+        "onerror"
+      ],
+      "natural_width": 0,
+      "note": ""
+    },
+    {
+      "handler": "onerror",
+      "id": "data_valid_gif",
+      "src": "data:image/gif;base64,R0lGODlhAQABAAAAACw=",
+      "fired": [
+        "onerror"
+      ],
+      "natural_width": 0,
+      "note": ""
+    },
+    {
+      "handler": "onerror",
+      "id": "data_valid_svg",
+      "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciLz4=",
+      "fired": [],
+      "natural_width": 300,
+      "note": ""
+    },
+    {
+      "handler": "onerror",
+      "id": "unknown_scheme",
+      "src": "x:confirm``",
+      "fired": [
+        "onerror"
+      ],
+      "natural_width": 0,
+      "note": ""
+    },
+    {
+      "handler": "onerror",
+      "id": "unknown_plain",
+      "src": "foo:bar",
+      "fired": [
+        "onerror"
+      ],
+      "natural_width": 0,
+      "note": ""
+    },
+    {
+      "handler": "onerror",
+      "id": "hash_only",
+      "src": "#frag",
+      "fired": [
+        "onerror"
+      ],
+      "natural_width": 0,
+      "note": ""
+    },
+    {
+      "handler": "onerror",
+      "id": "slash_root",
+      "src": "/does-not-exist",
+      "fired": [
+        "onerror"
+      ],
+      "natural_width": 0,
+      "note": ""
+    }
+  ]
+}
