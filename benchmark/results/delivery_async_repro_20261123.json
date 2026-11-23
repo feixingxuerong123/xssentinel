@@ -1,0 +1,52 @@
+{
+  "phase": "407",
+  "tree": "2982314",
+  "engine": "async",
+  "generated": "2026-11-24 00:42:47",
+  "honesty_header": "逐例单次扫描、无重试放大（runner._evaluate_with_retries 在本机 loopback 劣化时把 90s 超时反复重跑成 19h 卡死）。ERROR 单列不计 TN/FN；这是准确率验收，非性能跑分。",
+  "elapsed_s": 5.8,
+  "rows": [
+    {
+      "case_id": "neg-csp-05",
+      "path": "/s/csp05",
+      "param": "q",
+      "mode": "csp_nonce_ui_element",
+      "ground_truth": "safe",
+      "context": "html_element",
+      "difficulty": "hard",
+      "detected": false,
+      "verdict": "TN",
+      "scan_time_s": 1.809,
+      "findings_count": 0,
+      "requests": 239,
+      "finding_details": [],
+      "error": "",
+      "retries": 0
+    },
+    {
+      "case_id": "pos-worker-01",
+      "path": "/r/wk01",
+      "param": "q",
+      "mode": "worker_vuln",
+      "ground_truth": "vulnerable",
+      "context": "web_worker",
+      "difficulty": "hard",
+      "detected": true,
+      "verdict": "TP",
+      "scan_time_s": 3.948,
+      "findings_count": 1,
+      "requests": 96,
+      "finding_details": [
+        {
+          "type": "web_worker_xss",
+          "payload": "(new Worker: )",
+          "context": "dom_web_worker",
+          "severity": "medium",
+          "confidence": "high"
+        }
+      ],
+      "error": "",
+      "retries": 0
+    }
+  ]
+}

@@ -2807,3 +2807,46 @@ F1=1.0000。唯一 FN(pos-dom-02)经 repro x3 证明是 loopback 超时伪影。
 3. 长进程 gate 在此机 loopback 劣化下会被重试机制放大成 hang ⇒ 逐例落盘、
    无重试放大的分批门(`dev/_p407_batch_gate.py`)是可靠替代,环境伪影单
    case repro 定性、不冒充真回归。
+
+### 8.39 处置记录(2026-11-23~24):2.2.1 交付收口轮
+
+**起点**:Phase 400–407(11-17~21)八个工作流全部悬在未提交树上(15 个已跟踪
+修改 + 62 个未跟踪产物),origin/main 停在 Phase 400(`4339e8e`),本地仅领先
+1 提交(401);v2.2.0 有版本号无 tag。本轮按依赖闭包拆分入库并定版 patch 2.2.1。
+
+**提交闭包**(不 hunk 级拆分,混改整文件,每提交可导入可运行):
+`c101609` Phase 400-headless/402/403(认证重放 cookies + 证据分级 + MCP URL/
+截图/凭据卫生;verifier/mcp_server/llm_propose 同文件跨三 Phase 整文件入库)→
+`becf511` Phase 404/405(竞品语料三类接入 + sandbox onload 高估修复)→
+`afeecfd` Phase 407(async 无反射 L1 收敛,独立信号)→ `2982314` release 2.2.1
+(文档定版)→ 本提交(门禁数字回填 + 交付证据)。
+
+**文档收口**:① CHANGELOG 补 Phase 400-headless 条目(此前缺失),390–398
+明细自 Unreleased 归档回 `[2.2.0]`(该节早已声明随版发布却留在 Unreleased);
+② 本文件两个 §8.31/§8.32 重号顺移为 §8.33–8.38,全部交叉引用同步(含误写
+§10→§8.35);③ **Phase 400 编号撞车**(GET 缓存写条件 `4339e8e` 与 headless
+认证重放两条独立流跨会话撞号)如实记账、不追溯改名,以标题后缀与文件/提交
+为准;④ AGENTS.md 当前状态同步到 2026-11-23,文档地图增 Phase 400–407 行。
+
+**凭据处置**:.gitignore 新增 `benchmark/results/llm_state.json`(进程本地
+失败计数,同 `data/llm_state.json` 性质)与 `llm_local_glm53_20261119.json`
+(含真实 API key,只留本机);16 份 DVWA AI 报告证据中的 key 为产品自身脱敏
+形式(`sk-369***f3cb`),与脚本/交接文档逐一 grep 确认无完整密钥/PHPSESSID
+后入库。`package_data_hygiene` 守卫只钉 `xssentinel/data/*.json`,新增
+`benchmark/results` 规则不影响(实测绿)。
+
+**门禁**(终树 `2982314`,数字与跳过数见 CHANGELOG `[2.2.1]` 验收节):短守卫
+142/0skip + ruff 零;full sync 194 与 quick 双引擎质量+性能双 PASSED;full
+async 质量由无重试分批门给出(等效 107/0/75/0、12 SKIP、2 伪影 repro 干净)。
+**async 全量官方性能判词本轮未取得**:runner 重试放大挂起 ~2h(同 Phase 407
+形态)终止,clean 分批复跑再劣化亦终止;不冒充性能绿。
+
+**版本与 tag**:patch 2.2.1(400–407 全为缺陷修复/测量工具,无产品契约破坏;
+404 runner 属 benchmark 工具非产品能力)。v2.2.0 补打在 399 终树 `fddff54`,
+v2.2.1 打在交付终树;push origin main(含此前领先的 401)。
+
+**仍开放**(交下一轮/归属者):onstart 其余 11 形状判定修复(已量未修,独立轮);
+默认 headless 自证(handoff §6 P1,需拍板);trusted_types finding 契约(§8.35
+三选项,需拍板);async cookie 架构差异(需先 A/B 测量);async 全量官方性能
+判词(待 loopback 稳定期补跑);PyPI Trusted Publisher、wsl.exe 解封(归属者
+外部待办)。

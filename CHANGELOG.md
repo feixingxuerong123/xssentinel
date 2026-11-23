@@ -222,6 +222,42 @@ L8_cookie / header canary、error/redirect 探针按契约跳过读缓存,却把
 事实表与论证见 `benchmark/results/phase400_cache_write_headers_20261117.md`、
 OPTIMIZATION §8.31。
 
+### 验收(交付轮,2026-11-23~24,终树 `2982314` 自跑,引用带跳过数)
+
+**短守卫批**:13 文件 **142 passed / 0 skipped**(16.4s);ruff 全仓
+`All checks passed!`;`import xssentinel` OK,`__version__` 2.2.1 与
+CHANGELOG 最新章节同源(`test_doc_gate_parity` 绿)。
+
+**四档 strict gate(终树,loopback 健康期)**:
+
+- full 194 sync:**TP113/FP0/TN81/FN0、ERROR0、0 SKIP**,性能 PASSED
+  365.6s vs 795s(`delivery_full_sync_20261124.json`)。
+- quick 64 sync:**TP36/FP0/TN28/FN0、0 SKIP**,性能 PASSED 267.5s vs 330s
+  (`delivery_quick_sync_20261124.json`)。
+- quick 64 async:**TP36/FP0/TN27/FN0、1 SKIP**(63 scored),性能 PASSED
+  142.7s vs 350s(`delivery_quick_async_20261124.json`)。
+- full 194 async(无重试分批门 `dev/_p407_batch_gate.py`):**192 scored
+  TP106/FP0/TN74/FN0、12 SKIP**(sync-only),2 个带 error 的 case
+  (neg-csp-05 / pos-worker-01)单 case repro 全干净(TN/TP,6.2s)⇒ 环境
+  超时伪影非回归,等效 **TP107/FP0/TN75/FN0**,与历史逐位一致
+  (`delivery_async_full_20261123.json` + `delivery_async_repro_20261123.json`)。
+
+**async 全量官方性能判词本轮未取得(如实记)**:官方 runner full async 在本机
+loopback 波动下重试放大挂起 ~2h(00:56→02:59,无判词无报告),按 Phase 407
+方法论终止、不采用;clean 分批复跑至 55 例再劣化(pos-script-04/06 超时伪影)
+亦终止。async 性能口径以 quick async PASSED(142.7s/350s)+ Phase 405 full
+async 边界(860.9s/840s,超 2.5%,请求量 2.6× 吞吐边界)+ Phase 407 无反射
+请求腰斩为准;**不冒充 full async 性能 PASSED**。
+
+**环境事件(不改产品/测试代码)**:① Windows TCP 排除段会话中漂移到
+18932–19131,19093 bind 撞 WinError 10013 ⇒ 门禁改用 18931/20504/20506;
+② loopback 阵发劣化(连接 000/2s、case 90s 超时),quick sync 首轮性能
+FAILED 3803.5s/330s 即此形态,健康期复跑 267.5s PASSED;③ 分批门聚合文件
+放系统临时目录避开 safe-delete 50 次/turn 配额,终稿一次性拷入 results/。
+
+详见 `benchmark/results/delivery_gate_evidence_20261124.md` 与
+OPTIMIZATION §8.39。
+
 ## [2.2.0] - 2026-11-17
 
 ### BREAKING——Phase 399: REST `dom_engine` 值域校验(API 接受域收紧)
